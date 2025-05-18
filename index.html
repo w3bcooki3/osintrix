@@ -97,20 +97,192 @@
         </div>
       </aside>
 
-      <aside id="notes-panel" class="panel">
-        <div class="panel-header">
-          <h2>Investigation Notes</h2>
-          <div class="panel-actions">
-            <button class="btn-icon toggle-panel" title="Toggle Panel">
-              <i class="fas fa-chevron-right"></i>
+      <!-----Investigation Report----------->
+      <div class="osintrix_report_container" id="osintrix_report_container">
+        <div class="osintrix_report_resizers">
+          <div class="osintrix_report_resizer_horizontal" id="osintrix_report_resizer_h">
+            <div class="osintrix_report_resizer_handle_h"></div>
+          </div>
+          <div class="osintrix_report_resizer_vertical" id="osintrix_report_resizer_v">
+            <div class="osintrix_report_resizer_handle_v"></div>
+          </div>
+        </div>
+        <div class="osintrix_report_header" id="osintrix_report_header">
+          <div class="osintrix_report_header_title">
+            <span class="osintrix-icon">📋</span>
+            <div>
+              <h3 class="osintrix_report_title">Investigation Notes</h3>
+            </div>
+          </div>
+          <div class="osintrix_report_header_actions">
+            <button class="osintrix_report_btn" id="osintrix_report_btn_minimize" title="Minimize">
+              <span class="osintrix-icon">−</span>
+            </button>
+            <button class="osintrix_report_btn" id="osintrix_report_btn_expand" title="Expand">
+              <span class="osintrix-icon">⤢</span>
             </button>
           </div>
         </div>
-        <div class="panel-content">
-          <textarea id="investigation-notes" placeholder="Enter your investigation notes here..."></textarea>
-          <button id="save-notes" class="btn-primary">Save Notes</button>
+        <div class="osintrix_report_body">
+          <div class="osintrix_report_tabs">
+            <div class="osintrix_report_tab active" data-tab="notes">Notes</div>
+            <div class="osintrix_report_tab" data-tab="timeline">Timeline</div>
+          </div>
+          <div class="osintrix_report_content">
+            <div class="osintrix_report_tab_content active" data-tab="notes">
+              <div class="osintrix_notes_editor">
+                <div class="osintrix_notes_toolbar">
+                  <div class="osintrix_notes_tool_group">
+                    <button class="osintrix_notes_tool" data-format="bold" title="Bold">
+                      <span class="osintrix-icon">B</span>
+                    </button>
+                    <button class="osintrix_notes_tool" data-format="italic" title="Italic">
+                      <span class="osintrix-icon">I</span>
+                    </button>
+                    <button class="osintrix_notes_tool" data-format="underline" title="Underline">
+                      <span class="osintrix-icon">U</span>
+                    </button>
+                  </div>
+                  <div class="osintrix_notes_tool_group">
+                    <button class="osintrix_notes_tool" data-format="h1" title="Heading 1">
+                      <span class="osintrix-icon">H1</span>
+                    </button>
+                    <button class="osintrix_notes_tool" data-format="h2" title="Heading 2">
+                      <span class="osintrix-icon">H2</span>
+                    </button>
+                    <button class="osintrix_notes_tool" data-format="h3" title="Heading 3">
+                      <span class="osintrix-icon">H3</span>
+                    </button>
+                  </div>
+                  <div class="osintrix_notes_tool_group">
+                    <button class="osintrix_notes_tool" data-format="bullet" title="Bullet List">
+                      <span class="osintrix-icon">•</span>
+                    </button>
+                    <button class="osintrix_notes_tool" data-format="number" title="Numbered List">
+                      <span class="osintrix-icon">1.</span>
+                    </button>
+                    <button class="osintrix_notes_tool" data-format="check" title="Checklist">
+                      <span class="osintrix-icon">✓</span>
+                    </button>
+                  </div>
+                  <div class="osintrix_notes_tool_group">
+                    <button class="osintrix_notes_tool" data-format="highlight" title="Highlight">
+                      <span class="osintrix-icon">H</span>
+                    </button>
+                    <button class="osintrix_notes_tool" data-format="code" title="Code">
+                      <span class="osintrix-icon">{}</span>
+                    </button>
+                    <button class="osintrix_notes_tool" data-format="quote" title="Quote">
+                      <span class="osintrix-icon">"</span>
+                    </button>
+                  </div>
+                  <div class="osintrix_notes_tool_group">
+                    <button class="osintrix_notes_tool" id="osintrix_image_button" title="Insert Image">
+                      <span class="osintrix-icon">🖼️</span>
+                    </button>
+                    <button class="osintrix_notes_tool" data-format="link" title="Insert Link">
+                      <span class="osintrix-icon">🔗</span>
+                    </button>
+                  </div>
+                </div>
+                <textarea class="osintrix_notes_textarea" id="osintrix_notes_textarea" placeholder="Enter your investigation notes here..."></textarea>
+                
+                <!-- Image Upload Dialog -->
+                <div class="osintrix_image_uploader" id="osintrix_image_uploader">
+                  <div class="osintrix_image_uploader_header">Insert Image</div>
+                  <div class="osintrix_image_upload_area" id="osintrix_image_upload_area">
+                    <div class="osintrix_image_upload_text">Drop image here or click to upload</div>
+                    <span class="osintrix-icon" style="font-size: 24px;">📁</span>
+                    <input type="file" id="osintrix_image_file_input" style="display: none;" accept="image/*">
+                  </div>
+                  <div style="text-align: center; margin-top: 8px; font-size: 0.75rem; color: var(--text-tertiary);">or</div>
+                  <input type="text" class="osintrix_image_url_input" id="osintrix_image_url_input" placeholder="Paste image URL...">
+                  <div class="osintrix_image_actions">
+                    <button class="osintrix_report_btn_action" id="osintrix_image_cancel">Cancel</button>
+                    <button class="osintrix_report_btn_action osintrix_report_btn_primary" id="osintrix_image_insert">Insert</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="osintrix_report_tab_content" data-tab="timeline">
+              <div class="osintrix_timeline_editor">
+                <div class="osintrix_timeline_toolbar">
+                  <div class="osintrix_timeline_toolbar_title">Add Event</div>
+                  <div class="osintrix_priority_dropdown" id="osintrix_priority_dropdown">
+                    <button class="osintrix_report_btn_action" id="osintrix_priority_btn">
+                      <span>Priority</span> <span class="osintrix-icon">▼</span>
+                    </button>
+                    <div class="osintrix_priority_menu" id="osintrix_priority_menu">
+                      <div class="osintrix_priority_option" data-priority="low">Low Priority</div>
+                      <div class="osintrix_priority_option" data-priority="medium">Medium Priority</div>
+                      <div class="osintrix_priority_option" data-priority="high">High Priority</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="osintrix_timeline_content">
+                  <div class="osintrix_report_field_row">
+                    <div class="osintrix_report_field">
+                      <label for="osintrix_report_event">Event Description</label>
+                      <input type="text" id="osintrix_report_event" placeholder="Enter event description">
+                    </div>
+                    <div class="osintrix_report_field" style="max-width: 120px;">
+                      <label for="osintrix_report_date">Date</label>
+                      <input type="date" id="osintrix_report_date">
+                    </div>
+                  </div>
+                  <div class="osintrix_report_field_row">
+                    <div class="osintrix_report_field">
+                      <label for="osintrix_report_event_details">Details (optional)</label>
+                      <textarea id="osintrix_report_event_details" placeholder="Enter additional details..." rows="3"></textarea>
+                    </div>
+                  </div>
+                  <button class="osintrix_report_btn_action osintrix_report_btn_primary" id="osintrix_report_add_event">
+                    <span class="osintrix-icon">+</span> Add Entry
+                  </button>
+                </div>
+              </div>
+              
+              <div class="osintrix_report_timeline" id="osintrix_report_timeline">
+                <div class="osintrix_report_timeline_entry">
+                  <div class="osintrix_report_timeline_time">
+                    2025-05-15 09:23
+                    <div class="osintrix_report_timeline_actions">
+                      <button class="osintrix_timeline_action" title="Edit"><span class="osintrix-icon">✎</span></button>
+                      <button class="osintrix_timeline_action" title="Delete"><span class="osintrix-icon">×</span></button>
+                    </div>
+                  </div>
+                  <div class="osintrix_report_timeline_content">Initial suspicious transaction identified from wallet address 0xf47c...</div>
+                </div>
+                <div class="osintrix_report_timeline_entry medium-priority">
+                  <div class="osintrix_report_timeline_time">
+                    2025-05-16 14:37
+                    <div class="osintrix_report_timeline_actions">
+                      <button class="osintrix_timeline_action" title="Edit"><span class="osintrix-icon">✎</span></button>
+                      <button class="osintrix_timeline_action" title="Delete"><span class="osintrix-icon">×</span></button>
+                    </div>
+                  </div>
+                  <div class="osintrix_report_timeline_content">Connected to organization "CryptoClear" through domain registration records <span class="osintrix_priority_tag osintrix_priority_medium">Medium</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </aside>
+        <div class="osintrix_report_footer">
+          <div class="osintrix_report_status">
+          </div>
+          <div class="osintrix_report_actions">
+            <button class="osintrix_report_btn_action" id="osintrix_report_clear">
+              <span class="osintrix-icon">🗑️</span> Clear
+            </button>
+            <button class="osintrix_report_btn_action osintrix_report_btn_primary" id="osintrix_report_save">
+              <span class="osintrix-icon">💾</span> Save
+            </button>
+          </div>
+        </div>
+      </div>
+
+
+
     </main>
 
     <!-- Context Menu -->
@@ -252,5 +424,6 @@
     <a id="export-link" class="hidden"></a>
 
     <script type="module" src="./main.js"></script>
+    <script src="./js/ui/osintrix_report.js"></script>
   </body>
 </html>

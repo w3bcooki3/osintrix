@@ -5,7 +5,6 @@ import { initThemeManager } from './js/utils/themeManager.js';
 import { setupContextMenu } from './js/ui/contextMenu.js';
 import { setupEntityPanel } from './js/ui/entityPanel.js';
 import { setupEntityListPanel } from './js/ui/entityListPanel.js';
-import { setupNotesPanel } from './js/ui/notesPanel.js';
 import { setupNodeModal } from './js/ui/nodeModal.js';
 import { setupEdgeModal } from './js/ui/edgeModal.js';
 import { setupStorage } from './js/utils/storage.js';
@@ -21,7 +20,6 @@ document.addEventListener('DOMContentLoaded', () => {
   setupContextMenu(graph, dataStore);
   setupEntityPanel(graph, dataStore);
   setupEntityListPanel(graph, dataStore);
-  setupNotesPanel(dataStore);
   setupNodeModal(graph, dataStore);
   setupEdgeModal(graph, dataStore);
   setupStorage(graph, dataStore);

@@ -1,0 +1,1350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OSINTrix Investigation Notes</title>
+  <style>
+    /* OSINTrix Report Notes Panel Styles */
+    .osintrix_report_container {
+      position: fixed;
+      bottom: var(--space-4, 16px);
+      left: 50%;
+      transform: translateX(-50%);
+      width: 420px;
+      background-color: var(--bg-secondary, #f5f7fa);
+      border-radius: var(--radius-lg, 8px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+      border: 1px solid var(--border-color, #e2e8f0);
+      z-index: var(--z-panel, 1000);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      flex-direction: column;
+      max-height: 60vh;
+    }
+
+    .osintrix_report_container.osintrix_report_minimized {
+      height: 46px;
+      overflow: hidden;
+    }
+
+    .osintrix_report_header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color, #e2e8f0);
+      background: linear-gradient(to right, var(--bg-secondary, #f5f7fa), var(--bg-tertiary, #edf2f7));
+      border-radius: var(--radius-lg, 8px) var(--radius-lg, 8px) 0 0;
+      cursor: move;
+    }
+
+    .osintrix_report_header_title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-primary, #2d3748);
+    }
+
+    .osintrix_report_title {
+      font-weight: 600;
+      font-size: 1rem;
+      margin: 0;
+    }
+
+    .osintrix_report_subtitle {
+      color: var(--text-tertiary, #718096);
+      font-size: 0.75rem;
+      opacity: 0.8;
+    }
+
+    .osintrix_report_header_actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .osintrix_report_btn {
+      background: none;
+      border: none;
+      width: 30px;
+      height: 30px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-tertiary, #718096);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .osintrix_report_btn:hover {
+      background-color: var(--bg-tertiary, #edf2f7);
+      color: var(--text-primary, #2d3748);
+    }
+
+    .osintrix_report_body {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .osintrix_report_tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border-color, #e2e8f0);
+      margin-bottom: 8px;
+    }
+
+    .osintrix_report_tab {
+      padding: 8px 16px;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      font-size: 0.875rem;
+      color: var(--text-tertiary, #718096);
+      transition: all 0.2s ease;
+    }
+
+    .osintrix_report_tab.active {
+      border-bottom: 2px solid var(--primary, #4a5af8);
+      color: var(--primary, #4a5af8);
+      font-weight: 500;
+    }
+
+    .osintrix_report_tab:hover:not(.active) {
+      color: var(--text-secondary, #4a5568);
+      background-color: var(--bg-tertiary, #edf2f7);
+    }
+
+    .osintrix_report_content {
+      flex: 1;
+      overflow-y: auto;
+      position: relative;
+    }
+
+    .osintrix_report_tab_content {
+      display: none;
+      height: 100%;
+    }
+
+    .osintrix_report_tab_content.active {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .osintrix_notes_editor {
+      width: 100%;
+      height: 100%;
+      min-height: 200px;
+      border: 1px solid var(--border-color, #e2e8f0);
+      border-radius: var(--radius-md, 6px);
+      background-color: var(--bg-secondary, #f5f7fa);
+      color: var(--text-primary, #2d3748);
+      font-family: var(--font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
+      font-size: 0.9rem;
+      line-height: 1.5;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .osintrix_notes_toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      padding: 8px;
+      border-bottom: 1px solid var(--border-color, #e2e8f0);
+      background-color: var(--bg-tertiary, #edf2f7);
+      border-radius: var(--radius-md, 6px) var(--radius-md, 6px) 0 0;
+    }
+
+    .osintrix_notes_tool {
+      background: none;
+      border: 1px solid transparent;
+      width: 32px;
+      height: 32px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-tertiary, #718096);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-size: 14px;
+    }
+
+    .osintrix_notes_tool:hover {
+      background-color: var(--bg-secondary, #f5f7fa);
+      border-color: var(--border-color, #e2e8f0);
+      color: var(--text-primary, #2d3748);
+    }
+
+    .osintrix_notes_tool.active {
+      background-color: var(--primary-light, #ebf0ff);
+      border-color: var(--primary, #4a5af8);
+      color: var(--primary, #4a5af8);
+    }
+
+    .osintrix_notes_tool_group {
+      display: flex;
+      border-right: 1px solid var(--border-color, #e2e8f0);
+      padding-right: 4px;
+      margin-right: 4px;
+    }
+
+    .osintrix_notes_textarea {
+      width: 100%;
+      height: 100%;
+      resize: none;
+      padding: 12px;
+      border: none;
+      background-color: var(--bg-secondary, #f5f7fa);
+      color: var(--text-primary, #2d3748);
+      font-family: var(--font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
+      font-size: 0.9rem;
+      line-height: 1.5;
+      flex: 1;
+    }
+
+    .osintrix_notes_textarea:focus {
+      outline: none;
+    }
+
+    .osintrix_report_field_row {
+      display: flex;
+      gap: 12px;
+    }
+
+    .osintrix_report_field {
+      flex: 1;
+    }
+
+    .osintrix_report_field label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 500;
+      margin-bottom: 4px;
+      color: var(--text-tertiary, #718096);
+    }
+
+    .osintrix_report_field input,
+    .osintrix_report_field select,
+    .osintrix_report_field textarea {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid var(--border-color, #e2e8f0);
+      border-radius: var(--radius-md, 6px);
+      background-color: var(--bg-secondary, #f5f7fa);
+      color: var(--text-primary, #2d3748);
+      font-size: 0.875rem;
+    }
+
+    .osintrix_report_field input:focus,
+    .osintrix_report_field select:focus,
+    .osintrix_report_field textarea:focus {
+      outline: none;
+      border-color: var(--primary, #4a5af8);
+      box-shadow: 0 0 0 2px rgba(45, 91, 255, 0.2);
+    }
+
+    .osintrix_timeline_editor {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .osintrix_timeline_toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 8px;
+      border: 1px solid var(--border-color, #e2e8f0);
+      border-radius: var(--radius-md, 6px);
+      background-color: var(--bg-tertiary, #edf2f7);
+    }
+
+    .osintrix_timeline_toolbar_title {
+      font-weight: 500;
+      font-size: 0.875rem;
+      margin-right: 8px;
+      display: flex;
+      align-items: center;
+    }
+
+    .osintrix_timeline_content {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .osintrix_report_timeline {
+      margin-top: 16px;
+      border-left: 2px solid var(--border-color, #e2e8f0);
+      margin-left: 8px;
+      padding-left: 16px;
+    }
+
+    .osintrix_report_timeline_entry {
+      margin-bottom: 16px;
+      position: relative;
+    }
+
+    .osintrix_report_timeline_entry::before {
+      content: '';
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background-color: var(--primary, #4a5af8);
+      left: -24px;
+      top: 4px;
+    }
+
+    .osintrix_report_timeline_entry.high-priority::before {
+      background-color: var(--danger, #e53e3e);
+    }
+
+    .osintrix_report_timeline_entry.medium-priority::before {
+      background-color: var(--warning, #f6ad55);
+    }
+
+    .osintrix_report_timeline_time {
+      font-size: 0.75rem;
+      color: var(--text-tertiary, #718096);
+      margin-bottom: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .osintrix_report_timeline_actions {
+      display: flex;
+      gap: 4px;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .osintrix_report_timeline_entry:hover .osintrix_report_timeline_actions {
+      opacity: 1;
+    }
+
+    .osintrix_timeline_action {
+      width: 20px;
+      height: 20px;
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-tertiary, #718096);
+      font-size: 12px;
+      padding: 0;
+    }
+
+    .osintrix_timeline_action:hover {
+      background-color: var(--bg-tertiary, #edf2f7);
+      color: var(--text-primary, #2d3748);
+    }
+
+    .osintrix_report_timeline_content {
+      font-size: 0.875rem;
+      color: var(--text-primary, #2d3748);
+    }
+
+    .osintrix_report_timeline_content img {
+      max-width: 100%;
+      border-radius: 4px;
+      margin-top: 8px;
+    }
+
+    .osintrix_report_footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      border-top: 1px solid var(--border-color, #e2e8f0);
+    }
+
+    .osintrix_report_status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      color: var(--text-tertiary, #718096);
+    }
+
+    .osintrix_report_indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--success, #48bb78);
+    }
+
+    .osintrix_report_actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .osintrix_report_btn_action {
+      background-color: var(--bg-tertiary, #edf2f7);
+      border: 1px solid var(--border-color, #e2e8f0);
+      padding: 6px 12px;
+      border-radius: var(--radius-md, 6px);
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--text-secondary, #4a5568);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .osintrix_report_btn_action:hover {
+      background-color: var(--bg-secondary, #f5f7fa);
+      border-color: var(--text-tertiary, #718096);
+    }
+
+    .osintrix_report_btn_primary {
+      background-color: var(--primary, #4a5af8);
+      border: none;
+      color: white;
+    }
+
+    .osintrix_report_btn_primary:hover {
+      background-color: var(--primary-dark, #3344dd);
+      border-color: var(--primary-dark, #3344dd);
+      color: white;
+    }
+
+    /* Image uploader */
+    .osintrix_image_uploader {
+      display: none;
+      position: absolute;
+      background-color: var(--bg-secondary, #f5f7fa);
+      border: 1px solid var(--border-color, #e2e8f0);
+      border-radius: var(--radius-md, 6px);
+      padding: 16px;
+      width: 300px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      z-index: 1010;
+    }
+
+    .osintrix_image_uploader_header {
+      font-weight: 500;
+      font-size: 0.875rem;
+      margin-bottom: 12px;
+    }
+
+    .osintrix_image_upload_area {
+      border: 2px dashed var(--border-color, #e2e8f0);
+      border-radius: var(--radius-md, 6px);
+      padding: 24px 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .osintrix_image_upload_area:hover {
+      border-color: var(--primary, #4a5af8);
+      background-color: var(--primary-light, #ebf0ff);
+    }
+
+    .osintrix_image_upload_text {
+      font-size: 0.875rem;
+      color: var(--text-tertiary, #718096);
+      margin-bottom: 8px;
+    }
+
+    .osintrix_image_url_input {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid var(--border-color, #e2e8f0);
+      border-radius: var(--radius-md, 6px);
+      margin-top: 12px;
+      font-size: 0.875rem;
+    }
+
+    .osintrix_image_actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    /* Priority tags */
+    .osintrix_priority_dropdown {
+      position: relative;
+      display: inline-block;
+    }
+
+    .osintrix_priority_menu {
+      display: none;
+      position: absolute;
+      background-color: var(--bg-secondary, #f5f7fa);
+      border: 1px solid var(--border-color, #e2e8f0);
+      border-radius: var(--radius-md, 6px);
+      min-width: 120px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      z-index: 1010;
+      top: 100%;
+      left: 0;
+    }
+
+    .osintrix_priority_menu.active {
+      display: block;
+    }
+
+    .osintrix_priority_option {
+      padding: 8px 12px;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .osintrix_priority_option:hover {
+      background-color: var(--bg-tertiary, #edf2f7);
+    }
+
+    .osintrix_priority_tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      margin-left: 8px;
+    }
+
+    .osintrix_priority_high {
+      background-color: rgba(229, 62, 62, 0.1);
+      color: var(--danger, #e53e3e);
+    }
+
+    .osintrix_priority_medium {
+      background-color: rgba(246, 173, 85, 0.1);
+      color: var(--warning, #f6ad55);
+    }
+
+    .osintrix_priority_low {
+      background-color: rgba(72, 187, 120, 0.1);
+      color: var(--success, #48bb78);
+    }
+
+    /* Dark theme adjustments */
+    .dark-theme .osintrix_report_container {
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+    }
+
+    .dark-theme .osintrix_report_header {
+      background: linear-gradient(to right, var(--bg-secondary, #1a202c), var(--neutral-700, #2d3748));
+    }
+
+    /* Resizer handle */
+    .osintrix_report_resizers {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .osintrix_report_resizer_horizontal {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 6px;
+      height: 100%;
+      cursor: ew-resize;
+      pointer-events: all;
+    }
+
+    .osintrix_report_resizer_vertical {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 6px;
+      cursor: ns-resize;
+      pointer-events: all;
+    }
+
+    .osintrix_report_resizer_handle_h {
+      position: absolute;
+      width: 6px;
+      height: 36px;
+      top: 50%;
+      transform: translateY(-50%);
+      left: 0;
+      background-color: var(--border-color, #e2e8f0);
+      border-radius: 3px;
+      opacity: 0.5;
+      transition: opacity 0.2s ease;
+    }
+
+    .osintrix_report_resizer_handle_v {
+      position: absolute;
+      height: 6px;
+      width: 36px;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: 0;
+      background-color: var(--border-color, #e2e8f0);
+      border-radius: 3px;
+      opacity: 0.5;
+      transition: opacity 0.2s ease;
+    }
+
+    .osintrix_report_container:hover .osintrix_report_resizer_handle_h,
+    .osintrix_report_container:hover .osintrix_report_resizer_handle_v {
+      opacity: 1;
+    }
+
+    /* Font awesome icons replacement */
+    .osintrix-icon {
+      font-family: system-ui, -apple-system, sans-serif;
+      font-style: normal;
+      font-weight: normal;
+      display: inline-block;
+      line-height: 1;
+    }
+  </style>
+</head>
+<body>
+  <div class="osintrix_report_container" id="osintrix_report_container">
+    <div class="osintrix_report_resizers">
+      <div class="osintrix_report_resizer_horizontal" id="osintrix_report_resizer_h">
+        <div class="osintrix_report_resizer_handle_h"></div>
+      </div>
+      <div class="osintrix_report_resizer_vertical" id="osintrix_report_resizer_v">
+        <div class="osintrix_report_resizer_handle_v"></div>
+      </div>
+    </div>
+    <div class="osintrix_report_header" id="osintrix_report_header">
+      <div class="osintrix_report_header_title">
+        <span class="osintrix-icon">📋</span>
+        <div>
+          <h3 class="osintrix_report_title">Investigation Notes</h3>
+          <div class="osintrix_report_subtitle">Case #INV-238-FR2</div>
+        </div>
+      </div>
+      <div class="osintrix_report_header_actions">
+        <button class="osintrix_report_btn" id="osintrix_report_btn_minimize" title="Minimize">
+          <span class="osintrix-icon">−</span>
+        </button>
+        <button class="osintrix_report_btn" id="osintrix_report_btn_expand" title="Expand">
+          <span class="osintrix-icon">⤢</span>
+        </button>
+      </div>
+    </div>
+    <div class="osintrix_report_body">
+      <div class="osintrix_report_tabs">
+        <div class="osintrix_report_tab active" data-tab="notes">Notes</div>
+        <div class="osintrix_report_tab" data-tab="timeline">Timeline</div>
+        <div class="osintrix_report_tab" data-tab="report">Report</div>
+      </div>
+      <div class="osintrix_report_content">
+        <div class="osintrix_report_tab_content active" data-tab="notes">
+          <div class="osintrix_notes_editor">
+            <div class="osintrix_notes_toolbar">
+              <div class="osintrix_notes_tool_group">
+                <button class="osintrix_notes_tool" data-format="bold" title="Bold">
+                  <span class="osintrix-icon">B</span>
+                </button>
+                <button class="osintrix_notes_tool" data-format="italic" title="Italic">
+                  <span class="osintrix-icon">I</span>
+                </button>
+                <button class="osintrix_notes_tool" data-format="underline" title="Underline">
+                  <span class="osintrix-icon">U</span>
+                </button>
+              </div>
+              <div class="osintrix_notes_tool_group">
+                <button class="osintrix_notes_tool" data-format="h1" title="Heading 1">
+                  <span class="osintrix-icon">H1</span>
+                </button>
+                <button class="osintrix_notes_tool" data-format="h2" title="Heading 2">
+                  <span class="osintrix-icon">H2</span>
+                </button>
+                <button class="osintrix_notes_tool" data-format="h3" title="Heading 3">
+                  <span class="osintrix-icon">H3</span>
+                </button>
+              </div>
+              <div class="osintrix_notes_tool_group">
+                <button class="osintrix_notes_tool" data-format="bullet" title="Bullet List">
+                  <span class="osintrix-icon">•</span>
+                </button>
+                <button class="osintrix_notes_tool" data-format="number" title="Numbered List">
+                  <span class="osintrix-icon">1.</span>
+                </button>
+                <button class="osintrix_notes_tool" data-format="check" title="Checklist">
+                  <span class="osintrix-icon">✓</span>
+                </button>
+              </div>
+              <div class="osintrix_notes_tool_group">
+                <button class="osintrix_notes_tool" data-format="highlight" title="Highlight">
+                  <span class="osintrix-icon">H</span>
+                </button>
+                <button class="osintrix_notes_tool" data-format="code" title="Code">
+                  <span class="osintrix-icon">{}</span>
+                </button>
+                <button class="osintrix_notes_tool" data-format="quote" title="Quote">
+                  <span class="osintrix-icon">"</span>
+                </button>
+              </div>
+              <div class="osintrix_notes_tool_group">
+                <button class="osintrix_notes_tool" id="osintrix_image_button" title="Insert Image">
+                  <span class="osintrix-icon">🖼️</span>
+                </button>
+                <button class="osintrix_notes_tool" data-format="link" title="Insert Link">
+                  <span class="osintrix-icon">🔗</span>
+                </button>
+              </div>
+            </div>
+            <textarea class="osintrix_notes_textarea" id="osintrix_notes_textarea" placeholder="Enter your investigation notes here..."></textarea>
+            
+            <!-- Image Upload Dialog -->
+            <div class="osintrix_image_uploader" id="osintrix_image_uploader">
+              <div class="osintrix_image_uploader_header">Insert Image</div>
+              <div class="osintrix_image_upload_area" id="osintrix_image_upload_area">
+                <div class="osintrix_image_upload_text">Drop image here or click to upload</div>
+                <span class="osintrix-icon" style="font-size: 24px;">📁</span>
+                <input type="file" id="osintrix_image_file_input" style="display: none;" accept="image/*">
+              </div>
+              <div style="text-align: center; margin-top: 8px; font-size: 0.75rem; color: var(--text-tertiary);">or</div>
+              <input type="text" class="osintrix_image_url_input" id="osintrix_image_url_input" placeholder="Paste image URL...">
+              <div class="osintrix_image_actions">
+                <button class="osintrix_report_btn_action" id="osintrix_image_cancel">Cancel</button>
+                <button class="osintrix_report_btn_action osintrix_report_btn_primary" id="osintrix_image_insert">Insert</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="osintrix_report_tab_content" data-tab="timeline">
+          <div class="osintrix_timeline_editor">
+            <div class="osintrix_timeline_toolbar">
+              <div class="osintrix_timeline_toolbar_title">Add Event</div>
+              <div class="osintrix_priority_dropdown" id="osintrix_priority_dropdown">
+                <button class="osintrix_report_btn_action" id="osintrix_priority_btn">
+                  <span>Priority</span> <span class="osintrix-icon">▼</span>
+                </button>
+                <div class="osintrix_priority_menu" id="osintrix_priority_menu">
+                  <div class="osintrix_priority_option" data-priority="low">Low Priority</div>
+                  <div class="osintrix_priority_option" data-priority="medium">Medium Priority</div>
+                  <div class="osintrix_priority_option" data-priority="high">High Priority</div>
+                </div>
+              </div>
+            </div>
+            <div class="osintrix_timeline_content">
+              <div class="osintrix_report_field_row">
+                <div class="osintrix_report_field">
+                  <label for="osintrix_report_event">Event Description</label>
+                  <input type="text" id="osintrix_report_event" placeholder="Enter event description">
+                </div>
+                <div class="osintrix_report_field" style="max-width: 120px;">
+                  <label for="osintrix_report_date">Date</label>
+                  <input type="date" id="osintrix_report_date">
+                </div>
+              </div>
+              <div class="osintrix_report_field_row">
+                <div class="osintrix_report_field">
+                  <label for="osintrix_report_event_details">Details (optional)</label>
+                  <textarea id="osintrix_report_event_details" placeholder="Enter additional details..." rows="3"></textarea>
+                </div>
+              </div>
+              <button class="osintrix_report_btn_action osintrix_report_btn_primary" id="osintrix_report_add_event">
+                <span class="osintrix-icon">+</span> Add Entry
+              </button>
+            </div>
+          </div>
+          
+          <div class="osintrix_report_timeline" id="osintrix_report_timeline">
+            <div class="osintrix_report_timeline_entry">
+              <div class="osintrix_report_timeline_time">
+                2025-05-15 09:23
+                <div class="osintrix_report_timeline_actions">
+                  <button class="osintrix_timeline_action" title="Edit"><span class="osintrix-icon">✎</span></button>
+                  <button class="osintrix_timeline_action" title="Delete"><span class="osintrix-icon">×</span></button>
+                </div>
+              </div>
+              <div class="osintrix_report_timeline_content">Initial suspicious transaction identified from wallet address 0xf47c...</div>
+            </div>
+            <div class="osintrix_report_timeline_entry medium-priority">
+              <div class="osintrix_report_timeline_time">
+                2025-05-16 14:37
+                <div class="osintrix_report_timeline_actions">
+                  <button class="osintrix_timeline_action" title="Edit"><span class="osintrix-icon">✎</span></button>
+                  <button class="osintrix_timeline_action" title="Delete"><span class="osintrix-icon">×</span></button>
+                </div>
+              </div>
+              <div class="osintrix_report_timeline_content">Connected to organization "CryptoClear" through domain registration records <span class="osintrix_priority_tag osintrix_priority_medium">Medium</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="osintrix_report_tab_content" data-tab="report">
+          <div class="osintrix_report_structured_content">
+            <div class="osintrix_report_field">
+              <label for="osintrix_report_case_title">Case Title</label>
+              <input type="text" id="osintrix_report_case_title" placeholder="Enter case title">
+            </div>
+            <div class="osintrix_report_field_row">
+              <div class="osintrix_report_field">
+                <label for="osintrix_report_investigator">Lead Investigator</label>
+                <input type="text" id="osintrix_report_investigator" placeholder="Your name">
+              </div>
+              <div class="osintrix_report_field">
+                <label for="osintrix_report_severity">Threat Severity</label>
+                <select id="osintrix_report_severity">
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="critical">Critical</option>
+                </select>
+              </div>
+            </div>
+            <div class="osintrix_report_field">
+              <label for="osintrix_report_summary">Executive Summary</label>
+              <textarea class="osintrix_report_notes_textarea" id="osintrix_report_summary" placeholder="Brief summary of findings..." style="height: 120px;"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="osintrix_report_footer">
+      <div class="osintrix_report_status">
+        <div class="osintrix_report_indicator"></div>
+        <span>Last saved: 2 minutes ago</span>
+      </div>
+      <div class="osintrix_report_actions">
+        <button class="osintrix_report_btn_action" id="osintrix_report_clear">
+          <span class="osintrix-icon">🗑️</span> Clear
+        </button>
+        <button class="osintrix_report_btn_action osintrix_report_btn_primary" id="osintrix_report_save">
+          <span class="osintrix-icon">💾</span> Save
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // OSINTrix Report Panel JavaScript
+    document.addEventListener('DOMContentLoaded', function() {
+      // DOM Elements
+      const container = document.getElementById('osintrix_report_container');
+      const minimizeBtn = document.getElementById('osintrix_report_btn_minimize');
+      const expandBtn = document.getElementById('osintrix_report_btn_expand');
+      const tabs = document.querySelectorAll('.osintrix_report_tab');
+      const tabContents = document.querySelectorAll('.osintrix_report_tab_content');
+      const saveBtn = document.getElementById('osintrix_report_save');
+      const clearBtn = document.getElementById('osintrix_report_clear');
+      const notesTextarea = document.getElementById('osintrix_notes_textarea');
+      const addEventBtn = document.getElementById('osintrix_report_add_event');
+      const eventInput = document.getElementById('osintrix_report_event');
+      const eventDetails = document.getElementById('osintrix_report_event_details');
+      const dateInput = document.getElementById('osintrix_report_date');
+      const timeline = document.getElementById('osintrix_report_timeline');
+      const header = document.getElementById('osintrix_report_header');
+      const resizerH = document.getElementById('osintrix_report_resizer_h');
+      const resizerV = document.getElementById('osintrix_report_resizer_v');
+      const priorityBtn = document.getElementById('osintrix_priority_btn');
+      const priorityMenu = document.getElementById('osintrix_priority_menu');
+      const imageButton = document.getElementById('osintrix_image_button');
+      const imageUploader = document.getElementById('osintrix_image_uploader');
+      const imageUploadArea = document.getElementById('osintrix_image_upload_area');
+      const imageFileInput = document.getElementById('osintrix_image_file_input');
+      const imageUrlInput = document.getElementById('osintrix_image_url_input');
+      const imageCancel = document.getElementById('osintrix_image_cancel');
+      const imageInsert = document.getElementById('osintrix_image_insert');
+
+      // Panel state
+      let isMinimized = false;
+      let isExpanded = false;
+      let currentWidth = 420;
+      let currentHeight = container.offsetHeight;
+      let initialHeight;
+      let originalPosition;
+      let selectedPriority = 'low';
+      
+      // Formatting toolbar state
+      const formattingTools = document.querySelectorAll('.osintrix_notes_tool[data-format]');
+
+      // Initialize with current date in the date input
+      const today = new Date();
+      dateInput.value = today.toISOString().split('T')[0];
+
+      // Minimize/maximize panel
+      minimizeBtn.addEventListener('click', function() {
+        isMinimized = !isMinimized;
+        container.classList.toggle('osintrix_report_minimized', isMinimized);
+        minimizeBtn.innerHTML = isMinimized ? 
+          '<span class="osintrix-icon">+</span>' : 
+          '<span class="osintrix-icon">−</span>';
+      });
+
+      // Expand/restore panel
+      expandBtn.addEventListener('click', function() {
+        isExpanded = !isExpanded;
+        
+        if (isExpanded) {
+          initialHeight = container.style.height || `${container.offsetHeight}px`;
+          originalPosition = {
+            bottom: container.style.bottom || 'var(--space-4, 16px)',
+            transform: container.style.transform
+          };
+          
+          container.style.width = '80%';
+          container.style.height = '80vh';
+          container.style.bottom = '10vh';
+          container.style.transform = 'translateX(-50%)';
+          expandBtn.innerHTML = '<span class="osintrix-icon">⤓</span>';
+        } else {
+          container.style.width = currentWidth + 'px';
+          container.style.height = initialHeight;
+          container.style.bottom = originalPosition.bottom;
+          container.style.transform = originalPosition.transform;
+          expandBtn.innerHTML = '<span class="osintrix-icon">⤢</span>';
+        }
+      });
+
+      // Tab switching
+      tabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+          const tabName = this.getAttribute('data-tab');
+          
+          // Update active tab
+          tabs.forEach(t => t.classList.remove('active'));
+          this.classList.add('active');
+          
+          // Show active content
+          tabContents.forEach(content => {
+            if (content.getAttribute('data-tab') === tabName) {
+              content.classList.add('active');
+            } else {
+              content.classList.remove('active');
+            }
+          });
+        });
+      });
+
+      // Save notes (localStorage for demo)
+      saveBtn.addEventListener('click', function() {
+        const notes = notesTextarea.value;
+        localStorage.setItem('osintrixNotes', notes);
+        
+        // Update saved status
+        document.querySelector('.osintrix_report_status span').textContent = 'Last saved: just now';
+        
+        // Show quick save animation
+        saveBtn.classList.add('saving');
+        setTimeout(() => saveBtn.classList.remove('saving'), 500);
+      });
+
+      // Clear notes
+      clearBtn.addEventListener('click', function() {
+        if (confirm('Are you sure you want to clear all notes?')) {
+          notesTextarea.value = '';
+        }
+      });
+
+      // Load saved notes
+      const savedNotes = localStorage.getItem('osintrixNotes');
+      if (savedNotes) {
+        notesTextarea.value = savedNotes;
+      }
+
+      // Priority dropdown functionality
+      priorityBtn.addEventListener('click', function() {
+        priorityMenu.classList.toggle('active');
+      });
+
+      // Close priority dropdown when clicking elsewhere
+      document.addEventListener('click', function(e) {
+        if (!e.target.closest('#osintrix_priority_dropdown')) {
+          priorityMenu.classList.remove('active');
+        }
+      });
+
+      // Select priority
+      document.querySelectorAll('.osintrix_priority_option').forEach(option => {
+        option.addEventListener('click', function() {
+          selectedPriority = this.getAttribute('data-priority');
+          priorityMenu.classList.remove('active');
+          priorityBtn.innerHTML = `<span>Priority: ${selectedPriority.charAt(0).toUpperCase() + selectedPriority.slice(1)}</span> <span class="osintrix-icon">▼</span>`;
+        });
+      });
+
+      // Add timeline entry
+      addEventBtn.addEventListener('click', function() {
+        const event = eventInput.value.trim();
+        const date = dateInput.value;
+        const details = eventDetails.value.trim();
+        
+        if (!event) {
+          // Highlight the input field to indicate it's required
+          eventInput.style.borderColor = 'var(--danger, #e53e3e)';
+          eventInput.focus();
+          setTimeout(() => {
+            eventInput.style.borderColor = '';
+          }, 2000);
+          return;
+        }
+        
+        const now = new Date();
+        const timeString = `${date} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+        
+        let priorityHTML = '';
+        if (selectedPriority !== 'low') {
+          priorityHTML = `<span class="osintrix_priority_tag osintrix_priority_${selectedPriority}">${selectedPriority.charAt(0).toUpperCase() + selectedPriority.slice(1)}</span>`;
+        }
+        
+        let content = event;
+        if (details) {
+          content += `<br><div style="margin-top:4px; font-size:0.8rem; color:var(--text-secondary);">${details}</div>`;
+        }
+        
+        const entryHTML = `
+          <div class="osintrix_report_timeline_entry ${selectedPriority}-priority">
+            <div class="osintrix_report_timeline_time">
+              ${timeString}
+              <div class="osintrix_report_timeline_actions">
+                <button class="osintrix_timeline_action" title="Edit"><span class="osintrix-icon">✎</span></button>
+                <button class="osintrix_timeline_action" title="Delete"><span class="osintrix-icon">×</span></button>
+              </div>
+            </div>
+            <div class="osintrix_report_timeline_content">${content} ${priorityHTML}</div>
+          </div>
+        `;
+        
+        timeline.insertAdjacentHTML('afterbegin', entryHTML);
+        eventInput.value = '';
+        eventDetails.value = '';
+        
+        // Add event listeners to new buttons
+        const newEntry = timeline.firstElementChild;
+        const deleteBtn = newEntry.querySelector('.osintrix_timeline_action[title="Delete"]');
+        if (deleteBtn) {
+          deleteBtn.addEventListener('click', function() {
+            if (confirm('Are you sure you want to delete this entry?')) {
+              newEntry.remove();
+            }
+          });
+        }
+      });
+
+      // Format text functions
+      formattingTools.forEach(tool => {
+        tool.addEventListener('click', function() {
+          const format = this.getAttribute('data-format');
+          const textarea = notesTextarea;
+          const start = textarea.selectionStart;
+          const end = textarea.selectionEnd;
+          const selectedText = textarea.value.substring(start, end);
+          let replacement = '';
+          
+          switch(format) {
+            case 'bold':
+              replacement = `**${selectedText}**`;
+              break;
+            case 'italic':
+              replacement = `*${selectedText}*`;
+              break;
+            case 'underline':
+              replacement = `_${selectedText}_`;
+              break;
+            case 'h1':
+              replacement = `\n# ${selectedText}\n`;
+              break;
+            case 'h2':
+              replacement = `\n## ${selectedText}\n`;
+              break;
+            case 'h3':
+              replacement = `\n### ${selectedText}\n`;
+              break;
+            case 'bullet':
+              // Split by line and add bullet points
+              if (selectedText) {
+                const lines = selectedText.split('\n');
+                replacement = lines.map(line => `• ${line}`).join('\n');
+              } else {
+                replacement = '• ';
+              }
+              break;
+            case 'number':
+              if (selectedText) {
+                const lines = selectedText.split('\n');
+                replacement = lines.map((line, i) => `${i+1}. ${line}`).join('\n');
+              } else {
+                replacement = '1. ';
+              }
+              break;
+            case 'check':
+              if (selectedText) {
+                const lines = selectedText.split('\n');
+                replacement = lines.map(line => `[ ] ${line}`).join('\n');
+              } else {
+                replacement = '[ ] ';
+              }
+              break;
+            case 'highlight':
+              replacement = `==${selectedText}==`;
+              break;
+            case 'code':
+              if (selectedText.includes('\n')) {
+                replacement = `\`\`\`\n${selectedText}\n\`\`\``;
+              } else {
+                replacement = `\`${selectedText}\``;
+              }
+              break;
+            case 'quote':
+              // Split by line and add quote prefix
+              if (selectedText) {
+                const lines = selectedText.split('\n');
+                replacement = lines.map(line => `> ${line}`).join('\n');
+              } else {
+                replacement = '> ';
+              }
+              break;
+            case 'link':
+              if (selectedText) {
+                replacement = `[${selectedText}](url)`;
+              } else {
+                replacement = '[](url)';
+              }
+              break;
+          }
+          
+          // Insert the formatted text
+          textarea.value = textarea.value.substring(0, start) + replacement + textarea.value.substring(end);
+          
+          // Set the cursor position
+          textarea.focus();
+          if (format === 'link' && selectedText) {
+            // Place cursor at the URL position
+            textarea.selectionStart = start + selectedText.length + 3;
+            textarea.selectionEnd = start + selectedText.length + 6;
+          } else {
+            textarea.selectionStart = start + replacement.length;
+            textarea.selectionEnd = start + replacement.length;
+          }
+        });
+      });
+
+      // Image uploader functionality
+      imageButton.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Calculate position for the uploader
+        const rect = imageButton.getBoundingClientRect();
+        imageUploader.style.display = 'block';
+        imageUploader.style.top = `${rect.bottom + 10}px`;
+        imageUploader.style.left = `${rect.left}px`;
+      });
+      
+      // Close image uploader when clicking cancel
+      imageCancel.addEventListener('click', function() {
+        imageUploader.style.display = 'none';
+        imageUrlInput.value = '';
+      });
+      
+      // Open file browser when clicking upload area
+      imageUploadArea.addEventListener('click', function() {
+        imageFileInput.click();
+      });
+      
+      // Handle file selection
+      imageFileInput.addEventListener('change', function() {
+        // In a real app, this would upload the file to a server
+        // Here we'll just use it as a demo
+        if (this.files && this.files[0]) {
+          // Would normally upload file here
+          imageUploadArea.innerHTML = `<div>Selected: ${this.files[0].name}</div>`;
+        }
+      });
+      
+      // Handle image insertion
+      imageInsert.addEventListener('click', function() {
+        const urlValue = imageUrlInput.value.trim();
+        const fileSelected = imageFileInput.files && imageFileInput.files[0];
+        
+        // For demo purposes, just insert the URL or filename
+        let imgMarkdown = '';
+        
+        if (urlValue) {
+          imgMarkdown = `![Image](${urlValue})`;
+        } else if (fileSelected) {
+          // In a real app, this would use the uploaded file URL
+          imgMarkdown = `![${fileSelected.name}](uploaded-file)`;
+        } else {
+          imgMarkdown = '![placeholder image](https://via.placeholder.com/300x200)';
+        }
+        
+        // Insert at cursor position
+        const textarea = notesTextarea;
+        const curPos = textarea.selectionStart;
+        
+        textarea.value = 
+          textarea.value.substring(0, curPos) + 
+          imgMarkdown + 
+          textarea.value.substring(textarea.selectionEnd);
+        
+        // Reset and close uploader
+        imageUploader.style.display = 'none';
+        imageUrlInput.value = '';
+        imageFileInput.value = '';
+        imageUploadArea.innerHTML = `
+          <div class="osintrix_image_upload_text">Drop image here or click to upload</div>
+          <span class="osintrix-icon" style="font-size: 24px;">📁</span>
+        `;
+      });
+
+      // Close image uploader when clicking outside
+      document.addEventListener('click', function(e) {
+        if (imageUploader.style.display === 'block' && 
+            !e.target.closest('#osintrix_image_uploader') && 
+            !e.target.closest('#osintrix_image_button')) {
+          imageUploader.style.display = 'none';
+        }
+      });
+
+      // Timeline entry action handlers
+      document.addEventListener('click', function(e) {
+        // Delete button handler
+        if (e.target.closest('.osintrix_timeline_action[title="Delete"]')) {
+          const entry = e.target.closest('.osintrix_report_timeline_entry');
+          if (confirm('Are you sure you want to delete this entry?')) {
+            entry.remove();
+          }
+        }
+        
+        // Edit button handler (just a placeholder - would be more complex in real app)
+        if (e.target.closest('.osintrix_timeline_action[title="Edit"]')) {
+          const entry = e.target.closest('.osintrix_report_timeline_entry');
+          const content = entry.querySelector('.osintrix_report_timeline_content').textContent;
+          
+          // For demo purposes we'll just populate the form fields
+          eventInput.value = content.split('Medium')[0].split('Low')[0].split('High')[0].trim();
+          tabs[1].click(); // Switch to timeline tab
+          eventInput.focus();
+        }
+      });
+
+      // Draggable header
+      let isDragging = false;
+      let dragStartX, dragStartY;
+      let initialLeft, initialBottom;
+
+      header.addEventListener('mousedown', startDrag);
+
+      function startDrag(e) {
+        // Only allow dragging from header (not from buttons)
+        if (e.target.closest('.osintrix_report_btn')) return;
+        
+        isDragging = true;
+        dragStartX = e.clientX;
+        dragStartY = e.clientY;
+        
+        const rect = container.getBoundingClientRect();
+        initialLeft = rect.left;
+        initialBottom = window.innerHeight - rect.bottom;
+        
+        document.addEventListener('mousemove', drag);
+        document.addEventListener('mouseup', stopDrag);
+        
+        // Prevent text selection during drag
+        e.preventDefault();
+      }
+
+      function drag(e) {
+        if (!isDragging) return;
+        
+        const deltaX = e.clientX - dragStartX;
+        const deltaY = e.clientY - dragStartY;
+        
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        
+        // Calculate new position
+        const newLeft = Math.max(10, Math.min(viewportWidth - 100, initialLeft + deltaX));
+        const newBottom = Math.max(10, Math.min(viewportHeight - 50, initialBottom - deltaY));
+        
+        // Center horizontally
+        container.style.left = `${newLeft}px`;
+        container.style.bottom = `${newBottom}px`;
+        container.style.transform = 'none'; // Remove centering transform during drag
+      }
+
+      function stopDrag() {
+        isDragging = false;
+        document.removeEventListener('mousemove', drag);
+        document.removeEventListener('mouseup', stopDrag);
+      }
+
+      // Resizable panel
+      let isResizingH = false;
+      let isResizingV = false;
+      let startResizeX, startResizeY;
+      let initialResizeWidth, initialResizeHeight;
+
+      resizerH.addEventListener('mousedown', startResizeH);
+      resizerV.addEventListener('mousedown', startResizeV);
+
+      function startResizeH(e) {
+        isResizingH = true;
+        startResizeX = e.clientX;
+        initialResizeWidth = container.offsetWidth;
+        
+        document.addEventListener('mousemove', resizeH);
+        document.addEventListener('mouseup', stopResizeH);
+        
+        // Prevent text selection during resize
+        e.preventDefault();
+      }
+
+      function startResizeV(e) {
+        isResizingV = true;
+        startResizeY = e.clientY;
+        initialResizeHeight = container.offsetHeight;
+        
+        document.addEventListener('mousemove', resizeV);
+        document.addEventListener('mouseup', stopResizeV);
+        
+        // Prevent text selection during resize
+        e.preventDefault();
+      }
+
+      function resizeH(e) {
+        if (!isResizingH) return;
+        
+        const deltaX = startResizeX - e.clientX;
+        const newWidth = Math.max(300, Math.min(800, initialResizeWidth + deltaX * 2));
+        
+        container.style.width = newWidth + 'px';
+        currentWidth = newWidth;
+      }
+
+      function resizeV(e) {
+        if (!isResizingV) return;
+        
+        const deltaY = e.clientY - startResizeY;
+        const newHeight = Math.max(300, Math.min(window.innerHeight * 0.8, initialResizeHeight + deltaY));
+        
+        container.style.height = newHeight + 'px';
+        currentHeight = newHeight;
+      }
+
+      function stopResizeH() {
+        isResizingH = false;
+        document.removeEventListener('mousemove', resizeH);
+        document.removeEventListener('mouseup', stopResizeH);
+      }
+
+      function stopResizeV() {
+        isResizingV = false;
+        document.removeEventListener('mousemove', resizeV);
+        document.removeEventListener('mouseup', stopResizeV);
+      }
+    });
+  </script>
+</body>
+</html>
