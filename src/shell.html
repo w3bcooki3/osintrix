@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src https://api.rss2json.com; form-action 'none'; base-uri 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#0b1020">
+<title>OSINTrix</title>
+<link rel="icon" id="fav" href="data:,">
+<style>/*FONTS*/</style>
+<style>/*STYLES*/</style>
+</head>
+<body>
+<div class="splash" id="splash" aria-hidden="true"></div>
+<a class="sr" href="#main">Skip to content</a>
+<div class="app">
+  <aside class="side" id="side" aria-label="Main navigation">
+    <a class="brand" id="brand" href="#/home" aria-label="OSINTrix home" style="color:inherit;text-decoration:none"></a>
+    <nav class="sidescroll" id="sidenav"></nav>
+    <div class="sidefoot"><i class="pulse"></i><span>Offline · data stays in this browser</span></div>
+  </aside>
+  <header class="top">
+    <button class="iconbtn menubtn" data-act="navToggle" aria-label="Open menu"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+    <div class="gsearch"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <label class="sr" for="gq">Search the active case</label><input id="gq" placeholder="Search this case — try host:DC01 or verdict:malicious" autocomplete="off" spellcheck="false">
+      <span class="hints"><kbd>/</kbd><button class="btn xs ghost" data-act="palette" style="height:24px">Ctrl K</button></span></div>
+    <div class="topr">
+      <span class="saved hide-m" id="saved"><i></i>Saved in this browser</span>
+      <button class="iconbtn hide-m" data-act="palette" aria-label="Jump to anything">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3"/></svg></button>
+      <button class="iconbtn" id="themeBtn" data-act="theme" aria-label="Switch theme"></button>
+      <button class="iconbtn" id="inspBtn" data-act="inspToggle" aria-label="Details panel"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg></button>
+      <button class="btn primary hide-m" data-act="capture"><svg class="i sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Capture</button>
+    </div>
+  </header>
+  <div class="work"><main class="main" id="main" tabindex="-1"></main><aside class="insp" id="insp" aria-label="Details"></aside></div>
+</div>
+<nav class="bbar" id="bbar" aria-label="Quick navigation"></nav>
+<div class="scrim" id="scrim" hidden><div class="dlg" id="dlg" role="dialog" aria-modal="true"></div></div>
+<div class="welcome" id="welcome" hidden role="dialog" aria-modal="true" aria-labelledby="wTitle"></div>
+<div class="toast" id="toast" role="status" hidden><span id="toastMsg"></span><button id="toastBtn" hidden></button></div>
+<script>/*VENDOR*/</script>
+<script>/*SCRIPTS*/</script>
+</body>
+</html>
