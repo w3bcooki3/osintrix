@@ -1,0 +1,632 @@
+[
+    {
+        "id": 1,
+        "name": "Exposed Database Files",
+        "description": "Find exposed database files and backups on web servers.",
+        "query": "filetype:sql OR filetype:db OR filetype:mdb OR filetype:sqlite",
+        "category": "databases",
+        "engines": ["google", "bing"],
+        "tags": ["database", "sql", "backup", "exposed", "data leak"]
+    },
+    {
+        "id": 2,
+        "name": "Admin Login Panels",
+        "description": "Discover publicly accessible administration and login interfaces.",
+        "query": "inurl:admin OR inurl:login OR intitle:\"admin panel\" OR intitle:\"login page\"",
+        "category": "login",
+        "engines": ["google", "bing"],
+        "tags": ["admin", "login", "interface", "panel", "access"]
+    },
+    {
+        "id": 3,
+        "name": "Open MongoDB Instances",
+        "description": "Identify exposed MongoDB instances on the internet.",
+        "query": "port:27017 product:MongoDB",
+        "category": "databases",
+        "engines": ["shodan"],
+        "tags": ["mongodb", "database", "exposed", "nosql", "vulnerability"]
+    },
+    {
+        "id": 4,
+        "name": "SSH Servers with Specific Version",
+        "description": "Locate SSH servers running a particular version, often for vulnerability assessment.",
+        "query": "port:22 product:OpenSSH version:{{SSH_VERSION}}",
+        "category": "vulnerabilities",
+        "engines": ["shodan", "censys"],
+        "tags": ["ssh", "remote access", "server", "version", "vulnerability"]
+    },
+    {
+        "id": 5,
+        "name": "Public Cloud Storage Buckets",
+        "description": "Find misconfigured or exposed cloud storage buckets (AWS S3, GCP Storage).",
+        "query": "site:s3.amazonaws.com OR site:storage.googleapis.com OR site:blob.core.windows.net",
+        "category": "cloud",
+        "engines": ["google", "bing"],
+        "tags": ["cloud", "storage", "aws", "gcp", "azure", "bucket", "misconfiguration"]
+    },
+    {
+        "id": 6,
+        "name": "Exposed IP Cameras",
+        "description": "Identify accessible IP cameras and surveillance systems.",
+        "query": "port:554 product:\"IP Camera\" OR inurl:view/viewer.shtml",
+        "category": "iot",
+        "engines": ["shodan", "zoomeye"],
+        "tags": ["iot", "camera", "webcam", "surveillance", "exposed"]
+    },
+    {
+        "id": 7,
+        "name": "Sensitive Configuration Files on GitHub",
+        "description": "Search for common configuration files that may contain sensitive information in public GitHub repositories.",
+        "query": "filename:.env OR filename:config.php OR filename:wp-config.php OR extension:yml AND in:file password",
+        "category": "files",
+        "engines": ["github"],
+        "tags": ["config", "credentials", "api key", "source code", "leak"]
+    },
+    {
+        "id": 8,
+        "name": "Government Employee Emails",
+        "description": "Discover email addresses of individuals within government domains.",
+        "query": "site:gov filetype:pdf intext:email",
+        "category": "government",
+        "engines": ["google"],
+        "tags": ["government", "email", "contact", "osint"]
+    },
+    {
+        "id": 9,
+        "name": "Pastebin API Keys/Credentials",
+        "description": "Search Pastebin for leaked API keys, passwords, or sensitive data.",
+        "query": "site:pastebin.com (api_key OR password OR \"private key\" OR credential OR token)",
+        "category": "data leaks",
+        "engines": ["google", "pastebin"],
+        "tags": ["pastebin", "leak", "credentials", "api key", "sensitive data"]
+    },
+    {
+        "id": 10,
+        "name": "Webcams via BinaryEdge",
+        "description": "Find open webcams using BinaryEdge, often misconfigured.",
+        "query": "tag:webcam product:goahead",
+        "category": "iot",
+        "engines": ["binaryedge"],
+        "tags": ["webcam", "iot", "surveillance", "exposed", "binaryedge"]
+    },
+    {
+        "id": 11,
+        "name": "Email Addresses via IntelX",
+        "description": "Search for email addresses in IntelX database.",
+        "query": "type:1 \"{{EMAIL_DOMAIN}}\"",
+        "category": "osint",
+        "engines": ["intelx"],
+        "tags": ["email", "osint", "intelx", "reconnaissance"]
+    },
+    {
+        "id": 12,
+        "name": "Specific CVE Vulnerability on Shodan",
+        "description": "Search Shodan for systems vulnerable to a particular CVE.",
+        "query": "vuln:{{CVE_ID}}",
+        "category": "vulnerabilities",
+        "engines": ["shodan"],
+        "tags": ["cve", "vulnerability", "exploit", "shodan"]
+    },
+    {
+        "id": 13,
+        "name": "HTTP Basic Auth Panels",
+        "description": "Find web pages protected by HTTP Basic Authentication, often revealing exposed directories.",
+        "query": "intitle:\"Restricted Area\" OR inurl:auth OR intext:\"basic authentication\"",
+        "category": "login",
+        "engines": ["google", "bing"],
+        "tags": ["authentication", "exposed", "http", "panel"]
+    },
+    {
+        "id": 14,
+        "name": "SQL Injection Vulnerabilities (Generic)",
+        "description": "Attempt to identify potential SQL injection points by searching for common error messages.",
+        "query": "intext:\"SQL syntax\" OR intext:\"mysql_fetch_array()\" OR intext:\"Warning: mysql_num_rows()\"",
+        "category": "vulnerabilities",
+        "engines": ["google", "bing"],
+        "tags": ["sql injection", "vulnerability", "web security", "error message"]
+    },
+    {
+        "id": 15,
+        "name": "Apache Struts RCE Exposure",
+        "description": "Find potentially vulnerable Apache Struts instances exposed online.",
+        "query": "http.title:\"Apache Struts\" product:\"Apache httpd\" port:8080",
+        "category": "vulnerabilities",
+        "engines": ["shodan", "fofa"],
+        "tags": ["apache", "struts", "rce", "vulnerability", "server"]
+    },
+    {
+        "id": 16,
+        "name": "WordPress Vulnerabilities",
+        "description": "Identify WordPress sites with known vulnerabilities",
+        "query": "inurl:wp-content OR inurl:wp-includes intitle:\"WordPress\"",
+        "category": "web",
+        "engines": ["google", "bing"],
+        "tags": ["wordpress", "cms", "vulnerability", "php"]
+    },
+    {
+        "id": 17,
+        "name": "IoT Devices by Manufacturer",
+        "description": "Find specific IoT devices by manufacturer",
+        "query": "product:\"D-Link\" port:80",
+        "category": "iot",
+        "engines": ["shodan"],
+        "tags": ["iot", "device", "manufacturer", "smart-home"]
+    },
+    {
+        "id": 18,
+        "name": "Employee Directories",
+        "description": "Search for exposed employee directories or lists",
+        "query": "intitle:\"employee directory\" OR intitle:\"staff list\"",
+        "category": "people",
+        "engines": ["google", "bing"],
+        "tags": ["employee", "directory", "staff", "osint"]
+    },
+    {
+        "id": 19,
+        "name": "Google Docs Public",
+        "description": "Find publicly accessible Google Docs",
+        "query": "site:docs.google.com inurl:edit filetype:doc",
+        "category": "cloud",
+        "engines": ["google"],
+        "tags": ["google-docs", "cloud", "public", "sharing"]
+    },
+    {
+        "id": 20,
+        "name": "Exposed AWS S3 Buckets",
+        "description": "Specific search for exposed AWS S3 buckets",
+        "query": "site:.s3.amazonaws.com public",
+        "category": "cloud",
+        "engines": ["google"],
+        "tags": ["aws", "s3", "bucket", "cloud"]
+    },
+    {
+        "id": 21,
+        "name": "Social Media OSINT",
+        "description": "Find public social media profiles related to a keyword",
+        "query": "site:twitter.com OR site:linkedin.com \"keyword\"",
+        "category": "social",
+        "engines": ["google"],
+        "tags": ["social-media", "osint", "profile", "public"]
+    },
+    {
+        "id": 22,
+        "name": "Government Tender Documents",
+        "description": "Locate public government tender documents",
+        "query": "site:gov.au filetype:pdf tender OR bid",
+        "category": "government",
+        "engines": ["google"],
+        "tags": ["government", "tender", "procurement", "public-records"]
+    },
+    {
+        "id": 23,
+        "name": "Exposed Log Files",
+        "description": "Find publicly exposed server log files",
+        "query": "filetype:log access_log OR error_log",
+        "category": "files",
+        "engines": ["google", "bing"],
+        "tags": ["logs", "server", "exposed", "debug"]
+    },
+    {
+        "id": 24,
+        "name": "Vulnerable Jenkins Instances",
+        "description": "Find exposed Jenkins CI/CD servers",
+        "query": "product:Jenkins port:8080",
+        "category": "vulnerabilities",
+        "engines": ["shodan", "censys"],
+        "tags": ["jenkins", "ci/cd", "exposed", "devops"]
+    },
+    {
+        "id": 25,
+        "name": "IoT Dashboards",
+        "description": "Discover exposed IoT control panels/dashboards",
+        "query": "intitle:\"dashboard\" inurl:iot",
+        "category": "iot",
+        "engines": ["google", "bing"],
+        "tags": ["iot", "dashboard", "control", "exposed"]
+    },
+    {
+        "id": 26,
+        "name": "Company Contact Lists",
+        "description": "Search for exposed company contact information",
+        "query": "intitle:\"contact us\" OR \"our team\" filetype:xls",
+        "category": "people",
+        "engines": ["google", "bing"],
+        "tags": ["company", "contact", "employees", "osint"]
+    },
+    {
+        "id": 27,
+        "name": "Git Repositories",
+        "description": "Find exposed .git directories or repository leaks",
+        "query": "inurl:.git/config OR inurl:.git/HEAD",
+        "category": "files",
+        "engines": ["google", "bing"],
+        "tags": ["git", "repository", "exposed", "source-code"]
+    },
+    {
+        "id": 28,
+        "name": "Blockchain Explorers",
+        "description": "Access public blockchain explorers for crypto investigations",
+        "query": "site:etherscan.io OR site:blockchain.com bitcoin",
+        "category": "crypto",
+        "engines": ["google"],
+        "tags": ["blockchain", "crypto", "bitcoin", "ethereum"]
+    },
+    {
+        "id": 29,
+        "name": "Dark Web Forums (via Clearnet)",
+        "description": "Find mentions or links to dark web forums on clearnet",
+        "query": "site:.onion link:forum OR \"darknet market\"",
+        "category": "dark-web",
+        "engines": ["google"],
+        "tags": ["darkweb", "forum", "market", "clearnet"]
+    },
+    {
+        "id": 30,
+        "name": "Vulnerable Routers",
+        "description": "Identify potentially vulnerable router interfaces",
+        "query": "intitle:\"router setup\" OR \"admin login\" inurl:8080",
+        "category": "network",
+        "engines": ["google", "shodan"],
+        "tags": ["router", "vulnerability", "network", "admin"]
+    },
+    {
+        "id": 31,
+        "name": "Specific SSH Version via Shodan",
+        "description": "Find SSH servers running a specific version (e.g., for known vulnerabilities)",
+        "query": "port:22 product:OpenSSH version:{{SSH_VERSION}}",
+        "category": "vulnerabilities",
+        "engines": ["shodan"],
+        "tags": ["ssh", "version", "vulnerability"]
+    },
+    {
+        "id": 32,
+        "name": "Emails from Specific Domain (IntelX)",
+        "description": "Search for email addresses from a specific domain in IntelX",
+        "query": "type:1 \"{{EMAIL_DOMAIN}}\"",
+        "category": "osint",
+        "engines": ["intelx"],
+        "tags": ["email", "osint", "domain"]
+    },
+    {
+        "id": 33,
+        "name": "Apache Struts CVE Search (Shodan)",
+        "description": "Search Shodan for Apache Struts instances vulnerable to a specific CVE",
+        "query": "product:Apache Struts vuln:{{CVE_ID}}",
+        "category": "vulnerabilities",
+        "engines": ["shodan"],
+        "tags": ["apache", "struts", "cve", "vulnerability"]
+    },
+    {
+        "id": 34,
+        "name": "Public Trello Boards",
+        "description": "Find publicly accessible Trello boards that might contain sensitive information",
+        "query": "site:trello.com inurl:board intext:confidential OR password",
+        "category": "cloud",
+        "engines": ["google", "bing"],
+        "tags": ["trello", "collaboration", "exposed", "misconfiguration"]
+    },
+    {
+        "id": 35,
+        "name": "Exposed ElasticSearch Instances",
+        "description": "Discover publicly accessible ElasticSearch instances",
+        "query": "port:9200 product:ElasticSearch",
+        "category": "databases",
+        "engines": ["shodan"],
+        "tags": ["elasticsearch", "database", "exposed", "nosql"]
+    },
+    {
+        "id": 36,
+        "name": "Microsoft Exchange Web Access",
+        "description": "Find Microsoft Exchange Web Access (OWA) portals",
+        "query": "intitle:\"Outlook Web App\" inurl:owa",
+        "category": "web",
+        "engines": ["google", "bing"],
+        "tags": ["exchange", "owa", "webmail"]
+    },
+    {
+        "id": 37,
+        "name": "Open Jenkins Servers",
+        "description": "Find Jenkins servers that might be openly accessible",
+        "query": "intitle:\"Jenkins\" inurl:jenkins/login",
+        "category": "web",
+        "engines": ["google", "bing"],
+        "tags": ["jenkins", "ci/cd", "exposed"]
+    },
+    {
+        "id": 38,
+        "name": "Exposed Docker Registries",
+        "description": "Identify public or misconfigured Docker registries",
+        "query": "port:5000 \"Docker Registry\"",
+        "category": "cloud",
+        "engines": ["shodan"],
+        "tags": ["docker", "registry", "exposed", "container"]
+    },
+    {
+        "id": 39,
+        "name": "Confidential PDFs",
+        "description": "Search for PDF documents containing the word 'confidential'",
+        "query": "filetype:pdf confidential",
+        "category": "files",
+        "engines": ["google", "bing"],
+        "tags": ["pdf", "confidential", "document"]
+    },
+    {
+        "id": 40,
+        "name": "Public CCTV Streams",
+        "description": "Find public CCTV camera streams",
+        "query": "inurl:\"/view/viewer_index.shtml\" intitle:\"Live View\"",
+        "category": "iot",
+        "engines": ["google"],
+        "tags": ["cctv", "camera", "stream", "public"]
+    },
+    {
+        "id": 41,
+        "name": "Exposed RDP Servers",
+        "description": "Find systems with exposed RDP (Remote Desktop Protocol)",
+        "query": "port:3389",
+        "category": "remote-access",
+        "engines": ["shodan", "censys", "zoomeye"],
+        "tags": ["rdp", "remote", "desktop", "access"]
+    },
+    {
+        "id": 42,
+        "name": "Publicly Accessible FTP Servers",
+        "description": "Find exposed FTP servers allowing anonymous login",
+        "query": "port:21 \"Anonymous FTP login accepted\"",
+        "category": "network",
+        "engines": ["shodan", "censys"],
+        "tags": ["ftp", "filetransfer", "exposed", "anonymous"]
+    },
+    {
+        "id": 43,
+        "name": "Cisco IOS Devices",
+        "description": "Identify exposed Cisco IOS devices",
+        "query": "product:\"Cisco IOS\" port:8080",
+        "category": "network",
+        "engines": ["shodan", "censys", "zoomeye"],
+        "tags": ["cisco", "network", "device", "router"]
+    },
+    {
+        "id": 44,
+        "name": "Wayback Machine - All Snapshots for Domain",
+        "description": "Find all historical snapshots of a given domain using Wayback Machine via Google.",
+        "query": "site:web.archive.org/web/* {{DOMAIN_NAME}}",
+        "category": "osint",
+        "engines": ["google"],
+        "tags": ["wayback machine", "archive", "domain", "osint", "historical data"]
+    },
+    {
+        "id": 45,
+        "name": "Wayback Machine - Specific File Type on Domain",
+        "description": "Search for specific file types (e.g., PDF, DOCX) on a domain's historical snapshots.",
+        "query": "site:web.archive.org/web/* {{DOMAIN_NAME}} filetype:{{FILE_TYPE}}",
+        "category": "files",
+        "engines": ["google"],
+        "tags": ["wayback machine", "archive", "file type", "osint", "historical data"]
+    },
+    {
+        "id": 46,
+        "name": "GitHub - Private Key Exposure",
+        "description": "Identify repositories containing common private key extensions that might be exposed.",
+        "query": "extension:pem OR extension:key OR extension:ppk OR extension:p12 OR filename:id_rsa",
+        "category": "code & files",
+        "engines": ["github"],
+        "tags": ["github", "private key", "credentials", "exposed", "leak", "source code"]
+    },
+    {
+        "id": 47,
+        "name": "GitHub - API Key Exposure (Generic)",
+        "description": "Search for generic API key patterns in GitHub repositories.",
+        "query": "github_token OR api_key OR authorization_key OR client_secret OR consumer_key",
+        "category": "code & files",
+        "engines": ["github"],
+        "tags": ["github", "api key", "token", "credentials", "exposed", "leak"]
+    },
+    {
+        "id": 48,
+        "name": "GitHub - SQL Dump/Database Files",
+        "description": "Find SQL database dumps or backup files exposed on GitHub.",
+        "query": "filename:dump.sql OR extension:sql in:file database password",
+        "category": "databases",
+        "engines": ["github"],
+        "tags": ["github", "sql", "database", "dump", "exposed", "leak"]
+    },
+    {
+        "id": 49,
+        "name": "GitHub - History of Deleted Files",
+        "description": "Leverage GitHub's history to find content from deleted files (requires manual investigation of results).",
+        "query": "in:history \"deleted file\" OR \"removed credentials\" OR \"secret\"",
+        "category": "code & files",
+        "engines": ["github"],
+        "tags": ["github", "history", "deleted files", "leak", "version control"]
+    },
+    {
+        "id": 50,
+        "name": "Wayback Machine - Sensitive Keywords",
+        "description": "Search Wayback Machine archives for specific sensitive keywords on a domain.",
+        "query": "site:web.archive.org/web/* {{DOMAIN_NAME}} (password OR confidential OR secret OR private)",
+        "category": "data leaks",
+        "engines": ["google"],
+        "tags": ["wayback machine", "sensitive data", "keywords", "osint", "data leak"]
+    },
+    {
+        "id": 51,
+        "name": "Publicly Exposed .git Folder",
+        "description": "Find web servers with exposed .git folders containing repository information.",
+        "query": "inurl:.git/HEAD OR inurl:.git/config",
+        "category": "files",
+        "engines": ["google", "bing"],
+        "tags": ["git", "exposed", "repository", "misconfiguration"]
+    },
+    {
+        "id": 52,
+        "name": "Open Redirect Vulnerabilities",
+        "description": "Discover potential open redirect vulnerabilities on websites.",
+        "query": "inurl:redirect= OR inurl:url= OR inurl:next= site:{{TARGET_SITE}}",
+        "category": "vulnerabilities",
+        "engines": ["google", "bing"],
+        "tags": ["vulnerability", "open redirect", "web security"]
+    },
+    {
+        "id": 53,
+        "name": "Cross-Site Scripting (XSS) - Reflected",
+        "description": "Search for common reflected XSS patterns in URLs.",
+        "query": "inurl:\"<script>alert\" OR inurl:\"javascript:alert\" site:{{TARGET_SITE}}",
+        "category": "vulnerabilities",
+        "engines": ["google", "bing"],
+        "tags": ["xss", "vulnerability", "web security", "injection"]
+    },
+    {
+        "id": 54,
+        "name": "Exposed Nginx Configuration Files",
+        "description": "Locate publicly accessible Nginx configuration files that might reveal server details.",
+        "query": "filetype:conf intext:nginx version",
+        "category": "files",
+        "engines": ["google", "bing"],
+        "tags": ["nginx", "config", "exposed", "server"]
+    },
+    {
+        "id": 55,
+        "name": "Open Proxy Servers",
+        "description": "Identify potentially open proxy servers.",
+        "query": "intitle:\"Proxy Server\" inurl:proxy.php OR intext:\"Powered by Squid\"",
+        "category": "network",
+        "engines": ["google", "bing"],
+        "tags": ["proxy", "open proxy", "network"]
+    },
+    {
+        "id": 56,
+        "name": "OSINT - Social Media Profiles by Name",
+        "description": "Find public social media profiles (Twitter, LinkedIn, Facebook, Instagram) for a given name.",
+        "query": "\"{{FULL_NAME}}\" site:twitter.com OR site:linkedin.com OR site:facebook.com OR site:instagram.com",
+        "category": "osint",
+        "engines": ["google", "bing"],
+        "tags": ["osint", "social media", "person", "reconnaissance"]
+    },
+    {
+        "id": 57,
+        "name": "OSINT - Company Documents/Presentations",
+        "description": "Locate public documents or presentations from a specific company, often containing internal data.",
+        "query": "site:{{COMPANY_DOMAIN}} filetype:ppt OR filetype:pptx OR filetype:pdf OR filetype:doc OR filetype:docx (confidential OR internal OR proprietary)",
+        "category": "osint",
+        "engines": ["google", "bing"],
+        "tags": ["osint", "company", "documents", "data leak", "corporate intelligence"]
+    },
+    {
+        "id": 58,
+        "name": "OSINT - Email Lists/Spreadsheets",
+        "description": "Find spreadsheets or documents containing lists of email addresses.",
+        "query": "filetype:xls OR filetype:xlsx OR filetype:csv intext:@{{DOMAIN_NAME}}",
+        "category": "osint",
+        "engines": ["google", "bing"],
+        "tags": ["osint", "email", "list", "spreadsheet", "data leak"]
+    },
+    {
+        "id": 59,
+        "name": "OSINT - Forum/Blog Mentions of Entity",
+        "description": "Search for mentions of a specific entity (person, company, product) across forums and blogs.",
+        "query": "intext:\"{{ENTITY_NAME}}\" (inurl:forum OR inurl:blog OR inurl:comment)",
+        "category": "osint",
+        "engines": ["google", "bing"],
+        "tags": ["osint", "reputation", "mentions", "forum", "blog"]
+    },
+    {
+        "id": 60,
+        "name": "GitHub - Exposed SSH Keys",
+        "description": "Find public GitHub repositories containing .ssh directories or common SSH key names.",
+        "query": "inpath:.ssh id_rsa OR id_dsa OR known_hosts",
+        "category": "code & files",
+        "engines": ["github"],
+        "tags": ["github", "ssh key", "credentials", "exposed", "leak", "source code"]
+    },
+    {
+        "id": 61,
+        "name": "GitHub - AWS Credentials Exposure",
+        "description": "Search for common AWS credential patterns in GitHub repositories.",
+        "query": "aws_access_key_id OR aws_secret_access_key OR \"AKIA\" OR \"ASIA\"",
+        "category": "cloud",
+        "engines": ["github"],
+        "tags": ["github", "aws", "credentials", "exposed", "cloud", "leak"]
+    },
+    {
+        "id": 62,
+        "name": "GitHub - Google API Key Exposure",
+        "description": "Find Google API keys in public GitHub repositories.",
+        "query": "AIza{{GOOGLE_API_KEY_PATTERN}}",
+        "category": "cloud",
+        "engines": ["github"],
+        "tags": ["github", "google api", "api key", "credentials", "exposed", "cloud"]
+    },
+    {
+        "id": 63,
+        "name": "Wayback Machine - Domain Whois History",
+        "description": "Look for historical WHOIS records via Wayback Machine (may require external WHOIS tools, but directs to archive).",
+        "query": "site:whois.domaintools.com/{{DOMAIN_NAME}} OR site:who.is/whois/{{DOMAIN_NAME}}",
+        "category": "osint",
+        "engines": ["google"],
+        "tags": ["wayback machine", "whois", "domain", "osint", "historical data"]
+    },
+    {
+        "id": 64,
+        "name": "Wayback Machine - CMS Login Pages",
+        "description": "Find historical login pages for common CMS (e.g., WordPress, Joomla, Drupal) on a specific domain.",
+        "query": "site:web.archive.org/web/* {{DOMAIN_NAME}} (inurl:wp-admin OR inurl:administrator OR inurl:user/login)",
+        "category": "login",
+        "engines": ["google"],
+        "tags": ["wayback machine", "cms", "login", "vulnerability", "historical data"]
+    },
+    {
+        "id": 65,
+        "name": "Wayback Machine - Old API Endpoints",
+        "description": "Discover old or deprecated API endpoints in historical snapshots that might be vulnerable.",
+        "query": "site:web.archive.org/web/* {{DOMAIN_NAME}} inurl:api/v1 OR inurl:oldapi OR intext:\"deprecated endpoint\"",
+        "category": "vulnerabilities",
+        "engines": ["google"],
+        "tags": ["wayback machine", "api", "vulnerability", "historical data"]
+    },
+    {
+        "id": 66,
+        "name": "OSINT - Exposed Employee Resumes/CVs",
+        "description": "Search for public resumes or CVs associated with a company or domain, potentially revealing sensitive information.",
+        "query": "site:{{COMPANY_DOMAIN}} filetype:pdf (resume OR CV OR curriculum vitae) OR intext:\"looking for a new opportunity\" intext:{{COMPANY_NAME}}",
+        "category": "osint",
+        "engines": ["google", "bing"],
+        "tags": ["osint", "employee", "resume", "cv", "personal data", "reconnaissance"]
+    },
+    {
+        "id": 67,
+        "name": "OSINT - Exposed Google Groups/Forums",
+        "description": "Find publicly accessible Google Groups or other forum discussions related to a target.",
+        "query": "site:groups.google.com intext:{{TARGET_KEYWORD}} (confidential OR internal OR restricted)",
+        "category": "osint",
+        "engines": ["google"],
+        "tags": ["osint", "forum", "google groups", "discussion", "data leak"]
+    },
+    {
+        "id": 68,
+        "name": "GitHub - Exposed Database Connection Strings",
+        "description": "Search for common database connection string patterns in public GitHub repositories.",
+        "query": "jdbc:mysql:// OR postgresql:// OR mongodb:// OR sqlserver:// in:file password",
+        "category": "databases",
+        "engines": ["github"],
+        "tags": ["github", "database", "connection string", "credentials", "exposed", "leak"]
+    },
+    {
+        "id": 69,
+        "name": "GitHub - Generic Sensitive Information (Broad)",
+        "description": "A broad search for commonly exposed sensitive terms in GitHub repositories.",
+        "query": "password OR credentials OR secret OR token OR api_key OR private_key OR id_rsa OR .env",
+        "category": "code & files",
+        "engines": ["github"],
+        "tags": ["github", "sensitive data", "credentials", "leak", "broad scan"]
+    },
+    {
+        "id": 70,
+        "name": "Wayback Machine - Exposed Directories/Indexes",
+        "description": "Discover historical snapshots of exposed directories or file indexes.",
+        "query": "site:web.archive.org/web/* {{DOMAIN_NAME}} intitle:\"index of\" OR intitle:\"directory listing for\"",
+        "category": "files",
+        "engines": ["google"],
+        "tags": ["wayback machine", "directory listing", "exposed", "files", "historical data"]
+    }
+]
