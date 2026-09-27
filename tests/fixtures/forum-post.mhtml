@@ -1,0 +1,37 @@
+From: <Saved by Blink>
+Snapshot-Content-Location: https://forum.example/thread/lamp-loader-sale
+Subject: Lamp loader v2 =?utf-8?Q?=E2=80=94?= for sale
+Date: Sun, 21 Sep 2026 10:02:11 -0000
+MIME-Version: 1.0
+Content-Type: multipart/related;
+	type="text/html";
+	boundary="----MultipartBoundary--abc123----"
+
+
+------MultipartBoundary--abc123----
+Content-Type: text/html
+Content-ID: <frame-1@mhtml.blink>
+Content-Transfer-Encoding: quoted-printable
+Content-Location: https://forum.example/thread/lamp-loader-sale
+
+<!DOCTYPE html>
+<!-- saved from url=3D(0045)https://forum.example/thread/lamp-loader-sale -=
+->
+<html><head><title>Lamp loader v2 =E2=80=94 for sale | Example Forum</title>
+<meta name=3D"description" content=3D"Selling private loader, crypter inclu=
+ded">
+<meta property=3D"article:published_time" content=3D"2026-08-30T21:14:00Z">
+<meta name=3D"author" content=3D"n1ghtlamp">
+<script>document.title=3D'pwned'; alert(1)</script>
+<link rel=3D"canonical" href=3D"https://forum.example/thread/lamp-loader-sa=
+le">
+</head><body><nav><a href=3D"/">Home</a> <a href=3D"/rules">Rules</a></nav>
+<article><h1>Lamp loader v2 =E2=80=94 for sale</h1><p>Contact @n1ghtlamp on=
+ <a href=3D"https://t.me/lampshop">Telegram</a> or mail <a href=3D"mailto:n=
+1ghtlamp@proton.me">me</a>.</p>
+<p>Panel demo at https://lamp-support.example/panel =E2=80=94 price 0.15 BT=
+C to bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh</p>
+<img src=3D"https://tracker.example/pixel.gif"><p>Updated build beacons to =
+203.0.113.47:4444.</p></article></body></html>
+
+------MultipartBoundary--abc123------

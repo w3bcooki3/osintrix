@@ -116,7 +116,11 @@ function ctfEditor(c){
 function ctfSubmit(f){
   const c = DB.ctf.chals.find(x => x.id === f.dataset.id); if(!c) return;
   const status = f.dataset.status || c.status;
-  Object.assign(c, {name:$('chN').value.trim().slice(0, 140) || c.name, cat:$('chC').value, points:Math.max(0, parseInt($('chP').value, 10) || 0), eventId:$('chE').value, caseId:$('chK').value || null,
+  const nm = $('chN').value.trim().replace(/\s+/g, ' '); if(!nm) return fieldErr('chN', 'Name is required.'); if(!checkLen('chN', nm, 140, 'Name')) return;
+  if(clash(DB.ctf.chals.filter(x => x.eventId === $('chE').value), nm, 'name', c.id)) return fieldErr('chN', `This event already has a challenge called “${nm}”.`);
+  if(!/^\d{0,6}$/.test($('chP').value.trim())) return fieldErr('chP', 'Points must be a whole number from 0 to 999999.');
+  if(!checkLen('chF', $('chF').value.trim(), 400, 'Flag') || !checkLen('chW', $('chW').value, 20000, 'Notes')) return;
+  Object.assign(c, {name:nm, cat:$('chC').value, points:Math.max(0, parseInt($('chP').value, 10) || 0), eventId:$('chE').value, caseId:$('chK').value || null,
     flag:$('chF').value.trim().slice(0, 400), notes:$('chW').value.slice(0, 20000), status});
   if(c.flag && c.status !== 'solved' && !f.dataset.status) c.status = 'solved';
   if(c.status === 'solved' && !c.solvedAt) c.solvedAt = Date.now(); if(c.status !== 'solved') c.solvedAt = 0;
@@ -142,10 +146,10 @@ function ctfWriteups(){
 }
 
 /* ---------- forensics kit ---------- */
-const LAB_TABS = [['file','File inspector','file-search'], ['image','Image','image'], ['email','Email headers','mail'], ['time','Time & IDs','clock-3'], ['hash','Hashes','fingerprint'], ['geo','Coordinates','compass'], ['net','Network','network'], ['gen','Generators','users']];
+const LAB_TABS = [['file','File inspector','file-search'], ['logs','Log parser','scan-text'], ['pcap','PCAP','network'], ['sqlite','SQLite','database'], ['image','Image','image'], ['email','Email headers','mail'], ['time','Time & IDs','clock-3'], ['hash','Hashes','fingerprint'], ['geo','Coordinates','compass'], ['net','Network','network'], ['gen','Generators','users']];
 function viewLab(){
   const t = LAB_TABS.some(x => x[0] === UI.labTab) ? UI.labTab : 'file';
-  const body = {file:labFile, image:labImage, email:labEmail, time:labTime, hash:labHash, geo:labGeo, net:labNet, gen:labGen}[t]();
+  const body = {file:labFile, logs:labParse, pcap:labPcap, sqlite:labSql, image:labImage, email:labEmail, time:labTime, hash:labHash, geo:labGeo, net:labNet, gen:labGen}[t]();
   return `<div class="scroll"><div class="page wide">
     ${libHead('Forensics kit', 'Inspect files and images, read email headers, decode timestamps and IDs, identify hashes — entirely in your browser. Nothing is uploaded.', '', '')}
     <nav class="labtabs" role="tablist">${LAB_TABS.map(([k, l, i]) => `<button role="tab" data-act="labTab" data-v="${k}" aria-selected="${t === k}">${ico(i,'sm')}${l}</button>`).join('')}</nav>
@@ -309,7 +313,7 @@ function labFile(){
         <div class="entbar"><i style="width:${eh / 8 * 100}%;background:${ehl[1]}"></i></div>
         ${/^(png|jpg|gif|zip|gz|7z|rar|mp3|mp4|mkv|pdf)$/.test(r.type.ext) && eh > 7.5 ? '<p class="t3" style="font-size:12.5px;margin:0 0 8px">High entropy is normal for this format — its content is compressed.</p>' : ''}
         ${pivotSection('sha256', r.sha256)}
-        <div class="wrap" style="margin-top:14px"><button class="btn primary" data-act="labSave">${ico('plus','sm')}Save to ${esc(theCase().code)}</button><button class="btn" data-act="labReport">${ico('download','sm')}Download report</button>${isImg ? `<button class="btn" data-act="labToImage">${ico('image','sm')}Open in Image tools</button>` : ''}</div></div></section>
+        <div class="wrap" style="margin-top:14px"><button class="btn primary" data-act="labSave">${ico('plus','sm')}Save to ${esc(theCase().code)}</button><button class="btn" data-act="labReport">${ico('download','sm')}Download report</button>${isImg ? `<button class="btn" data-act="labToImage">${ico('image','sm')}Open in Image tools</button>` : ''}${/^pcap/.test(r.type.ext) ? `<button class="btn" data-act="labToPcap">${ico('network','sm')}Open in PCAP reader</button>` : ''}${r.type.ext === 'sqlite' ? `<button class="btn" data-act="labToSql">${ico('database','sm')}Open in SQLite viewer</button>` : ''}</div></div></section>
     ${yaraPanel(r)}
     </div>
     <div class="fi-side">
@@ -349,7 +353,8 @@ function bindLab(){
   deb('genName', v => { UI.genName = v; $('genOut').innerHTML = genOut(); }, 100); deb('genNums', v => { UI.genNums = v; $('genOut').innerHTML = genOut(); }, 100); deb('genDom', v => { UI.genDom = v; $('genOut').innerHTML = genOut(); }, 100);
   if(UI.macIn) macOut(UI.macIn);
   const sq = $('strq'); if(sq) sq.oninput = () => { UI.strq = sq.value; clearTimeout(bindLab.s); bindLab.s = setTimeout(() => { renderMain(); const x = $('strq'); if(x){ x.focus(); x.setSelectionRange(x.value.length, x.value.length); } }, 200); };
-  bindImage();
+  bindImage(); bindParse(); bindPcap(); bindSql();
+  const tb = document.querySelector('.labtabs [aria-selected=true]'), nav = tb && tb.parentElement; if(nav && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = Math.max(0, tb.offsetLeft - nav.clientWidth / 2 + tb.offsetWidth / 2);
 }
 async function labLoad(f){
   if(f.size > 200 * 1048576) return toast('That file is over 200 MB — too big to inspect in a browser tab');
@@ -462,16 +467,17 @@ function labImage(){
   const I = UI.img;
   if(!I) return `<label class="drop" id="imgDrop" tabindex="0"><input type="file" id="imgIn" accept="image/*" class="sr">${ico('image')}<b>Drop an image, or click to choose</b>
     <span>Colour channels, bit planes, least-significant-bit extraction, QR codes and reverse image search — the usual steganography and geolocation checks.</span>
-    <span class="drop-feat"><i>R · G · B · Alpha</i><i>Bit planes 0–7</i><i>LSB text</i><i>QR / barcode</i><i>Invert</i><i>Reverse search</i></span></label>`;
+    <span class="drop-feat"><i>R · G · B · Alpha</i><i>Bit planes 0–7</i><i>LSB text</i><i>QR / barcode</i><i>Invert</i><i>Error level (ELA)</i><i>Look-alikes</i><i>Reverse search</i></span></label>`;
   if(I.busy) return `<div class="card" style="padding:40px;text-align:center">${ico('refresh-cw','sm spin')} Loading image…</div>`;
   const ch = UI.imgCh || 'rgb', bit = UI.imgBit === undefined ? 'all' : UI.imgBit, L = I.lsb || {};
   return `<div class="imgwrap">
     <section class="card imgview"><header><h3>${esc(I.name)}</h3><span class="t3">${I.w} × ${I.h}${I.scaled ? ' · previewed at 4096 px' : ''}</span><span style="flex:1"></span><button class="btn sm" data-act="imgClear">${ico('x','sm')}Another image</button></header>
-      <div class="imgtools"><div class="seg">${[['rgb','Colour'],['r','Red'],['g','Green'],['b','Blue'],['a','Alpha'],['gray','Grey'],['inv','Invert']].map(([k, l]) => `<button data-act="imgCh" data-v="${k}" aria-pressed="${ch === k}">${l}</button>`).join('')}</div>
-        ${ch !== 'rgb' && ch !== 'inv' ? `<div class="seg bits"><button data-act="imgBit" data-v="all" aria-pressed="${bit === 'all'}">All bits</button>${[7,6,5,4,3,2,1,0].map(b => `<button data-act="imgBit" data-v="${b}" aria-pressed="${bit === b}" title="Bit plane ${b}">${b}</button>`).join('')}</div>` : ''}</div>
+      <div class="imgtools"><div class="seg">${[['rgb','Colour'],['r','Red'],['g','Green'],['b','Blue'],['a','Alpha'],['gray','Grey'],['inv','Invert'],['ela','Error level']].map(([k, l]) => `<button data-act="imgCh" data-v="${k}" aria-pressed="${ch === k}">${l}</button>`).join('')}</div>
+        ${ch !== 'rgb' && ch !== 'inv' && ch !== 'ela' ? `<div class="seg bits"><button data-act="imgBit" data-v="all" aria-pressed="${bit === 'all'}">All bits</button>${[7,6,5,4,3,2,1,0].map(b => `<button data-act="imgBit" data-v="${b}" aria-pressed="${bit === b}" title="Bit plane ${b}">${b}</button>`).join('')}</div>` : ''}</div>
       <div class="imgcanvas"><canvas id="imgCv"></canvas></div>
-      <p class="t3" style="font-size:12.5px;margin:0;padding:10px 16px">Hidden data often shows up as noise or text in bit plane 0 of one channel — compare it with plane 7.</p></section>
+      <p class="t3" id="elaNote" style="font-size:12.5px;margin:0;padding:10px 16px">${ch === 'ela' ? 'Computing error levels…' : 'Hidden data often shows up as noise or text in bit plane 0 of one channel — compare it with plane 7.'}</p></section>
     <div class="fi-side">
+      ${imgxCard()}
       <section class="card"><header><h3>${ico('scan','sm')} QR / barcode</h3></header><div class="body">${I.qr ? `<pre class="rawbox">${esc(I.qr)}</pre><div class="wrap" style="margin-top:8px"><button class="btn sm" data-act="flagCopy" data-v="${esc(I.qr)}">${ico('copy','sm')}Copy</button><button class="btn sm" data-act="imgToDecoder" data-v="${esc(I.qr)}">${ico('binary','sm')}Open in Decoder</button></div>${flagBox(findFlags(I.qr))}` : '<p class="t3" style="margin:0;font-size:13.5px">No QR code found in this image. Try a bit plane or crop tighter.</p>'}</div></section>
       <section class="card"><header><h3>${ico('binary','sm')} LSB extraction</h3></header><div class="body">
         <div class="wrap" style="margin-bottom:10px">${['rgb','r','g','b','bgr','rgba'].map(c => `<button class="chip" data-act="imgLsb" data-v="${c}" aria-pressed="${L.ch === c}">${c.toUpperCase()}</button>`).join('')}<button class="chip" data-act="imgLsbOrder" aria-pressed="${UI.imgCol ? 'true' : 'false'}">Column order</button></div>
@@ -484,7 +490,7 @@ function bindImage(){
   const inp = $('imgIn'), d = $('imgDrop');
   if(inp){ inp.onchange = () => { if(inp.files[0]) imgLoad(inp.files[0]); }; d.ondragover = e => { e.preventDefault(); d.classList.add('over'); }; d.ondragleave = () => d.classList.remove('over');
     d.ondrop = e => { e.preventDefault(); d.classList.remove('over'); const f = e.dataTransfer.files[0]; if(f) imgLoad(f); }; d.onkeydown = e => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); inp.click(); } }; }
-  const cv = $('imgCv'); if(cv && UI.img && UI.img.data) renderPlane(UI.img.data, UI.imgCh || 'rgb', UI.imgBit === undefined ? 'all' : UI.imgBit, cv);
+  const cv = $('imgCv'); if(cv && UI.img && UI.img.data){ if(UI.imgCh === 'ela') showEla(cv); else renderPlane(UI.img.data, UI.imgCh || 'rgb', UI.imgBit === undefined ? 'all' : UI.imgBit, cv); }
 }
 async function imgLoad(f){
   UI.img = {busy:true}; renderMain();

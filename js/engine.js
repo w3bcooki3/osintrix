@@ -17,37 +17,99 @@ function refang(t){
     .replace(/\[:\]|\(:\)/g,':')
     .replace(/\[@\]|\(@\)/g,'@')
     .replace(/\bh(?:xx|\[t\]t|__)p(s?):\/\//gi,'http$1://')
-    .replace(/\[\/\]/g,'/');
+    .replace(/\[\/\]/g,'/')
+    .replace(/\s*[\[({]\s*at\s*[\])}]\s*/gi,'@').replace(/\s*[\[({]\s*dot\s*[\])}]\s*/gi,'.');
 }
+/* ---------- normalisers shared by extraction and vault keys ---------- */
+const SOCIAL_HOSTS = {'twitter.com':'x.com','x.com':'x.com','mobile.twitter.com':'x.com','instagram.com':'instagram.com','facebook.com':'facebook.com','fb.com':'facebook.com','m.facebook.com':'facebook.com',
+  'tiktok.com':'tiktok.com','github.com':'github.com','gitlab.com':'gitlab.com','t.me':'t.me','telegram.me':'t.me','reddit.com':'reddit.com','old.reddit.com':'reddit.com','linkedin.com':'linkedin.com',
+  'youtube.com':'youtube.com','threads.net':'threads.net','pinterest.com':'pinterest.com','medium.com':'medium.com','twitch.tv':'twitch.tv','vk.com':'vk.com','keybase.io':'keybase.io',
+  'bsky.app':'bsky.app','snapchat.com':'snapchat.com','soundcloud.com':'soundcloud.com','steamcommunity.com':'steamcommunity.com','hackerone.com':'hackerone.com','patreon.com':'patreon.com','onlyfans.com':'onlyfans.com'};
+const SOCIAL_STOP = /^(home|search|explore|i|intent|share|login|signup|settings|hashtag|about|help|privacy|terms|watch|results|feed|messages|notifications|orgs|topics|features|pricing|marketplace|groups|pages|events|p|reel|reels|stories|status|tv|legal|policies|jobs|company|school|sharer|dialog|plugins|embed|joinchat|s|c|channel|playlist|shorts|r|wiki|gist|sponsors|trending|new|popular)$/i;
+function normSocial(url){
+  const m = String(url).match(/^(?:https?:\/\/)?(?:www\.)?([a-z0-9.-]+\.[a-z]{2,})\/+(.*)$/i); if(!m) return null;
+  const host = SOCIAL_HOSTS[m[1].toLowerCase()]; if(!host) return null;
+  let path = m[2].split(/[?#]/)[0].split('/').filter(Boolean), user = null;
+  if(host === 'linkedin.com'){ if(/^(in|company)$/i.test(path[0] || '')) user = path[0].toLowerCase() + '/' + (path[1] || ''); }
+  else if(host === 'reddit.com'){ if(/^(u|user)$/i.test(path[0] || '')) user = 'user/' + (path[1] || ''); }
+  else if(host === 'youtube.com'){ if(/^@/.test(path[0] || '')) user = path[0]; else if(/^(c|user)$/i.test(path[0] || '') && path[1]) user = path[0] + '/' + path[1]; }
+  else if(host === 'steamcommunity.com'){ if(/^(id|profiles)$/i.test(path[0] || '') && path[1]) user = path[0] + '/' + path[1]; }
+  else user = path[0] || null;
+  if(!user || /\/$/.test(user)) return null;
+  const bare = user.replace(/^@/, '').split('/').pop();
+  if(!/^[A-Za-z0-9_.-]{2,60}$/.test(bare) || SOCIAL_STOP.test(bare) || (SOCIAL_STOP.test(user) && !user.includes('/'))) return null;
+  return {v:host + '/' + user.replace(/^@/, host === 'youtube.com' || host === 'tiktok.com' || host === 'threads.net' ? '@' : ''), host, user:bare};
+}
+const normPhone = s => { const d = String(s).replace(/[^\d+]/g, ''); return /^\+/.test(String(s).trim()) ? '+' + d.replace(/\+/g, '') : d.replace(/\+/g, ''); };
+const normMac = s => String(s).toLowerCase().replace(/[^0-9a-f]/g, '').replace(/(..)(?!$)/g, '$1:');
+function validIPv6(s){
+  if(!/^[0-9a-f:]+$/i.test(s) || (s.match(/::/g) || []).length > 1) return false;
+  const parts = s.split(':'); if(s.includes('::')){ return parts.filter(Boolean).length <= 7 && parts.filter(Boolean).every(p => p.length <= 4) && parts.filter(Boolean).length >= 1; }
+  return parts.length === 8 && parts.every(p => p.length >= 1 && p.length <= 4);
+}
+const ibanOK = s => { s = s.replace(/\s+/g, '').toUpperCase(); if(!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(s)) return false;
+  const r = (s.slice(4) + s.slice(0, 4)).replace(/[A-Z]/g, c => c.charCodeAt(0) - 55); let m = 0; for(const ch of r) m = (m * 10 + +ch) % 97; return m === 1; };
+const mixedB58 = s => /\d/.test(s) && /[a-z]/.test(s) && /[A-Z]/.test(s);
+function norm(k, v){
+  v = String(v).trim();
+  switch(k){
+    case 'phone': return normPhone(v);
+    case 'mac': return normMac(v);
+    case 'ipv6': return v.toLowerCase();
+    case 'social': { const s = normSocial(/^https?:/i.test(v) ? v : 'https://' + v); return s ? s.v : v.toLowerCase(); }
+    case 'coords': { const m = v.match(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/); return m ? (+m[1]).toFixed(5) + ',' + (+m[2]).toFixed(5) : v; }
+    case 'iban': return v.replace(/\s+/g, '').toUpperCase();
+    case 'asn': return 'AS' + v.replace(/\D/g, '');
+    case 'ttp': case 'cve': return v.toUpperCase();
+    default: return v;
+  }
+}
+function cryptoKind(v){ v = String(v).trim();
+  if(/^0x[a-f0-9]{40}$/i.test(v)) return 'eth'; if(/^4[0-9AB][1-9A-HJ-NP-Za-km-z]{93}$/.test(v)) return 'xmr'; if(/^(ltc1|[LM][a-km-zA-HJ-NP-Z1-9]{26,33}$)/.test(v)) return 'ltc';
+  if(/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(v)) return 'trx'; if(/^D[5-9A-HJ-NP-U][1-9A-HJ-NP-Za-km-z]{32}$/.test(v)) return 'doge'; return 'btc'; }
 const PATTERNS = [
+  ['sha512',/\b[a-f0-9]{128}\b/gi],
   ['sha256',/\b[a-f0-9]{64}\b/gi],
   ['sha1',/\b[a-f0-9]{40}\b/gi],
   ['md5',/\b[a-f0-9]{32}\b/gi],
   ['cve',/\bCVE-\d{4}-\d{4,7}\b/gi],
   ['eventid',/\b(?:event\s*id|eventid|eid)\s*[:=]?\s*(\d{1,5})\b/gi,1],
+  ['ttp',/\bT1\d{3}(?:\.\d{3})?\b/g],
   ['eth',/\b0x[a-fA-F0-9]{40}\b/g],
+  ['xmr',/\b4[0-9AB][1-9A-HJ-NP-Za-km-z]{93}\b/g],
   ['btc',/\b(?:bc1[ac-hj-np-z02-9]{25,59}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})\b/g],
+  ['ltc',/\b(?:ltc1[ac-hj-np-z02-9]{39,59}|[LM][a-km-zA-HJ-NP-Z1-9]{26,33})\b/g],
+  ['trx',/\bT[1-9A-HJ-NP-Za-km-z]{33}\b/g],
+  ['doge',/\bD[5-9A-HJ-NP-U][1-9A-HJ-NP-Za-km-z]{32}\b/g],
+  ['iban',/\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]{4}){2,7}(?: ?[A-Z0-9]{1,4})?\b/g],
   ['sid',/\bS-1-(?:\d{1,10}-){1,14}\d{1,10}\b/g],
+  ['social',/\b(?:https?:\/\/)?(?:www\.|m\.|mobile\.|old\.)?(?:twitter\.com|x\.com|instagram\.com|facebook\.com|fb\.com|tiktok\.com|github\.com|gitlab\.com|t\.me|telegram\.me|reddit\.com|linkedin\.com|youtube\.com|threads\.net|pinterest\.com|medium\.com|twitch\.tv|vk\.com|keybase\.io|bsky\.app|snapchat\.com|soundcloud\.com|steamcommunity\.com|hackerone\.com|patreon\.com|onlyfans\.com)\/[^\s"'<>()\[\]]+/gi],
   ['url',/\bhttps?:\/\/[^\s"'<>()\[\]]+/gi],
+  ['mac',/\b(?:[0-9a-f]{2}[:-]){5}[0-9a-f]{2}\b|\b(?:[0-9a-f]{4}\.){2}[0-9a-f]{4}\b/gi],
+  ['ipv6',/(?<![\w:.])(?:[0-9a-f]{1,4}:(?::?[0-9a-f]{1,4}){0,7}::?|::)(?:[0-9a-f]{1,4}(?::[0-9a-f]{1,4}){0,7})?(?![\w:.])/gi],
+  ['phone',/(?:\btel:|(?:\b(?:phone|tel|mobile|cell|whats\s?app|call|fax|contact)\b[^\d+\n]{0,12}))?\+\d{1,3}[\s.-]?\(?\d{1,4}\)?(?:[\s.-]?\d{2,5}){1,4}\b|\b(?:phone|tel|mobile|cell|whats\s?app|call(?: me)?|fax)\b[^\d\n]{0,12}\(?\d{2,4}\)?[\s.-]?\d{3,4}[\s.-]?\d{3,5}\b/gi],
+  ['coords',/(?<![\d.])(-?\d{1,2}\.\d{3,})\s*,\s*(-?\d{1,3}\.\d{3,})(?![\d.])/g],
   ['email',/\b[\w.+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+\b/gi],
   ['handle',/(?:^|[\s(,;:])@([A-Za-z0-9_]{3,30})\b/g,1],
   ['hostport',/\b(?:(?:\d{1,3}\.){3}\d{1,3}|(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}):\d{1,5}\b/gi],
   ['regkey',/\bHK(?:EY_[A-Z_]+|LM|CU|CR|U|CC)(?:\\[^\s"'<>|,;]+)+/gi],
   ['path',/\b[a-zA-Z]:\\[^\s"'<>|,;]{2,}|(?:^|\s)\/(?:etc|var|tmp|usr|home|opt|root|dev)\/[^\s"'<>|,;]+/gi],
   ['account',/\b[A-Z][A-Z0-9-]{1,15}\\[A-Za-z][\w.$-]{1,30}\b/g],
+  ['uname',/(?:\b(?:user(?:\s?name)?|login|handle|alias|nick(?:name)?|screen[_ ]?name)\s*[:=]\s*@?|\b(?:a\.k\.a\.?|aka|also known as|goes by|alias)\s+@?(?=[A-Za-z0-9_.-]*[_\d])|(?<![\w/])u\/)([A-Za-z][A-Za-z0-9_.-]{2,29})(?![\w@.-])/gi,1],
+  ['asn',/\bAS\s?(\d{2,10})\b/g],
   ['file',/\b[\w][\w.\-()]{0,60}\.(?:exe|dll|sys|ps1|bat|cmd|vbs|js|hta|scr|jar|lnk|iso|zip|rar|7z|docm|xlsm|msi|evtx|pcap)\b/gi],
   ['ipv4',/\b(?:\d{1,3}\.){3}\d{1,3}\b/g],
   ['domain',/\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:[a-z]{2,24})\b/gi],
 ];
-const KINDS = ['ipv4','hostport','domain','url','email','handle','btc','eth','md5','sha1','sha256',
-  'file','path','regkey','account','sid','eventid','cve','custom'];
-const GROUP = {ipv4:'net',hostport:'net',domain:'net',url:'net',email:'id',handle:'id',btc:'id',eth:'id',
+const KINDS = ['ipv4','ipv6','hostport','domain','url','email','handle','social','phone','btc','eth','xmr','ltc','trx','doge','iban','md5','sha1','sha256','sha512',
+  'mac','asn','coords','file','path','regkey','account','sid','eventid','cve','ttp','custom'];
+const GROUP = {ipv6:'net',mac:'net',asn:'net',social:'id',phone:'id',xmr:'id',ltc:'id',trx:'id',doge:'id',iban:'id',sha512:'hash',coords:'place',ttp:'vuln',ipv4:'net',hostport:'net',domain:'net',url:'net',email:'id',handle:'id',btc:'id',eth:'id',
   md5:'hash',sha1:'hash',sha256:'hash',file:'host',path:'host',regkey:'host',account:'id',sid:'id',
   eventid:'host',cve:'vuln',custom:'hash'};
-const LABEL = {ipv4:'IP',hostport:'IP:port',domain:'Domain',url:'URL',email:'Email',handle:'Handle',
+const LABEL = {ipv6:'IPv6',mac:'MAC address',asn:'ASN',social:'Social profile',phone:'Phone',xmr:'XMR wallet',ltc:'LTC wallet',trx:'TRON wallet',doge:'DOGE wallet',iban:'IBAN',sha512:'SHA-512',coords:'Coordinates',ttp:'ATT&CK technique',ipv4:'IP',hostport:'IP:port',domain:'Domain',url:'URL',email:'Email',handle:'Handle',
   btc:'BTC wallet',eth:'ETH wallet',md5:'MD5',sha1:'SHA-1',sha256:'SHA-256',file:'File',path:'Path',
   regkey:'Reg key',account:'Account',sid:'SID',eventid:'Event ID',cve:'CVE',custom:'Custom'};
-const LOWER = /^(ipv4|hostport|domain|url|email|md5|sha1|sha256|file|handle)$/;
+const LOWER = /^(ipv4|ipv6|hostport|domain|url|email|md5|sha1|sha256|sha512|file|handle)$/;
 const validIP = s => s.split('.').every(o => o.length < 4 && +o <= 255);
 const trimEdge = s => String(s).replace(/[.,;:!?)\]}'"]+$/,'').replace(/^[('"[{]+/,'');
 /* A dotted word is only a domain if its TLD is plausible: any 2-letter ccTLD, or a common gTLD.
@@ -66,7 +128,7 @@ function extract(text){
   const out = [], seen = new Set();
   const push = (k, raw) => {
     let v = trimEdge(String(raw).trim()); if(!v) return;
-    if(k === 'cve') v = v.toUpperCase(); else if(LOWER.test(k)) v = v.toLowerCase();
+    if(k === 'cve') v = v.toUpperCase(); else if(LOWER.test(k)) v = v.toLowerCase(); else v = norm(k, v);
     if(k === 'handle') v = '@' + v.replace(/^@/,'');
     const id = k + ':' + v; if(seen.has(id)) return; seen.add(id); out.push({k, v});
   };
@@ -76,6 +138,13 @@ function extract(text){
       if(!m[0].length){ re.lastIndex++; continue; }
       const v = trimEdge(String(cap ? m[cap] : m[0]).trim()); if(!v) continue;
       if(kind === 'ipv4' && !validIP(v)) continue;
+      if(kind === 'ipv6' && (!validIPv6(v) || /^[0-9]+:[0-9]+(:[0-9]+)?$/.test(v) || (v.match(/:/g) || []).length < 2)) continue;
+      if(kind === 'social' && !normSocial(v)) continue;
+      if(kind === 'phone'){ const d = v.replace(/\D/g, ''); if(d.length < 8 || d.length > 15 || /^(19|20)\d{6}$/.test(d)) continue; }
+      if(kind === 'coords' && (Math.abs(+m[1]) > 90 || Math.abs(+m[2]) > 180 || (+m[1] === 0 && +m[2] === 0))) continue;
+      if(kind === 'iban' && !ibanOK(v)) continue;
+      if(/^(btc|ltc|trx|doge|xmr)$/.test(kind) && !/^(bc1|ltc1)/.test(v) && !mixedB58(v)) continue;
+      if(kind === 'uname' && /^(name|password|id|agent|none|null|admin|root|unknown|required|here|the|and|for|with|from)$/i.test(v)) continue;
       if(kind === 'domain' && (/^\d+\./.test(v) || FILE_EXT_TLD.test(v) || !plausibleTLD(v))) continue;
       hits.push([m.index, m[0].length, v]);
     }
@@ -85,6 +154,9 @@ function extract(text){
       work = built + work.slice(at);
     }
     for(const [,, v] of hits){
+      if(kind === 'phone'){ push('phone', v.replace(/^[^\d+]*(?=[+\d(])/, '').replace(/^tel:/i, '')); continue; }
+      if(kind === 'uname'){ push('handle', v); continue; }
+      if(kind === 'social'){ const s = normSocial(v); push('social', s.v); if(/^(x\.com|instagram\.com|tiktok\.com|github\.com|t\.me|threads\.net|twitch\.tv|gitlab\.com|keybase\.io|bsky\.app)$/.test(s.host) && /^[A-Za-z0-9_]{3,30}$/.test(s.user)) push('handle', s.user); continue; }
       push(kind, v);
       if(kind === 'path'){ const b = v.split(/[\\/]/).pop(); if(b && /\.[a-z0-9]{1,5}$/i.test(b)) push('file', b); }
       if(kind === 'hostport'){ const h = v.slice(0, v.lastIndexOf(':')); push(/^[\d.]+$/.test(h) ? 'ipv4' : 'domain', h); }
@@ -98,11 +170,15 @@ function extract(text){
 }
 
 /* ---------- time ---------- */
+const DTF = new Map();
+const dtf = (loc, o) => { const k = loc + JSON.stringify(o); let f = DTF.get(k); if(!f){ f = new Intl.DateTimeFormat(loc, o); DTF.set(k, f); } return f; };
+const PARTS = new Map();
 function partsIn(ep, tz){
+  const pk = tz + '|' + ep; const hit = PARTS.get(pk); if(hit) return hit;
   try{
-    const f = new Intl.DateTimeFormat('en-US',{timeZone:tz,hour12:false,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    const f = dtf('en-US',{timeZone:tz,hour12:false,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'});
     const p = {}; for(const x of f.formatToParts(ep)) p[x.type] = x.value;
-    return {y:+p.year, mo:+p.month, d:+p.day, h:(+p.hour) % 24, mi:+p.minute, s:+p.second};
+    const r = {y:+p.year, mo:+p.month, d:+p.day, h:(+p.hour) % 24, mi:+p.minute, s:+p.second}; if(PARTS.size > 60000) PARTS.clear(); PARTS.set(pk, r); return r;
   }catch(e){ const d = new Date(ep); return {y:d.getUTCFullYear(),mo:d.getUTCMonth()+1,d:d.getUTCDate(),h:d.getUTCHours(),mi:d.getUTCMinutes(),s:d.getUTCSeconds()}; }
 }
 const tzOff = (ep, tz) => { const p = partsIn(ep, tz); return Date.UTC(p.y, p.mo-1, p.d, p.h, p.mi, p.s) - ep; };
@@ -111,7 +187,7 @@ function wallToEpoch(y, mo, d, h, mi, s, tz){
   const o2 = tzOff(e, tz); if(o2 !== o1) e = g - o2; return e;
 }
 function zoneAbbr(ep, tz){
-  try{ return (new Intl.DateTimeFormat('en-US',{timeZone:tz,timeZoneName:'short'}).formatToParts(ep).find(x => x.type === 'timeZoneName') || {}).value || tz; }
+  try{ return (dtf('en-US',{timeZone:tz,timeZoneName:'short'}).formatToParts(ep).find(x => x.type === 'timeZoneName') || {}).value || tz; }
   catch(e){ return tz; }
 }
 const carriesZone = s => /(?:z|[+-]\d{2}:?\d{2}|\b(?:utc|gmt)\b)\s*$/i.test(String(s).trim());
@@ -147,7 +223,7 @@ const fmtClock = (ts, tz) => { const p = partsIn(ts, tz); return pad(p.h)+':'+pa
 const fmtFull  = (ts, tz) => { const p = partsIn(ts, tz); return p.y+'-'+pad(p.mo)+'-'+pad(p.d)+' '+pad(p.h)+':'+pad(p.mi)+':'+pad(p.s); };
 const fmtDate  = (ts, tz) => { const p = partsIn(ts, tz); return p.y+'-'+pad(p.mo)+'-'+pad(p.d); };
 function fmtDay(ts, tz){
-  try{ return new Intl.DateTimeFormat('en-GB',{timeZone:tz,weekday:'short',year:'numeric',month:'short',day:'numeric'}).format(ts); }
+  try{ return dtf('en-GB',{timeZone:tz,weekday:'short',year:'numeric',month:'short',day:'numeric'}).format(ts); }
   catch(e){ return fmtDate(ts, tz); }
 }
 function fmtGap(ms){
@@ -185,7 +261,14 @@ const HOTKEY = [[/currentversion\\run(once)?\b/i,'Autorun persistence, T1547.001
 const BADTLD = /\.(tk|ml|ga|cf|gq|top|xyz|zip|mov|icu)$/i;
 function ipClass(v){
   const o = v.split('.').map(Number);
+  if(String(v).includes(':')){ const l = String(v).toLowerCase(); return l === '::1' ? 'Loopback' : /^fe[89ab]/.test(l) ? 'Link-local' : /^f[cd]/.test(l) ? 'Private — unique local' : /^ff/.test(l) ? 'Multicast' : /^2001:0?db8:/.test(l) ? 'Documentation range — RFC 3849' : 'Public address'; }
   if(o[0] === 127) return 'Loopback';
+  if(o[0] === 0) return 'This network — reserved';
+  if(o[0] === 169 && o[1] === 254) return 'Link-local';
+  if(o[0] === 100 && o[1] >= 64 && o[1] <= 127) return 'Carrier-grade NAT — RFC 6598';
+  if(o[0] === 198 && (o[1] === 18 || o[1] === 19)) return 'Benchmarking — RFC 2544';
+  if(o[0] >= 224 && o[0] <= 239) return 'Multicast';
+  if(o[0] >= 240) return 'Reserved';
   if(o[0] === 10 || (o[0] === 172 && o[1] >= 16 && o[1] <= 31) || (o[0] === 192 && o[1] === 168)) return 'Private — RFC 1918';
   if((o[0] === 192 && o[1] === 0 && o[2] === 2) || (o[0] === 198 && o[1] === 51 && o[2] === 100) || (o[0] === 203 && o[1] === 0 && o[2] === 113)) return 'Documentation range — RFC 5737';
   return 'Public address';
@@ -262,11 +345,12 @@ function chapters(timed){
    bare words = substring; field:value; -x excludes; OR / | splits alternatives */
 const FIELDS = /^(host|source|from|tag|type|kind|ent|verdict|after|before|is|has)$/;
 function parseGroup(q){
-  const ast = {text:[], neg:[], f:[]}, re = /(-)?(?:([a-zA-Z]+):)?(?:"([^"]*)"|(\S+))/g; let m;
+  const ast = {text:[], neg:[], f:[]}, re = /(-)?(?:([a-zA-Z][\w.\-]*):(?!\/\/))?(?:"([^"]*)"|(\S+))/g; let m;
   while((m = re.exec(q)) !== null){
     const neg = !!m[1], field = (m[2] || '').toLowerCase(), val = (m[3] != null ? m[3] : (m[4] || '')).trim();
     if(!val) continue;
     if(field && FIELDS.test(field)) ast.f.push({field, val:val.toLowerCase(), raw:val, neg});
+    else if(field && !/^(https?|hxxps?|ftp|mailto|file)$/.test(field)) ast.f.push({field:'fld', name:field, val:val.toLowerCase(), raw:val, neg, text:(field + ':' + val).toLowerCase()});
     else (neg ? ast.neg : ast.text).push(((field ? field + ':' : '') + val).toLowerCase());
   }
   return ast;
@@ -277,7 +361,7 @@ function parseQuery(q){
 }
 
 const REF = {EVENTIDS, SYSMON, EVIL_PORTS, PORTS, LOLBINS};
-return {REF, esc, safeUrl, refang, extract, KINDS, GROUP, LABEL, parseTime, carriesZone, lineTime, zoneAbbr,
+return {REF, esc, safeUrl, refang, extract, norm, normSocial, normPhone, normMac, cryptoKind, validIPv6, KINDS, GROUP, LABEL, parseTime, carriesZone, lineTime, zoneAbbr,
   fmtClock, fmtFull, fmtDate, fmtDay, fmtGap, fmtAgo, relClock, meaning, observations, ipClass, beaconOf,
   chapters, parseQuery};
 })();

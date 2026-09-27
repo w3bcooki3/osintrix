@@ -214,6 +214,10 @@ function recFields(r){
   for(const m of s.matchAll(/(\w+)=("([^"]*)"|'([^']*)'|(\S+))/g)) f[m[1].toLowerCase()] = (m[3] ?? m[4] ?? m[5] ?? '').toLowerCase();
   const ev = s.match(/EventID[:= ]\s*(\d+)/i); if(ev) f.eventid = ev[1];
   if(r.host) f.computer = r.host.toLowerCase(); f.source = (r.source || '').toLowerCase();
+  const P = typeof parseLog === 'function' ? parseLog(r.body) : null;
+  if(P){ for(const [k, v] of Object.entries(P.fields)){ const key = k.toLowerCase().replace(/^.*\./, ''); if(f[key] == null) f[key] = String(v).toLowerCase(); }
+    const SIG = {'src.ip':'sourceip', 'src.port':'sourceport', 'dst.ip':'destinationip', 'dst.port':'destinationport', user:'user', process:'image', cmd:'commandline', parent:'parentimage', domain:'queryname', url:'url', 'event.id':'eventid', host:'computer', method:'cs-method', status:'sc-status', ua:'c-useragent', file:'targetfilename', hash:'hashes', proto:'protocol', action:'action'};
+    for(const [c, sg] of Object.entries(SIG)) if(P.norm[c] != null && f[sg] == null) f[sg] = String(P.norm[c]).toLowerCase(); }
   const alias = {commandline:['cmdline','command'], image:['process','newprocessname'], targetfilename:['filename','file'], destinationip:['dst','dest_ip'], destinationhostname:['queryname','dns'], queryname:['destinationhostname']};
   for(const [k, as] of Object.entries(alias)) if(!f[k]) for(const a of as) if(f[a]){ f[k] = f[a]; break; }
   return f;

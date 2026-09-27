@@ -45,25 +45,25 @@ function delRecord(ids){
 
 /* ---------- restore points (full snapshots in IndexedDB, outside the main state) ---------- */
 let SNAPS = null; const SNAP_MAX = 8;
-async function snapsLoad(){ if(SNAPS) return SNAPS; const raw = await IDB.get('osintrix-snaps'); try{ SNAPS = raw ? JSON.parse(raw) : []; }catch(e){ SNAPS = []; } return SNAPS; }
+async function snapsLoad(){ if(SNAPS) return SNAPS; const raw = await IDB.get('osintrix-snaps'); try{ SNAPS = raw ? JSON.parse(await openStr(raw)) : []; }catch(e){ SNAPS = []; } return SNAPS; }
 async function snapshot(why){
   if(!STORE.idb) return false; await snapsLoad(); const at = Date.now(), json = JSON.stringify(DB);
-  if(!await IDB.set('osintrix-snap:' + at, json)) return false;
+  if(!await IDB.set('osintrix-snap:' + at, await sealStr(json))) return false;
   SNAPS.unshift({at, why, size:json.length, cases:DB.cases.length, records:DB.records.length});
   while(SNAPS.length > SNAP_MAX){ const o = SNAPS.pop(); IDB.del('osintrix-snap:' + o.at); }
-  await IDB.set('osintrix-snaps', JSON.stringify(SNAPS)); return true;
+  await IDB.set('osintrix-snaps', await sealStr(JSON.stringify(SNAPS))); return true;
 }
 async function snapRestore(at){
   const s = (SNAPS || []).find(x => x.at === +at); if(!s) return;
   confirmDlg('Go back to this restore point?', `Everything in this browser returns to how it was ${E.fmtFull(s.at, tz()).slice(0, 16)} (${s.why}). A restore point of the current state is made first, so you can come back.`, 'Restore', async () => {
-    const raw = await IDB.get('osintrix-snap:' + s.at); let d = null; try{ d = JSON.parse(raw); }catch(e){}
+    const raw = await IDB.get('osintrix-snap:' + s.at); let d = null; try{ d = JSON.parse(await openStr(raw)); }catch(e){}
     if(!d || !Array.isArray(d.cases)) return toast('That restore point could not be read');
     await snapshot('Before restoring a restore point'); const prefs = DB.prefs; DB = d; DB.prefs = Object.assign({}, d.prefs, {lastExport:prefs.lastExport, remindAt:prefs.remindAt});
     ensureTools(); ensurePlaybooks(); ensureIntel(); ensureQueries(); ensureRules(); ensureNotes(); if(!DB.cases.some(c => c.id === DB.active)) DB.active = DB.cases[0].id;
     UI.sel = null; mutate('restored restore point'); applyPrefs(); renderAll(); toast('Restored');
   }, true);
 }
-async function snapDownload(at){ const raw = await IDB.get('osintrix-snap:' + at); if(raw) download('osintrix-restore-point-' + new Date(+at).toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.json', raw, 'application/json'); }
+async function snapDownload(at){ let raw = await IDB.get('osintrix-snap:' + at); if(raw && isEnv(raw)){ return downloadEncrypted('osintrix-restore-point.json', JSON.parse(await openStr(raw))); } if(raw) download('osintrix-restore-point-' + new Date(+at).toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.json', raw, 'application/json'); }
 async function snapNow(){ if(await snapshot('Made by hand')){ renderMain(); toast('Restore point saved'); } else toast('Restore points need IndexedDB, which this browser blocked'); }
 
 function viewTrash(){
@@ -100,25 +100,30 @@ async function storeFile(f){
   if(!STORE.idb) throw new Error('idb');
   if(f.size > 50 * 1048576) throw new Error('big');
   const buf = await f.arrayBuffer(), sha = await sha256Hex(buf), id = uid('f');
-  if(!await IDB.set('file:' + id, new Blob([buf], {type:f.type || 'application/octet-stream'}))) throw new Error('idb');
-  return {id, name:f.name || 'pasted-image.png', type:f.type || '', size:f.size, sha256:sha, modified:f.lastModified || Date.now(), added:Date.now()};
+  if(!await IDB.set('file:' + id, await sealBlob(new Blob([buf], {type:f.type || 'application/octet-stream'})))) throw new Error('idb');
+  let gps = null, cam = ''; if(/jpe?g|tiff|heic/i.test(f.type || f.name || '')){ try{ const x = exif(new Uint8Array(buf)); if(x){ if(x.GPS) gps = x.GPS; cam = [x.Make, x.Model].filter(Boolean).join(' '); } }catch(e){} }
+  const dhash = /^image\//.test(f.type || '') ? await dhashBlob(new Blob([buf], {type:f.type})) : null;
+  return {id, name:f.name || 'pasted-image.png', type:f.type || '', size:f.size, sha256:sha, modified:f.lastModified || Date.now(), added:Date.now(), gps, cam, dhash};
 }
-async function fileBlob(fid){ return await IDB.get('file:' + fid); }
+async function fileBlob(fid){ return await openBlob(await IDB.get('file:' + fid)); }
 async function fileURL(fid){ if(FILE_URLS.has(fid)) return FILE_URLS.get(fid); const b = await fileBlob(fid); if(!b) return null; const u = URL.createObjectURL(b); FILE_URLS.set(fid, u); return u; }
 function hydrateThumbs(root){ (root || document).querySelectorAll('img[data-fid]:not([src])').forEach(async im => { const u = await fileURL(im.dataset.fid); if(u) im.src = u; else im.replaceWith(Object.assign(document.createElement('span'), {className:'t3', textContent:'File missing from this browser'})); }); }
 new MutationObserver(() => { if(document.querySelector('img[data-fid]:not([src])')) hydrateThumbs(); }).observe(document.documentElement, {childList:true, subtree:true});
 
 async function attachFiles(files, recId){
   files = [...files].filter(f => f && f.size != null); if(!files.length) return;
+  if(!recId){ const pages = files.filter(isWebPage); if(pages.length){ files = files.filter(f => !isWebPage(f)); await importWebPages(pages); if(!files.length) return; } }
   if(!STORE.idb) return toast('Attachments need IndexedDB, which this browser blocked');
   const made = [], metas = []; let skipped = 0;
   for(const f of files){ let m; try{ m = await storeFile(f); }catch(e){ skipped++; continue; } metas.push(m); }
   if(!metas.length) return toast(skipped ? 'Files over 50 MB are not stored' : 'Nothing attached');
   if(recId){ const r = recById(recId); r.att = (r.att || []).concat(metas); mutate('attached ' + metas.length + ' file(s)'); renderAll(); return toast(metas.length + ' file' + (metas.length > 1 ? 's' : '') + ' attached'); }
-  for(const m of metas){ const img = /^image\//.test(m.type), body = `${img ? 'Screenshot' : 'File'}: ${m.name}\nType: ${m.type || 'unknown'}\nSize: ${m.size} bytes\nSHA-256: ${m.sha256}`;
-    made.push({id:uid('r'), caseId:DB.active, type:'evidence', title:(img ? 'Screenshot: ' : 'File: ') + m.name, body, tsRaw:new Date(m.modified).toISOString(), tsZone:'explicit', ts:m.modified, source:'attachment', host:'', tags:[img ? 'screenshot' : 'file'], ents:E.extract(body).filter(e => e.k !== 'file'), answer:'', addedBy:'You', addedAt:Date.now(), hash:'', att:[m]}); }
+  const cid = capCase();
+  for(const m of metas){ const img = /^image\//.test(m.type), body = `${img ? (m.cam || m.gps ? 'Photo' : /png/i.test(m.type) ? 'Screenshot' : 'Image') : 'File'}: ${m.name}\nType: ${m.type || 'unknown'}\nSize: ${m.size} bytes\nSHA-256: ${m.sha256}${m.cam ? '\nCamera: ' + m.cam : ''}${m.gps ? '\nEXIF GPS: ' + m.gps.lat.toFixed(6) + ', ' + m.gps.lon.toFixed(6) : ''}`;
+    made.push({id:uid('r'), caseId:cid, type:'evidence', title:(img ? (m.cam || m.gps ? 'Photo: ' : /png/i.test(m.type) ? 'Screenshot: ' : 'Image: ') : 'File: ') + m.name, body, tsRaw:new Date(m.modified).toISOString(), tsZone:'explicit', ts:m.modified, source:'attachment', host:'', tags:[img ? 'screenshot' : 'file'], ents:E.extract(body).filter(e => e.k !== 'file'), answer:'', addedBy:'You', addedAt:Date.now(), hash:'', att:[m]}); }
   DB.records.push(...made); mutate('added ' + made.length + ' file record(s)'); await hashRecords(); closeDlg();
-  UI.sel = {kind:'rec', id:made[0].id}; UI.inspOpen = true; UI.tlMode = 'events'; go(caseHash(DB.active, 'timeline'));
+  afterCapture(cid, made.map(r => r.id)); watchNotify(made);
+  UI.sel = {kind:'rec', id:made[0].id}; UI.inspOpen = true; UI.tlMode = 'events'; go(caseHash(cid, 'timeline'));
   toast(made.length + ' file' + (made.length > 1 ? 's' : '') + ' added as evidence' + (skipped ? ' · ' + skipped + ' skipped (over 50 MB)' : ''));
 }
 function attSection(r){
@@ -136,7 +141,8 @@ async function attAct(a, rid, fid){
   const r = recById(rid), m = r && (r.att || []).find(x => x.id === fid);
   if(a === 'attAdd') return pickFiles('', fs => attachFiles(fs, rid));
   if(!m) return;
-  if(a === 'attOpen'){ const u = await fileURL(fid); return u ? window.open(u, '_blank', 'noopener') : toast('That file is missing from this browser'); }
+  if(a === 'attOpen'){ if(/html|xml|svg|mhtml|multipart|message\/rfc822|^image\//i.test(m.type) || /\.(html?|xhtml|svg|xml|mhtml?|mht)$/i.test(m.name)) return safeView(rid, fid);
+    const u = await fileURL(fid); return u ? window.open(u, '_blank', 'noopener') : toast('That file is missing from this browser'); }
   if(a === 'attDl'){ const b = await fileBlob(fid); if(!b) return toast('That file is missing from this browser'); const u = URL.createObjectURL(b), l = document.createElement('a'); l.href = u; l.download = m.name; document.body.appendChild(l); l.click(); setTimeout(() => { URL.revokeObjectURL(u); l.remove(); }, 200); return; }
   if(a === 'attKit'){ const b = await fileBlob(fid); if(!b) return toast('That file is missing from this browser'); go('#/lab'); UI.labTab = 'file'; return labLoad(new File([b], m.name, {type:m.type, lastModified:m.modified})); }
   if(a === 'attDel') return confirmDlg('Remove ' + m.name + '?', 'The file is removed from this record and deleted from the browser. The record stays.', 'Remove file', () => { r.att = r.att.filter(x => x !== m); if(!fileInUse(fid) && !(DB.trash || []).some(x => filesOfItem(x).includes(fid))) IDB.del('file:' + fid); mutate('removed file ' + m.name); renderAll(); });
@@ -147,12 +153,15 @@ async function filesForExport(recs){
   for(const fid of ids){ const b = await fileBlob(fid); if(!b) continue; out[fid] = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = () => res(null); fr.readAsDataURL(b); }); }
   return out;
 }
-async function filesFromImport(files){ let n = 0; for(const [fid, url] of Object.entries(files || {})){ if(typeof url !== 'string' || !url.startsWith('data:')) continue; try{ const b = await (await fetch(url)).blob(); if(await IDB.set('file:' + fid, b)) n++; }catch(e){} } return n; }
-async function exportEverything(){
+async function filesFromImport(files){ let n = 0; for(const [fid, url] of Object.entries(files || {})){ if(typeof url !== 'string' || !url.startsWith('data:')) continue; try{ const m = url.match(/^data:([^;,]*)(;base64)?,(.*)$/); const bytes = m[2] ? b64d8(m[3]) : new TextEncoder().encode(decodeURIComponent(m[3])); if(await IDB.set('file:' + fid, await sealBlob(new Blob([bytes], {type:m[1] || 'application/octet-stream'})))) n++; }catch(e){} } return n; }
+async function exportEverything(enc){
+  if(enc == null) enc = !!SEC.key;
   const all = DB.records.concat((DB.trash || []).flatMap(x => x.kind === 'record' ? [x.data.r] : x.kind === 'case' ? x.data.records : []));
   const files = await filesForExport(all), n = Object.keys(files).length;
   DB.prefs.lastExport = Date.now(); DB.prefs.remindAt = 0; save();
-  download('osintrix-' + new Date().toISOString().slice(0, 10) + '.json', JSON.stringify(n ? Object.assign({}, DB, {files}) : DB, null, 2), 'application/json');
+  const name = 'osintrix-' + new Date().toISOString().slice(0, 10) + '.json', obj = n ? Object.assign({}, DB, {files}) : DB;
+  if(enc) return downloadEncrypted(name, obj);
+  download(name, JSON.stringify(obj, null, 2), 'application/json');
   if(UI.route.area === 'home') renderMain();
 }
 
@@ -193,7 +202,7 @@ const LOG_GUESS = {time:/^(@?timestamp|time|date|datetime|eventtime|_time|ts|utc
 function logGuess(cols, key){ return cols.find(c => LOG_GUESS[key].test(c)) || cols.find(c => LOG_GUESS[key].test(c.split('.').pop())) || ''; }
 function logTime(raw){
   if(raw == null || raw === '') return null; const s = String(raw).trim();
-  if(/^\d{10}(\.\d+)?$/.test(s)) return Math.round(parseFloat(s) * 1000); if(/^\d{13}$/.test(s)) return +s; if(/^\d{16}$/.test(s)) return Math.round(+s / 1000);
+  if(/^\d{10}(\.\d+)?$/.test(s)) return Math.round(parseFloat(s) * 1000); if(/^\d{13}$/.test(s)) return +s; if(/^\d{16}$/.test(s)) return Math.round(+s / 1000); if(/^\d{19}$/.test(s)) return Math.round(+s.slice(0, 13));
   const t = E.parseTime(s, tz()); return t == null || isNaN(t) ? (isNaN(Date.parse(s)) ? null : Date.parse(s)) : t;
 }
 let LOGIMP = null;
@@ -201,19 +210,19 @@ function logImportFile(f){
   if(f.size > 25 * 1048576) return toast('Log files over 25 MB are too big for one import — split it first');
   const fr = new FileReader(); fr.onload = () => { const P = logParse(String(fr.result), f.name); if(!P.rows.length) return toast('No rows found in that file');
     const cols = [...new Set(P.rows.slice(0, 200).flatMap(r => Object.keys(r)))];
-    LOGIMP = {name:f.name, fmt:P.fmt, rows:P.rows, cols, map:{time:logGuess(cols, 'time'), title:logGuess(cols, 'title'), host:logGuess(cols, 'host'), source:logGuess(cols, 'source')}}; logImportDlg(); };
+    LOGIMP = {caseId:capCase(), name:f.name, fmt:P.fmt, rows:P.rows, cols, map:{time:logGuess(cols, 'time'), title:logGuess(cols, 'title'), host:logGuess(cols, 'host'), source:logGuess(cols, 'source')}}; logImportDlg(); };
   fr.readAsText(f);
 }
 function logRec(row, M, name){
   const tsRaw = M.time ? row[M.time] : '', ts = logTime(tsRaw);
   const kv = Object.entries(row).filter(([k, v]) => v !== '' && k !== M.time).map(([k, v]) => { const key = k.replace(/\W+/g, '_'); v = String(v).replace(/\s*\n\s*/g, ' '); return key + '=' + (/[\s"]/.test(v) ? '"' + v.replace(/"/g, "'") + '"' : v); }).join(' ');
-  const title = (M.title && row[M.title] ? String(row[M.title]) : kv).replace(/\s+/g, ' ').slice(0, 96) || 'Log row';
+  const title = (M.title && row[M.title] ? String(row[M.title]) : parsedTitle(parseLog(kv)) || kv).replace(/\s+/g, ' ').slice(0, 110) || 'Log row';
   const body = (row.line != null && Object.keys(row).length === 1) ? row.line : kv;
-  return {id:uid('r'), caseId:DB.active, type:'evidence', title, body, tsRaw:tsRaw ? String(tsRaw) : '', tsZone:'explicit', ts, source:(M.source && row[M.source]) || 'import:' + name, host:(M.host && row[M.host]) || '', tags:['imported'], ents:E.extract(body), answer:'', addedBy:'You', addedAt:Date.now(), hash:''};
+  return {id:uid('r'), caseId:(LOGIMP && LOGIMP.caseId) || DB.active, type:'evidence', title, body, tsRaw:tsRaw ? String(tsRaw) : '', tsZone:'explicit', ts, source:(M.source && row[M.source]) || 'import:' + name, host:(M.host && row[M.host]) || '', tags:['imported'], ents:extractRich(body), answer:'', addedBy:'You', addedAt:Date.now(), hash:'', pv:1};
 }
 function logImportDlg(){
   const L = LOGIMP, sel = (k, lbl) => `<div class="field" style="margin:0"><label for="lm_${k}">${lbl}</label><select id="lm_${k}" data-lm="${k}"><option value="">—</option>${L.cols.map(c => `<option${L.map[k] === c ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select></div>`;
-  openDlg(dhead('Import log file') + `<div class="in"><p class="t2" style="margin:0 0 14px;font-size:14px"><b style="color:var(--text)">${esc(L.name)}</b> · ${esc(L.fmt)} · ${L.rows.length.toLocaleString()} rows · ${L.cols.length} columns. Each row becomes one evidence record in <b style="color:var(--text)">${esc(theCase().name)}</b>, with every column kept as <span class="mono">key=value</span> so detections can test it.</p>
+  openDlg(dhead(esc(L.title || 'Import log file')) + `<div class="in"><p class="t2" style="margin:0 0 14px;font-size:14px"><b style="color:var(--text)">${esc(L.name)}</b> · ${esc(L.fmt)} · ${L.rows.length.toLocaleString()} rows · ${L.cols.length} columns. Each row becomes one evidence record in <b style="color:var(--text)">${esc(theCase(L.caseId).name)}</b>, with every column kept as <span class="mono">key=value</span> so detections can test it.</p>
     <div class="frow4">${sel('time', 'Time column')}${sel('title', 'Title column')}${sel('host', 'Host column')}${sel('source', 'Source column')}</div>
     <h4 class="caps" style="margin:18px 0 8px">Preview</h4><div id="lmPrev" class="lmprev"></div>
     ${L.rows.length > 5000 ? `<p class="note amber" style="margin-top:12px"><span class="ic">${ico('triangle-alert','sm')}</span><span>Only the first 5,000 rows are imported. Filter the file first for the rest.</span></p>` : ''}</div>
@@ -224,7 +233,7 @@ function logImportDlg(){
 async function logGo(){
   const L = LOGIMP; if(!L) return; await snapshot('Before importing ' + L.name);
   const made = L.rows.slice(0, 5000).map(r => logRec(r, L.map, L.name)); DB.records.push(...made); LOGIMP = null; closeDlg();
-  mutate('imported ' + made.length + ' log rows'); await hashRecords(); UI.tlMode = 'events'; go(caseHash(DB.active, 'timeline'));
+  mutate('imported ' + made.length + ' log rows'); await hashRecords(); afterCapture(L.caseId, made.map(r => r.id)); watchNotify(made); UI.tlMode = 'events'; go(caseHash(L.caseId, 'timeline'));
   const ids = new Set(made.map(r => r.id)), timed = made.filter(r => r.ts).length;
   toast(`${made.length.toLocaleString()} rows imported${timed < made.length ? ' · ' + (made.length - timed) + ' without a time' : ''}`, 'Undo', () => { DB.records = DB.records.filter(r => !ids.has(r.id)); mutate('undid log import'); renderAll(); });
 }
@@ -236,5 +245,5 @@ const SAFE_ACTS = {
   bkpLater:() => { DB.prefs.remindAt = Date.now() + 7 * 864e5; save(); renderMain(); },
   recDel:id => delRecord(id),
   attAdd:(id, v, t) => attAct('attAdd', id, v), attOpen:(id, v) => attAct('attOpen', id, v), attDl:(id, v) => attAct('attDl', id, v), attKit:(id, v) => attAct('attKit', id, v), attDel:(id, v) => attAct('attDel', id, v),
-  capFiles:() => pickFiles('', fs => attachFiles(fs)), capLog:() => pickFiles('.csv,.tsv,.json,.ndjson,.jsonl,.log,.txt', fs => logImportFile(fs[0]), false), logGo:() => logGo()
+  capFiles:() => pickFiles('', fs => attachFiles(fs)), capWeb:() => pickFiles('.mhtml,.mht,.html,.htm,.xhtml', fs => importWebPages(fs)), capLog:() => pickFiles('.csv,.tsv,.json,.ndjson,.jsonl,.log,.txt', fs => logImportFile(fs[0]), false), logGo:() => logGo()
 };

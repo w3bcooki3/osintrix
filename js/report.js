@@ -71,6 +71,8 @@ function reportModel(c, D, tpl, redact){
       add('Files', D.recs.flatMap(r => (r.att || []).map(a => row(fmtBytes(a.size), red(a.name) + ' · sha256 ' + a.sha256, cite(r.id), true))));
     }
   }
+  if(c.ach && c.ach.hyps.length && tpl !== 'ctf'){ const S = achScore(c.ach); add('Competing hypotheses', S.rank.map((s, i) => row(s.h.status === 'rejected' ? 'Rejected' : '#' + (i + 1), red(s.h.t) + ' — ' + s.inc.toFixed(1) + ' against, ' + s.con.toFixed(1) + ' for' + (s.h.note ? ' (' + red(s.h.note) + ')' : '')))
+    .concat([para('', 'Ranked by weighted evidence against each hypothesis (analysis of competing hypotheses), across ' + c.ach.ev.length + ' pieces of evidence and assumptions.')])); }
   add('Evidence cited', cites.map((id, i) => { const r = recById(id); return {k:'src', n:i + 1, t:red(r.title), s:red(r.source || ''), h:(r.hash || '').slice(0, 16)}; }));
   return {S, cites, red};
 }

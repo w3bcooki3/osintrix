@@ -34,6 +34,7 @@ function evBulkHTML(list){
 const csvCell = v => { v = String(v == null ? '' : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
 function recsCsv(rs){ return ['time,title,type,host,source,tags,entities,body'].concat(rs.map(r => [r.ts ? new Date(r.ts).toISOString() : '', r.title, r.type, r.host, r.source, (r.tags || []).join(' '), r.ents.map(e => e.k + ':' + e.v).join(' '), r.body].map(csvCell).join(','))).join('\n'); }
 const TL_ACTS = {
+  tlMore:(id, v) => { const cur = UI.tlLim && UI.tlLim.k === v ? UI.tlLim.n : 300; UI.tlLim = {k:v, n:id === 'all' ? 1e9 : cur + 500}; renderMain(); },
   tlHeat:() => { UI.tlHeat = !UI.tlHeat; if(!UI.tlHeat) delete UI.facet.slot; renderMain(); },
   heatCell:(id, v) => { const s = JSON.parse(v), cur = UI.facet.slot; UI.facet.slot = cur && cur.h === s.h && cur.day === s.day && cur.wd === s.wd ? null : s; renderMain(); },
   slotOff:() => { delete UI.facet.slot; renderMain(); },

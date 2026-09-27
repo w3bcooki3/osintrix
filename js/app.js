@@ -1,12 +1,12 @@
 /* ==========================================================================
    Render loop, events, keyboard, boot
    ========================================================================== */
-function applyPrefs(){ const h = document.documentElement, p = DB.prefs; h.dataset.theme = p.theme; h.dataset.size = p.size; h.dataset.density = p.density;
+function applyPrefs(){ const h = document.documentElement, p = DB.prefs; h.dataset.theme = p.theme; try{ localStorage.setItem('osintrix:theme', p.theme); }catch(e){} h.dataset.size = p.size; h.dataset.density = p.density;
   const t = $('themeBtn'); if(t) t.innerHTML = ico(p.theme === 'dark' ? 'sun' : 'moon'); }
 const isNarrow = () => window.innerWidth < 1440;
 function renderMain(){
   const r = UI.route, el = $('main');
-  const V = {trash:viewTrash, ctf:viewCTF, lab:viewLab, help:viewHelp, home:viewHome, cases:viewCases, toolbox:viewToolbox, entities:viewEntities, feeds:viewIntel, decoder:viewDecoder, reference:viewReference, settings:viewSettings,
+  const V = {security:viewSecurity, watch:viewWatch, trash:viewTrash, ctf:viewCTF, lab:viewLab, help:viewHelp, home:viewHome, cases:viewCases, toolbox:viewToolbox, entities:viewEntities, feeds:viewIntel, decoder:viewDecoder, reference:viewReference, settings:viewSettings,
     detections:viewDetections, queries:viewQueries, notes:viewNotes, playbooks:viewPlaybooks};
   if(cy && !(r.area === 'case' && r.tab === 'graph')){ cy.destroy(); cy = null; }
   const key = r.area + '/' + (r.tab || ''), sc = el.querySelector('.scroll'), keepY = renderMain.key === key && sc ? sc.scrollTop : 0; renderMain.key = key;
@@ -14,15 +14,19 @@ function renderMain(){
   catch(err){ console.error(err); el.innerHTML = `<div class="page"><div class="note red"><span class="ic">${ico('triangle-alert','sm')}</span><div><b>This screen failed to draw.</b> Your data is safe. <code class="mono">${esc(err.message)}</code></div></div></div>`; }
   if(keepY){ const s2 = el.querySelector('.scroll'); if(s2) s2.scrollTop = keepY; }
   if(r.area === 'case' && r.tab === 'graph') requestAnimationFrame(mountGraph);
+  if(r.area === 'case' && r.tab === 'map') requestAnimationFrame(mountMap);
   { const at = el.querySelector('.tabs [aria-selected=true]'); if(at && at.parentElement.scrollWidth > at.parentElement.clientWidth) at.parentElement.scrollLeft = at.offsetLeft - 16; }
   if(r.area === 'toolbox') paintBulk();
   if(r.area === 'queries') bindQueryPanel();
   if(r.area === 'decoder') bindDecoder();
   if(r.area === 'lab') bindLab();
   if(r.area === 'detections') bindRuleEditor();
+  if(r.area === 'case' && r.tab === 'entities') bindCaseEnts();
+  if(r.area === 'security') paintFp();
+  el.classList.toggle('lock', !!el.querySelector('.drw'));
 }
-function renderAll(){ renderNav(); renderMain(); renderInsp(); $('inspBtn').classList.toggle('on', UI.inspOpen); }
-const TITLES = {trash:'Trash', ctf:'CTF', lab:'Forensics kit', help:'Help', home:'Dashboard', cases:'Cases', toolbox:'Toolbox', entities:'Entities', feeds:'Threat Intel', decoder:'Decoder', reference:'Reference', settings:'Settings', detections:'Detections', queries:'Query library', notes:'Notes', playbooks:'Playbooks', library:'Library'};
+function renderAll(){ renderNav(); renderMain(); renderInsp(); paintLock(); $('inspBtn').classList.toggle('on', UI.inspOpen); }
+const TITLES = {security:'Security', watch:'Watchlist', trash:'Trash', ctf:'CTF', lab:'Forensics kit', help:'Help', home:'Dashboard', cases:'Cases', toolbox:'Toolbox', entities:'Entities', feeds:'Threat Intel', decoder:'Decoder', reference:'Reference', settings:'Settings', detections:'Detections', queries:'Query library', notes:'Notes', playbooks:'Playbooks', library:'Library'};
 function onRoute(){
   UI.route = parseHash(); $('side').classList.remove('open');
   document.title = (UI.route.area === 'case' ? theCase().name.split(' — ')[0] + ' · ' + CASE_TABS.find(t => t[0] === UI.route.tab)[1] : TITLES[UI.route.area] || 'OSINTrix') + ' — OSINTrix';
@@ -59,6 +63,16 @@ document.addEventListener('click', ev => {
   if(SAFE_ACTS[a]) return SAFE_ACTS[a](id, v, t, ev);
   if(TL_ACTS[a]) return TL_ACTS[a](id, v, t, ev);
   if(REP_ACTS[a]) return REP_ACTS[a](id, v, t, ev);
+  if(CE_ACTS[a]) return CE_ACTS[a](id, v, t, ev);
+  if(REL_ACTS[a]) return REL_ACTS[a](id, v, t, ev);
+  if(WATCH_ACTS[a]) return WATCH_ACTS[a](id, v, t, ev);
+  if(PARSE_ACTS[a]) return PARSE_ACTS[a](id, v, t, ev);
+  if(MAP_ACTS[a]) return MAP_ACTS[a](id, v, t, ev);
+  if(RS_ACTS[a]) return RS_ACTS[a](id, v, t, ev);
+  if(ACH_ACTS[a]) return ACH_ACTS[a](id, v, t, ev);
+  if(PCAP_ACTS[a]) return PCAP_ACTS[a](id, v, t, ev);
+  if(SQL_ACTS[a]) return SQL_ACTS[a](id, v, t, ev);
+  if(SEC_ACTS[a]) return SEC_ACTS[a](id, v, t, ev);
   if(a === 'toolRun') return toolRunDlg(id);
   if(a === 'trPick'){ $('trV').value = v; return $('trV').focus(); }
   switch(a){
@@ -77,6 +91,7 @@ document.addEventListener('click', ev => {
     case 'capture': return openCapture();
     case 'capSave': return capSave(false);
     case 'capSplit': return capSave(true);
+    case 'capPara': return capSave('para');
     case 'sampleLine': $('capBody').value = '2026-09-14T09:03:15Z EventID 3 Image=C:\\Users\\Public\\svchost.exe DestinationIp=203.0.113.47 -> 203.0.113.47:4444'; $('capSrc').value = 'sysmon'; $('capHost').value = 'WS-FIN-07'; return capPreview();
     case 'dclose': return closeDlg();
     case 'newCase': return caseDlg();
@@ -133,7 +148,7 @@ document.addEventListener('click', ev => {
     case 'goCross': UI.entKind = 'cross'; return go('#/entities');
     case 'entKind': UI.entKind = v || null; return renderMain();
     case 'feedToCase': { const f = DB.feed.find(x => x.id === id); DB.records.push({id:uid('r'), caseId:DB.active, type:'evidence', title:f.title, body:f.body + (f.link ? '\n\nSource: ' + f.link : ''), tsRaw:'', tsZone:'explicit', ts:f.ts, source:'feed:' + f.source, host:'', tags:['intel'], ents:E.extract(f.title + ' ' + f.body), answer:'', addedBy:'You', addedAt:Date.now(), hash:''});
-      mutate('added feed item'); hashRecords(); renderAll(); return toast('Added to ' + theCase().code); }
+      mutate('added feed item'); hashRecords(); { const r0 = DB.records[DB.records.length - 1]; afterCapture(DB.active, [r0.id]); } renderAll(); return toast('Added to ' + theCase().code); }
     case 'feedImport': return importFeedFile();
     case 'feedRefresh': return refreshFeeds();
     case 'intelOn': DB.prefs.liveFeeds = true; save(); closeDlg(); return refreshFeeds();
@@ -165,12 +180,12 @@ document.addEventListener('click', ev => {
     case 'bulkDel': { const xs = DB.tools.filter(z => UI.tpick.has(z.id)); return confirmDlg('Delete ' + xs.length + ' tool' + (xs.length > 1 ? 's' : '') + '?', 'They will be removed from your toolbox. You can undo right after.', 'Delete ' + xs.length, () => {
       const prev = DB.tools.slice(), prevGone = (DB.deletedSeed || []).slice(); DB.tools = DB.tools.filter(z => !UI.tpick.has(z.id)); DB.deletedSeed = prevGone.concat(xs.filter(z => z.seed).map(z => z.url)); UI.tpick = new Set(); mutate('deleted ' + xs.length + ' tools'); renderAll();
       toast(xs.length + ' tools deleted', 'Undo', () => { DB.tools = prev; DB.deletedSeed = prevGone; mutate('restored tools'); renderAll(); }); }); }
-    case 'importAll': return pickFile('.json,application/json', txt => { let d; try{ d = JSON.parse(txt); }catch(e){ return toast('That file is not JSON'); }
+    case 'importAll': return pickFile('.json,application/json', raw => maybeDecrypt(raw, txt => { let d; try{ d = JSON.parse(txt); }catch(e){ return toast('That file is not JSON'); }
       if(!d || d.v !== 2 || !Array.isArray(d.cases) || !Array.isArray(d.entries) || !Array.isArray(d.records)) return toast('Not an OSINTrix backup — use a file from “Export everything”');
       confirmDlg('Replace everything with this backup?', 'Your current cases, notes, tools and rules in this browser are replaced by the ' + d.cases.length + ' case' + (d.cases.length === 1 ? '' : 's') + ' in the file. You can undo right after.', 'Import backup', async () => {
         await snapshot('Before importing a backup'); if(d.files){ await filesFromImport(d.files); delete d.files; }
         const prev = DB; DB = d; DB.prefs = Object.assign({}, prev.prefs, d.prefs || {}); ensureTools(); ensurePlaybooks(); ensureIntel(); ensureQueries(); ensureRules(); ensureNotes(); if(!DB.cases.some(c => c.id === DB.active)) DB.active = DB.cases[0] && DB.cases[0].id;
-        await hashRecords(); ensurePositions(); mutate('imported backup'); UI.sel = null; applyPrefs(); renderAll(); toast('Backup imported', 'Undo', () => { DB = prev; mutate('undo import'); applyPrefs(); renderAll(); }); }); });
+        await hashRecords(); ensurePositions(); mutate('imported backup'); UI.sel = null; applyPrefs(); renderAll(); toast('Backup imported', 'Undo', () => { DB = prev; mutate('undo import'); applyPrefs(); renderAll(); }); }); }));
     case 'freshStart': return confirmDlg('Start fresh?', 'Deletes every case, vault entry, evidence record and note in this browser. Tools, queries, rules and settings stay. Export first if you might need them. You can undo right after.', 'Delete my cases', async () => {
       await snapshot('Before starting fresh'); const prev = JSON.parse(JSON.stringify(DB)); const c = {id:uid('c'), name:'My first case', code:'TN-2026-001', status:'active', owner:'You', created:Date.now(), updated:Date.now(), scope:'', color:CASE_COLORS[0], icon:'briefcase'};
       Object.assign(DB, {cases:[c], entries:[], links:[], records:[], notes:[], verdicts:{}, active:c.id}); UI.sel = null; mutate('started fresh'); go('#/home'); renderAll();
@@ -208,7 +223,7 @@ document.addEventListener('click', ev => {
     case 'qExport': return download('osintrix-queries.json', JSON.stringify(DB.queries.map(({id, uses, ...r}) => r), null, 2), 'application/json');
     case 'qImport': return pickFile('.json,application/json', txt => { let d; try{ d = JSON.parse(txt); }catch(e){ return toast('Not a JSON file'); } if(!Array.isArray(d)) return toast('Expected a list of queries'); let n = 0;
       for(const r of d){ const query = String(r.query || '').slice(0, 2000); if(!query || DB.queries.some(z => z.query === query)) continue;
-        DB.queries.push({id:uid('q'), name:String(r.name || 'Imported query').slice(0, 120), desc:String(r.description || r.desc || '').slice(0, 400), query, cat:QCATS[r.category || r.cat] ? (r.category || r.cat) : 'custom', engines:(Array.isArray(r.engines) ? r.engines : ['google']).filter(e => ENGINES[e]).slice(0, 9).concat([]).filter((e, i, a) => a.indexOf(e) === i).length ? (r.engines || []).filter(e => ENGINES[e]) : ['google'], tags:Array.isArray(r.tags) ? r.tags.map(String).slice(0, 10) : [], starred:false, uses:0, custom:true}); n++; }
+        DB.queries.push({id:uid('q'), name:importName(String(r.name || 'Imported query').slice(0, 110), DB.queries.map(x => x.name)), desc:String(r.description || r.desc || '').slice(0, 400), query, cat:QCATS[r.category || r.cat] ? (r.category || r.cat) : 'custom', engines:(Array.isArray(r.engines) ? r.engines : ['google']).filter(e => ENGINES[e]).slice(0, 9).concat([]).filter((e, i, a) => a.indexOf(e) === i).length ? (r.engines || []).filter(e => ENGINES[e]) : ['google'], tags:Array.isArray(r.tags) ? r.tags.map(String).slice(0, 10) : [], starred:false, uses:0, custom:true}); n++; }
       mutate('imported ' + n + ' queries'); renderAll(); toast(n + ' queries imported'); });
     /* detections */
     case 'dtype': UI.dtype = v; UI.dcat = ''; return renderMain();
@@ -232,7 +247,7 @@ document.addEventListener('click', ev => {
     case 'rStar': { const r = DB.rules.find(z => z.id === id); r.starred = !r.starred; mutate('star rule'); return renderMain(); }
     case 'rDel': { const r = DB.rules.find(z => z.id === id); if(!r) return; DB.rules = DB.rules.filter(z => z.id !== id); UI.rule = null; mutate('deleted rule'); renderAll();
       return toast('Deleted “' + r.title + '”', 'Undo', () => { DB.rules.unshift(r); UI.rule = r.id; mutate('restored rule'); renderAll(); }); }
-    case 'rDup': { const r = DB.rules.find(z => z.id === id); const c2 = {...r, id:uid('r'), title:r.title + ' (copy)', created:Date.now(), modified:Date.now(), starred:false}; DB.rules.unshift(c2); UI.rule = c2.id; mutate('duplicated rule'); return renderMain(); }
+    case 'rDup': { const r = DB.rules.find(z => z.id === id); const c2 = {...r, id:uid('r'), title:copyName(r.title, DB.rules.map(x => x.title)), created:Date.now(), modified:Date.now(), starred:false}; DB.rules.unshift(c2); UI.rule = c2.id; mutate('duplicated rule'); return renderMain(); }
     case 'rCopy': { const r = DB.rules.find(z => z.id === id); return copyText(ruleText(r, $('rCode') ? $('rCode').value : r.code)); }
     case 'rExport': { const r = DB.rules.find(z => z.id === id); return download(slug(r.title) + (r.type === 'sigma' ? '.yml' : '.yar'), ruleText(r, $('rCode') ? $('rCode').value : r.code), 'text/plain'); }
     case 'rExportAll': return download('osintrix-detections.json', JSON.stringify(DB.rules.map(r => ({type:r.type, title:r.title, description:r.desc, code:ruleText(r), severity:r.severity, category:r.category, technique:r.technique, author:r.author, platform:r.platform, tags:r.tags})), null, 2), 'application/json');
@@ -247,7 +262,7 @@ document.addEventListener('click', ev => {
       {label:n.pinned ? 'Unpin' : 'Pin', icon:'pin', fn:() => { n.pinned = !n.pinned; mutate('pin note'); renderAll(); }},
       {label:'Edit…', icon:'pencil', fn:() => noteDlg(id)},
       {label:'Colour', seg:NOTE_COLORS.map(([k]) => ({label:k[0].toUpperCase() + k.slice(1), on:n.color === k, fn:() => { n.color = k; mutate('note colour'); renderAll(); }}))},
-      {label:'Duplicate', icon:'copy', fn:() => { DB.notes.unshift({...n, id:uid('n'), pinned:false, created:Date.now(), updated:Date.now()}); mutate('duplicated note'); renderAll(); }},
+      {label:'Duplicate', icon:'copy', fn:() => { const first = (n.text.split('\n')[0] || '').trim(), rest = n.text.slice(n.text.indexOf('\n') < 0 ? n.text.length : n.text.indexOf('\n')), c2 = {...n, id:uid('n'), pinned:false, created:Date.now(), updated:Date.now(), text:(copyName(first.slice(0, 200) || 'Note', DB.notes.map(x => (x.text.split('\n')[0] || '').trim())) + rest).slice(0, 4000), copyOf:n.id}; DB.notes.splice(DB.notes.indexOf(n) + 1, 0, c2); mutate('duplicated note'); renderAll(); toast('Duplicated as “' + c2.text.split('\n')[0].slice(0, 60) + '”'); }},
       {sep:true}, {label:'Delete', icon:'trash-2', danger:true, fn:() => clickAct('nDel', id)}]); }
     case 'nDel': { const n = DB.notes.find(z => z.id === id); DB.notes = DB.notes.filter(z => z.id !== id); const tx = trashPut('note', (n.text || '').split('\n')[0].replace(/^#+\s*/, '') || 'Note', {n}, n.caseId); closeDlg(); mutate('deleted note'); renderAll(); return toast('Note deleted', 'Undo', () => { DB.trash = DB.trash.filter(x => x !== tx); DB.notes.push(n); mutate('restored note'); renderAll(); }); }
     case 'nColor': document.querySelectorAll('.ncolors.big button').forEach(b => b.setAttribute('aria-pressed', String(b === t))); UI.noteColorEdit = v; return;
@@ -285,7 +300,7 @@ document.addEventListener('click', ev => {
     case 'ctfClose': UI.ctfSel = null; return renderMain();
     case 'ctfCat': UI.ctfCat = v; return renderMain();
     case 'ctfNew': { ensureCTF(); let ev = DB.ctf.events.find(e => e.id === UI.ctfEv) || DB.ctf.events[0]; if(!ev){ ev = {id:uid('ev'), name:'My CTF', flagRe:'', url:'', created:Date.now()}; DB.ctf.events.push(ev); }
-      const c = {id:uid('ch'), eventId:ev.id, name:'New challenge', cat:'osint', points:100, status:'todo', flag:'', notes:'', caseId:null, created:Date.now(), solvedAt:0}; DB.ctf.chals.unshift(c); UI.ctfSel = c.id; mutate('new challenge'); renderAll();
+      const c = {id:uid('ch'), eventId:ev.id, name:nextName('New challenge', DB.ctf.chals.filter(x => x.eventId === ev.id).map(x => x.name)), cat:'osint', points:100, status:'todo', flag:'', notes:'', caseId:null, created:Date.now(), solvedAt:0}; DB.ctf.chals.unshift(c); UI.ctfSel = c.id; mutate('new challenge'); renderAll();
       setTimeout(() => { const x = $('chN'); if(x){ x.focus(); x.select(); } }, 60); return; }
     case 'ctfEvNew': return ctfEventDlg();
     case 'ctfEvEdit': return ctfEventDlg(id);
@@ -295,7 +310,7 @@ document.addEventListener('click', ev => {
     case 'ctfExport': return ctfWriteups();
     case 'chStatus': { const f = t.closest('form'); f.dataset.status = v; f.querySelectorAll('[data-act=chStatus]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === v))); return; }
     case 'chCase': { const c = DB.ctf.chals.find(x => x.id === id), ev = DB.ctf.events.find(e => e.id === c.eventId);
-      const k = {id:uid('c'), name:'CTF — ' + c.name, code:'LAB-' + new Date().getFullYear() + '-' + String(DB.cases.length + 1).padStart(2, '0'), status:'active', owner:'You', created:Date.now(), updated:Date.now(), scope:(ev ? ev.name + ' · ' : '') + ctfCat(c.cat)[0] + ' challenge, ' + (c.points || 0) + ' pts.', color:CTF_CATS[c.cat] ? CTF_CATS[c.cat][1] : CASE_COLORS[0], icon:'flag'};
+      const k = {id:uid('c'), name:nextName('CTF — ' + c.name, DB.cases.map(x => x.name)), code:nextName('LAB-' + new Date().getFullYear() + '-' + String(DB.cases.length + 1).padStart(2, '0'), DB.cases.map(x => x.code)).replace(/ (\d+)$/, '-$1'), status:'active', owner:'You', created:Date.now(), updated:Date.now(), scope:(ev ? ev.name + ' · ' : '') + ctfCat(c.cat)[0] + ' challenge, ' + (c.points || 0) + ' pts.', color:CTF_CATS[c.cat] ? CTF_CATS[c.cat][1] : CASE_COLORS[0], icon:'flag'};
       DB.cases.push(k); c.caseId = k.id; DB.active = k.id; mutate('created case for ' + c.name); UI.ctfSel = null; renderAll(); return toast('Case ' + k.code + ' created and linked', 'Open', () => go(caseHash(k.id))); }
     case 'chDelAsk': { const c = DB.ctf.chals.find(x => x.id === id); return confirmDlg('Delete “' + c.name + '”?', 'Its flag and notes go too. You can undo right after.', 'Delete challenge', () => {
       const i = DB.ctf.chals.indexOf(c); DB.ctf.chals.splice(i, 1); UI.ctfSel = null; mutate('deleted challenge'); renderAll(); toast('Challenge deleted', 'Undo', () => { DB.ctf.chals.splice(i, 0, c); mutate('restored challenge'); renderAll(); }); }); }
@@ -306,6 +321,8 @@ document.addEventListener('click', ev => {
     case 'labYara': { const r = UI.labFile; if(!r) return; const rules = (DB.rules || []).filter(x => x.type === 'yara'); if(!rules.length) return toast('No YARA rules yet — add some in Detections');
       if(r.size > 60 * 1048576) return toast('YARA scanning in the browser is limited to 60 MB files');
       t.disabled = true; t.innerHTML = ico('refresh-cw','sm spin') + 'Scanning…'; return setTimeout(() => { r.yara = yaraScan(rules.map(x => x.code).join('\n\n'), r.bytes); renderMain(); }, 30); }
+    case 'labToPcap': UI.labTab = 'pcap'; return pcLoad(UI.labFile.file);
+    case 'labToSql': UI.labTab = 'sqlite'; return sqlLoad(UI.labFile.file);
     case 'labToImage': UI.labTab = 'image'; renderMain(); return imgLoad(UI.labFile.file);
     case 'imgClear': UI.img = null; return renderMain();
     case 'imgCh': UI.imgCh = v; if(v === 'rgb' || v === 'inv') UI.imgBit = 'all'; return renderMain();
@@ -316,7 +333,7 @@ document.addEventListener('click', ev => {
     case 'emlSample': UI.emlIn = SAMPLE_EML; return renderMain();
     case 'emlSave': { const A = analyseEmail(UI.emlIn || ''); if(!A) return; const body = (UI.emlIn || '').slice(0, 20000);
       DB.records.push({id:uid('r'), caseId:DB.active, type:'evidence', title:'Email headers: ' + (A.subject || A.from || 'message'), body, tsRaw:A.date, tsZone:'explicit', ts:Date.parse(A.date) || Date.now(), source:'email-headers', host:'', tags:['email'].concat(A.flags.some(f => f[0] === 'red') ? ['spoofing'] : []), ents:E.extract(body).filter(e => e.k !== 'handle'), answer:'', addedBy:'You', addedAt:Date.now(), hash:''});
-      mutate('saved email headers'); hashRecords(); renderNav(); return toast('Saved to ' + theCase().code, 'Open', () => go(caseHash(DB.active, 'timeline'))); }
+      mutate('saved email headers'); hashRecords(); { const r0 = DB.records[DB.records.length - 1]; afterCapture(DB.active, [r0.id]); watchNotify([r0]); } renderNav(); return toast('Saved to ' + theCase().code, 'Open', () => go(caseHash(DB.active, 'timeline'))); }
     case 'labClear': UI.labFile = null; return renderMain();
     case 'labSave': { const r = UI.labFile; if(!r) return; const body = labSummary(r);
       DB.records.push({id:uid('r'), caseId:DB.active, type:'evidence', title:'File inspected: ' + r.name, body, tsRaw:new Date(r.lastModified).toISOString(), tsZone:'explicit', ts:r.lastModified, source:'forensics-kit', host:'', tags:['file'].concat(r.flags.length ? ['flag'] : []), ents:E.extract(body), answer:'', addedBy:'You', addedAt:Date.now(), hash:''});
@@ -336,7 +353,7 @@ document.addEventListener('click', ev => {
     case 'pbNew': return pbDlg();
     case 'pbEdit': return pbDlg(id);
     case 'pbIcon': window.__pbIcon = v; document.querySelectorAll('#pbI button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === v))); return;
-    case 'pbDup': { const p = DB.playbooks.find(x => x.id === id); const c2 = {...JSON.parse(JSON.stringify(p)), id:uid('pb'), name:p.name + ' (copy)', custom:true, created:Date.now()}; DB.playbooks.unshift(c2); UI.pb = c2.id; mutate('duplicated playbook'); renderAll(); return toast('Duplicated — edit it to make it yours'); }
+    case 'pbDup': { const p = DB.playbooks.find(x => x.id === id); const c2 = {...JSON.parse(JSON.stringify(p)), id:uid('pb'), name:copyName(p.name, DB.playbooks.map(x => x.name)), custom:true, created:Date.now()}; DB.playbooks.unshift(c2); UI.pb = c2.id; mutate('duplicated playbook'); renderAll(); return toast('Duplicated — edit it to make it yours'); }
     case 'pbDelAsk': { const p = DB.playbooks.find(x => x.id === id); return confirmDlg('Delete “' + p.name + '”?', 'Questions it already added to cases stay. You can undo right after.', 'Delete playbook', () => {
       const i = DB.playbooks.indexOf(p); DB.playbooks.splice(i, 1); if(!p.custom) (DB.deletedPb || (DB.deletedPb = [])).push(p.id); UI.pb = null; mutate('deleted playbook'); renderAll();
       toast('Playbook deleted', 'Undo', () => { DB.playbooks.splice(i, 0, p); if(DB.deletedPb) DB.deletedPb = DB.deletedPb.filter(x => x !== p.id); mutate('restored playbook'); renderAll(); }); }); }
@@ -345,7 +362,8 @@ document.addEventListener('click', ev => {
     case 'pbMenu': { ensurePlaybooks(); const r0 = t.getBoundingClientRect(); return showMenu(Math.max(8, Math.min(r0.left, innerWidth - 300)), r0.bottom + 6, DB.playbooks.slice(0, 12).map(p => ({label:p.name, icon:p.icon || 'list-checks', fn:() => runPlaybook(p.id, DB.active)})).concat([{sep:true}, {label:'Browse all playbooks…', icon:'arrow-right', fn:() => { UI.pb = null; go('#/playbooks'); }}]), 'Run on ' + theCase().code); }
     case 'pref': DB.prefs[t.dataset.k] = v; applyPrefs(); save(); return renderMain();
     case 'exportMd': return download(slug(theCase().name) + '-report.md', reportMd(), 'text/markdown');
-    case 'exportCase': { const c = theCase(id), recs = DB.records.filter(r => r.caseId === c.id); return filesForExport(recs).then(files => download(slug(c.name) + '.json', JSON.stringify({format:'osintrix-case', v:2, case:c, entries:DB.entries.filter(e => e.caseId === c.id), links:DB.links.filter(l => l.caseId === c.id), records:recs, files}, null, 2), 'application/json')); }
+    case 'exportCase': { const c = theCase(id), recs = DB.records.filter(r => r.caseId === c.id); return filesForExport(recs).then(files => { const o = {format:'osintrix-case', v:2, case:c, entries:DB.entries.filter(e => e.caseId === c.id), links:DB.links.filter(l => l.caseId === c.id), records:recs, files};
+      if(SEC.key || v === 'enc') return downloadEncrypted(slug(c.name) + '.json', o); download(slug(c.name) + '.json', JSON.stringify(o, null, 2), 'application/json'); }); }
     case 'exportAll': return exportEverything();
     case 'resetDemo': { snapshot('Before resetting to the demo'); const prev = DB; DB = seedDB(); DB.prefs = prev.prefs; mutate('reset demo'); hashRecords(); UI.sel = null; renderAll(); return toast('Demo data reset', 'Undo', () => { DB = prev; mutate('undo reset'); renderAll(); }); }
   }
@@ -356,11 +374,21 @@ document.addEventListener('submit', ev => {
   const f = ev.target.closest('form[data-form]'); if(!f) return; ev.preventDefault();
   const k = f.dataset.form;
   if(k === 'evTag') return evTagSubmit();
-  if(k === 'toolRun'){ const t = DB.tools.find(x => x.id === f.dataset.id), u = toolUrl(t, $('trV').value.trim()); if(!u) return toast('That does not make a valid address'); t.uses = (t.uses || 0) + 1; save(); closeDlg(); return window.open(u, '_blank', 'noopener,noreferrer'); }
+  if(k === 'parser') return parserSubmit(f);
+  if(k === 'pass') return PASS_CB && PASS_CB();
+  if(k === 'achHyp' || k === 'achEv') return achSubmit(k, f);
+  if(k === 'alias'){ const key = $('alK').value.trim().toLowerCase(); if(!key) return fieldErr('alK', 'Field name is required.'); if(!/^[\w.@-]{1,64}$/.test(key)) return fieldErr('alK', 'Use letters, digits, dots, dashes or underscores — no spaces (max 64).'); DB.parserAliases = DB.parserAliases || {}; DB.parserAliases[key] = $('alC').value; P_CACHE.clear(); closeDlg(); mutate('mapped field ' + key); return renderMain(); }
+  if(k === 'toolRun'){ const t = DB.tools.find(x => x.id === f.dataset.id), v0 = $('trV').value.trim(); if(!v0) return fieldErr('trV', 'Enter what to look up.'); const u = toolUrl(t, v0); if(!u) return fieldErr('trV', 'That does not make a valid address for this tool.'); t.uses = (t.uses || 0) + 1; save(); closeDlg(); return window.open(u, '_blank', 'noopener,noreferrer'); }
   if(k === 'entry'){
     const d = entryDraft, t = TYPES[d.type], fields = {};
-    f.querySelectorAll('[data-f]').forEach(i => { const v = i.value.trim(); if(v) fields[i.dataset.f] = v; });
-    if(!fields[t.fields[0][0]]) return toast(t.fields[0][1] + ' is required');
+    f.querySelectorAll('[data-f]').forEach(i => { const v = i.value.trim().replace(/\s+/g, ' '); if(v) fields[i.dataset.f] = v; });
+    if(!fields[t.fields[0][0]]) return fieldErr('ef-' + t.fields[0][0], t.fields[0][1] + ' is required.');
+    for(const [n, l] of t.fields){ const v = fields[n]; if(!v) continue; if(v.length > 500) return fieldErr('ef-' + n, l + ' is too long (max 500 characters).');
+      const chk = FIELD_CHECK[n] && CHECK[FIELD_CHECK[n]]; const msg = chk && chk(v); if(msg) return fieldErr('ef-' + n, msg); }
+    if(fields.email) fields.email = fields.email.toLowerCase(); if(fields.domain) fields.domain = fields.domain.toLowerCase().replace(/^https?:\/\//, '').replace(/[/.]+$/, '');
+    if(!checkLen('ef-notes', $('ef-notes').value.trim(), LIMITS.body, 'Notes')) return;
+    { const pv = normName(fields[t.fields[0][0]]), twin = DB.entries.find(x => x.caseId === DB.active && x.type === d.type && x.id !== d.id && normName(x.fields[t.fields[0][0]]) === pv);
+      if(twin && !softDup(f, twin.id, 'ef-' + t.fields[0][0], `This ${t.label.toLowerCase()} is already in this case's vault.`)) return; }
     const tags = $('ef-tags').value.split(',').map(s => s.trim()).filter(Boolean), priority = $('ef-prio').value, notes = $('ef-notes').value.trim();
     if(d.id){ const e = entryById(d.id); Object.assign(e, {fields, tags, priority, notes}); mutate('edited ' + primary(e)); closeDlg(); renderAll(); return toast('Saved'); }
     const e = {id:uid('v'), caseId:DB.active, type:d.type, fields, priority, starred:false, tags, notes, src:d.src || '', created:Date.now(), pos:UI.graph.newPos || null};
@@ -372,49 +400,67 @@ document.addEventListener('submit', ev => {
     return toast(t.label + ' added to the vault' + (UI.route.tab === 'graph' ? ' and the graph' : ''));
   }
   if(k === 'case'){
-    const st = window.__caseDraft, name = $('cName').value.trim(); if(!name) return;
+    const st = window.__caseDraft, name = $('cName').value.trim().replace(/\s+/g, ' '); if(!name) return fieldErr('cName', 'Give the case a name.'); if(!checkLen('cName', name, LIMITS.name, 'Name') || !checkLen('cScope', $('cScope').value.trim(), LIMITS.desc, 'Scope')) return;
+    if(clash(DB.cases, name, 'name', f.dataset.edit ? DB.active : null)) return fieldErr('cName', `A case called “${name}” already exists. Use a different name so you can tell them apart.`);
     if(f.dataset.edit){ const c = theCase(); Object.assign(c, {name, scope:$('cScope').value.trim(), status:$('cStatus').value, color:st.color, icon:st.icon, updated:Date.now()}); mutate('edited case'); closeDlg(); return renderAll(); }
-    const c = {id:uid('c'), name, code:'TN-2026-' + String(13 + DB.cases.length).padStart(3, '0'), status:'active', owner:'You', created:Date.now(), updated:Date.now(), scope:$('cScope').value.trim(), color:st.color, icon:st.icon};
-    DB.cases.push(c); DB.active = c.id; mutate('created case ' + c.code); closeDlg(); return go(caseHash(c.id));
+    const c = {id:uid('c'), name, code:nextCaseCode(), status:'active', owner:'You', created:Date.now(), updated:Date.now(), scope:$('cScope').value.trim(), color:st.color, icon:st.icon};
+    DB.cases.push(c); DB.active = c.id; mutate('created case ' + c.code); closeDlg();
+    if(draft.reopen && Date.now() - draft.reopen < 180000){ draft.reopen = false; draft.caseId = c.id; go(caseHash(c.id)); return setTimeout(() => openCapture(), 60); }
+    return go(caseHash(c.id));
   }
   if(k === 'tool'){
-    const url = $('tUrl').value.trim(); if(!E.safeUrl(url)) return toast('The address must start with http:// or https://');
-    const vals = {name:$('tName').value.trim(), url, cat:$('tCat').value, sub:$('tSub').value, desc:$('tDesc').value.trim(), tags:$('tTags').value.split(',').map(s => s.trim()).filter(Boolean), tpl:$('tTpl').value.trim(), kinds:[...document.querySelectorAll('input[name=tKind]:checked')].map(x => x.value)};
-    if(vals.tpl && (!/\{(value|raw)\}/.test(vals.tpl) || !E.safeUrl(vals.tpl.replace(/\{(value|raw)\}/g, 'x')))) return toast('The lookup address needs http(s):// and a {value} placeholder');
+    const url = $('tUrl').value.trim(), nm = $('tName').value.trim().replace(/\s+/g, ' ');
+    if(!nm) return fieldErr('tName', 'Name is required.'); if(!checkLen('tName', nm, 80, 'Name')) return;
+    if(clash(DB.tools, nm, 'name', f.dataset.id || null)) return fieldErr('tName', `A tool called “${nm}” is already in the toolbox.`);
+    if(!E.safeUrl(url) || !/^https?:\/\/[^/\s]+\.[^/\s]+/i.test(url)) return fieldErr('tUrl', 'Enter a full address like https://example.com.');
+    { const same = DB.tools.find(x => x.id !== f.dataset.id && String(x.url).replace(/\/+$/, '').toLowerCase() === url.replace(/\/+$/, '').toLowerCase()); if(same && !softDup(f, same.id, 'tUrl', `“${same.name}” already uses this address.`)) return; }
+    const vals = {name:nm, url, cat:$('tCat').value, sub:$('tSub').value, desc:$('tDesc').value.trim(), tags:$('tTags').value.split(',').map(s => s.trim()).filter(Boolean), tpl:$('tTpl').value.trim(), kinds:[...document.querySelectorAll('input[name=tKind]:checked')].map(x => x.value)};
+    if(vals.tpl && (!/\{(value|raw)\}/.test(vals.tpl) || !E.safeUrl(vals.tpl.replace(/\{(value|raw)\}/g, 'x')))) return fieldErr('tTpl', 'The lookup address needs http(s):// and a {value} placeholder.');
     if(vals.tpl && !vals.kinds.length) vals.kinds = ['any'];
     if(f.dataset.id){ Object.assign(DB.tools.find(x => x.id === f.dataset.id), vals); mutate('edited tool ' + vals.name); }
     else { DB.tools.push({id:uid('t'), ...vals, pinned:false, starred:false, added:Date.now(), uses:0}); mutate('added tool ' + vals.name); }
     closeDlg(); renderAll(); return toast(f.dataset.id ? 'Tool saved' : vals.name + ' added to the toolbox');
   }
   if(k === 'link'){
-    const a = $('lA').value, b = $('lB').value, label = $('lL').value.trim(); if(!label) return; if(a === b) return toast('Pick two different entries');
+    const a = $('lA').value, b = $('lB').value, label = $('lL').value.trim().replace(/\s+/g, ' '); if(!label) return fieldErr('lL', 'Describe the relationship, e.g. “uses email”.'); if(!checkLen('lL', label, 80, 'Relationship')) return; if(a === b) return fieldErr('lB', 'Pick a different entry — a relationship joins two entries.');
+    if(DB.links.some(l => l.id !== f.dataset.id && l.caseId === DB.active && normName(l.label) === normName(label) && ((l.a === a && l.b === b) || (l.a === b && l.b === a)))) return fieldErr('lL', 'These two entries already have this relationship.');
     if(f.dataset.id) Object.assign(DB.links.find(l => l.id === f.dataset.id), {a, b, label, conf:+$('lC').value, src:$('lS').value});
     else DB.links.push({id:uid('l'), caseId:DB.active, a, b, label, conf:+$('lC').value, src:$('lS').value});
     mutate('relationship ' + label); closeDlg(); renderAll(); return toast('Relationship saved');
   }
   if(k === 'query'){ const engs = [...document.querySelectorAll('[data-eng]')].filter(i => i.checked).map(i => i.dataset.eng);
-    const vals = {name:$('qN').value.trim().slice(0, 120), query:$('qQ').value.trim().slice(0, 2000), desc:$('qD').value.trim().slice(0, 400), cat:$('qC').value, tags:$('qT').value.split(',').map(s => s.trim()).filter(Boolean), engines:engs.length ? engs : ['google']};
-    if(!vals.name || !vals.query) return;
+    if(!checkLen('qQ', $('qQ').value.trim(), 2000, 'Query') || !checkLen('qN', $('qN').value.trim(), 120, 'Name') || !checkLen('qD', $('qD').value.trim(), 400, 'Description')) return;
+    const vals = {name:$('qN').value.trim().replace(/\s+/g, ' '), query:$('qQ').value.trim(), desc:$('qD').value.trim(), cat:$('qC').value, tags:$('qT').value.split(',').map(s => s.trim()).filter(Boolean), engines:engs.length ? engs : ['google']};
+    if(!vals.name) return fieldErr('qN', 'Name is required.'); if(!vals.query) return fieldErr('qQ', 'Write the query itself.');
+    if(clash(DB.queries, vals.name, 'name', f.dataset.id || null)) return fieldErr('qN', `A query called “${vals.name}” already exists in the library.`);
     if(f.dataset.id) Object.assign(DB.queries.find(z => z.id === f.dataset.id), vals); else DB.queries.unshift({id:uid('q'), ...vals, starred:false, uses:0, custom:true});
     mutate('saved query ' + vals.name); closeDlg(); renderAll(); return toast('Query saved'); }
   if(k === 'rule'){ const r = DB.rules.find(z => z.id === f.dataset.id); if(!r) return;
-    Object.assign(r, {title:$('rTitle').value.trim() || r.title, severity:$('rSev').value, technique:$('rTech').value.trim().toUpperCase(), caseId:$('rCase').value || null, desc:$('rDesc').value.trim(), code:$('rCode').value,
+    const rt = $('rTitle').value.trim().replace(/\s+/g, ' '); if(!rt) return fieldErr('rTitle', 'Give the rule a title.'); if(!checkLen('rTitle', rt, LIMITS.title, 'Title')) return;
+    if(clash(DB.rules, rt, 'title', r.id)) return fieldErr('rTitle', `A rule called “${rt}” already exists.`);
+    const tech = $('rTech').value.trim().toUpperCase(); if(tech && !/^(T\d{4}(\.\d{3})?)(\s*,\s*T\d{4}(\.\d{3})?)*$/.test(tech)) return fieldErr('rTech', 'Use MITRE ATT&CK IDs like T1059 or T1059.001 (comma-separated).');
+    if(!$('rCode').value.trim()) return fieldErr('rCode', 'The rule body is empty.');
+    Object.assign(r, {title:rt, severity:$('rSev').value, technique:$('rTech').value.trim().toUpperCase(), caseId:$('rCase').value || null, desc:$('rDesc').value.trim(), code:$('rCode').value,
       platform:$('rPlat').value.trim(), author:$('rAuthor').value.trim(), tags:$('rTags').value.split(',').map(x => x.trim()).filter(Boolean).slice(0, 20), modified:Date.now()});
     mutate('saved rule ' + r.title); renderAll(); const iss = validateRule(r.type, r.code, r.title); return toast(iss.length ? 'Saved — with ' + iss.length + ' structure warning' + (iss.length > 1 ? 's' : '') : 'Rule saved'); }
   if(k === 'pb') return pbSubmit(f);
   if(k === 'chal') return ctfSubmit(f);
-  if(k === 'ctfEv'){ const vals = {name:$('evN').value.trim().slice(0, 100), flagRe:$('evR').value.trim().slice(0, 200), url:E.safeUrl($('evU').value.trim()) || ''}; if(!vals.name) return;
-    try{ if(vals.flagRe) new RegExp(vals.flagRe); }catch(e){ return toast('That flag format is not a valid regular expression'); }
+  if(k === 'ctfEv'){ const vals = {name:$('evN').value.trim().replace(/\s+/g, ' '), flagRe:$('evR').value.trim(), url:$('evU').value.trim()}; if(!vals.name) return fieldErr('evN', 'Name is required.');
+    if(!checkLen('evN', vals.name, 100, 'Name') || !checkLen('evR', vals.flagRe, 200, 'Flag format')) return; if(clash(DB.ctf.events, vals.name, 'name', f.dataset.id || null)) return fieldErr('evN', `An event called “${vals.name}” already exists.`);
+    if(vals.flagRe && !checkRegex('evR', vals.flagRe)) return; if(vals.url && !E.safeUrl(vals.url)) return fieldErr('evU', 'Enter a full address starting with http:// or https://.');
     if(f.dataset.id) Object.assign(DB.ctf.events.find(e => e.id === f.dataset.id), vals); else { const ev = {id:uid('ev'), ...vals, created:Date.now()}; DB.ctf.events.push(ev); UI.ctfEv = ev.id; }
     mutate('saved event'); closeDlg(); return renderAll(); }
-  if(k === 'nQuick'){ const ta = f.querySelector('textarea'), text = ta.value.trim(); if(!text) return;
+  if(k === 'nQuick'){ const ta = f.querySelector('textarea'), text = ta.value.trim(); if(!text) return; if(text.length > 4000) return fieldErr(ta, `Notes can be up to 4,000 characters — this one is ${text.length.toLocaleString()}.`);
     DB.notes.unshift({id:uid('n'), caseId:f.dataset.case || null, color:UI.ncolor || 'yellow', pinned:false, text:text.slice(0, 4000), due:'', created:Date.now(), updated:Date.now()});
     mutate('added note'); renderAll(); const x = document.querySelector('.nquick textarea'); if(x) x.focus(); return; }
-  if(k === 'note'){ const n = DB.notes.find(z => z.id === f.dataset.id); Object.assign(n, {text:$('nText').value.slice(0, 4000), caseId:$('nCase').value || null, due:$('nDue').value, pinned:$('nPin').checked, color:UI.noteColorEdit || n.color, updated:Date.now()});
+  if(k === 'note'){ const n = DB.notes.find(z => z.id === f.dataset.id); if(!$('nText').value.trim()) return fieldErr('nText', 'A note cannot be empty — delete it instead if you no longer need it.'); if(!checkLen('nText', $('nText').value, 4000, 'Note')) return; Object.assign(n, {text:$('nText').value.slice(0, 4000), caseId:$('nCase').value || null, due:$('nDue').value, pinned:$('nPin').checked, color:UI.noteColorEdit || n.color, updated:Date.now()});
     UI.noteColorEdit = null; mutate('edited note'); closeDlg(); return renderAll(); }
-  if(k === 'src'){ const url = $('srcUrl').value.trim(); if(!E.safeUrl(url)) return toast('Use an http(s) feed address'); DB.feedSources.push({id:uid('s'), name:$('srcName').value.trim().slice(0, 60), url, on:true, status:'', last:0}); mutate('added source'); return sourcesDlg(); }
-  if(k === 'answer'){ const r = recById(f.dataset.id); r.answer = $('ansIn').value.trim(); mutate('answered a question'); renderAll(); return toast('Answer saved'); }
-  if(k === 'addQ'){ const q = $('newQ').value.trim(); if(!q) return;
+  if(k === 'src'){ const url = $('srcUrl').value.trim(), sn = $('srcName').value.trim().replace(/\s+/g, ' ') || hostOf(url); if(!E.safeUrl(url)) return fieldErr('srcUrl', 'Enter the feed address, starting with http:// or https://.');
+    if(DB.feedSources.some(x => x.url.replace(/\/+$/, '') === url.replace(/\/+$/, ''))) return fieldErr('srcUrl', 'This feed is already in your sources.'); if(clash(DB.feedSources, sn)) return fieldErr('srcName', `A source called “${sn}” already exists.`); if(!checkLen('srcName', sn, 60, 'Name')) return;
+    DB.feedSources.push({id:uid('s'), name:sn, url, on:true, status:'', last:0}); mutate('added source'); return sourcesDlg(); }
+  if(k === 'answer'){ const r = recById(f.dataset.id); if(!checkLen('ansIn', $('ansIn').value.trim(), LIMITS.body, 'Answer')) return; r.answer = $('ansIn').value.trim(); mutate('answered a question'); renderAll(); return toast('Answer saved'); }
+  if(k === 'addQ'){ const q = $('newQ').value.trim().replace(/\s+/g, ' '); if(!q) return fieldErr('newQ', 'Type the question first.'); if(!checkLen('newQ', q, 300, 'Question')) return;
+    if(DB.records.some(r => r.caseId === DB.active && r.type === 'lead' && normName(r.title) === normName(q))) return fieldErr('newQ', 'This question is already on the list.');
     DB.records.push({id:uid('q'), caseId:DB.active, type:'lead', title:q, body:'', tsRaw:'', ts:null, source:'checklist', host:'', tags:[], ents:E.extract(q), answer:'', addedBy:'You', addedAt:Date.now(), hash:''});
     mutate('added question'); renderAll(); $('newQ').focus(); }
 });
@@ -436,7 +482,8 @@ document.addEventListener('input', ev => {
   if(t.id === 'tlq'){ clearTimeout(tq); tq = setTimeout(() => { UI.q = t.value.trim(); UI.ast = E.parseQuery(UI.q); renderMain(); keep('tlq'); }, 200); return; }
   if(t.id === 'gq'){ clearTimeout(tq); tq = setTimeout(() => { UI.q = t.value.trim(); UI.ast = E.parseQuery(UI.q); if(UI.q && !(UI.route.area === 'case' && UI.route.tab === 'timeline')){ UI.tlMode = 'events'; go(caseHash(DB.active, 'timeline')); } else renderMain(); }, 200); }
 });
-document.addEventListener('change', ev => { if(ev.target.id === 'qcatSel'){ UI.qcat = ev.target.value; UI.qsel = null; return renderMain(); } if(ev.target.id === 'ctfEvSel'){ UI.ctfEv = ev.target.value; return renderMain(); } if(ev.target.id === 'tcatSel2'){ UI.tcat = ev.target.value; UI.tsub = null; return renderMain(); } if(ev.target.id === 'dsev'){ UI.dsev = ev.target.value; return renderMain(); } if(ev.target.id === 'isrc'){ UI.isrc = ev.target.value; return renderMain(); } if(ev.target.id === 'tSort'){ UI.tsort = ev.target.value; return renderMain(); } if(ev.target.dataset.pref){ DB.prefs[ev.target.dataset.pref] = ev.target.value; mutate('time zone'); renderAll(); } });
+document.addEventListener('change', ev => { if(ev.target.id === 'secAuto'){ DB.security = DB.security || {}; DB.security.autolock = +ev.target.value; mutate('auto-lock ' + ev.target.value + ' min'); armAutolock(); return; } if(ev.target.id === 'entCase'){ UI.entCase = ev.target.value; return renderMain(); } if(ev.target.id === 'qcatSel'){ UI.qcat = ev.target.value; UI.qsel = null; return renderMain(); } if(ev.target.id === 'ctfEvSel'){ UI.ctfEv = ev.target.value; return renderMain(); } if(ev.target.id === 'tcatSel2'){ UI.tcat = ev.target.value; UI.tsub = null; return renderMain(); } if(ev.target.id === 'dsev'){ UI.dsev = ev.target.value; return renderMain(); } if(ev.target.id === 'isrc'){ UI.isrc = ev.target.value; return renderMain(); } if(ev.target.id === 'tSort'){ UI.tsort = ev.target.value; return renderMain(); } if(ev.target.dataset.pref){ DB.prefs[ev.target.dataset.pref] = ev.target.value; mutate('time zone'); renderAll(); } });
+new MutationObserver(() => document.documentElement.classList.toggle('modal', !$('scrim').hidden || !$('welcome').hidden)).observe(document.body, {attributes:true, subtree:true, attributeFilter:['hidden']});
 $('scrim').addEventListener('mousedown', ev => { if(ev.target.id === 'scrim') closeDlg(); });
 
 document.addEventListener('keydown', ev => {
@@ -457,7 +504,7 @@ document.addEventListener('keydown', ev => {
   if(ev.key === 'e'){ ev.preventDefault(); return entryDlg(); }
   if(ev.key === '/'){ ev.preventDefault(); return srchOpen(); }
   if((ev.key === 'Delete' || ev.key === 'Backspace') && UI.route.tab === 'graph' && UI.sel){ ev.preventDefault(); document.querySelector('[data-act=gDelete]').click(); }
-  if(/^[1-6]$/.test(ev.key) && UI.route.area === 'case') return go(caseHash(DB.active, CASE_TABS[+ev.key - 1][0]));
+  if(/^[1-8]$/.test(ev.key) && UI.route.area === 'case') return go(caseHash(DB.active, CASE_TABS[+ev.key - 1][0]));
 });
 window.addEventListener('hashchange', onRoute);
 let rz = null; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if(cy) cy.resize(); }, 120); });
@@ -474,21 +521,27 @@ function showWelcome(){
     </div>
     <div class="wacts"><button class="btn primary" data-act="welcomeDemo">${ico('crosshair','sm')}Explore the demo case</button><button class="btn" data-act="welcomeClose">Go to Dashboard</button></div>
     <div class="wnote"><i></i>Runs fully offline. Nothing you enter ever leaves this browser.</div></div>`;
-  const b = w.querySelector('[data-act=welcomeDemo]'); if(b) b.focus();
+  w.scrollTop = 0; const b = w.querySelector('[data-act=welcomeDemo]'); if(b) b.focus({preventScroll:true});
 }
 function closeWelcome(){ $('welcome').hidden = true; try{ localStorage.setItem('osintrix:welcomed', '1'); }catch(e){} }
 (async function boot(){
   $('splash').innerHTML = logoMark(64); $('brand').innerHTML = logoMark(32) + `<div class="txt">${wordmark()}<small>${esc(BRAND.tagline)}</small></div>`; $('fav').href = FAVICON;
-  DB = (await loadAll()) || seedDB();
+  try{ const th = localStorage.getItem('osintrix:theme'); if(th) document.documentElement.dataset.theme = th; }catch(e){}
+  const loaded = await loadAll();
+  if(loaded && loaded.__locked){ $('splash').classList.add('out'); setTimeout(() => $('splash').remove(), 320); return lockScreen(loaded.env, d => { DB = d; SEC.locked = false; bootRest(true); }); }
+  DB = loaded || seedDB(); bootRest(false);
+})();
+async function bootRest(unlocked){
   UI.inspOpen = false; UI.graph.legendMin = window.innerWidth < 1100;
   if(window.innerWidth <= 760) $('gq').placeholder = 'Search everything';
   $('gq').addEventListener('focus', () => { $('gq').blur(); srchOpen(); }); $('gq').addEventListener('mousedown', ev => { ev.preventDefault(); srchOpen(); });
-  ensureTools(); ensureToolTpl(); ensurePlaybooks(); ensureIntel(); ensureQueries(); ensureRules(); ensureNotes(); ensureSample(); ensureCTF(); applyPrefs(); storageEstimate(); await hashRecords(); ensurePositions(); flush(); onRoute();
+  ensureTools(); ensureToolTpl(); ensurePlaybooks(); ensureIntel(); ensureQueries(); ensureRules(); ensureNotes(); ensureSample(); ensureCTF(); ensureAchDemo(); applyPrefs(); storageEstimate(); await hashRecords(); migrateFieldEnts(); ensurePositions(); flush(); onRoute();
   let seen = false; try{ seen = !!localStorage.getItem('osintrix:welcomed'); }catch(e){}
-  setTimeout(() => { $('splash').classList.add('out'); setTimeout(() => $('splash').remove(), 320); if(!seen) showWelcome(); }, 350);
-})();
+  if(!unlocked) setTimeout(() => { $('splash').classList.add('out'); setTimeout(() => $('splash').remove(), 320); if(!seen) showWelcome(); }, 350);
+  armAutolock();
+}
 
-function newRule(type){ ensureRules(); const now = Date.now(); const r = {id:uid('r'), type, title:type === 'sigma' ? 'New Sigma rule' : 'New YARA rule', desc:'', code:RULE_TPL[type].replace('00000000-0000-4000-8000-000000000000', crypto.randomUUID ? crypto.randomUUID() : uid('sig')), severity:'medium', category:'', technique:'', author:'You', platform:'', tags:[], refs:[], created:now, modified:now, starred:false, caseId:null};
+function newRule(type){ ensureRules(); const now = Date.now(); const r = {id:uid('r'), type, title:nextName(type === 'sigma' ? 'New Sigma rule' : 'New YARA rule', DB.rules.map(x => x.title)), desc:'', code:RULE_TPL[type].replace('00000000-0000-4000-8000-000000000000', crypto.randomUUID ? crypto.randomUUID() : uid('sig')), severity:'medium', category:'', technique:'', author:'You', platform:'', tags:[], refs:[], created:now, modified:now, starred:false, caseId:null};
   DB.rules.unshift(r); UI.rule = r.id; UI.ropen = true; UI.dtype = 'all'; UI.dcat = ''; mutate('new rule'); if(UI.route.area !== 'detections') go('#/detections'); else renderMain(); setTimeout(() => { const x = $('rTitle'); if(x){ x.focus(); x.select(); } }, 50); }
 function copyText(s){ if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(s).then(() => toast('Copied'), () => toast('Clipboard blocked by the browser')); else toast('Clipboard not available'); }
 

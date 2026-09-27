@@ -146,7 +146,10 @@ function pbDlg(id){
 function pbSubmit(f){
   const steps = $('pbS').value.split('\n').map(l => l.trim()).filter(Boolean).slice(0, 60).map(l => { const [t, ...h] = l.split(/\s+--\s+/); return {t:t.slice(0, 300), h:h.join(' -- ').slice(0, 400)}; });
   const vals = {name:$('pbN').value.trim().slice(0, 120), desc:$('pbD').value.trim().slice(0, 300), cat:$('pbC').value, icon:window.__pbIcon || 'list-checks', steps};
-  if(!vals.name || !steps.length) return toast('Give it a name and at least one step');
+  vals.name = vals.name.replace(/\s+/g, ' ');
+  if(!vals.name) return fieldErr('pbN', 'Give the playbook a name.'); if(!steps.length) return fieldErr('pbS', 'Add at least one step — one per line.');
+  if(clash(DB.playbooks, vals.name, 'name', f.dataset.id || null)) return fieldErr('pbN', `A playbook called “${vals.name}” already exists.`);
+  if($('pbS').value.split('\n').filter(l => l.trim()).length > 60) return fieldErr('pbS', 'A playbook can have up to 60 steps.');
   if(f.dataset.id) Object.assign(DB.playbooks.find(p => p.id === f.dataset.id), vals);
   else { const p = {id:uid('pb'), ...vals, custom:true, created:Date.now()}; DB.playbooks.unshift(p); UI.pb = p.id; }
   mutate('saved playbook ' + vals.name); closeDlg(); renderAll(); toast('Playbook saved');
@@ -157,6 +160,6 @@ function pbImport(){
     for(const p of arr){ if(!p || !p.name || !Array.isArray(p.steps)) continue;
       const steps = p.steps.map(s => typeof s === 'string' ? {t:s, h:''} : {t:String(s.t || s.title || ''), h:String(s.h || s.hint || '')}).filter(s => s.t).slice(0, 60);
       if(!steps.length) continue;
-      DB.playbooks.push({id:uid('pb'), name:String(p.name).slice(0, 120), desc:String(p.desc || p.description || '').slice(0, 300), cat:PB_CATS[p.cat] ? p.cat : 'custom', icon:LUCIDE[p.icon] ? p.icon : 'list-checks', steps, custom:true, created:Date.now()}); n++; }
+      DB.playbooks.push({id:uid('pb'), name:clash(DB.playbooks, String(p.name).slice(0, 120)) ? copyName(String(p.name).slice(0, 110), DB.playbooks.map(x => x.name)) : String(p.name).slice(0, 120), desc:String(p.desc || p.description || '').slice(0, 300), cat:PB_CATS[p.cat] ? p.cat : 'custom', icon:LUCIDE[p.icon] ? p.icon : 'list-checks', steps, custom:true, created:Date.now()}); n++; }
     mutate('imported ' + n + ' playbooks'); renderAll(); toast(n ? n + ' playbook' + (n > 1 ? 's' : '') + ' imported' : 'No playbooks found in that file'); });
 }

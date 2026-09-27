@@ -20,9 +20,9 @@ const TYPE_LIST = [
   ['organization','Organisation','building-2','identity','--t-org',null,[['name','Organisation name','text'],['industry','Industry','text'],['website','Website','url'],['country','Country','text']]],
   ['alias','Alias','fingerprint','identity','--t-identity',null,[['alias','Alias','text'],['of','Alias of','text'],['firstSeen','First seen','date']]],
   ['username','Username / handle','at-sign','identity','--t-identity','handle',[['username','Handle','text'],['platform','Platform','text'],['availability','Status','select',['Active','Taken','Suspended','Unknown']]]],
-  ['social','Social profile','users','identity','--t-identity',null,[['username','Username','text'],['platform','Platform','select',['Facebook','X / Twitter','Instagram','LinkedIn','TikTok','YouTube','Telegram','Other']],['url','Profile URL','url'],['followers','Followers','number']]],
+  ['social','Social profile','users','identity','--t-identity','social',[['username','Username','text'],['platform','Platform','select',['Facebook','X / Twitter','Instagram','LinkedIn','TikTok','YouTube','Telegram','Other']],['url','Profile URL','url'],['followers','Followers','number']]],
   ['email','Email address','mail','identity','--t-contact','email',[['email','Email address','email'],['provider','Provider','text'],['verified','Verified','select',['Unverified','Verified','Bounced']]]],
-  ['phone','Phone number','phone','identity','--t-contact',null,[['number','Phone number','tel'],['country','Country code','text'],['carrier','Carrier','text'],['type','Line type','select',['Mobile','Landline','VoIP','Unknown']]]],
+  ['phone','Phone number','phone','identity','--t-contact','phone',[['number','Phone number','tel'],['country','Country code','text'],['carrier','Carrier','text'],['type','Line type','select',['Mobile','Landline','VoIP','Unknown']]]],
   ['forum','Forum / market','message-square','comms','--t-contact',null,[['name','Site','text'],['url','URL','url'],['section','Section / thread','text']]],
   ['messaging','Messaging channel','message-square','comms','--t-contact',null,[['handle','Channel or handle','text'],['app','App','select',['Telegram','Signal','WhatsApp','Discord','Jabber','Other']],['members','Members','number']]],
   ['link','Web link','link','comms','--t-contact',null,[['url','URL','url'],['platform','Platform','text'],['status','Status','select',['Active','Inactive','Suspended','Unknown']]]],
@@ -31,6 +31,7 @@ const TYPE_LIST = [
   ['breach','Data breach','key-round','finance','--t-finance',null,[['name','Breach name','text'],['date','Date','date'],['records','Records exposed','text']]],
   ['domain','Domain','globe','tech','--t-infra','domain',[['domain','Domain','text'],['registrar','Registrar','text'],['created','Created','date'],['nameservers','Name servers','text']]],
   ['ip','IP address','server','tech','--t-infra','ipv4',[['ip','IP address','text'],['asn','ASN','text'],['country','Country','text'],['ports','Open ports','text']]],
+  ['device','Device / MAC','cpu','tech','--t-infra','mac',[['mac','MAC address','text'],['vendor','Vendor','text'],['hostname','Host name','text']]],
   ['url','URL','link-2','tech','--t-infra','url',[['url','URL','text'],['status','Status','select',['Live','Down','Unknown']]]],
   ['document','Document','file-text','files','--t-file',null,[['title','Title','text'],['type','Type','select',['PDF','DOC','XLS','TXT','Other']],['url','Source URL','url'],['hash','SHA-256','text']]],
   ['media','Image / video','image','files','--t-file',null,[['title','Title','text'],['type','Media type','select',['Image','Video','Audio']],['url','Source URL','url'],['resolution','Resolution','text']]],
@@ -40,8 +41,8 @@ const TYPE_LIST = [
   ['location','Location','map-pin','places','--t-place',null,[['address','Address','text'],['city','City','text'],['country','Country','text'],['coordinates','Coordinates','text']]],
 ];
 const TYPES = Object.fromEntries(TYPE_LIST.map(([id, label, icon, group, color, kind, fields]) => [id, {id, label, icon, group, color, kind, fields}]));
-const KIND_TO_TYPE = {ipv4:'ip', domain:'domain', url:'url', email:'email', handle:'username', btc:'crypto', eth:'crypto', sha256:'file', md5:'file', sha1:'file', cve:'vulnerability', hostport:'ip'};
-const MONO_TYPES = new Set(['email','domain','ip','url','crypto','file','username','phone','transaction','vulnerability','link']);
+const KIND_TO_TYPE = {ipv4:'ip', ipv6:'ip', domain:'domain', url:'url', email:'email', handle:'username', social:'social', phone:'phone', mac:'device', coords:'location', btc:'crypto', eth:'crypto', xmr:'crypto', ltc:'crypto', trx:'crypto', doge:'crypto', sha256:'file', md5:'file', sha1:'file', cve:'vulnerability', hostport:'ip'};
+const MONO_TYPES = new Set(['email','domain','ip','url','crypto','file','username','phone','transaction','vulnerability','link','device','social']);
 
 const CASE_COLORS = ['#5470f5','#8b5cf6','#0ea5a4','#e8590c','#d6336c','#2f9e44','#e0a800','#64748b'];
 const CASE_ICONS = ['briefcase','shield-alert','crosshair','radar','bug','users','bitcoin','globe','skull','microscope'];

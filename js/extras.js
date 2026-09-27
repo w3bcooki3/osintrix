@@ -16,19 +16,29 @@ const PIV = {
   cve:[['NVD','https://nvd.nist.gov/vuln/detail/%s'],['CISA KEV','https://www.cisa.gov/known-exploited-vulnerabilities-catalog?search_api_fulltext=%e'],['Exploit-DB','https://www.exploit-db.com/search?cve=%e']],
   person:[['Google','https://www.google.com/search?q=%22%e%22'],['LinkedIn','https://www.linkedin.com/search/results/all/?keywords=%e']],
   organization:[['Google','https://www.google.com/search?q=%22%e%22'],['OpenCorporates','https://opencorporates.com/companies?q=%e']],
-  phone:[['Google','https://www.google.com/search?q=%22%e%22']],
+  phone:[['Google','https://www.google.com/search?q=%22%e%22'],['WhatsApp','https://wa.me/%s'],['Telegram','https://t.me/%s'],['Sync.me','https://sync.me/search/?number=%e'],['NumLookup','https://www.numlookup.com/?number=%e']],
+  ipv6:[['VirusTotal','https://www.virustotal.com/gui/ip-address/%s'],['Shodan','https://www.shodan.io/host/%s'],['IPinfo','https://ipinfo.io/%s'],['bgp.he.net','https://bgp.he.net/ip/%s']],
+  social:[['Open profile','https://%s'],['Wayback','https://web.archive.org/web/*/%s*'],['Google','https://www.google.com/search?q=%22%e%22']],
+  mac:[['MAC vendors','https://maclookup.app/search/result?mac=%e'],['WiGLE','https://wigle.net/search?netid=%e']],
+  asn:[['bgp.he.net','https://bgp.he.net/%s'],['IPinfo','https://ipinfo.io/%s'],['PeeringDB','https://www.peeringdb.com/search?q=%e']],
+  ttp:[['MITRE ATT&CK','https://attack.mitre.org/techniques/%t/']],
+  coords:[['Google Maps','https://www.google.com/maps?q=%s'],['OpenStreetMap','https://www.openstreetmap.org/?mlat=%a&mlon=%o#map=17/%a/%o'],['Street View','https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=%s']],
+  xmr:[['Blockchair','https://blockchair.com/search?q=%s']], ltc:[['Blockchair','https://blockchair.com/litecoin/address/%s']], doge:[['Blockchair','https://blockchair.com/dogecoin/address/%s']], trx:[['Tronscan','https://tronscan.org/#/address/%s']],
+  sha512:[['VirusTotal','https://www.virustotal.com/gui/search/%s']],
 };
 PIV.hostport = PIV.ipv4;
 function pivotLinks(kind, value){
   let v = String(value || '').trim(); if(!v) return [];
   if(kind === 'hostport') v = v.split(':')[0];
+  if(kind === 'phone') v = v.replace(/^\+/, '');
   if(kind === 'handle') v = v.replace(/^@/, '');
-  const base = (PIV[kind] || []).map(([n, t]) => [n, E.safeUrl(t.replace('%s', v).replace(/%e/g, encodeURIComponent(v)))]).filter(x => x[1]);
+  const [la, lo] = kind === 'coords' ? v.split(',') : ['', ''], tt = kind === 'ttp' ? v.replace('.', '/') : '';
+  const base = (PIV[kind] || []).map(([n, t]) => [n, E.safeUrl(t.replace(/%s/g, v).replace(/%e/g, encodeURIComponent(v)).replace(/%a/g, la).replace(/%o/g, lo).replace(/%t/g, tt))]).filter(x => x[1]);
   return base.concat(toolTplLinks(kind, v).filter(x => !base.some(b => b[0].toLowerCase() === x[0].toLowerCase())));
 }
 /* your own lookup tools: any toolbox entry with a URL template such as https://example.com/search?q={value} */
 const TPL_KINDS = [['ipv4','IP address'],['domain','Domain'],['url','URL'],['email','Email'],['handle','Username'],['hash','File hash'],['phone','Phone'],['person','Person name'],['btc','Wallet'],['cve','CVE'],['any','Anything']];
-const kindGroup = k => ({md5:'hash', sha1:'hash', sha256:'hash', file:'hash', hostport:'ipv4', ip:'ipv4', eth:'btc', crypto:'btc', username:'handle', vulnerability:'cve'})[k] || k;
+const kindGroup = k => ({md5:'hash', sha1:'hash', sha256:'hash', sha512:'hash', file:'hash', hostport:'ipv4', ipv6:'ipv4', ip:'ipv4', eth:'btc', xmr:'btc', ltc:'btc', trx:'btc', doge:'btc', crypto:'btc', username:'handle', vulnerability:'cve'})[k] || k;
 function toolUrl(t, v){ return t.tpl ? E.safeUrl(t.tpl.replace(/\{value\}/g, encodeURIComponent(v)).replace(/\{raw\}/g, v)) : null; }
 function toolTplLinks(kind, v){ const g = kindGroup(kind); return DB.tools.filter(t => t.tpl && (t.kinds || []).some(k => k === g || k === 'any')).map(t => [t.name, toolUrl(t, v), t.id]).filter(x => x[1]); }
 const SEED_TPL = {'Shodan':['https://www.shodan.io/host/{value}',['ipv4']], 'MalwareBazaar':['https://bazaar.abuse.ch/browse.php?search={value}',['hash']], 'Have I Been Pwned':['https://haveibeenpwned.com/account/{value}',['email']],
@@ -41,11 +51,28 @@ function toolRunDlg(id){
     ${sug.length ? `<div class="t3" style="font-size:13px;margin:4px 0 8px">From ${esc(theCase().code)}:</div><div class="wrap">${sug.map(x => `<button type="button" class="chip" data-act="trPick" data-v="${esc(x.v)}">${esc(x.v.length > 40 ? x.v.slice(0, 39) + '…' : x.v)}</button>`).join('')}</div>` : ''}</div>
     <footer><button class="btn" type="button" data-act="dclose">Cancel</button><button class="btn primary" type="submit">${ico('arrow-up-right','sm')}Open</button></footer></form>`);
 }
+/* research checklist: every lookup for an entity, ticked when you open it */
+const rsKey = (kind, value) => kind + ':' + String(value || '').trim();
+function rsState(key){ return ((DB.research || {})[key]) || {}; }
+function rsMark(key, name, on){ DB.research = DB.research || {}; const s = DB.research[key] || (DB.research[key] = {}); if(on === false) delete s[name]; else s[name] = s[name] || {at:Date.now()}; if(!Object.keys(s).length) delete DB.research[key]; save(); }
+function rsProgress(kind, value){ const l = pivotLinks(kind, value); if(!l.length) return null; const st = rsState(rsKey(kind, value)); return {done:l.filter(([n]) => st[n]).length, total:l.length}; }
 function pivotSection(kind, value){
   const l = pivotLinks(kind, value); if(!l.length) return '';
-  return `<div class="isec"><h4>Look up <span class="t3">opens in a new tab</span></h4><div class="pivots">${l.map(([n, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(n)}${ico('arrow-up-right','sm')}</a>`).join('')}
-    <button data-act="copyDefang" data-v="${esc(value)}" title="Copy a defanged version, safe to paste in chat or tickets">${ico('copy','sm')}Copy defanged</button></div></div>`;
+  const key = rsKey(kind, value), st = rsState(key), done = l.filter(([n]) => st[n]).length, next = l.find(([n]) => !st[n]);
+  return `<div class="isec rs"><h4>Research <span class="t3">${done} of ${l.length} checked</span></h4>
+    <div class="rsbar"><i style="width:${Math.round(done / l.length * 100)}%"></i></div>
+    <div class="rslist">${l.map(([n, u]) => { const d = st[n]; return `<div class="rsi${d ? ' done' : ''}"><button class="rsc" data-act="rsTick" data-id="${esc(key)}" data-v="${esc(n)}" aria-pressed="${!!d}" aria-label="${d ? 'Mark not checked' : 'Mark checked'}: ${esc(n)}">${d ? ico('check','sm') : ''}</button>
+      <a href="${esc(u)}" target="_blank" rel="noopener noreferrer" data-act="rsOpen" data-id="${esc(key)}" data-v="${esc(n)}">${esc(n)}${ico('arrow-up-right','sm')}</a>${d ? `<span class="t3">${esc(E.fmtAgo(Date.now() - d.at))} ago</span>` : ''}</div>`; }).join('')}</div>
+    <div class="wrap" style="margin-top:10px">${next ? `<a class="btn sm primary" href="${esc(next[1])}" target="_blank" rel="noopener noreferrer" data-act="rsOpen" data-id="${esc(key)}" data-v="${esc(next[0])}">${ico('arrow-up-right','sm')}Open next: ${esc(next[0])}</a>${l.length - done > 1 ? `<button class="btn sm" data-act="rsAll" data-id="${esc(key)}" data-v="${esc(kind)}">Open all ${l.length - done}</button>` : ''}` : `<span class="chip green sq">${ico('check','sm')}All lookups checked</span>`}
+      <button class="btn sm ghost" data-act="copyDefang" data-v="${esc(value)}" title="Copy a defanged version, safe to paste in chat or tickets">${ico('copy','sm')}Copy defanged</button></div></div>`;
 }
+const RS_ACTS = {
+  rsOpen:(id, v) => { rsMark(id, v, true); setTimeout(() => { renderInsp(); if(UI.route.tab === 'entities') renderMain(); }, 50); },
+  rsTick:(id, v) => { const on = !rsState(id)[v]; rsMark(id, v, on); renderInsp(); if(UI.route.tab === 'entities') renderMain(); },
+  rsAll:(id, v) => { const i = id.indexOf(':'), kind = id.slice(0, i), value = id.slice(i + 1), st = rsState(id), rest = pivotLinks(kind, value).filter(([n]) => !st[n]); let blocked = 0;
+    for(const [n, u] of rest){ const w = window.open(u, '_blank'); if(!w){ blocked++; continue; } try{ w.opener = null; }catch(e){} rsMark(id, n, true); }
+    renderInsp(); if(blocked) toast(`Your browser blocked ${blocked} tab${blocked > 1 ? 's' : ''}. Allow pop-ups for this site to open them all at once — or use “Open next”.`); }
+};
 const defang = s => String(s).replace(/^http/i, 'hxxp').replace(/:\/\//, '[://]').replace(/\./g, '[.]').replace(/@/g, '[@]');
 const refang = s => String(s).replace(/hxxp/ig, 'http').replace(/\[:\/\/\]/g, '://').replace(/\[\.\]|\(\.\)|\{\.\}/g, '.').replace(/\[@\]|\(at\)|\[at\]/ig, '@');
 
@@ -87,10 +114,10 @@ function printReport(){
 }
 /* ---------- import a single case ---------- */
 function importCase(){
-  pickFile('.json,application/json', txt => { let d; try{ d = JSON.parse(txt); }catch(e){ return toast('That file is not JSON'); }
+  pickFile('.json,application/json', raw => maybeDecrypt(raw, txt => { let d; try{ d = JSON.parse(txt); }catch(e){ return toast('That file is not JSON'); }
     if(!d || d.format !== 'osintrix-case' || !d.case || !Array.isArray(d.entries)) return toast('Not an OSINTrix case — export one from a case menu');
     const map = new Map(), nid = (old, p) => { const n = uid(p); map.set(old, n); return n; };
-    const c = {...d.case, id:uid('c'), updated:Date.now()}; if(DB.cases.some(x => x.code === c.code)) c.code = c.code + '-imp';
+    const c = {...d.case, id:uid('c'), updated:Date.now()}; if(DB.cases.some(x => x.code === c.code)) c.code = nextCaseCode(); if(clash(DB.cases, c.name)) c.name = nextName(String(c.name || 'Imported case').trim() + ' (imported)', DB.cases.map(x => x.name));
     const entries = d.entries.map(e => ({...e, id:nid(e.id, 'v'), caseId:c.id}));
     const records = (d.records || []).map(r => ({...r, id:nid(r.id, 'r'), caseId:c.id}));
     const links = (d.links || []).map(l => ({...l, id:uid('l'), caseId:c.id, a:map.get(l.a) || l.a, b:map.get(l.b) || l.b, src:map.get(l.src) || l.src}));
@@ -99,7 +126,7 @@ function importCase(){
     DB.cases.push(c); DB.entries.push(...entries); DB.records.push(...records); DB.links.push(...links.filter(l => entries.some(e => e.id === l.a) && entries.some(e => e.id === l.b)));
     if(d.files) filesFromImport(d.files);
     mutate('imported case ' + c.code); hashRecords(); ensurePositions(); DB.active = c.id; go(caseHash(c.id));
-    toast(`Imported ${c.code} — ${entries.length} entries, ${records.length} records`); });
+    toast(`Imported ${c.code} — ${entries.length} entries, ${records.length} records`); }));
 }
 
 /* ---------- transform workbench (Decoder) ---------- */

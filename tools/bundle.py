@@ -24,7 +24,10 @@ def js(src):
 html = re.sub(r'<link rel="stylesheet" href="([^"]+)">', lambda m: css(m.group(1)), html)
 html = re.sub(r'<script src="([^"]+)"></script>', lambda m: js(m.group(1)), html)
 # everything is inline now, so the policy allows inline code and data: fonts instead of files
-html = re.sub(r'content="default-src[^"]*"', "content=\"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; "
+html = re.sub(r'content="default-src[^"]*"', "content=\"default-src 'none'; script-src 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob: https://*.basemaps.cartocdn.com https://server.arcgisonline.com; font-src data:; "
               "connect-src https://api.rss2json.com; form-action 'none'; base-uri 'none'\"", html)
+# engines loaded on demand (the SQLite viewer) ride along as inert text and are started from it when needed
+LAZY = ['js/vendor/sql-wasm.js', 'js/vendor/sql-wasm-b64.js']
+html = html.replace('</body>', ''.join('<script type="text/plain" id="lazy:' + p + '">' + (root / p).read_text(encoding='utf-8') + '</script>' for p in LAZY) + '</body>')
 out = root / 'dist' / 'osintrix-offline.html'; out.parent.mkdir(exist_ok=True); out.write_text(html, encoding='utf-8')
 print(len(html) // 1024, 'KB  ->', out.relative_to(root))

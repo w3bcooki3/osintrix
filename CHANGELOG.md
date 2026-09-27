@@ -2,6 +2,70 @@
 
 How OSINTrix came together, newest first.
 
+## v1.7 — Packets, databases and tidier input
+
+- **PCAP reader** in the Forensics kit: pcap and pcapng, with conversations, hosts, DNS, DHCP, HTTP (with file export), TLS SNI / JA3, cleartext logins, beacon / scan / ARP-spoofing findings and a follow-stream view.
+- **SQLite viewer:** browser history, downloads, cookies and logins; phone messages; WhatsApp; any table. Timestamps are decoded, deleted-row text is recovered from free pages, and there's a read-only SQL console. Rows go to the timeline in one click.
+- **Case map rebuilt** on Leaflet: smooth zoom, a crisp offline outline map, optional street / light / satellite maps (asked first), a numbered movement path with speeds, and place popups with map links.
+- **Hypothesis board redesigned:** a ranking card with evidence-for and evidence-against bars, a clear matrix with credibility and relevance, and a legend.
+- **Input checks everywhere:** messages appear under the field. Names of cases, tools, queries, rules, playbooks, parsers, CTF events and challenges, and hypotheses must be unique. Likely duplicate vault entries and tool addresses trigger a warning. Formats are checked (email, domain, IP, URL, MAC, phone, CVE, hash, dates, ATT&CK IDs, regular expressions).
+- **Clear copies:** duplicates are named “… (copy)”, “… (copy 2)”. New rules and challenges get distinct names. Imports that clash get “(imported)”. Case codes never repeat.
+- **Saved web page** button and how-to in Capture.
+- **Map tiles:** the streets map now uses CARTO (OpenStreetMap's own servers refuse apps that open from a file or send no referrer). When tiles can't load, the map says so and falls back to the offline outline. Dialogs are no longer drawn under the map, and clicked countries don't get a focus box.
+- **PCAP findings** are a plain severity list (High / Medium) with a link to the table behind each one.
+- **Capture dialog:** the attach bar and the web-page how-to line up with the rest of the form.
+
+## v1.6 — Security, custody, maps and reasoning
+
+- **Encrypted workspace:**
+  - AES-256-GCM with a passphrase, covering cases, restore points and files.
+  - A lock screen, auto-lock and "Lock now".
+  - Change the passphrase or turn encryption off at any time.
+- **Encrypted backups and case exports.**
+- **Tamper-evident audit log** (hash chain) and **signed chain-of-custody reports** (ECDSA P-256) that you can verify inside the app.
+- **Saved web pages** (.html / .mhtml) archived as evidence, viewed in a script-free sandbox. Images and SVGs now open as pictures, so they can never run code.
+- **Case map:** an offline world map with places, shaded countries, a time-ordered movement path, and photo GPS picked up automatically from attached photos.
+- **Hypothesis board** (analysis of competing hypotheses) in the new Analysis tab, with a starting board on the sample case. The ranking is included in reports.
+- **Research checklist** for every indicator: ticks itself as you open lookups, with progress shown on the Entities tab.
+- **Image forensics:** error level analysis, and perceptual fingerprints that find look-alike photos in your evidence.
+- **Faster:**
+  - Timelines draw in pages.
+  - Date formatting is cached, so a 5,000-row case opens in about a quarter of a second, down from nearly a second.
+- **Automated tests** (Playwright) and a GitHub Actions workflow.
+
+## v1.5 — Connecting the dots
+
+- **Capture asks which case the evidence goes to.** There is a case picker, including "New case…", plus an "Add to graph" switch per case. File and log imports go to the case you pick too.
+- **Checked before you save:** every indicator shows whether it is already in this case or in another case, its verdict, whether you watch it, and offline context.
+- **Log parser:**
+  - Built-in formats: JSON, CEF, LEEF, Windows event XML, web access logs, IIS/W3C, Zeek, Cisco ASA, sshd/sudo, key=value (FortiGate, Sysmon, iptables) and syslog headers.
+  - Fields are mapped to common names and power the timeline filters (`dst.port:443`), Sigma and graph relations.
+  - Structured lines get readable titles, and the source, host and time are filled in from the log.
+  - Your own regex parsers can be drafted from a sample line in Forensics kit → Log parser, along with field-name mappings.
+- **Graph shows what is missing:** a notice counts the entities in the evidence that are not on the graph, and **Add from evidence** lets you pick them.
+- **Much wider extraction:**
+  - Network: IPv6, MAC addresses, ASNs.
+  - Identity: phone numbers, social-profile links (25 platforms, which also give the @handle), usernames written as `username:`, `aka` and `u/`, and `[at]`/`[dot]` obfuscated emails.
+  - Money: XMR, LTC, TRX and DOGE wallets, and IBANs (checksum-validated).
+  - Other: SHA-512, coordinates and ATT&CK technique IDs.
+- **Graph from evidence:**
+  - Relations stated in the evidence become links automatically, with the reason. Everything else becomes a suggestion.
+  - You can build a case's graph at any time, or turn on auto-add.
+  - Right-click a node for "Expand from evidence".
+  - New nodes are placed next to what they connect to.
+- **Suggested links** (seen together, near in time on one host, look-alike identities, shared infrastructure), each with Accept or Dismiss.
+- **Insights:** hubs, bridges, clusters (with colouring), "look at next", and unconnected nodes.
+- **Watchlist:** a Watchlist page, a Dashboard card, a count in the sidebar, and notices on new sightings.
+- **Offline context:** cloud provider ranges, Tor exit nodes, disposable and free email providers, dynamic DNS, URL shorteners, paste and file-sharing sites, free hosting, and phone country codes.
+- **Around this time:** ±5 minutes around any record, with a filtered timeline.
+- **Fix:** on phones, the welcome screen now opens at the top instead of halfway down.
+
+## v1.4.2 — Entities per case
+
+- **Each case now has an Entities tab.** It lists every indicator from that case's evidence and vault, with records, first and last seen, the other cases that share it, and whether it is in the vault. You can set verdicts, add to the vault, copy defanged or export CSV in bulk.
+- **The global Entities page** can filter by case, and it shows which cases each indicator appears in.
+- **Fix:** the page behind a query or rule drawer, or behind any dialog, no longer scrolls.
+
 ## v1.4.1 — Separate files
 
 - **The app is now a normal static site:** `index.html`, `css/`, `js/` and `fonts/` instead of one generated 2 MB file. There is no build step: edit a file and reload.

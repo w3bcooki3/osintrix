@@ -1,0 +1,14 @@
+{
+  "name": "osintrix",
+  "version": "1.6.0",
+  "private": true,
+  "description": "Private, browser-only OSINT and investigation workspace.",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "bundle": "python3 tools/bundle.py"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1"
+  }
+}

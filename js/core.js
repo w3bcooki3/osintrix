@@ -37,7 +37,9 @@ const IDB = {db:null,
 const STORE = {idb:false, ls:false, persisted:false, bytes:0, quota:0, lastSaved:0};
 async function loadAll(){
   STORE.idb = await IDB.open();
-  let a = null; if(STORE.idb){ const raw = await IDB.get(STORE_KEY); try{ a = raw ? JSON.parse(raw) : null; }catch(e){ a = null; } if(!(a && a.v === 2 && Array.isArray(a.entries))) a = null; }
+  let a = null, envs = []; if(STORE.idb){ const raw = await IDB.get(STORE_KEY); if(isEnv(raw)) envs.push(raw); else { try{ a = raw ? JSON.parse(raw) : null; }catch(e){ a = null; } if(!(a && a.v === 2 && Array.isArray(a.entries))) a = null; } }
+  try{ const ls = localStorage.getItem(STORE_KEY); if(isEnv(ls)) envs.push(ls); }catch(e){}
+  if(envs.length){ try{ if(navigator.storage && navigator.storage.persisted) STORE.persisted = await navigator.storage.persisted(); }catch(e){} const env = envs.sort((x, y) => (JSON.parse(y).at || 0) - (JSON.parse(x).at || 0))[0]; SEC.locked = true; return {__locked:true, env}; }
   const b = load();
   const pick = a && b ? ((a.savedAt || 0) >= (b.savedAt || 0) ? a : b) : (a || b);
   try{ if(navigator.storage && navigator.storage.persist) STORE.persisted = await navigator.storage.persisted() || await navigator.storage.persist(); }catch(e){}
@@ -46,14 +48,16 @@ async function loadAll(){
 async function storageEstimate(){ try{ if(navigator.storage && navigator.storage.estimate){ const e = await navigator.storage.estimate(); STORE.quota = e.quota || 0; STORE.usage = e.usage || 0; } }catch(e){} return STORE; }
 let saveT = null, storageOK = true;
 function save(){ clearTimeout(saveT); saveT = setTimeout(flush, 250); }
-function flush(){ clearTimeout(saveT); DB.savedAt = Date.now(); const json = JSON.stringify(DB); STORE.bytes = json.length * 2;
+function flush(){ clearTimeout(saveT); if(!DB || SEC.locked) return; DB.savedAt = Date.now(); const json = JSON.stringify(DB);
+  if(SEC.key) return flushSealed(json);
+  STORE.bytes = json.length * 2;
   let ok = false; try{ if(json.length < 2400000){ localStorage.setItem(STORE_KEY, json); STORE.ls = true; ok = true; } else { localStorage.removeItem(STORE_KEY); STORE.ls = false; } }catch(e){ STORE.ls = false; }
   if(STORE.idb){ ok = true; IDB.set(STORE_KEY, json).then(r => { if(!r && !STORE.ls){ storageOK = false; paintSaved(); } }); }
   storageOK = ok; STORE.lastSaved = Date.now(); paintSaved(); }
 function paintSaved(){ const s = $('saved'); if(s) s.innerHTML = storageOK ? '<i></i>Saved in this browser' : '<i style="background:var(--red)"></i>Not saved'; }
 window.addEventListener('pagehide', flush); document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'hidden') flush(); });
 let rev = 0, cache = {};
-function mutate(what){ rev++; cache = {}; DB.log.unshift({at:Date.now(), what}); DB.log.length = Math.min(DB.log.length, 200); save(); }
+function mutate(what){ rev++; cache = {}; auditAdd(what); DB.log.unshift({at:Date.now(), what}); DB.log.length = Math.min(DB.log.length, 200); save(); }
 
 /* ---------- lookups ---------- */
 const tz = () => DB.prefs.tz || 'UTC';
@@ -63,14 +67,20 @@ const entryById = id => DB.entries.find(e => e.id === id) || null;
 const entKey = e => e.k + ':' + e.v;
 const entSplit = id => { const i = id.indexOf(':'); return {k:id.slice(0, i), v:id.slice(i + 1)}; };
 const verdictOf = id => DB.verdicts[id] || '';
-const primary = e => { const t = TYPES[e.type]; return (e.fields[t.fields[0][0]] || '').trim(); };
+const primary = e => { const t = TYPES[e.type]; if(e.type === 'social' && e.fields.url){ const s = E.normSocial(e.fields.url); if(s) return s.v; } return (e.fields[t.fields[0][0]] || '').trim(); };
 function entryKey(e){
-  const t = TYPES[e.type]; if(!t || !t.kind) return null;
+  const t = TYPES[e.type]; if(!t) return null;
+  if(e.type === 'location'){ const co = (e.fields.coordinates || '').trim(); return /-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?/.test(co) ? 'coords:' + E.norm('coords', co) : null; }
+  if(e.type === 'social'){ const u = (e.fields.url || '').trim(), s = u && E.normSocial(u); if(s) return 'social:' + s.v; return null; }
+  if(!t.kind) return null;
   let v = primary(e); if(!v) return null;
   let k = t.kind;
-  if(e.type === 'crypto') k = /^0x/i.test(v) ? 'eth' : 'btc';
+  if(e.type === 'crypto') k = E.cryptoKind(v);
+  if(e.type === 'ip' && v.includes(':') && E.validIPv6(v.trim())) k = 'ipv6';
+  if(/^(phone|mac)$/.test(k)) v = E.norm(k, v);
   if(e.type === 'username') v = '@' + v.replace(/^@/, '');
-  if(/^(ipv4|domain|url|email|sha256|handle)$/.test(k)) v = v.toLowerCase();
+  if(/^(ipv4|ipv6|domain|url|email|sha256|handle)$/.test(k)) v = v.toLowerCase();
+  v = v.trim();
   if(k === 'cve') v = v.toUpperCase();
   return k + ':' + v;
 }
@@ -113,6 +123,8 @@ function matchField(r, f){
     case 'ent': return r.ents.some(e => e.v.toLowerCase().includes(v));
     case 'verdict': return r.ents.some(e => verdictOf(entKey(e)) === v);
     case 'is': return v === 'open' ? (r.type === 'lead' && !r.answer) : r.type.startsWith(v);
+    case 'fld': { const P = parseLog(r.body); if(P && (P.norm[f.name] != null || Object.keys(P.fields).some(k => k.toLowerCase() === f.name))) return fieldMatch(r, f.name, v);
+      return (r.title + ' ' + r.body).toLowerCase().includes(f.text); }
   }
   return true;
 }
@@ -121,14 +133,15 @@ function passes(r){
   if(UI.facet.type && r.type !== UI.facet.type) return false;
   if(UI.pivot && !r.ents.some(e => entKey(e) === UI.pivot)) return false;
   if(UI.facet.slot && !slotPass(r)) return false;
+  if(UI.facet.win && !winPass(r)) return false;
   if(UI.ast){ const h = (r.title + ' ' + r.body + ' ' + r.host + ' ' + r.source + ' ' + r.tags.join(' ')).toLowerCase();
     if(!UI.ast.some(g => g.text.every(t => h.includes(t)) && g.neg.every(t => !h.includes(t)) && g.f.every(f => matchField(r, f) !== f.neg))) return false; }
   return true;
 }
 
 /* ---------- routing ---------- */
-const AREAS = ['trash','help','ctf','lab','home','cases','case','toolbox','entities','feeds','decoder','reference','settings','detections','playbooks','queries','notes'];
-const CASE_TABS = [['overview','Overview','layout-dashboard'],['vault','Vault','layers'],['timeline','Timeline','clock'],['graph','Graph','waypoints'],['questions','Questions','list-checks'],['report','Report','file-chart-column']];
+const AREAS = ['security','watch','trash','help','ctf','lab','home','cases','case','toolbox','entities','feeds','decoder','reference','settings','detections','playbooks','queries','notes'];
+const CASE_TABS = [['overview','Overview','layout-dashboard'],['vault','Vault','layers'],['entities','Entities','fingerprint'],['timeline','Timeline','clock'],['graph','Graph','waypoints'],['map','Map','map'],['questions','Analysis','scale'],['report','Report','file-chart-column']];
 function parseHash(){
   const p = (location.hash || '#/home').replace(/^#\/?/, '').split('/').map(decodeURIComponent);
   if(p[0] === 'case' && DB.cases.some(c => c.id === p[1])){ DB.active = p[1]; return {area:'case', tab:CASE_TABS.some(t => t[0] === p[2]) ? p[2] : 'overview'}; }

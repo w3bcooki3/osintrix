@@ -13,9 +13,9 @@ function renderNav(){
     <div class="navg"><div class="caps">Workspace</div>${nv('notes','sticky-note','Notes', (DB.notes || []).reduce((s, n) => s + noteTasks(n).filter(t => !t.done).length, 0) || null)}</div>
     <div class="navg"><div class="caps">Research</div>${nv('toolbox','wrench','Toolbox', DB.tools.length)}${nv('queries','scan-search','Query library', (DB.queries || []).length || null)}</div>
     <div class="navg"><div class="caps">Lab</div>${nv('ctf','flag','CTF', DB.ctf ? DB.ctf.chals.filter(c => c.status !== 'solved').length || null : null)}${nv('lab','file-search','Forensics kit')}${nv('decoder','binary','Decoder')}</div>
-    <div class="navg"><div class="caps">Intelligence</div>${nv('feeds','rss','Threat Intel', DB.feed.length || null)}${nv('detections','file-code','Detections', (DB.rules || []).length || null)}${nv('entities','fingerprint','Entities')}</div>
+    <div class="navg"><div class="caps">Intelligence</div>${nv('feeds','rss','Threat Intel', DB.feed.length || null)}${nv('watch','eye','Watchlist', watchHits().length || null)}${nv('detections','file-code','Detections', (DB.rules || []).length || null)}${nv('entities','fingerprint','Entities')}</div>
     <div class="navg"><div class="caps">Knowledge</div>${nv('reference','book-open','Reference')}${nv('playbooks','list-checks','Playbooks', (DB.playbooks || []).length || null)}</div>
-    <div class="navg">${(DB.trash || []).length ? nv('trash','trash-2','Trash', DB.trash.length) : ''}${nv('help','circle-help','Help')}${nv('settings','settings','Settings')}</div>`;
+    <div class="navg">${(DB.trash || []).length ? nv('trash','trash-2','Trash', DB.trash.length) : ''}${nv('security', SEC.key ? 'lock' : 'shield-check', 'Security')}${nv('help','circle-help','Help')}${nv('settings','settings','Settings')}</div>`;
   const b = $('bbar');
   b.innerHTML = `<a href="#/home"${cur('home')}>${ico('layout-dashboard')}Home</a><a href="#/cases"${r.area === 'cases' || r.area === 'case' ? ' aria-current="page"' : ''}>${ico('folder-open')}Cases</a>
     <button class="cap" data-act="capture" aria-label="Capture"><span class="b">${ico('plus')}</span></button>
@@ -69,6 +69,7 @@ function viewHome(){
           <div class="axis">${buckets.map((v, i) => `<span>${['Tue 8','Wed 9','Thu 10','Fri 11','Sat 12','Sun 13','Mon 14','Tue 15'][i]}</span>`).join('')}</div></div></section>
       </div>
       <div class="stack">
+        ${watchCard()}
         <section class="card"><header><h3>Feed items about your entities</h3>${impl('mock')}</header><div class="body flush">
           ${fm.map(({f, hits}) => `<button class="li" data-act="selFeed" data-id="${f.id}" style="align-items:flex-start"><span class="tb sm" style="--c:var(--red)">${ico('rss')}</span>
             <div class="main2"><b style="white-space:normal">${esc(f.title)}</b><small>${esc(f.source)} · ${hits.length} match${hits.length > 1 ? 'es' : ''}</small></div></button>`).join('') || empty('rss', 'No matches', 'No feed item mentions an entity from your cases.')}</div></section>
@@ -112,8 +113,8 @@ function caseCard(c){
 }
 function viewCase(tab){
   const c = theCase(), D = derive();
-  const counts = {vault:D.entries.length, timeline:D.recs.filter(r => r.ts).length, questions:D.recs.filter(r => r.type === 'lead' && !r.answer).length || null};
-  const body = {overview:caseOverview, vault:caseVault, timeline:caseTimeline, graph:caseGraph, questions:caseQuestions, report:caseReport}[tab] || caseOverview;
+  const counts = {vault:D.entries.length, entities:caseEntList(c.id).length, timeline:D.recs.filter(r => r.ts).length, questions:D.recs.filter(r => r.type === 'lead' && !r.answer).length || null};
+  const body = {map:caseMapView, overview:caseOverview, vault:caseVault, entities:caseEntities, timeline:caseTimeline, graph:caseGraph, questions:caseQuestions, report:caseReport}[tab] || caseOverview;
   return `<div class="chead${tab === 'graph' ? ' g' : ''}" style="--cc:${esc(c.color)}"><div class="crumb"><a href="#/cases">Cases</a>${ico('chevron-right','sm')}<span>${esc(c.code)}</span></div>
     <div class="row1"><span class="cicon" style="background:${esc(c.color)}">${ico(c.icon)}</span>
       <div style="flex:1;min-width:0"><h1>${esc(c.name)}</h1><div class="meta">${statusTag(c.status)}<span>${ico('calendar','sm')}Opened ${esc(E.fmtDate(c.created, tz()))}</span><span>${ico('user','sm')}${esc(c.owner)}</span></div></div>
@@ -207,18 +208,22 @@ function caseTimeline(c, D){
     ${hosts.slice(0, 5).map(([h, n]) => `<button class="chip" data-act="facet" data-f="host" data-v="${esc(h)}" aria-pressed="${UI.facet.host === h}">${esc(h)}<span class="n">${n}</span></button>`).join('')}
     ${UI.pivot ? `<span class="chip accent">Pivot: ${esc(entSplit(UI.pivot).v)} <button data-act="pivotOff" aria-label="Exit pivot">${ico('x','sm')}</button></span>` : ''}
     ${UI.facet.slot ? `<span class="chip accent">${esc(UI.facet.slot.day != null ? UI.facet.slot.day.replace(/^\w+,?\s*/, '') : WD[UI.facet.slot.wd])} ${String(UI.facet.slot.h).padStart(2, '0')}:00 <button data-act="slotOff" aria-label="Clear time filter">${ico('x','sm')}</button></span>` : ''}
-    ${UI.facet.host || UI.pivot || UI.q || UI.facet.slot ? `<button class="btn xs ghost" data-act="clearFilters">Clear</button>` : ''}
+    ${UI.facet.win ? `<span class="chip accent">±5 min of ${esc(E.fmtClock(UI.facet.win.at, tz()))} <button data-act="winOff" aria-label="Clear time window">${ico('x','sm')}</button></span>` : ''}
+    ${UI.facet.host || UI.pivot || UI.q || UI.facet.slot || UI.facet.win ? `<button class="btn xs ghost" data-act="clearFilters">Clear</button>` : ''}
     <span class="sp"></span><button class="btn xs${UI.tlSel ? ' on' : ''}" data-act="tlSel" aria-pressed="${!!UI.tlSel}">${ico('square-check','sm')}Select</button><button class="btn xs${UI.tlHeat ? ' on' : ''}" data-act="tlHeat" aria-pressed="${!!UI.tlHeat}">${ico('grid-3x3','sm')}Heatmap</button>` : ''}</div>`;
   if(UI.tlMode === 'story') return `<div class="scroll">${bar}${storyHTML(D)}</div>`;
   let h = '', lastDay = null, prev = null;
-  for(const r of list){
+  const lim = UI.tlLim && UI.tlLim.k === c.id + '|' + (UI.q || '') ? UI.tlLim.n : 300, shown = list.slice(0, lim), dayN = new Map();
+  for(const r of list) if(r.ts){ const d = E.fmtDay(r.ts, tz()); dayN.set(d, (dayN.get(d) || 0) + 1); }
+  for(const r of shown){
     if(r.ts){ const d = E.fmtDay(r.ts, tz());
-      if(d !== lastDay){ const n = list.filter(x => x.ts && E.fmtDay(x.ts, tz()) === d).length; h += `<div class="day"><b>${esc(d)}</b><span>${n} event${n > 1 ? 's' : ''} · ${esc(tz())}</span></div>`; lastDay = d; prev = null; }
+      if(d !== lastDay){ const n = dayN.get(d) || 0; h += `<div class="day"><b>${esc(d)}</b><span>${n} event${n > 1 ? 's' : ''} · ${esc(tz())}</span></div>`; lastDay = d; prev = null; }
       if(prev !== null){ const g = r.ts - prev; if(g > 1000){ const px = Math.max(10, Math.min(56, Math.round(5 * Math.log2(g / 1000)))); h += `<div class="gap${g > 36e5 ? ' wide' : ''}" style="--h:${px}px" aria-hidden="true"><em>${g > 36e5 ? ico('clock','sm') : ''}${esc(E.fmtGap(g))}${g > 36e5 ? ' gap' : ''}</em></div>`; } }
       prev = r.ts;
     } else if(lastDay !== '-'){ h += `<div class="day">No timestamp</div>`; lastDay = '-'; prev = null; }
     h += evWrap(r, evHTML(r, D, c));
   }
+  if(list.length > lim) h += `<div class="tlmore" id="tlMore"><span class="t3">Showing ${lim.toLocaleString()} of ${list.length.toLocaleString()} events</span><button class="btn sm" data-act="tlMore" data-v="${c.id + '|' + (UI.q || '')}">Show ${Math.min(500, list.length - lim).toLocaleString()} more</button><button class="btn sm ghost" data-act="tlMore" data-v="${c.id + '|' + (UI.q || '')}" data-id="all">Show all</button></div>`;
   if(UI.evPick){ const have = new Set(D.recs.map(r => r.id)); for(const i of [...UI.evPick]) if(!have.has(i)) UI.evPick.delete(i); }
   return `<div class="scroll">${bar}${UI.tlHeat ? heatHTML(D) : ''}<div class="tl${UI.tlSel || (UI.evPick && UI.evPick.size) ? ' picking' : ''}">${evBulkHTML(list)}${list.length ? h : empty('filter','Nothing matches','Clear the filters or change the search.', `<button class="btn" data-act="clearFilters">Clear filters</button>`)}</div></div>`;
 }
@@ -263,7 +268,10 @@ function caseQuestions(c, D){
   for(const l of leads){ const k = pbOf(l); if(!k) continue; let g = groups.find(x => x.id === k); if(!g){ const p = DB.playbooks.find(x => x.id === k); g = {id:k, name:p ? p.name : 'Playbook', icon:p ? p.icon : 'list-checks', items:[], pb:true}; groups.push(g); } g.items.push(l); }
   const sec = g => { const d = g.items.filter(l => l.answer).length; return `<section class="card qsec"><header><span class="qsec-ic">${ico(g.icon,'sm')}</span><h3>${esc(g.name)}${g.pb ? ' <span class="pill" style="--c:#8b5cf6">Playbook</span>' : ''}</h3><span style="flex:1"></span><span class="pb-prog"><i style="width:${g.items.length ? Math.round(d / g.items.length * 100) : 0}%"></i></span><span class="t3 mono">${d}/${g.items.length}</span></header>
     <div class="body flush">${g.items.map(row).join('')}</div></section>`; };
-  return `<div class="scroll"><div class="page narrow">
+  const qv = UI.qView === 'hyp' ? 'hyp' : 'q', A = c.ach || {hyps:[]};
+  const seg = `<div class="seg qseg" role="tablist"><button data-act="qView" data-v="q" aria-pressed="${qv === 'q'}">${ico('list-checks','sm')}Open questions <span class="segn">${leads.length - done}</span></button><button data-act="qView" data-v="hyp" aria-pressed="${qv === 'hyp'}">${ico('scale','sm')}Hypotheses <span class="segn">${A.hyps.length}</span></button></div>`;
+  if(qv === 'hyp') return `<div class="scroll"><div class="page">${seg}${achHTML(c, D)}</div></div>`;
+  return `<div class="scroll"><div class="page narrow">${seg}
     <div class="qtop card"><div class="qring" style="--p:${pct}"><b>${pct}%</b></div><div style="flex:1;min-width:0"><h3>${done} of ${leads.length} questions answered</h3><p class="t3">Every open question is something the case does not know yet.</p></div>
       <button class="btn" data-act="pbMenu">${ico('list-checks','sm')}Run a playbook</button></div>
     <form class="card qadd" data-form="addQ"><label class="sr" for="newQ">New question</label><input id="newQ" class="inp" placeholder="What do you still need to find out?" autocomplete="off"><button class="btn primary" type="submit">${ico('plus','sm')}Add</button></form>

@@ -7,6 +7,8 @@
 A private OSINT investigation workspace that runs entirely in your browser.
 No server. No account. No tracking. Your cases never leave your machine.
 
+[![Tests](https://github.com/YOUR-USERNAME/osintrix/actions/workflows/test.yml/badge.svg)](https://github.com/YOUR-USERNAME/osintrix/actions/workflows/test.yml)
+
 [**Launch the app →**](https://YOUR-USERNAME.github.io/osintrix/) &nbsp;·&nbsp; [Features](#features) &nbsp;·&nbsp; [Privacy](#privacy-by-design) &nbsp;·&nbsp; [Run it locally](#run-it-locally)
 
 ![OSINTrix dashboard](docs/dashboard.png)
@@ -44,13 +46,25 @@ Press `Ctrl K` or `/`, or click the search bar, to search the whole app at once:
 
 ### 🗂️ Cases
 - **Case vaults:** each investigation holds typed entries (people, usernames, emails, phones, domains, IPs, crypto wallets, forums, documents and more). Each type has its own fields, plus priority, verdict, tags and notes.
-- **Evidence capture:** paste a log line, a post or a note. Indicators (IPs, domains, hashes, emails, handles, CVEs…) and timestamps are pulled out automatically.
+- **Evidence capture:** choose the case it goes to, then paste a log line, a post, a WHOIS record or a whole report. Indicators and timestamps are pulled out automatically: IPv4/IPv6, domains, URLs, emails (including `[at]`/`[dot]` obfuscation), @handles and usernames, social-profile links for 25 platforms, phone numbers, BTC/ETH/XMR/LTC/TRX/DOGE wallets, IBANs, MD5 to SHA-512, MAC addresses, ASNs, coordinates, CVEs and ATT&CK technique IDs.
+  - **Log parsing:** JSON, CEF, LEEF, Windows event XML, Apache/Nginx, IIS/W3C, Zeek, Cisco ASA, sshd/sudo, key=value (FortiGate, Sysmon, iptables…) and syslog headers. Fields are mapped to common names (src.ip, dst.port, user, action, url…) for filters like `dst.port:443`, for Sigma, and for graph relations. Records get readable titles such as “TCP 10.0.0.8:51000 → 93.184.216.34:443 · deny — FortiGate”.
+  - **Your own parsers:** Forensics kit → Log parser drafts a regex from a sample line. You name the groups, and it runs before the built-ins. You can also map vendor field names to common ones.
+  - **Before you save,** every indicator is checked against all your cases, your verdicts, your watchlist and the offline context lists (cloud provider, Tor exit, disposable email, dynamic DNS, URL shortener, paste site, phone country).
+  - **Saved web pages:** drop an `.html` or `.mhtml` page you saved with the browser. Its URL, title, author, dates, text, outbound links and email links are archived as evidence with the file's SHA-256. The original opens in a sandbox with scripts off.
   - **Screenshots and files:** paste or drop them in. Each is hashed (SHA-256), stored in the browser and shown with a preview on its record.
   - **Log import:** CSV, TSV, JSON or NDJSON exports (Sysmon, firewall, proxy, EDR…). Pick the time, title and host columns; each row becomes a record, with every column kept so detections can test it.
+- **Entities per case:** every indicator in the case, with first and last seen, record counts and which other cases share it. Filter by kind or verdict, then set verdicts, add to the vault or export in bulk.
 - **Timeline:** every record in order, with day headers, event markers and filters. Search with `host:`, `verdict:`, `type:`, `tag:`, `after:` and `before:`.
   - **Activity heatmap** (day × hour): click a cell to see just that hour.
   - **Multi-select:** tag, mark as key evidence, export to CSV or delete many records at once.
+- **Case map:** a pan-and-zoom map (Leaflet) with every place in the case. Points come from Location entries, coordinates in evidence and photo GPS. Countries are shaded from country fields, phone country codes and log fields. A numbered movement path shows legs in time order, with distance, time and speed, and flags impossible travel. The default outline map works offline. Street and light maps (CARTO) and satellite imagery (Esri) load tiles only after you agree, because those servers see the area you view. If tiles can't be loaded (offline, or blocked on your network), the map says so and falls back to the outline map.
+- **Hypothesis board (Analysis tab):** analysis of competing hypotheses. List the explanations, rate every piece of evidence against each (++ + · – ––), weighted by credibility and relevance. Hypotheses are ranked by how much evidence *contradicts* them. Non-diagnostic evidence and evidence that alone decides the ranking are flagged. The ranking goes into the report.
 - **Link graph:**
+  - **Not on the graph yet?** The graph shows vault entries. It tells you how many entities from the evidence are missing, and **Add from evidence** lets you tick exactly which ones to add.
+  - **Build from evidence:** entities in your records become nodes. Relations the evidence *states* become links, with the reason attached. That covers URL→domain, email→domain, profile→handle, DNS answers, Sysmon connections, email From/To/Reply-To, WHOIS registrant and name servers, and phrases like “resolves to”, “beacons to” or “aka”. Filters skip private IPs, benign entities and one-off mentions. You can turn it on per case so every new capture is added automatically.
+  - **Suggested links:** pairs that appear together in the evidence, that happen within two minutes on the same host, look-alike usernames across platforms, and shared IPs or registrants. Each comes with a reason, and you accept or dismiss it.
+  - **Expand from evidence:** right-click a node to bring in everything its records mention.
+  - **Insights:** hubs, bridges (betweenness), clusters with colouring, and “look at next” — unrated entities touching malicious ones.
   - Drag, add, edit and connect nodes.
   - Right-click menus on nodes, links and empty canvas.
   - Every relationship carries a confidence rating and its evidence.
@@ -62,9 +76,14 @@ Press `Ctrl K` or `/`, or click the search bar, to search the whole app at once:
   - A cited report with four templates (full, executive, technical, CTF write-up), a relationship map, and a **redact** switch that masks emails, phones, IPs, handles and names. Print it, save it as PDF, or export it as Markdown.
   - Every indicator as CSV, a defanged text list, or a STIX 2.1 bundle.
   - A whole case as JSON, which a colleague can import on their own machine.
+- **Research checklist:** every lookup for an indicator is a checklist. It ticks itself when you open a site, shows how far you got, and offers “Open next”. Progress also shows on the case Entities tab.
 - **One-click pivots:** every IP, domain, URL, email, hash, wallet, handle and CVE has lookup buttons for VirusTotal, AbuseIPDB, Shodan, urlscan, crt.sh, HIBP, Etherscan, NVD and more. Each opens in a new tab; nothing is fetched by OSINTrix.
 
 ![Graph](docs/graph.png)
+
+![Case map](docs/map.png)
+
+![Hypothesis board](docs/hypotheses.png)
 
 ### 🧰 Research
 - **Toolbox:** 90+ curated OSINT and security tools across 8 categories.
@@ -98,7 +117,15 @@ Press `Ctrl K` or `/`, or click the search bar, to search the whole app at once:
   - strings (ASCII and UTF-16) with compressed noise filtered out, indicators found in them, and a hex dump;
   - a **YARA scan** with your own rules.
   Save the findings to a case in one click.
-- **Image tools:** colour channels, bit planes 0–7, LSB text extraction, QR code decoding and one-click reverse image search sites.
+- **PCAP reader:** open a .pcap or .pcapng file (Wireshark, tcpdump, firewall exports). It shows:
+  - conversations, hosts with MAC addresses and names, and protocol counts;
+  - DNS lookups and answers, DHCP hostnames, HTTP requests with downloadable files, and TLS server names (SNI), versions, ALPN and JA3 fingerprints;
+  - cleartext logins (HTTP Basic and forms, FTP, POP3, IMAP, SMTP AUTH, SNMP communities);
+  - findings: beacons, port scans, ARP spoofing, DNS tunnelling, programs downloaded over HTTP and malware-typical ports;
+  - a follow-stream view in text or hex.
+  Encrypted traffic (HTTPS, SSH, QUIC) stays encrypted, but who talked to whom, when and how much is still shown. Send the events to a case timeline in one click.
+- **SQLite viewer:** open any SQLite database. It recognises Chrome / Edge / Brave history, downloads, searches, cookies, saved logins and autofill; Firefox history, bookmarks, cookies and form history; Safari history; Android SMS and call logs; iPhone messages; and WhatsApp. Time columns are decoded (Unix, WebKit, PRTime, Apple, FILETIME). Free pages are scanned for text left over from deleted rows. There's a read-only SQL console and CSV export, and rows can be sent to a case timeline. Passwords and encrypted cookies are never decrypted.
+- **Image tools:** colour channels, bit planes 0–7, LSB text extraction, QR code decoding, **error level analysis (ELA)**, a perceptual fingerprint that finds the same photo among your evidence even after resizing, and one-click reverse image search sites.
 - **Email headers:** paste raw headers to see SPF, DKIM and DMARC results, From / Reply-To / Return-Path mismatches, the hop path with delays, and the sender's first public IP.
 - **Timestamps and IDs:** paste a number and see it as Unix (seconds, ms, µs, ns), Windows FILETIME / LDAP, Chrome / WebKit, Cocoa, HFS+, GPS and DOS time, with the most likely reading flagged. Paste a post or profile ID (X, Discord, TikTok, Instagram, Mastodon, LinkedIn), a MongoDB ObjectId, UUID v1/v7, ULID or KSUID to get the time it was created.
 - **Network:** subnet calculator (IPv4 and IPv6), MAC address vendor lookup from the bundled IEEE list, and a user-agent parser that flags scripts and bots.
@@ -107,15 +134,19 @@ Press `Ctrl K` or `/`, or click the search bar, to search the whole app at once:
 - **Coordinates:** reads decimal degrees, DMS or a Google Maps link, and converts between formats. Links to Google Maps, Street View, OpenStreetMap, Google Earth, Bing and Mapillary.
 - **Decoder:** 25 operations. Beyond the basics there are Base32, Base58, binary, character codes, `\x` / `\u` unescaping, all 25 Caesar shifts, single-byte XOR brute force, Morse and gunzip / inflate.
 
-![Forensics kit](docs/lab.png)
+![PCAP reader](docs/lab.png)
+
+![SQLite viewer](docs/sqlite.png)
 
 ### 🛡️ Intelligence
+- **Watchlist:** watch any indicator. New evidence, log imports and news that mention it are flagged, with a notice, a Dashboard card and a list of sightings.
+- **Around this time:** every record shows what else happened within ±5 minutes, on any host, one click from a filtered timeline.
 - **Detections:** write, keep and import Sigma and YARA rules.
   - Editor with syntax highlighting and a live structure check.
   - **Test a rule** against a case's evidence (Sigma and YARA) or against a file (YARA). The engines are subsets that run in the page; anything they cannot evaluate is reported, never silently passed.
   - Link a rule to a case, or generate starter rules from a case's malicious indicators.
 - **Threat Intel:** security news from your RSS sources, classified by category and severity, and checked against every entity in your cases. It is off until you turn it on.
-- **Entities:** every indicator across every case, with verdicts and cross-case matches.
+- **Entities:** every indicator across every case, with verdicts and cross-case matches. Filter by case.
 
 ![Detections](docs/detections.png)
 
@@ -127,16 +158,24 @@ Press `Ctrl K` or `/`, or click the search bar, to search the whole app at once:
 
 <p align="center"><img src="docs/mobile.png" width="260" alt="OSINTrix on a phone"></p>
 
+## Security and chain of custody
+
+- **Encrypted workspace:** AES-256-GCM with a key from your passphrase (PBKDF2-SHA-256, 310,000 rounds). It covers cases, notes, restore points and attached files, and can auto-lock when idle. The passphrase is never stored.
+- **Encrypted backups and case exports:** these use a passphrase of their own. Importing asks for it.
+- **Tamper-evident audit log:** every change is chained by hash, and Verify shows exactly where a chain was edited.
+- **Signed chain-of-custody reports:** every record of a case with its SHA-256, capture time and files, plus the audit chain, signed with the workspace's ECDSA P-256 key. Anyone can verify one in the app.
+
 ## Privacy by design
 
 | | |
 |---|---|
 | **Where your data lives** | Only in this browser (IndexedDB, with a localStorage copy). Nothing is uploaded. There is no backend and no analytics. |
-| **Network access** | The page's Content Security Policy blocks every outside connection except one: `api.rss2json.com`, used only if you turn on live Threat Intel feeds. Even then, only feed addresses are sent. |
+| **Network access** | The page's Content Security Policy blocks every outside connection except two, both opt-in: `api.rss2json.com` if you turn on live Threat Intel feeds (only feed addresses are sent), and map tiles from CARTO or Esri if you pick the streets, light or satellite map (the tile server sees the area you view, never your case). The default outline map, the PCAP reader and the SQLite viewer work fully offline. |
 | **Untrusted content** | Feed articles and pasted evidence are shown as plain text. Links open only when you click them, in a new tab with no referrer. |
 | **Storage** | Saved in **IndexedDB**, with a localStorage copy while it fits. Every change is written within about 250 ms, and again when you switch tabs or close the page. Room depends on the browser and free disk space: usually hundreds of MB or more, compared with roughly 5 MB for localStorage alone. Help shows how much you are using. |
 | **One browser, one address** | Data belongs to one browser profile *and* one address. A copy opened from disk (`file://`) and the GitHub Pages copy each keep their own data, and so do Chrome and Firefox. Private windows and embedded previews keep nothing; a red banner warns you when saving is blocked. |
 | **Backups** | Clearing site data erases everything. Export regularly from **Help → Export everything** (attached files are included); the same page imports a backup. The Dashboard reminds you when your last backup is more than two weeks old. |
+| **Encryption** | Optional. Everything the browser stores is sealed with AES-256-GCM, and the app opens locked. |
 | **Undo, trash and restore points** | Deleted cases, entries, records, relationships and notes stay in the trash for 30 days. A full restore point is saved before every import, reset, sample-data removal or log import. |
 | **Sample data** | The app starts with three example investigations, notes, news items and CTF challenges. **Remove sample data** (on the Dashboard banner, Settings or Help) deletes only those and keeps your own work. |
 
@@ -164,7 +203,7 @@ osintrix/
 │   │   ├── tools.js            ← default toolbox (JSON after the "=")
 │   │   ├── query-templates.js  ← default query library
 │   │   └── detection-rules.js  ← default Sigma / YARA rules
-│   ├── vendor/             ← cytoscape.min.js, jsqr.min.js, oui-vendors.js (IEEE MAC vendor list)
+│   ├── vendor/             ← cytoscape, Leaflet, world outlines, sql.js (loaded on demand), jsQR, IEEE MAC vendors, offline context lists
 │   ├── icons.js            ← Lucide icon set
 │   ├── engine.js           ← indicator extraction, time parsing, search syntax
 │   ├── brand.js · model.js · demo.js   ← name and logo, entry types, sample cases
@@ -179,10 +218,46 @@ osintrix/
 │   ├── search.js           ← search everything
 │   ├── safety.js           ← trash, restore points, backups, attachments, log import
 │   ├── tl.js · report.js   ← timeline heatmap and multi-select, report templates
+│   ├── caseents.js         ← the Entities tab inside each case
+│   ├── map.js · ach.js     ← case map, hypothesis board
+│   ├── pcap.js · sqlite.js ← packet capture reader, SQLite viewer
+│   ├── validate.js         ← form checks, duplicate names
+│   ├── security.js         ← encryption, audit chain, signed custody reports
+│   ├── webpage.js · imgx.js ← saved web pages, ELA and image fingerprints
+│   ├── parse.js            ← log parser: formats, field names, your own parsers
+│   ├── relate.js           ← build the graph from evidence, suggested links, expand, insights
+│   ├── watch.js            ← offline enrichment, watchlist, “around this time”
 │   └── app.js              ← events, keyboard, boot (loads last)
 ├── tools/bundle.py         ← optional: makes a one-file offline copy
+├── tests/                  ← Playwright end-to-end tests (npm test), run on every push by GitHub Actions
+├── .github/workflows/      ← CI
 └── docs/                   ← screenshots
 ```
+
+### Tests
+
+```bash
+npm install
+npx playwright install chromium
+npm test
+```
+
+The tests open the real app from disk and check that:
+
+- every screen draws;
+- extraction and log parsing work;
+- graph relations are built from evidence;
+- encryption locks and unlocks;
+- the audit chain catches edits, and custody reports catch tampering;
+- saved web pages never run scripts;
+- photo GPS lands on the map;
+- the hypothesis board ranks by evidence against;
+- a packet capture yields its DNS, HTTP, TLS server names and JA3, cleartext logins and beacon findings (pcap and pcapng);
+- a Chrome history database opens with decoded times, recovered deleted text and a SQL console that cannot change it;
+- forms show inline errors and refuse duplicate names, and copies are numbered;
+- every control can be clicked without an error.
+
+GitHub Actions runs them on every push.
 
 ### One-file offline copy (optional)
 
@@ -205,7 +280,7 @@ Add entries to `js/data/tools.js` and reload. When people load the new version, 
 | `Ctrl` `K` or `/` | Search everything, run actions |
 | `N` | Capture evidence |
 | `E` | Add a vault entry |
-| `1` – `6` | Switch case tabs |
+| `1` – `7` | Switch case tabs |
 | `Ctrl` `S` | Save the rule you're editing |
 | `Ctrl` `Enter` | Save a capture or note |
 | `Shift` `F10` | Graph menu for the selected node |
@@ -217,8 +292,9 @@ Add entries to `js/data/tools.js` and reload. When people load the new version, 
 - [x] Case import and export, IOC export (CSV, text, STIX 2.1), print to PDF
 - [x] CTF tracker, forensics kit, flag finder
 - [x] IndexedDB storage (well beyond the ~5 MB localStorage limit)
-- [ ] Optional encrypted backup files
-- [ ] PCAP summary (hosts, DNS, HTTP) in the File inspector
+- [x] Optional encrypted backup files
+- [x] PCAP reader (conversations, DNS, HTTP, TLS, cleartext logins) and SQLite / browser-history viewer
+- [ ] Crypto-currency tracing (needs a blockchain API)
 - [ ] Library: a personal knowledge base of articles and write-ups
 - [x] Evidence attachments (screenshots, files) stored locally
 - [x] Bulk log import, report templates and redaction, trash and restore points
@@ -235,6 +311,12 @@ Vanilla JavaScript and CSS, with no framework. Everything is bundled so it runs 
 | [Lucide](https://lucide.dev/) icons | ISC |
 | [jsQR](https://github.com/cozmo/jsQR) 1.4 | Apache-2.0 |
 | IEEE OUI list via [oui-data](https://github.com/silverwind/oui-data) | BSD-2-Clause |
+| [Leaflet](https://leafletjs.com/) 1.9 | BSD-2-Clause |
+| [sql.js](https://sql.js.org/) 1.13 (SQLite in WebAssembly, loaded only when the SQLite viewer opens) | MIT |
+| [Natural Earth](https://www.naturalearthdata.com/) country outlines via world-atlas | Public domain / ISC |
+| Cloud IPv4 ranges via [lord-alfred/ipranges](https://github.com/lord-alfred/ipranges) | CC0-1.0 |
+| Tor exit nodes via [SecOps-Institute/Tor-IP-Addresses](https://github.com/SecOps-Institute/Tor-IP-Addresses) | public Tor Project data |
+| [disposable-email-domains](https://github.com/disposable-email-domains/disposable-email-domains) | CC0-1.0 |
 
 The demo case data is synthetic. The IPs and domains in it use reserved documentation ranges such as `203.0.113.0/24` and `.example`.
 

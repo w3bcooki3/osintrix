@@ -9,19 +9,23 @@ const nodeIcon = (icon, color) => 'data:image/svg+xml;utf8,' + encodeURIComponen
   `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="-6 -6 36 36" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${LUCIDE[icon] || ''}</svg>`);
 
 function caseGraph(c, D){
-  if(!D.entries.length) return `<div class="scroll">${empty('waypoints','No entries to draw','The graph is built from the case vault. Add an entry and it appears here, ready to connect.', `<button class="btn primary" data-act="addEntry">${ico('plus','sm')}Add entry</button>`)}</div>`;
+  if(!D.entries.length) return `<div class="scroll">${empty('waypoints','No entries to draw', D.recs.length ? `This case has ${D.recs.length} records. Build the graph from what they mention — stated relations are linked for you — or add entries by hand.` : 'The graph is built from the case vault. Add an entry, or capture evidence and build the graph from it.', `${D.recs.length ? `<button class="btn primary" data-act="gBuild">${ico('sparkles','sm')}Build from evidence</button>` : ''}<button class="btn${D.recs.length ? '' : ' primary'}" data-act="addEntry">${ico('plus','sm')}Add entry</button>`)}</div>`;
+  const nSugg = suggestLinks(c.id).length, nMiss = missingCount(c.id);
   const gm = UI.graph, hide = gm.hide || (gm.hide = new Set()), sel = !!(UI.sel && (UI.sel.kind === 'entry' || UI.sel.kind === 'link'));
   const tb = (act, icon, label, extra = '') => `<button class="gbtn" data-act="${act}" title="${label}" aria-label="${label}" ${extra}>${ico(icon,'sm')}<span>${label}</span></button>`;
   return `<div class="gwrap">
     <div class="gtools">
       <div class="gset">${tb('addEntry','plus','Add node')}${tb('gConnect', 'git-branch', gm.mode === 'connect' ? 'Connecting…' : 'Connect', gm.mode === 'connect' ? 'aria-pressed="true"' : '')}</div>
       <div class="gset">${tb('gEdit','pencil','Edit', sel ? '' : 'disabled')}${tb('gDelete','trash-2','Delete', sel ? '' : 'disabled')}</div>
+      <div class="gset">${tb('gPick','list-plus','Add from evidence')}${tb('gBuild','sparkles','Build from evidence')}<button class="gbtn${gm.panel === 'sugg' ? ' on' : ''}" data-act="gPanel" data-v="${gm.panel === 'sugg' ? '' : 'sugg'}" title="Suggested links" aria-pressed="${gm.panel === 'sugg'}">${ico('link-2','sm')}<span>Suggestions</span>${nSugg ? `<b class="gcount">${nSugg}</b>` : ''}</button><button class="gbtn${gm.panel === 'ins' ? ' on' : ''}" data-act="gPanel" data-v="${gm.panel === 'ins' ? '' : 'ins'}" title="Insights" aria-pressed="${gm.panel === 'ins'}">${ico('radar','sm')}<span>Insights</span></button></div>
       <div class="search-in gfind">${ico('search')}<label class="sr" for="gFind">Find in graph</label><input id="gFind" class="inp" placeholder="Find a node…" value="${esc(gm.find || '')}" autocomplete="off"></div>
       <span style="flex:1"></span>
       <div class="gset"><label class="sr" for="gLayout">Arrange</label><select id="gLayout" class="gsel"><option value="">Arrange…</option><option value="cose">Force-directed</option><option value="concentric">By importance</option><option value="breadthfirst">Hierarchy</option><option value="circle">Circle</option><option value="grid">Grid</option></select>
         ${tb('gCo', gm.co ? 'eye' : 'eye', 'Co-occurrence', `aria-pressed="${!!gm.co}"`)}${tb('gExport','download','Export')}</div>
     </div>
-    <div class="gcanvas"><div id="cy" role="application" aria-label="Relationship graph for ${esc(c.name)}"></div>
+    <div class="gcanvas${gm.panel ? ' haspanel' : ''}"><div id="cy" role="application" aria-label="Relationship graph for ${esc(c.name)}"></div>
+      <div id="gpanel"></div>
+      ${nMiss && !(gm.noteOff && gm.noteOff.has(c.id)) && !gm.mode && !gm.path ? `<div class="gfloat gmiss">${ico('layers','sm')}<span title="The graph shows vault entries. Adding an entity puts it in the vault and on the graph."><b>${nMiss}</b> ${nMiss === 1 ? 'entity' : 'entities'} from the evidence ${nMiss === 1 ? 'is' : 'are'} not on the graph yet</span><button class="btn xs primary" data-act="gPick">Choose…</button><button class="btn xs" data-act="gBuild">Add by rule…</button><button class="iconbtn" data-act="gNoteOff" aria-label="Hide">${ico('x','sm')}</button></div>` : ''}
       ${gm.mode === 'path' ? `<div class="gfloat gmode">${ico('route','sm')}<span>Now click the entry to find a path to</span><button class="btn xs" data-act="gPathOff">Cancel</button></div>` : ''}
       ${gm.path ? `<div class="gfloat gmode">${ico('route','sm')}<span>${gm.path.len ? `${gm.path.len} step${gm.path.len > 1 ? 's' : ''} from <b>${esc(gm.path.a)}</b> to <b>${esc(gm.path.b)}</b>` : `No path between <b>${esc(gm.path.a)}</b> and <b>${esc(gm.path.b)}</b>`}</span><button class="btn xs" data-act="gPathOff">Clear</button></div>` : ''}
       ${graphDates(D) ? `<div class="gfloat gtime"><label for="gAsof">${ico('clock','sm')}As of</label><input type="range" id="gAsof" min="0" max="1000" value="${gm.asof == null ? 1000 : gm.asof}"><span id="gAsofL">${esc(asofLabel(D))}</span></div>` : ''}
@@ -44,7 +48,7 @@ function graphElements(D){
       ring:v === 'malicious' ? cssVar('--red') : v === 'suspicious' ? cssVar('--amber') : col, w:e.priority === 'critical' ? 62 : e.priority === 'high' ? 54 : 46, star:e.starred ? 1 : 0},
       position:e.pos ? {...e.pos} : undefined});
   }
-  for(const l of D.links) if(vis.has(l.a) && vis.has(l.b)) els.push({group:'edges', data:{id:l.id, source:l.a, target:l.b, label:l.label, w:.8 + l.conf * .7, kind:'asserted'}});
+  for(const l of D.links) if(vis.has(l.a) && vis.has(l.b)) els.push({group:'edges', data:{id:l.id, source:l.a, target:l.b, label:l.label, w:.8 + l.conf * .7, kind:'asserted', auto:l.auto ? 1 : 0}});
   if(UI.graph.co){
     const pairs = new Map();
     for(const r of D.recs){ const es = [...new Set(r.ents.map(entKey))].map(k => D.byKey.get(k)).filter(e => e && vis.has(e.id));
@@ -78,6 +82,8 @@ function mountGraph(){
       {selector:'.faded', style:{opacity:.16}},
       {selector:'.onpath', style:{'underlay-color':cssVar('--green'), 'underlay-opacity':.45, 'underlay-padding':9, 'underlay-shape':'ellipse', opacity:1, 'line-color':cssVar('--green'), 'target-arrow-color':cssVar('--green'), width:4}},
       {selector:'.later', style:{display:'none'}},
+      {selector:'edge[auto = 1]', style:{'line-style':'solid', 'line-color':cssVar('--text-3'), 'target-arrow-color':cssVar('--text-3'), opacity:.7}},
+      {selector:'edge[auto = 1][w < 2]', style:{'line-style':'dashed'}},
       {selector:'node.hit', style:{'underlay-color':cssVar('--amber'), 'underlay-opacity':.4, 'underlay-padding':10, 'underlay-shape':'ellipse'}},
     ]});
   if(!hasPos){ cy.nodes().forEach(n => { const e = entryById(n.id()); if(e) e.pos = {...n.position()}; }); save(); }
@@ -112,6 +118,9 @@ function mountGraph(){
   if(UI.sel && UI.sel.kind === 'entry'){ const n = cy.getElementById(UI.sel.id); if(n.length) n.select(); }
   if(UI.graph.first){ const n = cy.getElementById(UI.graph.first); if(n.length) n.addClass('src'); }
   applyFind(); applyPath(); applyAsof();
+  if(UI.graph.panel){ const gp = $('gpanel'); if(gp){ gp.innerHTML = gPanelHTML(); bindGPanel(gp); } }
+  applyClusters();
+  cy.edges('[?auto]').addClass('auto');
   const ga = $('gAsof'); if(ga) ga.oninput = () => { UI.graph.asof = +ga.value; $('gAsofL').textContent = asofLabel(derive()); applyAsof(); };
   const gf = $('gFind'); if(gf) gf.oninput = () => { UI.graph.find = gf.value; applyFind(); };
   const lay = $('gLayout'); if(lay) lay.onchange = () => { if(!lay.value) return; runLayout(lay.value); lay.value = ''; };
@@ -178,6 +187,8 @@ function nodeMenu(id, x, y){
     {label:'Priority', seg:['low','medium','high','critical'].map(p => ({label:p[0].toUpperCase() + p.slice(1), on:e.priority === p, fn:() => { e.priority = p; mutate('priority ' + p); renderAll(); }}))},
     {label:e.starred ? 'Unstar' : 'Star', icon:'star', fn:() => { e.starred = !e.starred; mutate('star'); renderAll(); }},
     {sep:true},
+    {label:'Expand from evidence', icon:'sparkles', disabled:!k, fn:() => expandNode(id)},
+    {label:isWatched(k) ? 'Stop watching' : 'Watch for new sightings', icon:'eye', disabled:!k, fn:() => toggleWatch(k)},
     {label:'Find path to…', icon:'route', fn:() => { UI.graph.mode = 'path'; UI.graph.first = id; UI.graph.path = null; renderMain(); }},
     {label:'Highlight neighbours', icon:'waypoints', fn:() => { const nb = cy.getElementById(id).closedNeighborhood(); cy.elements().removeClass('faded').not(nb).addClass('faded'); }},
     {label:'Show evidence on timeline', icon:'clock', disabled:!k, fn:() => { UI.pivot = k; UI.tlMode = 'events'; go(caseHash(DB.active, 'timeline')); }},

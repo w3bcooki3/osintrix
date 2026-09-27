@@ -29,8 +29,8 @@ function inspEntry(e){
   return ihead('Vault entry', `<button class="iconbtn${e.starred ? ' on' : ''}" data-act="star" data-id="${e.id}" aria-label="Star">${ico('star')}</button>`) + `<div class="ibody">
     <div style="display:flex;gap:14px;align-items:flex-start">${tbadge(e.type,'lg')}<div style="min-width:0"><div class="t3" style="font-size:13px;font-weight:560">${esc(t.label)}</div>
       <h2 class="${MONO_TYPES.has(e.type) ? 'mono' : ''}" style="overflow-wrap:anywhere;${MONO_TYPES.has(e.type) ? 'font-size:16px;font-weight:600' : ''}">${esc(primary(e))}</h2>
-      ${m ? `<div style="font-size:13px;margin-top:3px;color:${m.hot ? 'var(--amber)' : 'var(--text-3)'}">${esc(m.t)}</div>` : ''}</div></div>
-    <div class="wrap" style="margin-top:14px"><button class="btn sm" data-act="editEntry" data-id="${e.id}">${ico('pencil','sm')}Edit</button><button class="btn sm" data-act="linkFrom" data-id="${e.id}">${ico('git-branch','sm')}Connect</button>
+      ${m ? `<div style="font-size:13px;margin-top:3px;color:${m.hot ? 'var(--amber)' : 'var(--text-3)'}">${esc(m.t)}</div>` : ''}${k ? `<div class="cxts">${ctxChips(entSplit(k).k, entSplit(k).v)}</div>` : ''}</div></div>
+    <div class="wrap" style="margin-top:14px"><button class="btn sm" data-act="editEntry" data-id="${e.id}">${ico('pencil','sm')}Edit</button>${k ? `<button class="btn sm${isWatched(k) ? ' on' : ''}" data-act="watch" data-id="${esc(k)}">${ico(isWatched(k) ? 'eye-off' : 'eye','sm')}${isWatched(k) ? 'Unwatch' : 'Watch'}</button>` : ''}<button class="btn sm" data-act="linkFrom" data-id="${e.id}">${ico('git-branch','sm')}Connect</button>
       <a class="btn sm" href="${caseHash(e.caseId,'graph')}" data-act="showInGraph" data-id="${e.id}">${ico('waypoints','sm')}Graph</a><button class="btn sm danger" data-act="delEntry" data-id="${e.id}" aria-label="Delete">${ico('trash-2','sm')}</button></div>
     ${pivotSection(k ? entSplit(k).k : e.type, k ? entSplit(k).v : primary(e))}
     <div class="isec"><h4>Verdict ${k ? '<span class="t3">applies in every case</span>' : ''}</h4><div class="seg v">${[['malicious','Malicious'],['suspicious','Suspicious'],['benign','Benign'],['','Unknown']].map(([x, l]) => `<button data-act="entryVerdict" data-id="${e.id}" data-v="${x}" aria-pressed="${v === x}">${l}</button>`).join('')}</div></div>
@@ -52,7 +52,7 @@ function inspLink(l){
   const a = entryById(l.a), b = entryById(l.b), r = recById(l.src);
   return ihead('Relationship') + `<div class="ibody">
     <div style="display:flex;flex-direction:column;gap:10px;align-items:flex-start">${entryPill(a)}<span style="color:var(--accent);font-weight:620;display:flex;gap:6px;align-items:center">${ico('arrow-up-right','sm')}${esc(l.label)}</span>${entryPill(b)}</div>
-    <div class="isec"><dl class="kv"><dt>Confidence</dt><dd>${conf(l.conf)} ${['','Low','Medium','High'][l.conf]}</dd><dt>Evidence</dt><dd>${r ? `<button class="linkbtn" data-act="selRec" data-id="${r.id}">${esc(r.title)}</button>` : '—'}</dd><dt>Kind</dt><dd>Analyst claim</dd></dl></div>
+    <div class="isec"><dl class="kv"><dt>Confidence</dt><dd>${conf(l.conf)} ${['','Low','Medium','High'][l.conf]}</dd><dt>Evidence</dt><dd>${r ? `<button class="linkbtn" data-act="selRec" data-id="${r.id}">${esc(r.title)}</button>` : '—'}</dd><dt>Kind</dt><dd>${l.auto ? 'Found in evidence' : 'Analyst claim'}</dd>${l.why ? `<dt>Why</dt><dd>${esc(l.why)}</dd>` : ''}</dl></div>
     <div class="wrap" style="margin-top:18px"><button class="btn sm" data-act="editLink" data-id="${l.id}">${ico('pencil','sm')}Edit</button><button class="btn sm danger" data-act="delLink" data-id="${l.id}">${ico('trash-2','sm')}Delete</button></div></div>`;
 }
 function inspRecord(r){
@@ -65,15 +65,18 @@ function inspRecord(r){
       <dt>Added</dt><dd>${esc(r.addedBy)} · ${esc(E.fmtFull(r.addedAt, tz()).slice(0, 16))}</dd><dt>SHA-256</dt><dd class="mono" title="Fingerprint of the captured text">${esc((r.hash || '…').slice(0, 24))}…</dd></dl>
       ${r.ts ? `<button class="btn sm" data-act="setT0" data-id="${r.id}" style="margin-top:12px">${ico('crosshair','sm')}${c.t0 === r.id ? 'Clear T0' : 'Make this T0'}</button>` : ''}</div>
     ${r.body ? `<div class="isec"><h4>Captured text</h4><pre class="rawbox">${esc(r.body)}</pre></div>` : ''}
+    ${r.body ? fieldsSection(r) : ''}
     ${obs.length ? `<div class="isec"><h4>Observations <span class="t3">heuristic</span></h4>${obs.map(o => `<div class="note amber obs"><span class="ic">${ico('triangle-alert','sm')}</span><div><b>${esc(o.tag[0].toUpperCase() + o.tag.slice(1))}</b> — ${esc(o.t)}</div></div>`).join('')}</div>` : ''}
     <div class="isec"><h4>Entities found <span class="t3">${r.ents.length}</span></h4><div class="wrap">${r.ents.map(e => { const id = entKey(e), en = D.byKey.get(id); return en ? entryPill(en) : entPill(id); }).join('') || '<span class="t3">None.</span>'}</div></div>
+    ${aroundHTML(r)}
     ${attSection(r)}
     <div class="isec"><div class="wrap"><button class="btn sm danger" data-act="recDel" data-id="${r.id}">${ico('trash-2','sm')}Delete record</button></div></div></div>`;
 }
 function inspEnt(id){
   const {k, v} = entSplit(id), g = globalEnts().get(id), recs = g ? g.recs : [], m = E.meaning(k, v), vd = verdictOf(id), canVault = !!KIND_TO_TYPE[k];
   return ihead('Indicator') + `<div class="ibody"><div style="display:flex;gap:14px;align-items:flex-start">${kindBadge(k,'lg')}<div style="min-width:0"><div class="t3" style="font-size:13px">${esc(E.LABEL[k] || k)} · extracted</div><h2 class="mono" style="font-size:16px;font-weight:600;overflow-wrap:anywhere">${esc(v)}</h2>
-    ${m ? `<div style="font-size:13px;margin-top:3px;color:${m.hot ? 'var(--amber)' : 'var(--text-3)'}">${esc(m.t)}</div>` : ''}</div></div>
+    ${m ? `<div style="font-size:13px;margin-top:3px;color:${m.hot ? 'var(--amber)' : 'var(--text-3)'}">${esc(m.t)}</div>` : ''}<div class="cxts">${ctxChips(k, v)}</div></div></div>
+    <div class="wrap" style="margin-top:14px"><button class="btn sm${isWatched(id) ? ' on' : ''}" data-act="watch" data-id="${esc(id)}">${ico(isWatched(id) ? 'eye-off' : 'eye','sm')}${isWatched(id) ? 'Unwatch' : 'Watch'}</button></div>
     ${canVault && !derive().byKey.has(id) ? `<button class="btn primary sm" data-act="promote" data-id="${esc(id)}" style="margin-top:14px">${ico('plus','sm')}Add to ${esc(theCase().code)} vault</button>` : ''}
     ${pivotSection(k, v)}
     <div class="isec"><h4>Verdict <span class="t3">applies in every case</span></h4><div class="seg v">${[['malicious','Malicious'],['suspicious','Suspicious'],['benign','Benign'],['','Unknown']].map(([x, l]) => `<button data-act="entVerdict" data-id="${esc(id)}" data-v="${x}" aria-pressed="${vd === x}">${l}</button>`).join('')}</div></div>
@@ -179,33 +182,63 @@ function linkDlg(o = {}){
 }
 
 /* capture */
-const draft = {body:'', type:'evidence', source:'', host:''};
+const draft = {body:'', type:'evidence', source:'', host:'', caseId:null};
+const capCase = () => { const s = $('capCase'); const id = (s && s.value) || draft.caseId || DB.active; return DB.cases.some(c => c.id === id) ? id : DB.active; };
 function openCapture(prefill){
   if(prefill != null) draft.body = prefill;
-  openDlg(dhead('Capture evidence') + `<div class="in"><p class="t2" style="margin:0 0 12px;font-size:14px">Paste a log line, a WHOIS record, a forum post — anything. It lands in <b style="color:var(--text)">${esc(theCase().name)}</b>.</p>
+  if(!draft.caseId || !DB.cases.some(c => c.id === draft.caseId)) draft.caseId = DB.active;
+  const cur = theCase(draft.caseId), open = DB.cases.filter(c => c.status !== 'closed' || c.id === cur.id);
+  openDlg(dhead('Capture evidence') + `<div class="in"><div class="capto"><label for="capCase">Save to</label><span class="capdot" style="background:${esc(cur.color)}"></span><select id="capCase" class="gsel bord">${open.map(c => `<option value="${c.id}"${c.id === cur.id ? ' selected' : ''}>${esc(c.code + ' · ' + c.name)}</option>`).join('')}<option value="__new">+ New case…</option></select>
+      <label class="chk capg" title="Add what this evidence mentions to the case graph, and link relations it states"><span class="sw"><input type="checkbox" id="capGraph"${cur.autoGraph ? ' checked' : ''}><span></span></span>Add to graph</label></div>
+    <p class="t2" style="margin:0 0 12px;font-size:14px">Paste a log line, a WHOIS record, a forum post, a whole report — anything. Indicators are picked out and checked against every case, your watchlist and the offline context lists.</p>
     <label class="sr" for="capBody">Evidence text</label><textarea id="capBody" class="inp code" rows="6" placeholder="2026-09-14T09:03:15Z EventID 3 … -> 203.0.113.47:4444">${esc(draft.body)}</textarea>
     <div class="found" id="capFound"></div>
-    <div class="frow" style="margin-top:14px"><div class="field"><label for="capSrc">Source</label><input id="capSrc" value="${esc(draft.source)}" placeholder="sysmon, whois, forum…"></div><div class="field"><label for="capHost">Host</label><input id="capHost" value="${esc(draft.host)}" placeholder="WS-FIN-07"></div></div></div>
-    <div class="capfiles">${ico('paperclip','sm')}<span>Drop screenshots or files here, or paste an image</span><button class="btn xs" data-act="capFiles">Attach files…</button><button class="btn xs" data-act="capLog" title="CSV, TSV, JSON or NDJSON — one record per row">${ico('table-2','sm')}Import log file…</button></div>
-    <footer><button class="btn ghost" type="button" data-act="sampleLine" style="margin-right:auto">Use a sample line</button><button class="btn" data-act="capSplit">One record per line</button><button class="btn primary" data-act="capSave">Capture <kbd>Ctrl ↵</kbd></button></footer>`, true, () => { capPreview(); bindCaptureFiles(); });
+    <div class="frow" style="margin-top:14px"><div class="field"><label for="capSrc">Source</label><input id="capSrc" value="${esc(draft.source)}" placeholder="sysmon, whois, forum…"></div><div class="field"><label for="capHost">Host</label><input id="capHost" value="${esc(draft.host)}" placeholder="WS-FIN-07"></div></div>
+    <div class="capfiles">${ico('paperclip','sm')}<span>Drop files, screenshots or saved pages here, or paste an image</span><button class="btn xs" data-act="capFiles">Attach files…</button><button class="btn xs" data-act="capWeb" title="A page you saved from your browser (.mhtml or .html)">${ico('globe','sm')}Saved web page…</button><button class="btn xs" data-act="capLog" title="CSV, TSV, JSON or NDJSON — one record per row">${ico('table-2','sm')}Import log file…</button></div>
+    <details class="caphelp"><summary>${ico('circle-help','sm')}How do I archive a web page?</summary><div class="caphelp-b"><ol>
+      <li>Open the page in your browser and press <kbd>Ctrl</kbd>+<kbd>S</kbd> (<kbd>⌘</kbd>+<kbd>S</kbd> on a Mac).</li>
+      <li>Chrome / Edge: choose <b>Webpage, Single File</b> (.mhtml). Firefox: <b>Web Page, HTML only</b> (.html). Safari: <b>Page Source</b>.</li>
+      <li>Click <b>Saved web page…</b> above, or drop the file here.</li></ol>
+      <p>OSINTrix keeps the original file with its SHA-256, reads the title, URL, author, dates, text and outbound links into a new evidence entry, and extracts the entities. Open it later from the entry's attachments — it is shown in a sandbox with scripts and outside requests blocked.</p></div></details></div>
+    <footer><button class="btn ghost" type="button" data-act="sampleLine" style="margin-right:auto">Use a sample line</button><button class="btn" data-act="capSplit">One per line</button><button class="btn" data-act="capPara" title="Split at blank lines — good for reports and chat logs">One per paragraph</button><button class="btn primary" data-act="capSave">Capture <kbd>Ctrl ↵</kbd></button></footer>`, true, () => { capPreview(); bindCaptureFiles(); bindCapCase(); });
+}
+function bindCapCase(){
+  const s = $('capCase'), g = $('capGraph'); if(!s) return;
+  s.onchange = () => { if(s.value === '__new'){ draft.body = $('capBody').value; draft.reopen = Date.now(); closeDlg(); return caseDlg(false); }
+    draft.caseId = s.value; const c = theCase(s.value); document.querySelector('.capdot').style.background = c.color; g.checked = !!c.autoGraph; capPreview(); };
+  g.onchange = () => { const c = theCase(capCase()); c.autoGraph = g.checked; save(); };
 }
 function capPreview(){
-  const el = $('capFound'); if(!el) return; const ents = E.extract($('capBody').value), D = derive();
-  el.innerHTML = ents.length ? `<span class="t3" style="font-size:13px;margin-right:4px">${ents.length} found:</span>` + ents.slice(0, 16).map(e => { const id = entKey(e), known = D.byKey.get(id) || D.ents.get(id);
-    return `<span class="ent" data-v="${verdictOf(id)}">${kindBadge(e.k)}<span class="v">${esc(e.v)}</span><span class="n">${known ? 'known' : 'new'}</span></span>`; }).join('') : '';
+  const el = $('capFound'); if(!el) return; const txt = $('capBody').value, lines = txt.split('\n').filter(l => l.trim()), P = lines.length ? parseLog(lines[0], txt) : null, ents = extractRich(txt).filter(e => e.k !== 'eventid'), cid = capCase(), D = derive(cid), G = globalEnts();
+  const ph = P ? `<div class="cap-parse"><span class="chip accent sq">${esc(P.format)}</span><span class="t3">${Object.keys(P.fields).length} fields${lines.length > 1 ? ' · first of ' + lines.length + ' lines' : ''}</span>${parsedLine(P) ? `<div class="pline">${parsedLine(P)}</div>` : ''}</div>` : '';
+  if(!ents.length){ el.innerHTML = ph; return; }
+  let inCase = 0, other = 0, bad = 0, watched = 0;
+  const chips = ents.slice(0, 40).map(e => { const id = entKey(e), here = D.byKey.get(id) || D.ents.get(id), ge = G.get(id), oc = ge ? [...ge.cases].filter(x => x !== cid && theCase(x)) : [], vd = verdictOf(id), w = isWatched(id), cx = ctxOf(e.k, e.v);
+    if(here) inCase++; if(oc.length) other++; if(vd === 'malicious' || vd === 'suspicious') bad++; if(w) watched++;
+    const note = w ? `<span class="n w">${ico('eye','sm')}watched</span>` : oc.length ? `<span class="n o" title="${esc(oc.map(x => theCase(x).name).join(', '))}">in ${esc(theCase(oc[0]).code)}${oc.length > 1 ? ' +' + (oc.length - 1) : ''}</span>` : `<span class="n">${here ? 'in case' : 'new'}</span>`;
+    const ctx = cx.find(x => x[1] === 'red') || cx.find(x => x[1] === 'amber') || cx.find(x => x[1] === 'blue');
+    return `<span class="ent" data-v="${vd}" title="${esc((E.LABEL[e.k] || e.k) + (cx.length ? ' · ' + cx.map(x => x[0]).join(' · ') : ''))}">${kindBadge(e.k)}<span class="v">${esc(e.v)}</span>${ctx ? `<span class="n ctxn ${ctx[1]}">${esc(ctx[0])}</span>` : ''}${note}</span>`; }).join('');
+  const sum = [`<b>${ents.length}</b> indicator${ents.length > 1 ? 's' : ''}`, inCase ? `${inCase} already in this case` : '', other ? `<span style="color:var(--accent)">${other} seen in other cases</span>` : '', bad ? `<span style="color:var(--red)">${bad} marked malicious or suspicious</span>` : '', watched ? `<span style="color:var(--amber)">${watched} on your watchlist</span>` : ''].filter(Boolean).join(' · ');
+  el.innerHTML = `${ph}<div class="capsum">${sum}</div>${chips}${ents.length > 40 ? `<span class="t3" style="font-size:12.5px">+${ents.length - 40} more</span>` : ''}`;
 }
 async function capSave(split){
   const body = ($('capBody').value || '').trim(); draft.source = $('capSrc').value.trim(); draft.host = $('capHost').value.trim();
-  if(!body) return toast('Nothing to capture yet');
-  const parts = split ? body.split('\n').map(s => s.trim()).filter(Boolean) : [body];
-  const have = new Set(DB.records.filter(r => r.caseId === DB.active).map(r => r.body.trim()));
-  const made = parts.filter(p => !have.has(p)).map(p => { const tsRaw = E.lineTime(p);
-    return {id:uid('r'), caseId:DB.active, type:'evidence', title:(p.split('\n')[0].replace(tsRaw, '').replace(/^[\s\-|,\]]+/, '') || 'Untitled').slice(0, 96), body:p, tsRaw, tsZone:tsRaw && E.carriesZone(tsRaw) ? 'explicit' : tz(),
-      ts:tsRaw ? E.parseTime(tsRaw, tz()) : null, source:draft.source, host:draft.host, tags:[], ents:E.extract(p), answer:'', addedBy:'You', addedAt:Date.now(), hash:''}; });
-  if(!made.length) return toast('Already captured — nothing new');
+  if(!body) return fieldErr('capBody', 'Paste or type what you found — or attach a file below.');
+  if(body.length > 2000000) return fieldErr('capBody', 'That is more than 2 million characters. Use “Import log file…” for large logs.');
+  if(draft.source.length > 200) return fieldErr('capSrc', 'Source is too long (max 200 characters).'); if(draft.host.length > 200) return fieldErr('capHost', 'Host is too long (max 200 characters).');
+  const cid = capCase(); draft.caseId = cid;
+  const parts = split === 'para' ? body.split(/\n\s*\n/).map(s => s.trim()).filter(Boolean) : split ? body.split('\n').map(s => s.trim()).filter(Boolean) : [body];
+  const have = new Set(DB.records.filter(r => r.caseId === cid).map(r => r.body.trim()));
+  const made = parts.filter(p => !have.has(p)).map(p => { let tsRaw = E.lineTime(p); if(!tsRaw){ const P = parseLog(p.split('\n')[0]); if(P && P.norm.time){ const t = logTime(P.norm.time); if(t) tsRaw = new Date(t).toISOString(); } }
+    const Pp = parseLog(p.split('\n')[0]), pt = parsedTitle(Pp);
+    return {id:uid('r'), caseId:cid, type:'evidence', title:pt || (p.split('\n')[0].replace(tsRaw, '').replace(/^[\s\-|,\]]+/, '') || 'Untitled').slice(0, 96), body:p, tsRaw, tsZone:tsRaw && E.carriesZone(tsRaw) ? 'explicit' : tz(),
+      ts:tsRaw ? E.parseTime(tsRaw, tz()) : null, source:draft.source || (Pp && !/Label/.test(Pp.format) ? Pp.format : ''), host:draft.host || (Pp && Pp.norm.host) || '', tags:[], ents:extractRich(p), pv:1, answer:'', addedBy:'You', addedAt:Date.now(), hash:''}; });
+  if(!made.length) return fieldErr('capBody', parts.length > 1 ? 'Every one of these is already captured in this case — nothing new to add.' : 'This exact text is already captured in this case.');
   DB.records.push(...made); draft.body = ''; mutate('captured ' + made.length + ' record(s)'); await hashRecords(); closeDlg();
-  UI.sel = {kind:'rec', id:made[0].id}; UI.inspOpen = true; UI.tlMode = 'events'; go(caseHash(DB.active, 'timeline'));
-  toast(made.length + ' record' + (made.length > 1 ? 's' : '') + ' captured', 'Undo', () => { const ids = new Set(made.map(r => r.id)); DB.records = DB.records.filter(r => !ids.has(r.id)); UI.sel = null; mutate('undid capture'); renderAll(); });
+  const g = afterCapture(cid, made.map(r => r.id)); watchNotify(made);
+  UI.sel = {kind:'rec', id:made[0].id}; UI.inspOpen = true; UI.tlMode = 'events'; go(caseHash(cid, 'timeline'));
+  toast(made.length + ' record' + (made.length > 1 ? 's' : '') + ' captured in ' + theCase(cid).code + (g ? ` · ${g.made.length} added to the graph${g.links.length ? ', ' + g.links.length + ' linked' : ''}` : ''), 'Undo', () => { const ids = new Set(made.map(r => r.id)); DB.records = DB.records.filter(r => !ids.has(r.id));
+    if(g){ const s = new Set(g.made.map(e => e.id)), sl = new Set(g.links.map(l => l.id)); DB.entries = DB.entries.filter(e => !s.has(e.id)); DB.links = DB.links.filter(l => !sl.has(l.id)); } UI.sel = null; mutate('undid capture'); renderAll(); });
 }
 
 /* command palette */
