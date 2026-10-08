@@ -152,6 +152,7 @@ function viewLab(){
   const body = {file:labFile, logs:labParse, pcap:labPcap, sqlite:labSql, image:labImage, email:labEmail, time:labTime, hash:labHash, geo:labGeo, net:labNet, gen:labGen}[t]();
   return `<div class="scroll"><div class="page wide">
     ${libHead('Forensics kit', 'Inspect files and images, read email headers, decode timestamps and IDs, identify hashes — entirely in your browser. Nothing is uploaded.', '', '')}
+    <div class="mpick"><label for="labSel" class="ix">Tool</label><select id="labSel" class="gsel bord">${LAB_TABS.map(([k, l]) => `<option value="${k}"${t === k ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
     <nav class="labtabs" role="tablist">${LAB_TABS.map(([k, l, i]) => `<button role="tab" data-act="labTab" data-v="${k}" aria-selected="${t === k}">${ico(i,'sm')}${l}</button>`).join('')}</nav>
     ${body}</div></div>`;
 }

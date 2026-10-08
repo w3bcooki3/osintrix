@@ -14,21 +14,23 @@ const toolBtns = (t, withEdit) => `<button class="tb-ic${t.starred ? ' on star' 
   ${withEdit ? `<button class="tb-ic" data-act="toolEdit" data-id="${t.id}" aria-label="Edit ${esc(t.name)}" title="Edit">${ico('pencil','sm')}</button>` : ''}`;
 const openBtn = (t, cls = 'btn sm') => { const u = E.safeUrl(t.url); return u ? `<a class="${cls}" href="${esc(u)}" target="_blank" rel="noopener noreferrer" data-act="toolOpen" data-id="${t.id}" aria-label="Open ${esc(t.name)} in a new tab">Open ${ico('arrow-up-right','sm')}</a>` : ''; };
 /* A — tool card (the classic ThreatNet card, cleaned up) */
-function toolCard(t){
+function toolCard(t, idx){
   const u = E.safeUrl(t.url), picked = UI.tpick && UI.tpick.has(t.id), host = u ? hostOf(u) || u : t.url, anyPick = UI.tpick && UI.tpick.size;
-  return `<article class="tk${picked ? ' picked' : ''}${anyPick ? ' picking' : ''}">
-    <label class="tk-chk"><span class="sr">Select ${esc(t.name)}</span><input type="checkbox" data-act="toolPick" data-id="${t.id}"${picked ? ' checked' : ''}></label>
-    <div class="tk-h">${mono(t,'sm')}
-      <div class="tk-n">${u ? `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer" data-act="toolOpen" data-id="${t.id}" title="Open ${esc(t.name)}">${esc(t.name)}</a>` : `<span>${esc(t.name)}</span>`}<small>${esc(host)}</small></div>
-      <button class="tk-star${t.starred ? ' on' : ''}" data-act="toolStar" data-id="${t.id}" aria-label="${t.starred ? 'Remove from favourites' : 'Add to favourites'}" title="Favourite">${ico('star','sm')}</button></div>
+  const cat = TOOL_CATS[t.cat] || {name:t.cat}, sub = toolSub(t), no = String((DB.tools.indexOf(t) + 1)).padStart(3, '0');
+  return `<article class="ic3${picked ? ' picked' : ''}${anyPick ? ' picking' : ''}" style="--cc:${catCol(t.cat)}">
+    <header class="ic3-top"><label class="ic3-chk"><span class="sr">Select ${esc(t.name)}</span><input type="checkbox" data-act="toolPick" data-id="${t.id}"${picked ? ' checked' : ''}></label>
+      <span class="ix">T-${no} · ${esc(sub)}</span>
+      <button class="ic3-star${t.starred ? ' on' : ''}" data-act="toolStar" data-id="${t.id}" aria-label="${t.starred ? 'Remove from favourites' : 'Add to favourites'}" title="Favourite">${ico('star','sm')}</button></header>
+    <h3>${u ? `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer" data-act="toolOpen" data-id="${t.id}">${esc(t.name)}</a>` : esc(t.name)}</h3>
+    <span class="ic3-dom">${esc(host)}</span>
     <p>${esc(t.desc || 'No description yet.')}</p>
-    ${t.tags.length ? `<div class="tk-tags">${t.tags.slice(0, 3).map(g => `<button data-act="toolTag" data-v="${esc(g)}" title="Show tools tagged ${esc(g)}">${esc(g.replace(/-/g, ' '))}</button>`).join('')}${t.tags.length > 3 ? `<span>+${t.tags.length - 3}</span>` : ''}</div>` : ''}
-    <footer><span class="tk-cat"><i style="background:${catCol(t.cat)}"></i>${esc(toolSub(t))}${t.seed ? '' : ' · <b>Custom</b>'}${t.pinned ? ` · ${ico('pin','sm')}` : ''}</span>
-      <span class="tk-acts">${t.tpl ? `<button class="tb-ic run" data-act="toolRun" data-id="${t.id}" aria-label="Run ${esc(t.name)} with a value" title="Run with a value — ${esc(t.tpl)}">${ico('play','sm')}</button>` : ''}
+    ${t.tags.length ? `<div class="ic3-tags">${t.tags.slice(0, 3).map(g => `<button data-act="toolTag" data-v="${esc(g)}" title="Show tools tagged ${esc(g)}">${esc(g.replace(/-/g, ' '))}</button>`).join('')}</div>` : ''}
+    <footer><span class="ic3-acts">${t.tpl ? `<button class="tb-ic run" data-act="toolRun" data-id="${t.id}" aria-label="Run ${esc(t.name)} with a value" title="Look something up — ${esc(t.tpl)}">${ico('play','sm')}</button>` : ''}
         <button class="tb-ic${t.pinned ? ' on pin' : ''}" data-act="toolPin" data-id="${t.id}" aria-label="${t.pinned ? 'Remove from quick launch' : 'Add to quick launch'}" title="Quick launch">${ico('pin','sm')}</button>
         <button class="tb-ic" data-act="toolEdit" data-id="${t.id}" aria-label="Edit ${esc(t.name)}" title="Edit">${ico('pencil','sm')}</button>
         <button class="tb-ic del" data-act="toolDelAsk" data-id="${t.id}" aria-label="Delete ${esc(t.name)}" title="Delete">${ico('trash-2','sm')}</button></span>
-      ${u ? `<a class="tk-open" href="${esc(u)}" target="_blank" rel="noopener noreferrer" data-act="toolOpen" data-id="${t.id}">Open${ico('arrow-up-right','sm')}</a>` : ''}</footer></article>`;
+      <span class="ic3-meta">${t.seed ? '' : '<b>Custom</b>'}${t.tpl ? '<span title="Has a lookup address">lookup</span>' : ''}</span>
+      ${u ? `<a class="ic3-open" href="${esc(u)}" target="_blank" rel="noopener noreferrer" data-act="toolOpen" data-id="${t.id}">Open${ico('arrow-up-right','sm')}</a>` : ''}</footer></article>`;
 }
 function paintBulk(){
   const el = $('tbulk'); if(!el) return; const n = UI.tpick ? [...UI.tpick].filter(id => DB.tools.some(t => t.id === id)).length : 0;
@@ -66,7 +68,7 @@ function viewToolbox(){
     if(UI.tcat === 'all') groups = cats.map(([k, c]) => ({name:c.name, col:catCol(k), items:list.filter(t => t.cat === k)})).filter(g => g.items.length);
     else if(TOOL_CATS[UI.tcat] && !UI.tsub) groups = Object.entries(TOOL_CATS[UI.tcat].children).map(([k, n]) => ({name:n, col:catCol(UI.tcat), items:list.filter(t => t.sub === k)})).filter(g => g.items.length);
   }
-  const render = items => view === 'list' ? `<div class="tdir card">${items.map(toolRow).join('')}</div>` : view === 'compact' ? `<div class="tchips">${items.map(toolChip).join('')}</div>` : `<div class="tcards">${items.map(toolCard).join('')}</div>`;
+  const render = items => view === 'list' ? `<div class="tdir card">${items.map(toolRow).join('')}</div>` : view === 'compact' ? `<div class="tchips">${items.map(toolChip).join('')}</div>` : `<div class="tcards">${items.map(t => toolCard(t)).join('')}</div>`;
   return `<div class="scroll"><div class="tbx">
     <aside class="tcats"><div class="caps" style="padding:0 10px 8px">Library</div>
       <button class="tcat" data-act="tcat" data-v="all" aria-pressed="${UI.tcat === 'all'}">${ico('layout-dashboard','sm')}All tools<span class="cnt">${DB.tools.length}</span></button>
@@ -151,6 +153,7 @@ function viewReference(){
       <nav class="rf-nav" aria-label="Sections"><button data-act="refCat" data-v="all" aria-pressed="${cat === 'all'}">${ico('book-open','sm')}<span>Everything</span><small>${total}</small></button>
         ${Object.entries(REFDATA).map(([k, S]) => `<button data-act="refCat" data-v="${k}" aria-pressed="${cat === k}">${ico(S.icon,'sm')}<span>${esc(S.name)}</span><small>${S.rows.length}</small></button>`).join('')}</nav>
       <div class="rf-main">
+        <div class="mpick"><label for="refSel" class="ix">Section</label><select id="refSel" class="gsel bord"><option value="all">Everything (${total})</option>${Object.entries(REFDATA).map(([k, S]) => `<option value="${k}"${cat === k ? ' selected' : ''}>${esc(S.name)} (${S.rows.length})</option>`).join('')}</select></div>
         <div class="rf-tb"><div class="search-in">${ico('search')}<label class="sr" for="refQ">Filter</label><input id="refQ" class="inp" placeholder="4698, 4444, rundll32, kerberoast, T1059…" value="${esc(UI.refQ || '')}"></div>
           <label class="chk"><input type="checkbox" data-act="refHot" ${only ? 'checked' : ''}> Only “worth a look”</label><span class="t3 small">${shown} of ${total}</span></div>
         ${secs.map(([k, S, rows]) => `<section class="rf-sec"><header><h2>${ico(S.icon,'sm')}${esc(S.name)}</h2><p>${esc(S.note)}</p></header><div class="rf-list">${rows.map(r => row(k, r)).join('')}</div></section>`).join('') || `<div class="card" style="padding:28px;text-align:center"><p class="t3" style="margin:0">Nothing matches “${esc(UI.refQ || '')}”.</p></div>`}
@@ -170,7 +173,7 @@ function viewSettings(){
   return `<div class="scroll"><div class="page"><div class="ph"><div><h1>Settings</h1><div class="sub">Stored in this browser only.</div></div></div>
     <section class="card" style="margin-bottom:18px"><div class="body" style="padding:22px"><div class="about">${logoMark(64)}<div style="flex:1;min-width:220px"><h2>${wordmark().replace('wordmark','wordmark big')}</h2>
       <div class="t2" style="margin-top:4px">${esc(BRAND.tagline)} · <span class="mono">${esc(BRAND.version)}</span></div>
-      <div class="wrap"><button class="btn" data-act="showWelcome">${ico('eye','sm')}Show welcome</button></div></div>
+      <div class="wrap" style="align-items:center"><button class="btn" data-act="showWelcome">${ico('eye','sm')}Show welcome</button></div></div>
       <p class="t3" style="margin:16px 0 0;font-size:13px">A private, browser-only OSINT workspace. Inter and JetBrains Mono (OFL 1.1) · Lucide icons (ISC) · Cytoscape.js (MIT) · jsQR (Apache-2.0) · IEEE OUI list via oui-data (BSD-2) — all bundled, nothing loads from the network. <a href="#/help">Help &amp; FAQ</a></p></div></section>
     <div class="grid cols-2" style="align-items:start">
       <section class="card"><header><h3>Appearance</h3></header><div class="body">
@@ -216,9 +219,15 @@ function viewHelp(){
   const qa = (q, a) => `<details class="hq"><summary>${q}${ico('chevron-down','sm')}</summary><p>${a}</p></details>`;
   const toc = [['hx-know','Things to know'],['hx-data','Your data'],['hx-start','Getting started'],['hx-where','What’s where'],['hx-keys','Shortcuts & search'],['hx-faq','Questions']];
   return `<div class="scroll"><div class="page help hx">
-    <nav class="hx-toc" aria-label="On this page"><span>On this page</span>${toc.map(([id, l]) => `<button data-act="helpGo" data-v="${id}">${l}</button>`).join('')}</nav><div class="hx-main">
-    <header class="hx-hd"><div>${logoMark(40)}<div><h1>Help &amp; documentation</h1><p>${esc(BRAND.name)} ${esc(BRAND.version)} — a private investigation workspace that runs entirely in your browser. No server, no account, no tracking.</p></div></div>
-      <div class="hx-q"><button class="btn" data-act="helpWelcome">${ico('play','sm')}Show the welcome tour</button><a class="btn" href="https://github.com/w3bcooki3/osintrix" target="_blank" rel="noopener noreferrer">${ico('external-link','sm')}Project on GitHub</a></div></header>
+    <nav class="hx-toc" aria-label="On this page"><span class="ix">On this page</span>${toc.map(([id, l], i) => `<button data-act="helpGo" data-v="${id}"><i>${String(i + 1).padStart(2, '0')}</i>${l}</button>`).join('')}</nav><div class="hx-main">
+    <header class="hx-hd"><span class="ix">Help · ${esc(BRAND.name)} ${esc(BRAND.version)}</span><h1>How ${esc(BRAND.name)} works</h1>
+      <p>A private investigation workspace that runs entirely in your browser — no server, no account, no tracking. Start below, or jump to a section.</p>
+      <div class="hx-start">
+        <button data-act="capture"><span class="ix">Step 1</span><b>Capture evidence</b><small>Paste a log, a post or a WHOIS record — indicators come out on their own.</small>${ico('arrow-right','sm')}</button>
+        <button data-act="welcomeDemo"><span class="ix">Step 2</span><b>Explore the demo case</b><small>Op Lantern shows the timeline, graph, map and report filled in.</small>${ico('arrow-right','sm')}</button>
+        <button data-act="exportAll"><span class="ix">Step 3</span><b>Back up your work</b><small>One JSON file with everything. Your data only lives in this browser.</small>${ico('arrow-right','sm')}</button>
+      </div>
+      <div class="hx-q"><button class="btn sm" data-act="helpWelcome">${ico('play','sm')}Welcome tour</button><a class="btn sm" href="https://github.com/w3bcooki3/osintrix" target="_blank" rel="noopener noreferrer">${ico('external-link','sm')}GitHub</a></div></header>
 
     <h2 class="hh" id="hx-know">Things to know</h2>
     <div class="hx-know">

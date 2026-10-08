@@ -156,24 +156,36 @@ function runPlaybook(id, caseId){
   mutate('ran playbook ' + p.name + ' on ' + c.code); hashRecords(); renderAll();
   toast(n ? n + ' steps added to ' + c.code + ' as questions' : 'Those steps are already on ' + c.code, 'Open', () => { DB.active = c.id; go(caseHash(c.id, 'questions')); });
 }
+function pbThread(p, caseId){
+  const recs = DB.records.filter(r => r.caseId === caseId && r.type === 'lead' && (r.tags || []).includes(pbTag(p.id)));
+  return `<span class="pbt" aria-hidden="true">${p.steps.map(st => { const r = recs.find(x => x.title.toLowerCase() === st.t.toLowerCase()); return `<i class="${r ? (r.answer ? 'd' : 'o') : ''}"></i>`; }).join('')}</span>`;
+}
 function viewPlaybooks(){
   ensurePlaybooks();
   const cur = DB.playbooks.find(p => p.id === UI.pb);
   if(cur) return pbDetail(cur);
-  const q = (UI.pbq || '').toLowerCase(), f = UI.pbf || 'all';
+  const q = (UI.pbq || '').toLowerCase(), f = UI.pbf || 'all', view = UI.pbView || DB.prefs.pbView || 'grid';
   const list = DB.playbooks.filter(p => (f === 'all' || p.cat === f) && (!q || (p.name + ' ' + p.desc + ' ' + p.steps.map(s => s.t).join(' ')).toLowerCase().includes(q)));
-  const cats = countBy(DB.playbooks, p => p.cat);
+  const cats = countBy(DB.playbooks, p => p.cat), code = esc(theCase().code);
+  const num = p => 'PB-' + String(DB.playbooks.indexOf(p) + 1).padStart(2, '0');
+  const card = p => { const [cn, col] = PB_CATS[p.cat] || PB_CATS.custom, a = pbProgress(p, DB.active), used = pbCases(p);
+    return `<article class="pbk" style="--cc:${col}"><button class="gcard-hit" data-act="pbOpen" data-id="${p.id}" aria-label="Open ${esc(p.name)}"></button>
+      <header><span class="ix">${num(p)} · ${esc(cn)}${p.custom ? ' · custom' : ''}</span>${ico(p.icon || 'list-checks','sm')}</header>
+      <h3>${esc(p.name)}</h3><p>${esc(p.desc)}</p>
+      <div class="pbk-th">${pbThread(p, DB.active)}<span>${a.total ? `${a.done} of ${a.total} answered on ${code}` : `${p.steps.length} steps${used.length ? ' · used in ' + used.length + ' case' + (used.length > 1 ? 's' : '') : ''}`}</span></div>
+      <footer><button class="pbk-run" data-act="pbRun" data-id="${p.id}">${ico('play','sm')}${a.total ? 'Add missing steps to' : 'Run on'} ${code}</button><span class="pbk-open">Open${ico('arrow-right','sm')}</span></footer></article>`; };
+  const row = p => { const [cn, col] = PB_CATS[p.cat] || PB_CATS.custom, a = pbProgress(p, DB.active);
+    return `<div class="pbr" style="--cc:${col}" role="row"><button class="gcard-hit" data-act="pbOpen" data-id="${p.id}" aria-label="Open ${esc(p.name)}"></button>
+      <span class="pbr-n ix">${num(p)}</span><div class="pbr-t"><b>${esc(p.name)}</b><small>${esc(p.desc)}</small></div>
+      <span class="pbr-c"><i></i>${esc(cn)}</span><span class="pbr-p">${pbThread(p, DB.active)}<small>${a.total ? a.done + '/' + a.total : p.steps.length + ' steps'}</small></span>
+      <button class="btn sm pbr-run" data-act="pbRun" data-id="${p.id}">${ico('play','sm')}Run</button></div>`; };
   return `<div class="scroll"><div class="page wide">
-    ${libHead('Playbooks', `${DB.playbooks.length} investigation checklists · run one on a case and every step becomes an open question`,
+    ${libHead('Playbooks', `${DB.playbooks.length} investigation checklists. Run one on a case and each step becomes an open question there; the dots fill in as you answer them.`,
       `<button class="btn" data-act="pbImport">${ico('upload','sm')}Import</button><button class="btn" data-act="pbExport">${ico('download','sm')}Export</button><button class="btn primary" data-act="pbNew">${ico('plus','sm')}New playbook</button>`, '')}
-    <div class="toolbar ltb"><div class="search-in">${ico('search')}<label class="sr" for="pbq">Search playbooks</label><input id="pbq" class="inp" placeholder="Search playbooks and steps…" value="${esc(UI.pbq || '')}"></div>
-      <div class="seg"><button data-act="pbf" data-v="all" aria-pressed="${f === 'all'}">All</button>${cats.map(([c]) => `<button data-act="pbf" data-v="${c}" aria-pressed="${f === c}">${esc((PB_CATS[c] || PB_CATS.custom)[0])}</button>`).join('')}</div></div>
-    ${list.length ? `<div class="pbl">${list.map(p => { const [cn, col] = PB_CATS[p.cat] || PB_CATS.custom, used = pbCases(p), a = pbProgress(p, DB.active);
-      return `<article class="pbl-c" style="--c:${col}"><button class="gcard-hit" data-act="pbOpen" data-id="${p.id}" aria-label="Open ${esc(p.name)}"></button>
-        <div class="pbl-h"><span class="pbl-ic">${ico(p.icon || 'list-checks')}</span><span class="pbl-cat"><i></i>${esc(cn)}${p.custom ? ' · Custom' : ''}</span></div>
-        <h3>${esc(p.name)}</h3><p>${esc(p.desc)}</p>
-        <footer>${a.total ? `<span class="pbl-prog"><span class="pb-prog"><i style="width:${Math.round(a.done / a.total * 100)}%"></i></span>${a.done}/${a.total} on ${esc(theCase().code)}</span>` : `<span class="t3">${p.steps.length} steps${used.length ? ' · in ' + used.length + ' case' + (used.length > 1 ? 's' : '') : ''}</span>`}
-          <button class="btn sm pb-run" data-act="pbRun" data-id="${p.id}">${ico('play','sm')}Run on ${esc(theCase().code)}</button></footer></article>`; }).join('')}</div>`
+    <div class="toolbar ltb pb-tb"><div class="search-in">${ico('search')}<label class="sr" for="pbq">Search playbooks</label><input id="pbq" class="inp" placeholder="Search playbooks and steps…" value="${esc(UI.pbq || '')}"></div>
+      <label class="sr" for="pbfSel">Category</label><select id="pbfSel" class="gsel bord"><option value="all">All categories (${DB.playbooks.length})</option>${cats.map(([c, n]) => `<option value="${c}"${f === c ? ' selected' : ''}>${esc((PB_CATS[c] || PB_CATS.custom)[0])} (${n})</option>`).join('')}</select>
+      <span style="flex:1"></span>${layoutSeg('pbView', view, [['grid','layout-grid','Cards'],['list','rows-3','List']])}</div>
+    ${list.length ? (view === 'list' ? `<div class="pbrs card" role="table">${list.map(row).join('')}</div>` : `<div class="pbks">${list.map(card).join('')}</div>`)
       : empty('list-checks','No playbooks match','Try another search, or write your own checklist.', `<button class="btn primary" data-act="pbNew">${ico('plus','sm')}New playbook</button>`)}
   </div></div>`;
 }

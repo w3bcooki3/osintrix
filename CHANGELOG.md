@@ -2,6 +2,24 @@
 
 How OSINTrix came together, newest first.
 
+## v1.9 — One visual language
+
+- **Welcome page:** the launch-post look. It cycles Night, Day and Indigo themes every 3 seconds, and the screenshots switch between light and dark to match. On phones the tags drift in two rows and the app sits in a phone frame. It stays still when reduced motion is on, and clicking a theme stops the cycle.
+
+- **"Case file" design language** across the library pages:
+  - Monospaced index labels, a colour tab per category, and dashed footer rules.
+  - No coloured icon blobs.
+- **Toolbox cards:** redesigned as index cards — category tab, index line, name, domain, description and tags. Actions appear on hover, with a clear Open button.
+- **Playbooks:**
+  - Fixed the overlapping progress label on cards.
+  - Added **Cards / List** views and a category picker.
+  - Each playbook shows a step thread: dots fill in as steps are answered on the current case.
+- **Help:** a documentation page with a numbered table of contents, numbered sections and a "Start here" row (capture, demo case, backup).
+- **Phones:**
+  - Reference, Decoder and Forensics kit use a single picker instead of long chip rows.
+  - The query panel is a full bottom sheet with the Search button pinned at the bottom.
+  - The graph has a two-button toolbar with a **More** menu (add or build from evidence, suggestions, insights, arrange, export), a pill-sized "not on the graph" banner and a slim time slider.
+
 ## v1.8 — Responsive polish and redesigns
 
 - **Decoder:** auto-decode was broken for anything beyond plain Base64 and hex. It now detects and peels layered encodings: Base64 (including UTF-16 and gzip inside), hex, Base32, Base58, URL, HTML entities, \x / \u escapes, binary, character codes, JWT, Morse, reversed Base64 and ROT13 flags. It also finds a blob inside a longer line (e.g. `powershell -enc …`) and leaves plain text alone.

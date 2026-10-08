@@ -78,6 +78,7 @@ document.addEventListener('click', ev => {
   if(a === 'trPick'){ $('trV').value = v; return $('trV').focus(); }
   switch(a){
     case 'navToggle': return $('side').classList.toggle('open');
+    case 'wlTheme': { wlCycle(false); const l = document.querySelector('.lw'); if(l) l.classList.remove('auto'); return wlSet(v); }
     case 'helpGo': { const el = $(v); if(el) el.scrollIntoView({behavior:'smooth', block:'start'}); return; }
     case 'helpWelcome': return showWelcome();
     case 'pbGo': return pbGo(v);
@@ -281,6 +282,12 @@ document.addEventListener('click', ev => {
     case 'gFit': return cy && cy.animate({fit:{padding:50}, duration:250});
     case 'gZoom': return cy && cy.animate({zoom:{level:cy.zoom() * +v, renderedPosition:{x:cy.width() / 2, y:cy.height() / 2}}, duration:150});
     case 'gLegend': UI.graph.legendMin = !UI.graph.legendMin; { const l = document.querySelector('.glegend'); if(l){ l.classList.toggle('min', UI.graph.legendMin); t.setAttribute('aria-expanded', String(!UI.graph.legendMin)); t.innerHTML = ico(UI.graph.legendMin ? 'chevron-right' : 'chevron-down','sm') + 'Legend &amp; filters'; } } return;
+    case 'gFindM': UI.graph.findOpen = !UI.graph.findOpen; renderMain(); if(UI.graph.findOpen) setTimeout(() => { const f = $('gFind'); if(f) f.focus(); }, 60); return;
+    case 'gMore': { const r0 = t.getBoundingClientRect(), g = UI.graph, lay = k => () => runLayout(k);
+      return showMenu(r0.left, r0.bottom + 6, [{label:'Add from evidence…', icon:'list-plus', fn:() => clickAct('gPick')}, {label:'Build from evidence…', icon:'sparkles', fn:() => clickAct('gBuild')},
+        {label:(g.panel === 'sugg' ? 'Hide' : 'Show') + ' suggested links', icon:'link-2', fn:() => { g.panel = g.panel === 'sugg' ? null : 'sugg'; renderMain(); }}, {label:(g.panel === 'ins' ? 'Hide' : 'Show') + ' insights', icon:'radar', fn:() => { g.panel = g.panel === 'ins' ? null : 'ins'; renderMain(); }},
+        {sep:true}, {label:'Arrange', seg:[{label:'Force', fn:lay('cose')}, {label:'Rank', fn:lay('concentric')}, {label:'Tree', fn:lay('breadthfirst')}, {label:'Circle', fn:lay('circle')}]},
+        {label:(g.co ? 'Hide' : 'Show') + ' co-occurrence', icon:'eye', fn:() => clickAct('gCo')}, {label:'Export…', icon:'download', fn:() => clickAct('gExport')}], 'Graph'); }
     case 'gCo': UI.graph.co = !UI.graph.co; return renderMain();
     case 'gHide': { const h = UI.graph.hide || (UI.graph.hide = new Set()); h.has(v) ? h.delete(v) : h.add(v); return renderMain(); }
     case 'gPathOff': UI.graph.mode = null; UI.graph.first = null; UI.graph.path = null; return renderMain();
@@ -355,6 +362,7 @@ document.addEventListener('click', ev => {
     case 'pbOpen': UI.pb = id; renderMain(); { const s2 = $('main').querySelector('.scroll'); if(s2) s2.scrollTop = 0; } return;
     case 'pbBack': UI.pb = null; return renderMain();
     case 'pbf': UI.pbf = v; return renderMain();
+    case 'pbView': UI.pbView = v; DB.prefs.pbView = v; save(); return renderMain();
     case 'pbRun': return runPlaybook(id, DB.active);
     case 'pbRunSel': return runPlaybook(id, $('pbCase').value);
     case 'pbNew': return pbDlg();
@@ -490,7 +498,7 @@ document.addEventListener('input', ev => {
   if(t.id === 'tlq'){ clearTimeout(tq); tq = setTimeout(() => { UI.q = t.value.trim(); UI.ast = E.parseQuery(UI.q); renderMain(); keep('tlq'); }, 200); return; }
   if(t.id === 'gq'){ clearTimeout(tq); tq = setTimeout(() => { UI.q = t.value.trim(); UI.ast = E.parseQuery(UI.q); if(UI.q && !(UI.route.area === 'case' && UI.route.tab === 'timeline')){ UI.tlMode = 'events'; go(caseHash(DB.active, 'timeline')); } else renderMain(); }, 200); }
 });
-document.addEventListener('change', ev => { if(ev.target.id === 'secAuto'){ DB.security = DB.security || {}; DB.security.autolock = +ev.target.value; mutate('auto-lock ' + ev.target.value + ' min'); armAutolock(); return; } if(ev.target.id === 'entCase'){ UI.entCase = ev.target.value; return renderMain(); } if(ev.target.id === 'qcatSel'){ UI.qcat = ev.target.value; UI.qsel = null; return renderMain(); } if(ev.target.id === 'ctfEvSel'){ UI.ctfEv = ev.target.value; return renderMain(); } if(ev.target.id === 'tcatSel2'){ UI.tcat = ev.target.value; UI.tsub = null; return renderMain(); } if(ev.target.id === 'dsev'){ UI.dsev = ev.target.value; return renderMain(); } if(ev.target.id === 'isrc'){ UI.isrc = ev.target.value; return renderMain(); } if(ev.target.id === 'tSort'){ UI.tsort = ev.target.value; return renderMain(); } if(ev.target.dataset.pref){ DB.prefs[ev.target.dataset.pref] = ev.target.value; mutate('time zone'); renderAll(); } });
+document.addEventListener('change', ev => { if(ev.target.id === 'secAuto'){ DB.security = DB.security || {}; DB.security.autolock = +ev.target.value; mutate('auto-lock ' + ev.target.value + ' min'); armAutolock(); return; } if(ev.target.id === 'entCase'){ UI.entCase = ev.target.value; return renderMain(); } if(ev.target.id === 'labSel'){ UI.labTab = ev.target.value; return renderMain(); } if(ev.target.id === 'refSel'){ UI.refCat = ev.target.value; return renderMain(); } if(ev.target.id === 'txSel'){ UI.txOp = ev.target.value; return renderMain(); } if(ev.target.id === 'pbfSel'){ UI.pbf = ev.target.value; return renderMain(); } if(ev.target.id === 'qcatSel'){ UI.qcat = ev.target.value; UI.qsel = null; return renderMain(); } if(ev.target.id === 'ctfEvSel'){ UI.ctfEv = ev.target.value; return renderMain(); } if(ev.target.id === 'tcatSel2'){ UI.tcat = ev.target.value; UI.tsub = null; return renderMain(); } if(ev.target.id === 'dsev'){ UI.dsev = ev.target.value; return renderMain(); } if(ev.target.id === 'isrc'){ UI.isrc = ev.target.value; return renderMain(); } if(ev.target.id === 'tSort'){ UI.tsort = ev.target.value; return renderMain(); } if(ev.target.dataset.pref){ DB.prefs[ev.target.dataset.pref] = ev.target.value; mutate('time zone'); renderAll(); } });
 new MutationObserver(() => document.documentElement.classList.toggle('modal', !$('scrim').hidden || !$('welcome').hidden)).observe(document.body, {attributes:true, subtree:true, attributeFilter:['hidden']});
 $('scrim').addEventListener('mousedown', ev => { if(ev.target.id === 'scrim') closeDlg(); });
 
@@ -517,40 +525,46 @@ document.addEventListener('keydown', ev => {
 window.addEventListener('hashchange', onRoute);
 let rz = null; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if(cy) cy.resize(); }, 120); });
 
+const WL_IMG = {'dashboard-dark':'assets/welcome/dashboard-dark.jpg', 'dashboard-light':'assets/welcome/dashboard-light.jpg', 'graph-dark':'assets/welcome/graph-dark.jpg', 'graph-light':'assets/welcome/graph-light.jpg', 'phone-dark':'assets/welcome/phone-dark.jpg', 'phone-light':'assets/welcome/phone-light.jpg'};
+const WL_THEMES = [['night','Night'],['day','Day'],['indigo','Indigo']];
+let WL_T = null;
+/* welcome page — the launch-post look; it cycles Night → Day → Indigo every 3 s (still when reduced motion is on) */
 function showWelcome(){
-  const w = $('welcome'); w.hidden = false;
-  const caps = [['scan-text','Paste anything','Logs, WHOIS, forum posts, emails. Indicators, timestamps and log fields are pulled out and checked against every case.'],
-    ['waypoints','See the network','A link graph built from the evidence. Every relationship carries a confidence and the record that proves it.'],
-    ['network','Open the hard files','PCAP captures, SQLite and browser history, Office, PDF, PE/ELF, EXIF and saved web pages — parsed locally.'],
-    ['shield-check','Prove it held up','Encrypted workspace, a hash-chained audit log and signed chain-of-custody reports.']];
-  const ev = [['08:52:10','Invoice email delivered to finance','mail-gateway','1 malicious','r'],['08:57:33','LNK opened — cmd spawns PowerShell','WS-FIN-07 · sysmon','Encoded','a'],['08:57:35','Script block downloads second stage','WS-FIN-07','2 malicious','r'],['09:02:11','Beacon to 203.0.113.47:4444 every 60 s','FW-EDGE','C2','r']];
-  w.innerHTML = `<div class="wl">
-    <header class="wl-top">${logoMark(30)}<b>OSINTrix</b><span class="wl-ver">${esc(BRAND.version)}</span><span style="flex:1"></span><button class="wl-skip" data-act="welcomeClose">Skip</button></header>
-    <section class="wl-hero">
-      <div class="wl-copy">
-        <span class="wl-eyebrow"><i></i>Free · no account · works offline</span>
-        <h1 id="wTitle">The investigation workspace that never leaves your browser.</h1>
-        <p>OSINTrix brings cases, evidence, entities, timelines and a link graph together for OSINT and DFIR work — with a forensics kit, detections and threat intel built in. No server, no tracking, works offline.</p>
-        <div class="wl-acts"><button class="btn primary" data-act="welcomeDemo">Explore the demo case${ico('arrow-right','sm')}</button><button class="btn wl-ghost" data-act="welcomeClose">Start with a blank dashboard</button></div>
-        <dl class="wl-stats"><div><dt>0</dt><dd>servers — everything stays in this browser</dd></div><div><dt>AES-256</dt><dd>optional workspace encryption</dd></div><div><dt>11</dt><dd>forensics tools, from PCAP to SQLite</dd></div></dl>
+  const w = $('welcome'); w.hidden = false; w.removeAttribute('data-v');
+  const chips = [['v','Case vaults'],['b','Link graph'],['a','Timeline'],['c','PCAP & SQLite'],['t','Sigma & YARA'],['r','Threat intel'],['g','Map & geo'],['p','Encrypted']];
+  const pic = n => `<img class="d" src="${WL_IMG[n + '-dark']}" alt="" decoding="async"><img class="l" src="${WL_IMG[n + '-light']}" alt="" decoding="async">`;
+  const win = (cls, title, n) => `<div class="lw-win ${cls}"><div class="lw-bar"><i></i><i></i><i></i><span>osintrix · ${title}</span></div><div class="lw-pic">${pic(n)}</div></div>`;
+  const chipRow = chips.map(([c, t]) => `<li class="lk-${c}"><i></i>${t}</li>`).join('');
+  w.innerHTML = `<div class="lw" data-wt="night">
+    <svg class="lw-thread" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true"><path d="M-40 860 C 420 840, 720 760, 940 560 S 1300 120, 1520 60" fill="none"/></svg>
+    <header class="lw-top"><span class="lw-ver">${esc(BRAND.version)}</span>
+      <div class="lw-th" role="group" aria-label="Preview theme">${WL_THEMES.map(([k, l]) => `<button data-act="wlTheme" data-v="${k}" aria-pressed="${k === 'night'}"><i></i><span>${l}</span></button>`).join('')}</div>
+      <button class="lw-skip" data-act="welcomeClose">Skip ${ico('arrow-right','sm')}</button></header>
+    <section class="lw-hero">
+      <div class="lw-copy">
+        <div class="lw-lock">${logoMark(84)}<span class="lw-word">OSINT<b>rix</b></span></div>
+        <p class="lw-tag" id="wTitle">${esc(BRAND.tagline)}</p>
+        <p class="lw-sub">A private OSINT investigation workspace that runs entirely in your browser — no server, no account, no tracking.</p>
+        <ul class="lw-chips">${chipRow}</ul>
+        <div class="lw-marq" aria-hidden="true"><ul>${chipRow}${chipRow}</ul><ul class="rev">${chipRow}${chipRow}</ul></div>
+        <div class="lw-acts"><button class="btn primary" data-act="welcomeDemo">Explore the demo case${ico('arrow-right','sm')}</button><button class="btn lw-ghost" data-act="welcomeClose">Open the dashboard</button></div>
+        <p class="lw-mono"><i></i>No server · no account · works offline</p>
       </div>
-      <figure class="wl-shot" aria-hidden="true">
-        <div class="wl-win"><div class="wl-bar"><i></i><i></i><i></i><span>Op Lantern — invoice LNK intrusion</span></div>
-          <div class="wl-body">
-            <div class="wl-tl"><div class="wl-h">Timeline <small>17 events · UTC</small></div>${ev.map(([t, a, b, c, k]) => `<div class="wl-ev"><code>${t}</code><div><b>${a}</b><small>${b}</small></div><span class="wl-tag ${k}">${c}</span></div>`).join('')}</div>
-            <div class="wl-g"><div class="wl-h">Graph <small>18 links</small></div>
-              <svg viewBox="0 0 220 190"><g class="e"><line x1="40" y1="40" x2="110" y2="70"/><line x1="110" y1="70" x2="180" y2="40"/><line x1="110" y1="70" x2="110" y2="130"/><line x1="110" y1="130" x2="50" y2="160"/><line x1="110" y1="130" x2="175" y2="160"/><line x1="180" y1="40" x2="175" y2="160"/></g>
-                <g class="n"><circle cx="40" cy="40" r="9"/><circle cx="180" cy="40" r="9"/><circle cx="50" cy="160" r="9"/><circle cx="175" cy="160" r="9"/></g><circle class="hot" cx="110" cy="70" r="12"/><circle class="hot" cx="110" cy="130" r="10"/>
-                <text x="110" y="96">203.0.113.47</text><text x="40" y="22">@n1ghtlamp</text><text x="180" y="22">update-lamp.test</text></svg></div>
-          </div></div>
-      </figure>
-    </section>
-    <section class="wl-caps">${caps.map(([i, t, d]) => `<div>${ico(i)}<b>${t}</b><p>${d}</p></div>`).join('')}</section>
-    <footer class="wl-foot"><span><i></i>Runs fully offline. Nothing you enter leaves this device.</span><span>Press <kbd>Esc</kbd> to skip</span></footer>
-  </div>`;
+      <figure class="lw-shots" aria-hidden="true">${win('back', 'dashboard', 'dashboard')}${win('front', 'case graph', 'graph')}
+        <div class="lw-phone"><div class="lw-scr"><div class="lw-notch"></div><div class="lw-sb"><span>9:41</span><span><i></i></span></div><div class="lw-pic">${pic('phone')}</div></div></div></figure>
+    </section></div>`;
+  wlCycle(true);
   w.scrollTop = 0; const b = w.querySelector('[data-act=welcomeDemo]'); if(b) b.focus({preventScroll:true});
 }
-function closeWelcome(){ $('welcome').hidden = true; try{ localStorage.setItem('osintrix:welcomed', '1'); }catch(e){} }
+function wlSet(k){ const l = document.querySelector('.lw'); if(!l) return; l.dataset.wt = k; l.querySelectorAll('[data-act=wlTheme]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === k))); }
+function wlCycle(on){
+  clearInterval(WL_T); WL_T = null;
+  if(!on || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const l = document.querySelector('.lw'); if(l) l.classList.add('auto');
+  WL_T = setInterval(() => { const l2 = document.querySelector('.lw'); if(!l2 || $('welcome').hidden){ clearInterval(WL_T); return; }
+    const i = WL_THEMES.findIndex(t => t[0] === l2.dataset.wt); wlSet(WL_THEMES[(i + 1) % WL_THEMES.length][0]); }, 3000);
+}
+function closeWelcome(){ wlCycle(false); $('welcome').hidden = true; try{ localStorage.setItem('osintrix:welcomed', '1'); }catch(e){} }
 (async function boot(){
   $('splash').innerHTML = logoMark(64); $('brand').innerHTML = logoMark(32) + `<div class="txt">${wordmark()}<small>${esc(BRAND.tagline)}</small></div>`; $('fav').href = FAVICON;
   try{ const th = localStorage.getItem('osintrix:theme'); if(th) document.documentElement.dataset.theme = th; }catch(e){}

@@ -202,6 +202,7 @@ async function autoDecode(input){
   for(let n = 0; n < 8; n++){ const d = await decodeOnce(cur); if(!d) break; steps.push(d); cur = d[1]; }
   return steps;
 }
+const TX_GROUPS = {"Decode": ["auto", "b64d", "hexd", "urld", "html", "b32d", "b58d", "bin", "dec", "uni", "jwt", "morse", "gunzip"], "Encode & transform": ["b64e", "hexe", "urle", "rot13", "rev", "caesar", "xor", "defang", "refang"], "Analyse": ["iocs", "sha256", "sha1"]};
 async function runTx(op, input){
   if(op === 'auto'){ const st = await autoDecode(input); return {out:st.length ? st[st.length - 1][1] : '', steps:st}; }
   if(op === 'gunzip'){ if(typeof DecompressionStream === 'undefined') throw new Error('This browser cannot decompress');
@@ -216,6 +217,7 @@ function viewDecoder(){
   const op = UI.txOp || 'auto';
   return `<div class="scroll"><div class="page wide">
     ${libHead('Decoder', 'Decode, encode, defang, hash and pull indicators out of anything — entirely in this browser.', `<button class="btn" data-act="decSample">${ico('play','sm')}Try a sample</button>`, '')}
+    <div class="mpick"><label for="txSel" class="ix">Operation</label><select id="txSel" class="gsel bord">${Object.entries(TX_GROUPS).map(([g, ks]) => `<optgroup label="${g}">${ks.filter(k => TX[k]).map(k => `<option value="${k}"${op === k ? ' selected' : ''}>${esc(TX[k][0])}</option>`).join('')}</optgroup>`).join('')}</select><p class="t3 small">${esc(op === 'auto' ? 'Detects the encoding for you and peels layers until the text is readable.' : '')}</p></div>
     <div class="txops" role="toolbar" aria-label="Operation">${Object.entries(TX).map(([k, [l, i]]) => `<button data-act="txOp" data-v="${k}" aria-pressed="${op === k}">${ico(i,'sm')}${l}</button>`).join('')}</div>
     <div id="txFlags"></div>
     <div class="txgrid">
