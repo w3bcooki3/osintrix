@@ -133,7 +133,7 @@ function importCase(){
 const b64d = s => { const b = Uint8Array.from(atob(s.replace(/\s+/g, '').replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)); return (b.length > 3 && b[1] === 0 && b[3] === 0) ? new TextDecoder('utf-16le').decode(b) : new TextDecoder().decode(b); };
 const b64e = s => btoa(String.fromCharCode(...new TextEncoder().encode(s)));
 const TX = {
-  auto:['Auto-decode','layers','Peels URL, Base64, hex and UTF-16 layers until the text is readable'],
+  auto:['Auto-decode','layers','Detects and peels layers — URL, HTML, escapes, Base64, Base32, Base58, hex, binary, char codes, gzip, JWT, Morse, ROT13 — until the text is readable'],
   b64d:['Base64 decode','binary', s => b64d(s)], b64e:['Base64 encode','binary', s => b64e(s)],
   hexd:['Hex decode','hash', s => { const h = s.replace(/0x|\\x|[\s:,-]/gi, ''); if(!/^([0-9a-f]{2})+$/i.test(h)) throw new Error('Not hex'); return new TextDecoder().decode(new Uint8Array(h.match(/../g).map(x => parseInt(x, 16)))); }],
   hexe:['Hex encode','hash', s => [...new TextEncoder().encode(s)].map(b => b.toString(16).padStart(2, '0')).join(' ')],
@@ -159,8 +159,51 @@ const TX = {
   gunzip:['Gunzip / inflate (Base64 or hex in)','box', null],
   sha256:['SHA-256','fingerprint', null], sha1:['SHA-1','fingerprint', null],
 };
+/* ---------- auto-decode: try every decoder, keep the one that gives readable text, repeat ---------- */
+function readability(s){
+  if(!s) return 0; if(s.includes('�')) return 0; let ok = 0, ctl = 0;
+  for(const c of s){ const k = c.codePointAt(0); if(k === 9 || k === 10 || k === 13 || (k >= 32 && k < 127)) ok++; else if(k >= 160 && k < 0x2000 || k >= 0x3000 && k < 0xFFF0) ok += .6; else ctl++; }
+  const n = [...s].length; return ctl / n > .05 ? 0 : ok / n;
+}
+const wordy2 = s => /[A-Za-z]{3,}|\d{1,3}(\.\d{1,3}){3}|[{}()=:\/\\]/.test(s);
+function bytesOf(t){ const h = t.replace(/^0x/i, '').replace(/\\x|0x|[\s:,-]/gi, '');
+  if(/^([0-9a-f]{2})+$/i.test(h) && h.length >= 8) return ['hex', new Uint8Array(h.match(/../g).map(x => parseInt(x, 16)))];
+  const b = t.replace(/\s+/g, ''); if(/^[A-Za-z0-9+/_-]+={0,2}$/.test(b) && b.length >= 8 && b.replace(/=+$/, '').length % 4 !== 1){ try{ return ['Base64', Uint8Array.from(atob(b.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))]; }catch(e){} }
+  return null; }
+function textOf(bytes){ if(bytes.length >= 4 && bytes[1] === 0 && bytes[3] === 0) return [new TextDecoder('utf-16le').decode(bytes), ' (UTF-16LE)']; try{ return [new TextDecoder('utf-8', {fatal:true}).decode(bytes), '']; }catch(e){ return [null, '']; } }
+async function inflateAny(bytes){ const kind = bytes[0] === 0x1f && bytes[1] === 0x8b ? 'gzip' : bytes[0] === 0x78 && [0x01, 0x5e, 0x9c, 0xda].includes(bytes[1]) ? 'deflate' : null; if(!kind || typeof DecompressionStream === 'undefined') return null;
+  try{ return [kind, new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream(kind))).arrayBuffer())]; }catch(e){ return null; } }
+async function decodeOnce(t){
+  const cands = [], add = (name, out) => { if(typeof out === 'string' && out && out !== t && out.trim() !== t.trim()) cands.push([name, out]); };
+  const tt = t.trim();
+  if(/^eyJ[\w-]+\.[\w-]+(\.[\w-]*)?$/.test(tt)) try{ add('JWT', TX.jwt[2](tt)); }catch(e){}
+  if(/%[0-9a-f]{2}/i.test(tt)) try{ add('URL decode', decodeURIComponent(tt.replace(/\+/g, ' '))); }catch(e){}
+  if(/&(#x?[0-9a-f]+|[a-z]{2,8});/i.test(tt)) add('HTML entities', TX.html[2](tt));
+  if(/\\u\{?[0-9a-f]{4}|\\x[0-9a-f]{2}|%u[0-9a-f]{4}/i.test(tt)) add('Unescape', TX.uni[2](tt));
+  if(/^[01]{8}([\s,]*[01]{8})*$/.test(tt)) try{ add('Binary', TX.bin[2](tt)); }catch(e){}
+  if(/^\d{2,3}([\s,;]+\d{2,3}){3,}$/.test(tt) && tt.match(/\d+/g).every(n => +n >= 9 && +n < 256)) add('Char codes', TX.dec[2](tt));
+  if(/^[.\-\s\/|•·—–_]+$/.test(tt) && /[.\-]/.test(tt) && tt.length >= 5) add('Morse', TX.morse[2](tt));
+  const B = bytesOf(tt);
+  if(B){ let [nm, by] = B; const z = await inflateAny(by); if(z){ nm += ' → ' + z[0]; by = z[1]; } const [txt, enc] = textOf(by); if(txt != null) add(nm + enc, txt); }
+  if(/^[A-Z2-7]+=*$/.test(tt.replace(/\s/g, '')) && tt.replace(/\s|=/g, '').length >= 8) try{ add('Base32', TX.b32d[2](tt)); }catch(e){}
+  if(/^[1-9A-HJ-NP-Za-km-z]{8,}$/.test(tt)) try{ add('Base58', TX.b58d[2](tt)); }catch(e){}
+  if(/^[A-Za-z0-9+/]{8,}={0,2}$/.test(tt.split('').reverse().join('')) && /^=/.test(tt)) { const r = bytesOf(tt.split('').reverse().join('')); if(r){ const [x] = textOf(r[1]); if(x != null) add('Reversed → Base64', x); } }
+  const r13 = TX.rot13[2](tt); if(findFlags(r13).length > findFlags(tt).length) add('ROT13', r13);
+  /* best candidate: readable, and looks like language or data */
+  let best = null, bs = .88;
+  for(const [n, o] of cands){ const sc = readability(o) + (wordy2(o) ? .05 : 0) + (findFlags(o).length ? .2 : 0); if(sc > bs){ bs = sc; best = [n, o]; } }
+  return best;
+}
+async function autoDecode(input){
+  const steps = []; let cur = String(input || '');
+  /* a long line with one encoded blob in it (e.g. powershell -enc …): decode the blob */
+  if(!(await decodeOnce(cur))){ const m = [...cur.matchAll(/[A-Za-z0-9+/]{20,}={0,2}|(?:[0-9a-f]{2}){12,}/gi)].sort((a, b) => b[0].length - a[0].length)[0];
+    if(m){ const d = await decodeOnce(m[0]); if(d){ steps.push(['Blob in the line → ' + d[0], d[1]]); cur = d[1]; } } }
+  for(let n = 0; n < 8; n++){ const d = await decodeOnce(cur); if(!d) break; steps.push(d); cur = d[1]; }
+  return steps;
+}
 async function runTx(op, input){
-  if(op === 'auto'){ const s = decodeChain(input); return {out:s.length ? s[s.length - 1][1] : '', steps:s}; }
+  if(op === 'auto'){ const st = await autoDecode(input); return {out:st.length ? st[st.length - 1][1] : '', steps:st}; }
   if(op === 'gunzip'){ if(typeof DecompressionStream === 'undefined') throw new Error('This browser cannot decompress');
     const t = input.trim(); const bytes = /^([0-9a-f]{2}\s*)+$/i.test(t) ? new Uint8Array(t.replace(/\s/g, '').match(/../g).map(x => parseInt(x, 16))) : Uint8Array.from(atob(t.replace(/\s/g, '')), c => c.charCodeAt(0));
     const kind = bytes[0] === 0x1f && bytes[1] === 0x8b ? 'gzip' : bytes[0] === 0x78 ? 'deflate' : 'deflate-raw';
@@ -192,7 +235,7 @@ async function paintTx(){
   if(s.trim()) try{ res = await runTx(op, s); }catch(e){ err = e.message || 'Could not transform this input'; }
   const out = $('txOut'); if(!out) return;
   out.textContent = err ? '' : (res.out || (s.trim() && op === 'auto' ? '' : '')); out.classList.toggle('err', !!err);
-  if(err) out.textContent = '⚠ ' + err; else if(s.trim() && op === 'auto' && !res.steps.length) out.textContent = 'Nothing to decode — not URL-encoded, Base64 or hex, or the result is not readable text.';
+  if(err) out.textContent = '⚠ ' + err; else if(s.trim() && op === 'auto' && !res.steps.length) out.textContent = 'No encoding recognised — tried URL, HTML entities, escapes, Base64, Base32, Base58, hex, binary, char codes, gzip, JWT, Morse and ROT13. Pick a specific operation above to force one.';
   UI.txOut = err ? '' : res.out || '';
   $('txOutN').textContent = UI.txOut ? UI.txOut.length + ' chars' : '';
   $('txSteps').innerHTML = res.steps && res.steps.length ? res.steps.map(([o], i) => `<span>${i + 1}. ${esc(o)}</span>`).join('<i>→</i>') : '';

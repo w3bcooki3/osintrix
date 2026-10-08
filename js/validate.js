@@ -68,3 +68,10 @@ document.addEventListener('invalid', ev => {
 }, true);
 /* imports: keep the incoming name unless it is taken, then mark it */
 function importName(name, taken){ const n = String(name || '').trim().replace(/\s+/g, ' '); const list = [...taken]; return list.some(x => normName(x) === normName(n)) ? nextName(n + ' (imported)', list) : n; }
+
+/* horizontal rows that scroll (tabs, filters, toolbars): fade the edge that has more, so it's clear they scroll */
+const SH_SEL = '.rf-nav,.hx-toc,.tabs,.labtabs,.iv-tabs,.rx-tabs,.sr-scopes,.gtools,.pc-tabs,.sq-side,.txops,.dock-i,.vcats,.tcats,.seg,.tblwrap,.hb-scroll';
+function shOne(el){ const max = el.scrollWidth - el.clientWidth; if(max <= 2){ el.removeAttribute('data-sh'); return; } const l = el.scrollLeft > 2, r = el.scrollLeft < max - 2; el.dataset.sh = l && r ? 'lr' : l ? 'l' : r ? 'r' : ''; }
+function scrollHints(root){ (root || document).querySelectorAll(SH_SEL).forEach(shOne); }
+document.addEventListener('scroll', ev => { const t = ev.target; if(t && t.matches && t.matches(SH_SEL)) shOne(t); }, true);
+addEventListener('resize', () => { clearTimeout(scrollHints.t); scrollHints.t = setTimeout(() => scrollHints(), 150); });

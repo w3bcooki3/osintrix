@@ -7,9 +7,11 @@
 A private OSINT investigation workspace that runs entirely in your browser.
 No server. No account. No tracking. Your cases never leave your machine.
 
-[![Tests](https://github.com/YOUR-USERNAME/osintrix/actions/workflows/test.yml/badge.svg)](https://github.com/YOUR-USERNAME/osintrix/actions/workflows/test.yml)
+[![Tests](https://github.com/w3bcooki3/osintrix/actions/workflows/test.yml/badge.svg)](https://github.com/w3bcooki3/osintrix/actions/workflows/test.yml)
 
-[**Launch the app →**](https://YOUR-USERNAME.github.io/osintrix/) &nbsp;·&nbsp; [Features](#features) &nbsp;·&nbsp; [Privacy](#privacy-by-design) &nbsp;·&nbsp; [Run it locally](#run-it-locally)
+[**Launch the app →**](https://w3bcooki3.github.io/osintrix/) &nbsp;·&nbsp; [Features](#features) &nbsp;·&nbsp; [Privacy](#privacy-by-design) &nbsp;·&nbsp; [Run it locally](#run-it-locally)
+
+![OSINTrix](docs/welcome.png)
 
 ![OSINTrix dashboard](docs/dashboard.png)
 
@@ -71,7 +73,7 @@ Press `Ctrl K` or `/`, or click the search bar, to search the whole app at once:
   - **Shortest path** between any two entries.
   - **"As of" time slider** that replays how the picture grew.
   - Automatic layouts, and export as PNG, GraphML (Gephi, yEd, Maltego) or CSV.
-- **Questions and playbooks:** track what you still don't know, or run a playbook (phishing triage, username OSINT, domain & infrastructure, malware triage, crypto tracing, IR first hour…) and every step becomes an open question.
+- **Questions and playbooks:** track what you still don't know, or run a playbook (phishing triage, username OSINT, domain & infrastructure, malware triage, crypto tracing, IR first hour, photo geolocation, packet capture review, browser artefacts, ransomware first look…) and every step becomes an open question.
 - **Reports and exports:**
   - A cited report with four templates (full, executive, technical, CTF write-up), a relationship map, and a **redact** switch that masks emails, phones, IPs, handles and names. Print it, save it as PDF, or export it as Markdown.
   - Every indicator as CSV, a defanged text list, or a STIX 2.1 bundle.
@@ -94,7 +96,7 @@ Press `Ctrl K` or `/`, or click the search bar, to search the whole app at once:
 - **Query library:** 68 saved search recipes with `{{BLANKS}}` that fill from your case entries.
   - Runs in Google, Bing, DuckDuckGo, Shodan, Censys, GitHub, ZoomEye, FOFA and Intelligence X.
   - Each search can be logged to the case.
-- **Reference:** Windows and Sysmon event IDs, ports, and living-off-the-land binaries.
+- **Reference:** an offline field guide with 128 entries — Windows and Sysmon event IDs, logon types, ports, LOLBins, auth failure codes and persistence locations. Each has what it means, what to look for, an ATT&CK link and a one-click search of your evidence.
 
 ![Toolbox](docs/toolbox.png)
 
@@ -132,7 +134,7 @@ Press `Ctrl K` or `/`, or click the search bar, to search the whole app at once:
 - **Username and email generator:** likely handles and addresses from a person's name, ready to check.
 - **Hash identifier:** MD5 / NTLM, SHA family, bcrypt, the Unix crypt formats, NetNTLMv1 and v2, Kerberoast / AS-REP, JWT and more, each with its hashcat mode.
 - **Coordinates:** reads decimal degrees, DMS or a Google Maps link, and converts between formats. Links to Google Maps, Street View, OpenStreetMap, Google Earth, Bing and Mapillary.
-- **Decoder:** 25 operations. Beyond the basics there are Base32, Base58, binary, character codes, `\x` / `\u` unescaping, all 25 Caesar shifts, single-byte XOR brute force, Morse and gunzip / inflate.
+- **Decoder:** 25 operations, plus an auto-decode that recognises and peels layered encodings (Base64, hex, Base32, Base58, URL, HTML, escapes, binary, char codes, gzip, JWT, Morse, ROT13). Beyond the basics there are Base32, Base58, binary, character codes, `\x` / `\u` unescaping, all 25 Caesar shifts, single-byte XOR brute force, Morse and gunzip / inflate.
 
 ![PCAP reader](docs/lab.png)
 
@@ -150,11 +152,13 @@ Press `Ctrl K` or `/`, or click the search bar, to search the whole app at once:
 
 ![Detections](docs/detections.png)
 
+![Reference](docs/reference.png)
+
 ### 📝 And also
 - Sticky notes and to-dos, general or pinned to a case.
 - A command palette (`Ctrl K`) for searching everything and running actions.
 - Light (default) and dark themes, three text sizes, and a compact density.
-- Fully responsive: sidebar on desktop, icon rail on tablet, and a bottom bar with sheets on phones.
+- Fully responsive, from a 360 px phone to a 4K screen: a sidebar on desktop, an icon rail on tablets, and a bottom bar with sheet dialogs on phones. Every screen, tab and dialog is checked at five widths.
 
 <p align="center"><img src="docs/mobile.png" width="260" alt="OSINTrix on a phone"></p>
 
@@ -184,7 +188,7 @@ Press `Ctrl K` or `/`, or click the search bar, to search the whole app at once:
 No install, no build step, no dependencies.
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/osintrix.git
+git clone https://github.com/w3bcooki3/osintrix.git
 cd osintrix
 # then open index.html in any modern browser
 ```

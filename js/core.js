@@ -54,7 +54,7 @@ function flush(){ clearTimeout(saveT); if(!DB || SEC.locked) return; DB.savedAt 
   let ok = false; try{ if(json.length < 2400000){ localStorage.setItem(STORE_KEY, json); STORE.ls = true; ok = true; } else { localStorage.removeItem(STORE_KEY); STORE.ls = false; } }catch(e){ STORE.ls = false; }
   if(STORE.idb){ ok = true; IDB.set(STORE_KEY, json).then(r => { if(!r && !STORE.ls){ storageOK = false; paintSaved(); } }); }
   storageOK = ok; STORE.lastSaved = Date.now(); paintSaved(); }
-function paintSaved(){ const s = $('saved'); if(s) s.innerHTML = storageOK ? '<i></i>Saved in this browser' : '<i style="background:var(--red)"></i>Not saved'; }
+function paintSaved(){ const s = $('saved'); if(s) s.innerHTML = storageOK ? '<i></i><span>Saved in this browser</span>' : '<i style="background:var(--red)"></i><span>Not saved</span>'; s.title = storageOK ? 'Saved in this browser' : 'Not saved — this browser blocks storage'; }
 window.addEventListener('pagehide', flush); document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'hidden') flush(); });
 let rev = 0, cache = {};
 function mutate(what){ rev++; cache = {}; auditAdd(what); DB.log.unshift({at:Date.now(), what}); DB.log.length = Math.min(DB.log.length, 200); save(); }

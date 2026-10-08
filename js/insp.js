@@ -94,7 +94,10 @@ function inspFeed(f){
 /* ---------- dialogs ---------- */
 let lastFocus = null;
 function openDlg(html, wide, after){ lastFocus = document.activeElement; $('scrim').hidden = false; const d = $('dlg'); d.className = 'dlg' + (wide ? ' wide' : ''); d.removeAttribute('aria-labelledby'); d.innerHTML = html; if(after) after();
-  const f = d.querySelector('[autofocus]') || d.querySelector('input,select,textarea,button'); if(f) f.focus(); }
+  /* touch screens: don't pop the keyboard over the sheet; keyboards: start in the first field, not on the close button */
+  const touch = matchMedia('(hover:none) and (pointer:coarse)').matches, body = d.querySelector('.in') || d;
+  const f = touch ? null : d.querySelector('[autofocus]') || body.querySelector('textarea:not([readonly]),input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([readonly]),select');
+  if(f) f.focus({preventScroll:true}); else { d.tabIndex = -1; d.focus({preventScroll:true}); } scrollHints(d); }
 function closeDlg(){ UI.graph.linkFrom = null; $('scrim').hidden = true; $('dlg').innerHTML = ''; if(lastFocus && lastFocus.focus) lastFocus.focus(); }
 const dhead = t => `<header><h3>${t}</h3><button class="iconbtn" type="button" data-act="dclose" aria-label="Close">${ico('x')}</button></header>`;
 
@@ -191,7 +194,7 @@ function openCapture(prefill){
   openDlg(dhead('Capture evidence') + `<div class="in"><div class="capto"><label for="capCase">Save to</label><span class="capdot" style="background:${esc(cur.color)}"></span><select id="capCase" class="gsel bord">${open.map(c => `<option value="${c.id}"${c.id === cur.id ? ' selected' : ''}>${esc(c.code + ' · ' + c.name)}</option>`).join('')}<option value="__new">+ New case…</option></select>
       <label class="chk capg" title="Add what this evidence mentions to the case graph, and link relations it states"><span class="sw"><input type="checkbox" id="capGraph"${cur.autoGraph ? ' checked' : ''}><span></span></span>Add to graph</label></div>
     <p class="t2" style="margin:0 0 12px;font-size:14px">Paste a log line, a WHOIS record, a forum post, a whole report — anything. Indicators are picked out and checked against every case, your watchlist and the offline context lists.</p>
-    <label class="sr" for="capBody">Evidence text</label><textarea id="capBody" class="inp code" rows="6" placeholder="2026-09-14T09:03:15Z EventID 3 … -> 203.0.113.47:4444">${esc(draft.body)}</textarea>
+    <label class="sr" for="capBody">Evidence text</label><textarea id="capBody" class="inp code" rows="6" autofocus placeholder="2026-09-14T09:03:15Z EventID 3 … -> 203.0.113.47:4444">${esc(draft.body)}</textarea>
     <div class="found" id="capFound"></div>
     <div class="frow" style="margin-top:14px"><div class="field"><label for="capSrc">Source</label><input id="capSrc" value="${esc(draft.source)}" placeholder="sysmon, whois, forum…"></div><div class="field"><label for="capHost">Host</label><input id="capHost" value="${esc(draft.host)}" placeholder="WS-FIN-07"></div></div>
     <div class="capfiles">${ico('paperclip','sm')}<span>Drop files, screenshots or saved pages here, or paste an image</span><button class="btn xs" data-act="capFiles">Attach files…</button><button class="btn xs" data-act="capWeb" title="A page you saved from your browser (.mhtml or .html)">${ico('globe','sm')}Saved web page…</button><button class="btn xs" data-act="capLog" title="CSV, TSV, JSON or NDJSON — one record per row">${ico('table-2','sm')}Import log file…</button></div>

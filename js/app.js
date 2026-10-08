@@ -15,6 +15,7 @@ function renderMain(){
   if(keepY){ const s2 = el.querySelector('.scroll'); if(s2) s2.scrollTop = keepY; }
   if(r.area === 'case' && r.tab === 'graph') requestAnimationFrame(mountGraph);
   if(r.area === 'case' && r.tab === 'map') requestAnimationFrame(mountMap);
+  requestAnimationFrame(() => scrollHints($('main')));
   { const at = el.querySelector('.tabs [aria-selected=true]'); if(at && at.parentElement.scrollWidth > at.parentElement.clientWidth) at.parentElement.scrollLeft = at.offsetLeft - 16; }
   if(r.area === 'toolbox') paintBulk();
   if(r.area === 'queries') bindQueryPanel();
@@ -77,6 +78,12 @@ document.addEventListener('click', ev => {
   if(a === 'trPick'){ $('trV').value = v; return $('trV').focus(); }
   switch(a){
     case 'navToggle': return $('side').classList.toggle('open');
+    case 'helpGo': { const el = $(v); if(el) el.scrollIntoView({behavior:'smooth', block:'start'}); return; }
+    case 'helpWelcome': return showWelcome();
+    case 'pbGo': return pbGo(v);
+    case 'refCat': UI.refCat = v; return renderMain();
+    case 'refHot': UI.refHot = !UI.refHot; return renderMain();
+    case 'refFind': return srchOpen(v);
     case 'welcomeDemo': closeWelcome(); return go(caseHash('c-lantern', 'overview'));
     case 'welcomeClose': closeWelcome(); return go('#/home');
     case 'showWelcome': return showWelcome();
@@ -477,6 +484,7 @@ document.addEventListener('input', ev => {
   if(t.id === 'entq'){ UI.entq = t.value; clearTimeout(tq); tq = setTimeout(() => { renderMain(); keep('entq'); }, 160); return; }
   if(t.id === 'nqs'){ UI.nq = t.value; clearTimeout(tq); tq = setTimeout(() => { renderMain(); keep('nqs'); }, 160); return; }
   if(t.matches && t.matches('.nquick textarea')){ t.style.height = 'auto'; t.style.height = Math.min(220, t.scrollHeight) + 'px'; return; }
+  if(t.id === 'hxq'){ const q = t.value.trim().toLowerCase(); let n = 0; document.querySelectorAll('.hfaq .hq').forEach(d => { const hit = !q || d.textContent.toLowerCase().includes(q); d.hidden = !hit; if(hit) n++; if(q && hit) d.open = true; }); let e = $('hxqE'); if(!n){ if(!e){ e = document.createElement('p'); e.id = 'hxqE'; e.className = 'sx-empty'; document.querySelector('.hfaq').appendChild(e); } e.textContent = 'No question matches “' + t.value + '”.'; } else if(e) e.remove(); return; }
   if(t.id === 'iq'){ UI.iq = t.value; clearTimeout(tq); tq = setTimeout(() => { renderMain(); keep('iq'); }, 160); return; }
   if(t.id === 'refQ'){ UI.refQ = t.value; clearTimeout(tq); tq = setTimeout(() => { renderMain(); keep('refQ'); }, 160); return; }
   if(t.id === 'tlq'){ clearTimeout(tq); tq = setTimeout(() => { UI.q = t.value.trim(); UI.ast = E.parseQuery(UI.q); renderMain(); keep('tlq'); }, 200); return; }
@@ -511,16 +519,35 @@ let rz = null; window.addEventListener('resize', () => { clearTimeout(rz); rz = 
 
 function showWelcome(){
   const w = $('welcome'); w.hidden = false;
-  w.innerHTML = `<div class="wcard">${logoMark(76)}
-    <h1 id="wTitle">Follow every <span>thread.</span></h1>
-    <p>OSINTrix is an investigation workspace for OSINT analysts and security researchers. Cases, evidence, entities and relationships — in one place, entirely in your browser.</p>
-    <div class="wfeat">
-      <div><span class="ic" style="color:var(--accent);background:var(--accent-soft)">${ico('layers')}</span><b>Cases are vaults</b><span>People, handles, wallets, domains and IPs, each with their own fields, priority and evidence.</span></div>
-      <div><span class="ic" style="color:var(--amber);background:var(--amber-soft)">${ico('clock')}</span><b>Evidence becomes a timeline</b><span>Paste any log or post. Indicators, timestamps and observations come out on their own.</span></div>
-      <div><span class="ic" style="color:var(--t-identity);background:color-mix(in srgb,var(--t-identity) 15%,transparent)">${ico('waypoints')}</span><b>Draw the connections</b><span>A graph you can drag, edit and export — every link carries its confidence and its proof.</span></div>
-    </div>
-    <div class="wacts"><button class="btn primary" data-act="welcomeDemo">${ico('crosshair','sm')}Explore the demo case</button><button class="btn" data-act="welcomeClose">Go to Dashboard</button></div>
-    <div class="wnote"><i></i>Runs fully offline. Nothing you enter ever leaves this browser.</div></div>`;
+  const caps = [['scan-text','Paste anything','Logs, WHOIS, forum posts, emails. Indicators, timestamps and log fields are pulled out and checked against every case.'],
+    ['waypoints','See the network','A link graph built from the evidence. Every relationship carries a confidence and the record that proves it.'],
+    ['network','Open the hard files','PCAP captures, SQLite and browser history, Office, PDF, PE/ELF, EXIF and saved web pages — parsed locally.'],
+    ['shield-check','Prove it held up','Encrypted workspace, a hash-chained audit log and signed chain-of-custody reports.']];
+  const ev = [['08:52:10','Invoice email delivered to finance','mail-gateway','1 malicious','r'],['08:57:33','LNK opened — cmd spawns PowerShell','WS-FIN-07 · sysmon','Encoded','a'],['08:57:35','Script block downloads second stage','WS-FIN-07','2 malicious','r'],['09:02:11','Beacon to 203.0.113.47:4444 every 60 s','FW-EDGE','C2','r']];
+  w.innerHTML = `<div class="wl">
+    <header class="wl-top">${logoMark(30)}<b>OSINTrix</b><span class="wl-ver">${esc(BRAND.version)}</span><span style="flex:1"></span><button class="wl-skip" data-act="welcomeClose">Skip</button></header>
+    <section class="wl-hero">
+      <div class="wl-copy">
+        <span class="wl-eyebrow"><i></i>Free · no account · works offline</span>
+        <h1 id="wTitle">The investigation workspace that never leaves your browser.</h1>
+        <p>OSINTrix brings cases, evidence, entities, timelines and a link graph together for OSINT and DFIR work — with a forensics kit, detections and threat intel built in. No server, no tracking, works offline.</p>
+        <div class="wl-acts"><button class="btn primary" data-act="welcomeDemo">Explore the demo case${ico('arrow-right','sm')}</button><button class="btn wl-ghost" data-act="welcomeClose">Start with a blank dashboard</button></div>
+        <dl class="wl-stats"><div><dt>0</dt><dd>servers — everything stays in this browser</dd></div><div><dt>AES-256</dt><dd>optional workspace encryption</dd></div><div><dt>11</dt><dd>forensics tools, from PCAP to SQLite</dd></div></dl>
+      </div>
+      <figure class="wl-shot" aria-hidden="true">
+        <div class="wl-win"><div class="wl-bar"><i></i><i></i><i></i><span>Op Lantern — invoice LNK intrusion</span></div>
+          <div class="wl-body">
+            <div class="wl-tl"><div class="wl-h">Timeline <small>17 events · UTC</small></div>${ev.map(([t, a, b, c, k]) => `<div class="wl-ev"><code>${t}</code><div><b>${a}</b><small>${b}</small></div><span class="wl-tag ${k}">${c}</span></div>`).join('')}</div>
+            <div class="wl-g"><div class="wl-h">Graph <small>18 links</small></div>
+              <svg viewBox="0 0 220 190"><g class="e"><line x1="40" y1="40" x2="110" y2="70"/><line x1="110" y1="70" x2="180" y2="40"/><line x1="110" y1="70" x2="110" y2="130"/><line x1="110" y1="130" x2="50" y2="160"/><line x1="110" y1="130" x2="175" y2="160"/><line x1="180" y1="40" x2="175" y2="160"/></g>
+                <g class="n"><circle cx="40" cy="40" r="9"/><circle cx="180" cy="40" r="9"/><circle cx="50" cy="160" r="9"/><circle cx="175" cy="160" r="9"/></g><circle class="hot" cx="110" cy="70" r="12"/><circle class="hot" cx="110" cy="130" r="10"/>
+                <text x="110" y="96">203.0.113.47</text><text x="40" y="22">@n1ghtlamp</text><text x="180" y="22">update-lamp.test</text></svg></div>
+          </div></div>
+      </figure>
+    </section>
+    <section class="wl-caps">${caps.map(([i, t, d]) => `<div>${ico(i)}<b>${t}</b><p>${d}</p></div>`).join('')}</section>
+    <footer class="wl-foot"><span><i></i>Runs fully offline. Nothing you enter leaves this device.</span><span>Press <kbd>Esc</kbd> to skip</span></footer>
+  </div>`;
   w.scrollTop = 0; const b = w.querySelector('[data-act=welcomeDemo]'); if(b) b.focus({preventScroll:true});
 }
 function closeWelcome(){ $('welcome').hidden = true; try{ localStorage.setItem('osintrix:welcomed', '1'); }catch(e){} }

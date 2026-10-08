@@ -2,6 +2,39 @@
 
 How OSINTrix came together, newest first.
 
+## v1.8 — Responsive polish and redesigns
+
+- **Decoder:** auto-decode was broken for anything beyond plain Base64 and hex. It now detects and peels layered encodings: Base64 (including UTF-16 and gzip inside), hex, Base32, Base58, URL, HTML entities, \x / \u escapes, binary, character codes, JWT, Morse, reversed Base64 and ROT13 flags. It also finds a blob inside a longer line (e.g. `powershell -enc …`) and leaves plain text alone.
+- **Welcome screen:** rebuilt as a launch page, with a clear headline, a product preview, key facts and four capabilities.
+- **Dashboard:**
+  - Scrollbars are thin and quiet everywhere, with no Windows arrow bars; the sidebar's shows only on hover.
+  - Key entries on a case overview are a clean list instead of tiles.
+- **Toolbox cards:** name and domain, a two-line description and a few tags. Actions appear on hover, with a clear Open link.
+- **Reference:** now an offline field guide with 128 entries in 8 sections:
+  - Sections: Windows event IDs, logon types, Sysmon, ports, LOLBins, authentication failure codes and persistence locations.
+  - Each entry: what it means, what to look for, an ATT&CK link and "Search my evidence".
+- **Playbooks:**
+  - Four new playbooks: photo geolocation, packet capture review, browser and phone artefacts, and ransomware first look.
+  - Each step has a shortcut to the part of OSINTrix that helps with it.
+  - The playbook page shows which steps are answered on the current case.
+- **Security & audit:** a settings-style page with a status summary (encryption, audit chain, signing key, last backup). The audit badge no longer stays on "Checking…" when the log is empty.
+- **Help:** a documentation layout with a sticky table of contents and searchable questions.
+- **Fixed:** times like "5 d ago" were shown as "5 d ago ago".
+
+- **Full responsive audit** of every screen, tab, dialog and panel at 360, 390, 768, 1024 and 1440 px, with no sideways scrolling anywhere.
+- **Phones:**
+  - Playbook, PCAP, SQLite and file headers stack cleanly, with actions in an even row below the title.
+  - The SQLite table list becomes a scrollable chip row.
+  - The graph's "not on the graph yet" banner and time slider no longer cover each other or the zoom buttons.
+  - The toolbox and notes toolbars use the full width.
+  - Dialog footers stay clear of the home bar.
+  - Opening a dialog no longer pops up the keyboard over it.
+  - Tap targets are at least 32–36 px.
+- **Tablets:**
+  - Case titles keep a readable width, and their buttons move underneath instead of squeezing them.
+  - The top bar hides the "Saved in this browser" label so search has room; the status dot stays.
+- **Scrolling rows** (tabs, filters, toolbars, wide tables) fade at the edge that has more, so it's clear they scroll.
+
 ## v1.7 — Packets, databases and tidier input
 
 - **PCAP reader** in the Forensics kit: pcap and pcapng, with conversations, hosts, DNS, DHCP, HTTP (with file export), TLS SNI / JA3, cleartext logins, beacon / scan / ARP-spoofing findings and a follow-stream view.

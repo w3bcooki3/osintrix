@@ -140,7 +140,7 @@ function srchPreview(){
   el.innerHTML = `<div class="sp-h"><span class="sr-ic"${it.color ? ` style="--c:${esc(it.color)}"` : ''}>${ico(it.icon || 'search','sm')}</span><div><h3 class="${it.mono ? 'mono' : ''}">${hl(it.title, terms)}</h3><small>${esc(it.sub)}</small></div></div><div class="sp-b">${b}</div>
     <div class="sp-f"><span><kbd>Enter</kbd> ${it.kind === 'tool' ? 'open site' : 'open'}</span>${it.kind === 'tool' ? '<span><kbd>Shift</kbd> <kbd>Enter</kbd> show in Toolbox</span>' : ''}</div>`;
 }
-function srchOpen(prefill){
+function srchOpen(prefill){ setTimeout(() => scrollHints(), 80);
   S.index = srchIndex(); S.open = true; S.at = 0; S.scope = 'all'; S.q = prefill || '';
   let w = $('srch'); if(!w){ w = document.createElement('div'); w.id = 'srch'; document.body.appendChild(w); }
   w.hidden = false;

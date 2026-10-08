@@ -167,28 +167,39 @@ async function custodyVerify(m){
 
 /* ---------- Security page ---------- */
 function viewSecurity(){
-  const S = DB.security || {}, A = DB.audit || {entries:[]}, enc = !!SEC.key, V = UI.auditV;
+  const S = DB.security || {}, A = DB.audit || {entries:[]}, enc = !!SEC.key;
+  if(!A.entries.length && !UI.auditV) UI.auditV = {ok:true, empty:true};
+  const V = UI.auditV;
   if(!V && A.entries.length) auditQ.then(() => auditVerify(A.entries, A.base)).then(r => { UI.auditV = r; if(UI.route.area === 'security') renderMain(); });
-  const recent = A.entries.slice(-40).reverse();
-  return `<div class="scroll"><div class="page narrow">${pageHead('shield-check','var(--green)','Security & audit','Encrypt what this browser stores, and prove your evidence was not changed.', '')}
-    <section class="card secc"><header><h3>${ico(enc ? 'lock' : 'lock-open','sm')} Encryption</h3>${enc ? '<span class="chip green sq">On</span>' : '<span class="chip sq">Off</span>'}</header><div class="body">
-      <p class="t2" style="margin:0 0 14px">${enc ? `Cases, notes, restore points and attached files are stored encrypted (AES-256-GCM). Opening ${esc(BRAND.name)} asks for your passphrase${S.autolock ? `, and it locks itself after ${S.autolock} minutes without activity` : ''}.` : `Anyone who can open this browser profile can read your cases. With encryption on, everything is stored encrypted with a key made from your passphrase, and the app opens locked.`}</p>
-      ${enc ? `<div class="wrap"><button class="btn" data-act="secLock">${ico('lock','sm')}Lock now</button><button class="btn" data-act="secChange">${ico('key-round','sm')}Change passphrase</button><button class="btn danger" data-act="secOff">Turn off</button></div>
-        <div class="field" style="margin:16px 0 0"><label for="secAuto">Lock automatically</label><select id="secAuto" class="gsel bord" style="max-width:260px">${[[0,'Never'],[5,'After 5 minutes idle'],[15,'After 15 minutes idle'],[30,'After 30 minutes idle'],[60,'After 1 hour idle']].map(([v, l]) => `<option value="${v}"${+(S.autolock || 0) === v ? ' selected' : ''}>${l}</option>`).join('')}</select></div>`
-        : `<button class="btn primary" data-act="secOn">${ico('lock','sm')}Encrypt this workspace…</button>`}
-      <p class="heur">${enc ? 'Forget the passphrase and the data is gone for good — keep an (encrypted) backup somewhere safe.' : 'The passphrase is never stored or sent anywhere. There is no recovery if you forget it.'}</p></div></section>
-    <section class="card secc"><header><h3>${ico('download','sm')} Encrypted backups</h3></header><div class="body"><p class="t2" style="margin:0 0 12px">Backups and case exports can be sealed with a passphrase of their own. Importing one asks for it.</p>
-      <div class="wrap"><button class="btn" data-act="secBackup">${ico('file-lock','sm')}Export everything, encrypted</button></div></div></section>
-    <section class="card secc"><header><h3>${ico('link-2','sm')} Audit log</h3>${V ? (V.ok ? `<span class="chip green sq">${ico('check','sm')}Chain intact</span>` : '<span class="chip red sq">Chain broken</span>') : '<span class="chip sq">Checking…</span>'}</header><div class="body">
-      <p class="t2" style="margin:0 0 12px">Every change is added to a hash chain: each entry's hash includes the one before it, so editing or removing a past entry is detectable. ${A.entries.length} entries${A.head && A.head !== 'genesis' ? ` · head <span class="mono">${esc(A.head.slice(0, 16))}…</span>` : ''}.</p>
-      ${V && !V.ok ? `<div class="note red" style="margin-bottom:12px"><span class="ic">${ico('triangle-alert','sm')}</span><div>${esc(V.why)}</div></div>` : ''}
-      <div class="wrap" style="margin-bottom:14px"><button class="btn sm" data-act="auditCheck">${ico('shield-check','sm')}Verify now</button><button class="btn sm" data-act="auditCsv">${ico('download','sm')}Export log</button></div>
-      <div class="audlist">${recent.map(e => `<div class="aud"><span class="mono t3">${esc(E.fmtFull(e.at, tz()).slice(0, 19))}</span><span>${esc(e.what)}</span><span class="mono t3" title="${esc(e.h)}">${esc((e.h || '…').slice(0, 10))}</span></div>`).join('') || '<p class="t3" style="margin:0">No entries yet — changes from now on are recorded.</p>'}</div></div></section>
-    <section class="card secc"><header><h3>${ico('stamp','sm')} Chain-of-custody report</h3></header><div class="body">
-      <p class="t2" style="margin:0 0 12px">A signed file listing every record in a case with its SHA-256, capture time and attached files, plus the audit chain. Whoever receives it can check here that nothing was altered after signing.</p>
-      <div class="wrap"><label class="sr" for="cusCase">Case</label><select id="cusCase" class="gsel bord">${DB.cases.map(c => `<option value="${c.id}"${c.id === DB.active ? ' selected' : ''}>${esc(c.code + ' · ' + c.name)}</option>`).join('')}</select><button class="btn primary" data-act="cusMake">${ico('stamp','sm')}Create signed report</button><button class="btn" data-act="cusVerify">${ico('badge-check','sm')}Verify a report…</button></div>
-      <p class="t3" style="font-size:13px;margin:12px 0 0">${S.sign ? 'Signing key fingerprint: <span class="mono" id="keyFp">…</span>' : 'A signing key is created for this workspace the first time you make a report.'}</p></div></section>
-  </div></div>`;
+  const recent = A.entries.slice(-25).reverse(), lastB = DB.prefs && DB.prefs.lastExport;
+  const tile = (lbl, val, tone, sub) => `<div class="sx-t"><span>${lbl}</span><b class="${tone}">${val}</b><small>${sub}</small></div>`;
+  const row = (id, title, desc, body) => `<section class="sx-row" id="${id}"><div class="sx-l"><h2>${title}</h2><p>${desc}</p></div><div class="sx-r">${body}</div></section>`;
+  return `<div class="scroll"><div class="page">
+    ${libHead('Security & audit', 'Protect what this browser stores, and be able to prove later that your evidence was not changed.', '', '')}
+    <div class="sx-sum">
+      ${tile('Encryption', enc ? 'On' : 'Off', enc ? 'ok' : 'warn', enc ? 'AES-256-GCM · ' + (S.autolock ? 'locks after ' + S.autolock + ' min' : 'no auto-lock') : 'Data is readable by anyone using this browser profile')}
+      ${tile('Audit chain', V ? (V.empty ? 'Empty' : V.ok ? 'Intact' : 'Broken') : 'Checking…', V && !V.ok ? 'bad' : V && !V.empty ? 'ok' : '', A.entries.length + ' entr' + (A.entries.length === 1 ? 'y' : 'ies') + ' recorded')}
+      ${tile('Signing key', S.sign ? 'Ready' : 'Not created', S.sign ? 'ok' : '', S.sign ? 'ECDSA P-256 · used for custody reports' : 'Made with your first custody report')}
+      ${tile('Last backup', lastB ? esc(ago(lastB)) : 'Never', lastB ? '' : 'warn', 'Help → Export everything')}
+    </div>
+    <div class="sx">
+    ${row('enc', 'Workspace encryption', 'With encryption on, cases, notes, restore points and attached files are stored encrypted with a key made from your passphrase (PBKDF2, 310,000 rounds). The app opens locked. The passphrase is never stored — there is no recovery if you forget it.',
+      enc ? `<div class="sx-state ok">${ico('lock','sm')}<div><b>Encrypted</b><span>Everything in this browser is sealed with your passphrase.</span></div></div>
+        <div class="sx-ctl"><label for="secAuto">Lock automatically</label><select id="secAuto" class="gsel bord">${[[0,'Never'],[5,'After 5 minutes idle'],[15,'After 15 minutes idle'],[30,'After 30 minutes idle'],[60,'After 1 hour idle']].map(([v, l]) => `<option value="${v}"${+(S.autolock || 0) === v ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
+        <div class="sx-btns"><button class="btn" data-act="secLock">${ico('lock','sm')}Lock now</button><button class="btn" data-act="secChange">${ico('key-round','sm')}Change passphrase</button><button class="btn ghost sx-off" data-act="secOff">Turn off encryption</button></div>`
+      : `<div class="sx-state warn">${ico('lock-open','sm')}<div><b>Not encrypted</b><span>Anyone who can open this browser profile can read your cases.</span></div></div>
+        <div class="sx-btns"><button class="btn primary" data-act="secOn">${ico('lock','sm')}Encrypt this workspace…</button></div>`)}
+    ${row('bkp', 'Encrypted backups', 'Exports can be sealed with a passphrase of their own, separate from the workspace one. Importing asks for it. Keep one somewhere other than this computer.',
+      `<div class="sx-btns"><button class="btn" data-act="secBackup">${ico('file-lock','sm')}Export everything, encrypted</button></div><p class="sx-note">Case-by-case exports are on each case’s menu.</p>`)}
+    ${row('audit', 'Audit log', 'Every change is added to a hash chain: each entry’s hash includes the one before it, so editing or removing any past entry breaks the chain and shows where.',
+      `${V && !V.ok ? `<div class="sx-state bad">${ico('triangle-alert','sm')}<div><b>Chain broken</b><span>${esc(V.why)}</span></div></div>` : ''}
+       <div class="sx-btns"><button class="btn sm" data-act="auditCheck">${ico('shield-check','sm')}Verify now</button><button class="btn sm" data-act="auditCsv" ${A.entries.length ? '' : 'disabled'}>${ico('download','sm')}Export as CSV</button>${A.head && A.head !== 'genesis' ? `<span class="sx-note mono">head ${esc(A.head.slice(0, 16))}…</span>` : ''}</div>
+       <div class="sx-log">${recent.length ? `<div class="sx-lh"><span>Time</span><span>Change</span><span>Hash</span></div>` + recent.map(e => `<div class="aud"><span class="mono">${esc(E.fmtFull(e.at, tz()).slice(0, 19))}</span><span>${esc(e.what)}</span><span class="mono" title="${esc(e.h)}">${esc((e.h || '…').slice(0, 10))}</span></div>`).join('') : '<p class="sx-empty">No entries yet. Changes you make from now on are recorded here.</p>'}</div>`)}
+    ${row('custody', 'Chain-of-custody report', 'A signed JSON file listing every record in a case with its SHA-256, capture time and attached files, plus the audit chain. Anyone can check it here; any change after signing is detected.',
+      `<div class="sx-ctl"><label for="cusCase">Case</label><select id="cusCase" class="gsel bord">${DB.cases.map(c => `<option value="${c.id}"${c.id === DB.active ? ' selected' : ''}>${esc(c.code + ' · ' + c.name)}</option>`).join('')}</select></div>
+       <div class="sx-btns"><button class="btn primary" data-act="cusMake">${ico('stamp','sm')}Create signed report</button><button class="btn" data-act="cusVerify">${ico('badge-check','sm')}Verify a report…</button></div>
+       <p class="sx-note">${S.sign ? 'Signing key fingerprint: <span class="mono" id="keyFp">…</span>' : 'A signing key is created for this workspace the first time you make a report.'}</p>`)}
+    </div></div></div>`;
 }
 const SEC_ACTS = {
   secOn:() => passDlg('Encrypt this workspace', 'Choose a passphrase. You will need it every time you open ' + esc(BRAND.name) + ' in this browser. It cannot be recovered.', 'Encrypt', async p => { await encEnable(p); closeDlg(); renderAll(); toast('Encryption is on'); }, true),

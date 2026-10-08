@@ -177,11 +177,28 @@ test('validates input inline and refuses duplicate names', async ({ page }) => {
   noErrors(errors);
 });
 
+test('auto-decode finds layered and uncommon encodings', async ({ page }) => {
+  const errors = await open(page, '#/decoder');
+  const run = v => page.evaluate(async x => { const s = await autoDecode(x); return s.length ? s[s.length - 1][1] : ''; }, v);
+  expect(await run('aGVsbG8gYW5hbHlzdCwgZmxhZ3thdXRvfQ==')).toBe('hello analyst, flag{auto}');
+  expect(await run('YUdWc2JHOGdZVzVoYkhsemRDd2dabXhoWjN0aGRYUnZmUT09')).toBe('hello analyst, flag{auto}');
+  expect(await run('68656c6c6f20776f726c64')).toBe('hello world');
+  expect(await run('NBSWY3DPEB3W64TMMQ======')).toBe('hello world');
+  expect(await run('StV1DL6CwTryKyV')).toBe('hello world');
+  expect(await run('01101000 01101001 00100001')).toBe('hi!');
+  expect(await run('104 105 33 32 104 105')).toBe('hi! hi');
+  expect(await run('synt{ebg_guvegrra}')).toBe('flag{rot_thirteen}');
+  expect(await run('.... . .-.. .-.. --- / .-- --- .-. .-.. -..')).toBe('HELLO WORLD');
+  expect(await run('powershell -enc SQBFAFgAIAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQAIABOAGUAdAAuAFcAZQBiAEMAbABpAGUAbgB0ACkA')).toContain('IEX (New-Object');
+  expect(await run('just a normal sentence')).toBe('');
+  noErrors(errors);
+});
+
 test('clicks every control on the main screens without an error', async ({ page }) => {
   test.setTimeout(240_000);
   const errors = await open(page);
-  const SKIP = new Set(['exportAll', 'resetDemo', 'freshStart', 'removeSample', 'importAll', 'importCase', 'secOn', 'secLock', 'secOff', 'secChange', 'capFiles', 'capLog', 'capWeb', 'attAdd', 'attOpen', 'attDl', 'rsAll', 'printReport']);
-  for (const r of ['#/home', '#/case/c-lantern/overview', '#/case/c-lantern/entities', '#/case/c-lantern/timeline', '#/case/c-lantern/graph', '#/case/c-lab/map', '#/case/c-lantern/questions', '#/toolbox', '#/lab', '#/security']) {
+  const SKIP = new Set(['exportAll', 'resetDemo', 'freshStart', 'removeSample', 'importAll', 'importCase', 'secOn', 'secLock', 'secOff', 'secChange', 'capFiles', 'capLog', 'capWeb', 'attAdd', 'attOpen', 'attDl', 'rsAll', 'printReport', 'helpWelcome', 'refFind', 'pbGo']);
+  for (const r of ['#/home', '#/case/c-lantern/overview', '#/case/c-lantern/entities', '#/case/c-lantern/timeline', '#/case/c-lantern/graph', '#/case/c-lab/map', '#/case/c-lantern/questions', '#/toolbox', '#/lab', '#/security', '#/reference', '#/playbooks', '#/help']) {
     await page.evaluate(h => { location.hash = h; renderMain(); }, r); await page.waitForTimeout(200);
     const acts = await page.evaluate(() => [...document.querySelectorAll('#main [data-act]')].map((e, i) => [i, e.dataset.act]));
     for (const [i, a] of acts.slice(0, 60)) {

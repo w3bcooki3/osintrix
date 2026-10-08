@@ -15,21 +15,20 @@ const toolBtns = (t, withEdit) => `<button class="tb-ic${t.starred ? ' on star' 
 const openBtn = (t, cls = 'btn sm') => { const u = E.safeUrl(t.url); return u ? `<a class="${cls}" href="${esc(u)}" target="_blank" rel="noopener noreferrer" data-act="toolOpen" data-id="${t.id}" aria-label="Open ${esc(t.name)} in a new tab">Open ${ico('arrow-up-right','sm')}</a>` : ''; };
 /* A — tool card (the classic ThreatNet card, cleaned up) */
 function toolCard(t){
-  const u = E.safeUrl(t.url), picked = UI.tpick && UI.tpick.has(t.id);
-  return `<article class="tcard2${picked ? ' picked' : ''}">
-    <div class="tc-h"><label class="tc-chk"><span class="sr">Select ${esc(t.name)}</span><input type="checkbox" data-act="toolPick" data-id="${t.id}"${picked ? ' checked' : ''}></label>${mono(t,'sm')}
-      <h3 title="${esc(t.name)}">${esc(t.name)}</h3><span class="tc-badge${t.seed ? '' : ' mine'}">${t.seed ? 'Pre-added' : 'Custom'}</span></div>
-    ${u ? `<a class="tc-url" href="${esc(u)}" target="_blank" rel="noopener noreferrer" data-act="toolOpen" data-id="${t.id}">${esc(u.replace(/\/$/, ''))}${ico('external-link','sm')}</a>` : `<span class="tc-url">${esc(t.url)}</span>`}
-    <div class="tc-acts">
-      <button class="tb-ic" data-act="toolEdit" data-id="${t.id}" aria-label="Edit ${esc(t.name)}" title="Edit">${ico('pencil','sm')}</button>
-      <button class="tb-ic${t.starred ? ' on star' : ''}" data-act="toolStar" data-id="${t.id}" aria-label="${t.starred ? 'Remove from favourites' : 'Add to favourites'}" title="Favourite">${ico('star','sm')}</button>
-      <button class="tb-ic${t.pinned ? ' on pin' : ''}" data-act="toolPin" data-id="${t.id}" aria-label="${t.pinned ? 'Remove from quick launch' : 'Add to quick launch'}" title="Quick launch">${ico('pin','sm')}</button>
-      ${u ? `<a class="tb-ic" href="${esc(u)}" target="_blank" rel="noopener noreferrer" data-act="toolOpen" data-id="${t.id}" aria-label="Open ${esc(t.name)}" title="Open in a new tab">${ico('external-link','sm')}</a>` : ''}
-      ${t.tpl ? `<button class="tb-ic run" data-act="toolRun" data-id="${t.id}" aria-label="Run ${esc(t.name)} with a value" title="Run with a value — ${esc(t.tpl)}">${ico('play','sm')}</button>` : ''}
-      <button class="tb-ic del" data-act="toolDelAsk" data-id="${t.id}" aria-label="Delete ${esc(t.name)}" title="Delete">${ico('trash-2','sm')}</button>
-      <span class="tc-sub">${esc(toolSub(t))}</span></div>
+  const u = E.safeUrl(t.url), picked = UI.tpick && UI.tpick.has(t.id), host = u ? hostOf(u) || u : t.url, anyPick = UI.tpick && UI.tpick.size;
+  return `<article class="tk${picked ? ' picked' : ''}${anyPick ? ' picking' : ''}">
+    <label class="tk-chk"><span class="sr">Select ${esc(t.name)}</span><input type="checkbox" data-act="toolPick" data-id="${t.id}"${picked ? ' checked' : ''}></label>
+    <div class="tk-h">${mono(t,'sm')}
+      <div class="tk-n">${u ? `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer" data-act="toolOpen" data-id="${t.id}" title="Open ${esc(t.name)}">${esc(t.name)}</a>` : `<span>${esc(t.name)}</span>`}<small>${esc(host)}</small></div>
+      <button class="tk-star${t.starred ? ' on' : ''}" data-act="toolStar" data-id="${t.id}" aria-label="${t.starred ? 'Remove from favourites' : 'Add to favourites'}" title="Favourite">${ico('star','sm')}</button></div>
     <p>${esc(t.desc || 'No description yet.')}</p>
-    ${t.tags.length ? `<div class="tc-tags">${t.tags.slice(0, 8).map(g => `<button data-act="toolTag" data-v="${esc(g)}" title="Show tools tagged ${esc(g)}">${esc(g.replace(/-/g, ' '))}</button>`).join('')}</div>` : ''}</article>`;
+    ${t.tags.length ? `<div class="tk-tags">${t.tags.slice(0, 3).map(g => `<button data-act="toolTag" data-v="${esc(g)}" title="Show tools tagged ${esc(g)}">${esc(g.replace(/-/g, ' '))}</button>`).join('')}${t.tags.length > 3 ? `<span>+${t.tags.length - 3}</span>` : ''}</div>` : ''}
+    <footer><span class="tk-cat"><i style="background:${catCol(t.cat)}"></i>${esc(toolSub(t))}${t.seed ? '' : ' · <b>Custom</b>'}${t.pinned ? ` · ${ico('pin','sm')}` : ''}</span>
+      <span class="tk-acts">${t.tpl ? `<button class="tb-ic run" data-act="toolRun" data-id="${t.id}" aria-label="Run ${esc(t.name)} with a value" title="Run with a value — ${esc(t.tpl)}">${ico('play','sm')}</button>` : ''}
+        <button class="tb-ic${t.pinned ? ' on pin' : ''}" data-act="toolPin" data-id="${t.id}" aria-label="${t.pinned ? 'Remove from quick launch' : 'Add to quick launch'}" title="Quick launch">${ico('pin','sm')}</button>
+        <button class="tb-ic" data-act="toolEdit" data-id="${t.id}" aria-label="Edit ${esc(t.name)}" title="Edit">${ico('pencil','sm')}</button>
+        <button class="tb-ic del" data-act="toolDelAsk" data-id="${t.id}" aria-label="Delete ${esc(t.name)}" title="Delete">${ico('trash-2','sm')}</button></span>
+      ${u ? `<a class="tk-open" href="${esc(u)}" target="_blank" rel="noopener noreferrer" data-act="toolOpen" data-id="${t.id}">Open${ico('arrow-up-right','sm')}</a>` : ''}</footer></article>`;
 }
 function paintBulk(){
   const el = $('tbulk'); if(!el) return; const n = UI.tpick ? [...UI.tpick].filter(id => DB.tools.some(t => t.id === id)).length : 0;
@@ -139,20 +138,24 @@ function decodeChain(input){
   return steps;
 }
 function viewReference(){
-  const q = (UI.refQ || '').toLowerCase(), R = E.REF, rows = [];
-  for(const [id, [t, hot]] of Object.entries(R.EVENTIDS)) rows.push(['Windows event', id, t, hot]);
-  for(const [id, [t]] of Object.entries(R.SYSMON)) rows.push(['Sysmon event', id, t.replace('Sysmon: ', ''), 0]);
-  for(const [p, t] of Object.entries(R.EVIL_PORTS)) rows.push(['Port', p, t, 1]);
-  for(const [p, t] of Object.entries(R.PORTS)) rows.push(['Port', p, t, 0]);
-  for(const [b, t] of Object.entries(R.LOLBINS)) rows.push(['Binary', b, t, 1]);
-  const list = rows.filter(r => !q || r.join(' ').toLowerCase().includes(q));
-  return `<div class="scroll"><div class="page narrow">
-    <div class="ph"><div><h1>Reference</h1><div class="sub">What an indicator means, offline. The same table explains entities everywhere in the app.</div></div></div>
-    <div class="toolbar"><div class="search-in">${ico('search')}<label class="sr" for="refQ">Filter</label><input id="refQ" class="inp" placeholder="4698, 4444, rundll32…" value="${esc(UI.refQ || '')}"></div><span class="t3">${list.length} entries</span></div>
-    <section class="card" style="overflow:hidden"><table class="tbl ref"><thead><tr><th>Type</th><th>Value</th><th>Meaning</th><th></th></tr></thead><tbody>
-      ${list.map(r => `<tr style="cursor:default"><td class="t3">${esc(r[0])}</td><td class="v">${esc(r[1])}</td><td>${esc(r[2])}</td><td>${r[3] ? '<span class="chip amber sq">Worth a look</span>' : ''}</td></tr>`).join('')}</tbody></table></section></div></div>`;
+  const q = (UI.refQ || '').trim().toLowerCase(), cat = REFDATA[UI.refCat] ? UI.refCat : 'all', only = !!UI.refHot;
+  const match = r => (!q || r.slice(0, 5).join(' ').toLowerCase().includes(q)) && (!only || r[5]);
+  const secs = Object.entries(REFDATA).filter(([k]) => cat === 'all' || cat === k).map(([k, S]) => [k, S, S.rows.filter(match)]).filter(x => x[2].length);
+  const total = Object.values(REFDATA).reduce((n, S) => n + S.rows.length, 0), shown = secs.reduce((n, x) => n + x[2].length, 0);
+  const row = (k, r) => `<details class="rf-r"><summary><code class="rf-v">${esc(r[0])}</code><span class="rf-t">${esc(r[1])}</span>${r[5] ? '<span class="rf-hot">Worth a look</span>' : '<span></span>'}${r[4] ? `<span class="rf-att">${esc(r[4])}</span>` : '<span></span>'}${ico('chevron-down','sm')}</summary>
+    <div class="rf-b"><div><h5>What it means</h5><p>${esc(r[2])}</p></div><div><h5>What to look for</h5><p>${esc(r[3])}</p></div>
+      <div class="rf-a"><button class="btn xs" data-act="flagCopy" data-v="${esc(r[0])}">${ico('copy','sm')}Copy</button><button class="btn xs" data-act="refFind" data-v="${esc(r[0].replace(/^.*\\/, ''))}">${ico('search','sm')}Search my evidence</button>${r[4] ? `<a class="btn xs ghost" href="https://attack.mitre.org/techniques/${esc(r[4].replace('.', '/'))}/" target="_blank" rel="noopener noreferrer">MITRE ATT&amp;CK ${esc(r[4])}${ico('arrow-up-right','sm')}</a>` : ''}</div></div></details>`;
+  return `<div class="scroll"><div class="page">
+    ${libHead('Reference', 'An offline field guide: what an event ID, port, binary or code means, and what to check next. Click a row for the detail.', '', '')}
+    <div class="rf">
+      <nav class="rf-nav" aria-label="Sections"><button data-act="refCat" data-v="all" aria-pressed="${cat === 'all'}">${ico('book-open','sm')}<span>Everything</span><small>${total}</small></button>
+        ${Object.entries(REFDATA).map(([k, S]) => `<button data-act="refCat" data-v="${k}" aria-pressed="${cat === k}">${ico(S.icon,'sm')}<span>${esc(S.name)}</span><small>${S.rows.length}</small></button>`).join('')}</nav>
+      <div class="rf-main">
+        <div class="rf-tb"><div class="search-in">${ico('search')}<label class="sr" for="refQ">Filter</label><input id="refQ" class="inp" placeholder="4698, 4444, rundll32, kerberoast, T1059…" value="${esc(UI.refQ || '')}"></div>
+          <label class="chk"><input type="checkbox" data-act="refHot" ${only ? 'checked' : ''}> Only “worth a look”</label><span class="t3 small">${shown} of ${total}</span></div>
+        ${secs.map(([k, S, rows]) => `<section class="rf-sec"><header><h2>${ico(S.icon,'sm')}${esc(S.name)}</h2><p>${esc(S.note)}</p></header><div class="rf-list">${rows.map(r => row(k, r)).join('')}</div></section>`).join('') || `<div class="card" style="padding:28px;text-align:center"><p class="t3" style="margin:0">Nothing matches “${esc(UI.refQ || '')}”.</p></div>`}
+      </div></div></div></div>`;
 }
-
 function stub(title, sub, from, what){
   return `<div class="scroll"><div class="page narrow"><div class="ph"><div><h1>${title}</h1><div class="sub">${sub}</div></div></div>
     <section class="card"><div class="body" style="display:flex;gap:16px;align-items:flex-start"><span class="tb lg" style="--c:var(--text-3)">${ico('history')}</span>
@@ -207,16 +210,18 @@ function viewHelp(){
   const where = !storageOK ? '<b style="color:var(--red)">Not saving</b> — this browser is blocking storage (private window, blocked site data or an embedded preview). Export before you close the tab.'
     : STORE.idb ? `Saved in IndexedDB${STORE.ls ? ' with a localStorage mirror' : ''}. ${STORE.persisted ? 'Marked <b>persistent</b> — the browser will not clear it to free space.' : 'Not marked persistent — under heavy disk pressure a browser may clear it. Keep backups.'}`
     : 'Saved in localStorage (IndexedDB unavailable). About 5 MB fits.';
-  const feat = (icon, col, title, body) => `<div class="hf"><span class="hf-ic" style="--c:${col}">${ico(icon)}</span><div><h3>${title}</h3><p>${body}</p></div></div>`;
+  const feat = (icon, col, title, body) => `<div class="hx-f">${ico(icon,'sm')}<div><h3>${title}</h3><p>${body}</p></div></div>`;
   const mod = (href, icon, name, body) => `<a class="hm" href="${href}">${ico(icon,'sm')}<b>${name}</b><span>${body}</span></a>`;
   const kb = (keys, what) => `<div class="hk"><span>${keys.map(k => `<kbd>${k}</kbd>`).join(' ')}</span><span>${what}</span></div>`;
   const qa = (q, a) => `<details class="hq"><summary>${q}${ico('chevron-down','sm')}</summary><p>${a}</p></details>`;
-  return `<div class="scroll"><div class="page help">
-    <section class="hhero">${logoMark(56)}<div><h1>Welcome to ${esc(BRAND.name)}</h1><p class="hsub">Your personal OSINT workspace — client-side only.</p>
-      <p>${esc(BRAND.name)} is a fast, private investigation workspace that runs entirely in your browser. Cases, evidence, entities, tools and notes are stored on this device and never leave it. There is no server, no account and no tracking.</p></div></section>
+  const toc = [['hx-know','Things to know'],['hx-data','Your data'],['hx-start','Getting started'],['hx-where','What’s where'],['hx-keys','Shortcuts & search'],['hx-faq','Questions']];
+  return `<div class="scroll"><div class="page help hx">
+    <nav class="hx-toc" aria-label="On this page"><span>On this page</span>${toc.map(([id, l]) => `<button data-act="helpGo" data-v="${id}">${l}</button>`).join('')}</nav><div class="hx-main">
+    <header class="hx-hd"><div>${logoMark(40)}<div><h1>Help &amp; documentation</h1><p>${esc(BRAND.name)} ${esc(BRAND.version)} — a private investigation workspace that runs entirely in your browser. No server, no account, no tracking.</p></div></div>
+      <div class="hx-q"><button class="btn" data-act="helpWelcome">${ico('play','sm')}Show the welcome tour</button><a class="btn" href="https://github.com/w3bcooki3/osintrix" target="_blank" rel="noopener noreferrer">${ico('external-link','sm')}Project on GitHub</a></div></header>
 
-    <h2 class="hh">Key features &amp; things to know</h2>
-    <div class="hgrid">
+    <h2 class="hh" id="hx-know">Things to know</h2>
+    <div class="hx-know">
       ${feat('lock','#10b981','Privacy first','Everything you add is saved only in this browser (IndexedDB, with a localStorage copy). Every change is saved within a quarter of a second and survives reloads and restarts. Nothing is uploaded. The page’s security policy blocks every outside connection except one you opt into (below).')}
       ${feat('download','#3b82f6','Back up regularly','Because data lives in this browser, clearing site data, using a private window or switching browsers means starting empty. Export a JSON backup often — you can import it on another device. Deleted items wait 30 days in the trash, and a restore point is saved before every import, reset or clean-up.')}
       ${feat('rss','#f59e0b','The one network request','Threat Intel is offline until you turn on live feeds. Then only the feed addresses are sent to <span class="mono">api.rss2json.com</span>, the relay the original app used. Your cases never are.')}
@@ -225,7 +230,7 @@ function viewHelp(){
       ${feat('maximize','#06b6d4','Best on a larger screen','Everything works on a phone, but the graph, timeline and rule editor are happiest on a laptop or desktop.')}
     </div>
 
-    <h2 class="hh">Important actions</h2>
+    <h2 class="hh" id="hx-data">Your data</h2>
     <section class="card hact"><div class="hact-store"><div><b>Storage used</b><span>${mb} MB · room for ${cap}</span></div><span class="bar"><i style="width:${Math.max(pct, 1)}%"></i></span></div>
       <p class="hact-note">${where}</p>
       <div class="hact-row">
@@ -235,7 +240,7 @@ function viewHelp(){
           <div class="wrap">${DB.sample ? `<button class="btn" data-act="removeSample">${ico('box','sm')}Remove sample data</button>` : ''}<button class="btn dangerbtn" data-act="freshStart">${ico('trash-2','sm')}Start fresh</button><button class="btn" data-act="resetDemo">${ico('undo-2','sm')}Reset to demo</button></div></div>
       </div></section>
 
-    <h2 class="hh">Getting started</h2>
+    <h2 class="hh" id="hx-start">Getting started</h2>
     <ol class="hsteps">
       <li><b>Open a case.</b> Each case is its own vault. Create one from Cases, or explore the demo “Op Lantern”.</li>
       <li><b>Add what you know.</b> People, usernames, emails, domains, IPs, wallets… each type has its own fields, priority and verdict.</li>
@@ -244,7 +249,7 @@ function viewHelp(){
       <li><b>Answer the questions, then report.</b> Pick a report template (full, executive, technical or CTF write-up), redact personal data if needed, and export Markdown or PDF.</li>
     </ol>
 
-    <h2 class="hh">What’s where</h2>
+    <h2 class="hh" id="hx-where">What’s where</h2>
     <div class="hmods">
       ${mod('#/home','layout-dashboard','Dashboard','Your open cases, activity and pinned notes at a glance.')}
       ${mod('#/cases','folder-open','Cases','Vault, timeline, graph, questions and report for each investigation.')}
@@ -264,7 +269,7 @@ function viewHelp(){
       ${mod('#/security','shield-check','Security & audit','Encryption, encrypted backups, the audit chain and signed chain-of-custody reports.')}
     </div>
 
-    <div class="hcols">
+    <div class="hcols" id="hx-keys">
       <section><h2 class="hh">Keyboard shortcuts</h2><div class="card hkeys">
         ${kb(['Ctrl','K'],'Search everything — cases, IOCs, tools, notes, rules, actions')}${kb(['N'],'Capture evidence')}${kb(['E'],'Add a vault entry')}${kb(['/'],'Search everything')}
         ${kb(['1','–','8'],'Switch case tabs')}${kb(['Esc'],'Close a panel or dialog')}${kb(['Ctrl','S'],'Save the rule you are editing')}${kb(['Ctrl','Enter'],'Save a capture or note')}${kb(['Shift','F10'],'Graph menu for the selected node')}</div></section>
@@ -273,7 +278,8 @@ function viewHelp(){
         ${[['in:tools shodan','Search one area (cases, vault, evidence, indicators, notes, tools, queries, rules, playbooks, ctf, news)'],['case:TN-2026-014 dns','Only inside one case'],['"lamp loader" -firewall','Exact phrase, exclude a word'],['host:DC01','Records from one machine'],['verdict:malicious','Only bad indicators'],['type:finding','Findings, notes, questions…'],['tag:intel','Records with a tag'],['after:2026-09-14','Time windows (also before:)'],['source:sysmon','Where the evidence came from']].map(([c, d]) => `<div class="hk"><code class="mono">${c}</code><span>${d}</span></div>`).join('')}</div></section>
     </div>
 
-    <h2 class="hh">Questions</h2>
+    <h2 class="hh" id="hx-faq">Questions</h2>
+    <div class="hx-faqf"><div class="search-in">${ico('search')}<label class="sr" for="hxq">Search questions</label><input id="hxq" class="inp" placeholder="Search the questions…"></div></div>
     <div class="card hfaq">
       ${qa('Is any of my data sent anywhere?', 'No. Cases, entries, evidence, notes, tools, queries and rules stay in this browser. The only outbound request is the optional live-feed relay described above, which receives feed URLs only.')}
       ${qa('My changes disappeared after a refresh — why?', 'Saved data belongs to one browser <i>and</i> one address. The copy you open from your disk (file://…) and the one on GitHub Pages (https://…github.io) are two different places with separate data, and so are Chrome and Firefox, or two browser profiles. Private windows, “clear data on exit” settings and embedded previews (for example a file preview inside another app) do not keep anything. The status in the top bar says “Saved in this browser” when saving works, and a red warning appears when it does not.')}
@@ -302,5 +308,5 @@ function viewHelp(){
     </div>
 
     <p class="hfoot">${esc(BRAND.name)} ${esc(BRAND.version)} · Inter &amp; JetBrains Mono (OFL 1.1) · Lucide icons (ISC) · Cytoscape.js (MIT) · jsQR (Apache-2.0) · IEEE OUI vendor list via oui-data (BSD-2) · cloud ranges &amp; disposable domains (CC0) · Natural Earth map (public domain) · <a href="#/settings">Settings &amp; about</a> · <button class="linkbtn" data-act="showWelcome">Show the welcome screen</button></p>
-  </div></div>`;
+  </div></div></div>`;
 }

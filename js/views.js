@@ -143,7 +143,7 @@ function caseOverview(c, D){
     <div class="grid cols-main" style="margin-top:18px">
       <div class="stack">
         <a class="card mapcard" href="${caseHash(c.id,'graph')}"><header><h3>Case map</h3><span class="t3">${D.entries.length} entries · ${D.links.length} relationships</span><span class="btn sm ghost" style="margin-left:auto">Open graph ${ico('chevron-right','sm')}</span></header><div class="body">${caseMap(c.id, 720, 260)}</div></a>
-        <section class="card"><header><h3>Key entries</h3><a class="btn sm ghost" href="${caseHash(c.id,'vault')}">Open vault ${ico('chevron-right','sm')}</a></header><div class="body"><div class="egrid" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr))">${key.map(entryCard).join('')}</div></div></section>
+        <section class="card"><header><h3>Key entries</h3><a class="btn sm ghost" href="${caseHash(c.id,'vault')}">Open vault ${ico('chevron-right','sm')}</a></header><div class="kel" role="list">${key.map(keyRow).join('')}</div></section>
         <section class="card"><header><h3>What the evidence adds up to</h3><span class="t3">heuristic</span></header><div class="body">
           ${[...byTag.entries()].map(([tag, l]) => `<div class="note amber obs"><span class="ic">${ico('triangle-alert','sm')}</span><div><b>${esc(tag[0].toUpperCase() + tag.slice(1))}</b> — ${esc(l[0].o.t)} <button class="btn xs" data-act="selRec" data-id="${l[0].r.id}" style="margin-left:6px">Open</button>${l.length > 1 ? ` <span class="t3" style="font-size:12.5px">+${l.length - 1} more</span>` : ''}</div></div>`).join('') || '<span class="t3">Nothing combined yet.</span>'}
           <p class="heur">These point at combinations worth a look. They never set a verdict.</p></div></section>
@@ -160,6 +160,14 @@ function caseOverview(c, D){
 }
 
 /* ---------- vault ---------- */
+function keyRow(e){
+  const t = TYPES[e.type], v = entryVerdict(e), m = entryMentions(e).length, f = t.fields.slice(1).find(([n]) => e.fields[n] && e.fields[n] !== '—');
+  return `<button class="kel-r" role="listitem" data-act="selEntry" data-id="${e.id}" aria-selected="${!!(UI.sel && UI.sel.id === e.id)}">
+    <span class="kel-t">${ico(t.icon,'sm')}${esc(t.label)}</span>
+    <span class="kel-v"><b class="${MONO_TYPES.has(e.type) ? 'mono' : ''}" title="${esc(primary(e))}">${esc(primary(e))}</b>${f ? `<small>${esc(f[1])}: ${esc(e.fields[f[0]])}</small>` : ''}</span>
+    <span class="kel-s">${v ? `<span class="kel-vd ${v}">${esc(v[0].toUpperCase() + v.slice(1))}</span>` : '<span class="kel-vd">No verdict</span>'}<span class="kel-p ${e.priority}">${esc(e.priority[0].toUpperCase() + e.priority.slice(1))}</span></span>
+    <span class="kel-m" title="Records that mention it">${m ? m + ' rec' : ''}</span>${e.starred ? `<span class="kel-star" aria-label="Starred">${ico('star','sm')}</span>` : '<span></span>'}</button>`;
+}
 function entryCard(e){
   const t = TYPES[e.type], v = entryVerdict(e), m = entryMentions(e).length;
   const extra = t.fields.slice(1).filter(([n]) => e.fields[n]).slice(0, 2);

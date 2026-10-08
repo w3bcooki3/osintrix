@@ -3,7 +3,7 @@
    file / screenshot attachments (IndexedDB blobs), bulk log import.
    ========================================================================== */
 IDB.del = k => new Promise(res => { if(!IDB.db) return res(false); try{ const tx = IDB.db.transaction('kv', 'readwrite'); tx.objectStore('kv').delete(k); tx.oncomplete = () => res(true); tx.onerror = tx.onabort = () => res(false); }catch(e){ res(false); } });
-const ago = t => E.fmtAgo(Math.max(0, Date.now() - t)) + (Date.now() - t < 6e4 ? '' : ' ago');
+const ago = t => E.fmtAgo(Math.max(0, Date.now() - t));
 
 /* ---------- trash ---------- */
 const TRASH_DAYS = 30;
