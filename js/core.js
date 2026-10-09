@@ -192,7 +192,7 @@ const AVC = ['#5470f5','#8b5cf6','#0ea5a4','#e8590c','#d6336c','#2f9e44','#b07b0
 const avColor = s => AVC[[...String(s)].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7) % AVC.length];
 /* Standard page header: icon tile, title, subtitle, actions, and an optional KPI strip */
 function pageHead(icon, color, title, sub, acts, kpis){
-  return `<header class="phd"><div class="phd-t"><span class="phd-ic" style="--c:${color}">${ico(icon)}</span><div class="phd-tt"><h1>${title}</h1>${sub ? `<p>${sub}</p>` : ''}</div>${acts ? `<div class="phd-a">${acts}</div>` : ''}</div>
+  return `<header class="phd"><div class="phd-t"><div class="phd-tt"><h1>${title}</h1>${sub ? `<p>${sub}</p>` : ''}</div>${acts ? `<div class="phd-a">${acts}</div>` : ''}</div>
     ${kpis && kpis.length ? `<div class="kpis">${kpis.map(([n, l, extra]) => `<div class="kpi"><b>${n}</b><span>${l}</span>${extra || ''}</div>`).join('')}</div>` : ''}</header>`;
 }
 

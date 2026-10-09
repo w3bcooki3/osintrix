@@ -81,6 +81,12 @@ document.addEventListener('click', ev => {
     case 'wlTheme': { wlCycle(false); const l = document.querySelector('.lw'); if(l) l.classList.remove('auto'); return wlSet(v); }
     case 'helpGo': { const el = $(v); if(el) el.scrollIntoView({behavior:'smooth', block:'start'}); return; }
     case 'helpWelcome': return showWelcome();
+    case 'helpQ': { const i = $('hxq'); if(!i) return; i.value = v; i.dispatchEvent(new Event('input', {bubbles:true})); i.focus(); return; }
+    case 'helpReset': { const r0 = t.getBoundingClientRect(); return showMenu(Math.max(8, r0.right - 240), r0.bottom + 6, [
+      ...(DB.sample ? [{label:'Remove sample data', icon:'box', fn:() => clickAct('removeSample')}] : []),
+      {label:'Reset to demo', icon:'undo-2', fn:() => clickAct('resetDemo')},
+      {label:'Trash & restore points', icon:'trash-2', fn:() => go('#/trash')},
+      {sep:true}, {label:'Start fresh — delete everything…', icon:'triangle-alert', danger:true, fn:() => clickAct('freshStart')}], 'A restore point is saved first'); }
     case 'pbGo': return pbGo(v);
     case 'refCat': UI.refCat = v; return renderMain();
     case 'refHot': UI.refHot = !UI.refHot; return renderMain();
@@ -169,7 +175,19 @@ document.addEventListener('click', ev => {
     case 'imatch': UI.imatch = !UI.imatch; return renderMain();
     /* toolbox */
     case 'tcat': UI.tcat = v; UI.tsub = null; return renderMain();
-    case 'tview': UI.tview = v; DB.prefs.tview = v; save(); return renderMain();
+    case 'tset': UI.tset = v; UI.tsort = null; UI.tsel = null; return renderMain();
+    case 'toolSel': { if(ev.target.closest('.tpk')) return; UI.tsel = UI.tsel === id ? null : id; renderMain(); const d = document.querySelector('.tdet .btn'); if(d && matchMedia('(max-width:1100px)').matches) d.focus({preventScroll:true}); return; }
+    case 'toolSelX': UI.tsel = null; return renderMain();
+    case 'toolCopy': { const x = DB.tools.find(z => z.id === id); return x && copyText(x.url); }
+    case 'tsortBy': UI.tsort = v; return renderMain();
+    case 'bulkAllT': { const s = UI.tpick || (UI.tpick = new Set()), ids = [...document.querySelectorAll('#tlist [data-act=toolPick]')].map(i => i.dataset.id); if(t.checked) ids.forEach(i => s.add(i)); else ids.forEach(i => s.delete(i)); return renderMain(); }
+    case 'toolMenu': { const x = DB.tools.find(z => z.id === id), r0 = t.getBoundingClientRect(); if(!x) return; return showMenu(Math.max(8, r0.right - 220), r0.bottom + 6, [
+      ...(x.tpl ? [{label:'Look up a value…', icon:'play', fn:() => clickAct('toolRun', x.id)}] : []),
+      {label:'Copy link', icon:'copy', fn:() => copyText(x.url)},
+      {label:x.pinned ? 'Remove from quick launch' : 'Add to quick launch', icon:'pin', fn:() => clickAct('toolPin', x.id)},
+      {label:'Edit…', icon:'pencil', fn:() => toolDlg(x.id)},
+      {sep:true}, {label:'Delete…', icon:'trash-2', danger:true, fn:() => clickAct('toolDelAsk', x.id)}], x.name); }
+    case 'tview': UI.tview = v; DB.prefs.tview = v; if(v !== 'list') UI.tsel = null; save(); return renderMain();
     case 'tsub': UI.tsub = UI.tsub === v ? null : v; return renderMain();
     case 'toolPin': { const x = DB.tools.find(z => z.id === id); x.pinned = !x.pinned; mutate((x.pinned ? 'pinned ' : 'unpinned ') + x.name); return renderMain(); }
     case 'toolStar': { const x = DB.tools.find(z => z.id === id); x.starred = !x.starred; mutate((x.starred ? 'starred ' : 'unstarred ') + x.name); return renderMain(); }
@@ -178,10 +196,10 @@ document.addEventListener('click', ev => {
     case 'toolDel': { const x = DB.tools.find(z => z.id === id); if(!x) return; DB.tools = DB.tools.filter(z => z.id !== id); if(x.seed) (DB.deletedSeed || (DB.deletedSeed = [])).push(x.url); if(UI.tpick) UI.tpick.delete(id); closeDlg(); mutate('deleted tool ' + x.name); renderAll();
       return toast('Deleted ' + x.name, 'Undo', () => { DB.tools.push(x); if(DB.deletedSeed) DB.deletedSeed = DB.deletedSeed.filter(u => u !== x.url); mutate('restored tool'); renderAll(); }); }
     case 'toolDelAsk': { const x = DB.tools.find(z => z.id === id); return confirmDlg('Delete ' + x.name + '?', x.seed ? 'It is a pre-added tool. It stays deleted, even when the app updates its tool list. You can undo right after.' : 'It will be removed from your toolbox. You can undo right after.', 'Delete tool', () => clickAct('toolDel', id)); }
-    case 'toolPick': { const s = UI.tpick || (UI.tpick = new Set()); t.checked ? s.add(id) : s.delete(id); const c = t.closest('.tcard2'); if(c) c.classList.toggle('picked', t.checked); return paintBulk(); }
+    case 'toolPick': { const s = UI.tpick || (UI.tpick = new Set()); t.checked ? s.add(id) : s.delete(id); const c = t.closest('[data-pick]'); if(c) c.classList.toggle(c.tagName === 'TR' ? 'sel' : 'picked', t.checked); return paintBulk(); }
     case 'tqClear': UI.tq = ''; return renderMain();
     case 'toolTag': UI.tq = v; UI.tcat = 'all'; UI.tsub = null; return renderMain();
-    case 'bulkAll': { const s = UI.tpick || (UI.tpick = new Set()); document.querySelectorAll('[data-act=toolPick]').forEach(i => { i.checked = true; s.add(i.dataset.id); const c = i.closest('.tcard2'); if(c) c.classList.add('picked'); }); return paintBulk(); }
+    case 'bulkAll': { const s = UI.tpick || (UI.tpick = new Set()); document.querySelectorAll('[data-act=toolPick]').forEach(i => { i.checked = true; s.add(i.dataset.id); const c = i.closest('[data-pick]'); if(c) c.classList.add(c.tagName === 'TR' ? 'sel' : 'picked'); }); return paintBulk(); }
     case 'bulkClear': UI.tpick = new Set(); return renderMain();
     case 'bulkStar': case 'bulkPin': { const k = a === 'bulkStar' ? 'starred' : 'pinned', xs = DB.tools.filter(z => UI.tpick.has(z.id)), on = !xs.every(z => z[k]); xs.forEach(z => z[k] = on); mutate((on ? '' : 'un') + k + ' ' + xs.length + ' tools'); renderAll(); return toast(xs.length + ' tool' + (xs.length > 1 ? 's ' : ' ') + (on ? (k === 'starred' ? 'starred' : 'added to quick launch') : (k === 'starred' ? 'unstarred' : 'removed from quick launch'))); }
     case 'bulkExport': { const xs = DB.tools.filter(z => UI.tpick.has(z.id)); return download('osintrix-tools.json', JSON.stringify(xs.map(z => ({name:z.name, url:z.url, parentCategory:z.cat, childCategory:z.sub, description:z.desc, tags:z.tags})), null, 2), 'application/json'); }
@@ -198,7 +216,7 @@ document.addEventListener('click', ev => {
       await snapshot('Before starting fresh'); const prev = JSON.parse(JSON.stringify(DB)); const c = {id:uid('c'), name:'My first case', code:'TN-2026-001', status:'active', owner:'You', created:Date.now(), updated:Date.now(), scope:'', color:CASE_COLORS[0], icon:'briefcase'};
       Object.assign(DB, {cases:[c], entries:[], links:[], records:[], notes:[], verdicts:{}, active:c.id}); UI.sel = null; mutate('started fresh'); go('#/home'); renderAll();
       toast('All cases deleted', 'Undo', () => { DB = prev; mutate('undo fresh start'); renderAll(); }); });
-    case 'toolOpen': { const x = DB.tools.find(z => z.id === id); if(x){ x.uses++; save(); } return; }
+    case 'toolOpen': { const x = DB.tools.find(z => z.id === id); if(x){ x.uses = (x.uses || 0) + 1; x.last = Date.now(); save(); } return; }
     case 'toolImport': return pickFile('.json,application/json', txt => { let d; try{ d = JSON.parse(txt); }catch(e){ return toast('Not a JSON file'); }
       if(!Array.isArray(d)) return toast('Expected a list of tools, like tools.json'); let n = 0;
       for(const t of d){ if(!t || !t.name || !E.safeUrl(t.url) || DB.tools.some(x => x.url === t.url)) continue;
@@ -383,7 +401,7 @@ document.addEventListener('click', ev => {
     case 'resetDemo': { snapshot('Before resetting to the demo'); const prev = DB; DB = seedDB(); DB.prefs = prev.prefs; mutate('reset demo'); hashRecords(); UI.sel = null; renderAll(); return toast('Demo data reset', 'Undo', () => { DB = prev; mutate('undo reset'); renderAll(); }); }
   }
 });
-document.addEventListener('keydown', ev => { if((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches('span[role=button][data-act], tr[data-act]')){ ev.preventDefault(); ev.target.click(); } });
+document.addEventListener('keydown', ev => { if((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches('span[role=button][data-act], div[role=button][data-act], tr[data-act]')){ ev.preventDefault(); ev.target.click(); } });
 
 document.addEventListener('submit', ev => {
   const f = ev.target.closest('form[data-form]'); if(!f) return; ev.preventDefault();
@@ -393,7 +411,7 @@ document.addEventListener('submit', ev => {
   if(k === 'pass') return PASS_CB && PASS_CB();
   if(k === 'achHyp' || k === 'achEv') return achSubmit(k, f);
   if(k === 'alias'){ const key = $('alK').value.trim().toLowerCase(); if(!key) return fieldErr('alK', 'Field name is required.'); if(!/^[\w.@-]{1,64}$/.test(key)) return fieldErr('alK', 'Use letters, digits, dots, dashes or underscores — no spaces (max 64).'); DB.parserAliases = DB.parserAliases || {}; DB.parserAliases[key] = $('alC').value; P_CACHE.clear(); closeDlg(); mutate('mapped field ' + key); return renderMain(); }
-  if(k === 'toolRun'){ const t = DB.tools.find(x => x.id === f.dataset.id), v0 = $('trV').value.trim(); if(!v0) return fieldErr('trV', 'Enter what to look up.'); const u = toolUrl(t, v0); if(!u) return fieldErr('trV', 'That does not make a valid address for this tool.'); t.uses = (t.uses || 0) + 1; save(); closeDlg(); return window.open(u, '_blank', 'noopener,noreferrer'); }
+  if(k === 'toolRun'){ const t = DB.tools.find(x => x.id === f.dataset.id), inp = f.querySelector('#trV,#tdV'), v0 = inp.value.trim(); if(!v0) return fieldErr(inp, 'Enter what to look up.'); const u = toolUrl(t, v0); if(!u) return fieldErr(inp, 'That does not make a valid address for this tool.'); t.uses = (t.uses || 0) + 1; t.last = Date.now(); save(); if(inp.id === 'trV') closeDlg(); return window.open(u, '_blank', 'noopener,noreferrer'); }
   if(k === 'entry'){
     const d = entryDraft, t = TYPES[d.type], fields = {};
     f.querySelectorAll('[data-f]').forEach(i => { const v = i.value.trim().replace(/\s+/g, ' '); if(v) fields[i.dataset.f] = v; });
@@ -492,7 +510,11 @@ document.addEventListener('input', ev => {
   if(t.id === 'entq'){ UI.entq = t.value; clearTimeout(tq); tq = setTimeout(() => { renderMain(); keep('entq'); }, 160); return; }
   if(t.id === 'nqs'){ UI.nq = t.value; clearTimeout(tq); tq = setTimeout(() => { renderMain(); keep('nqs'); }, 160); return; }
   if(t.matches && t.matches('.nquick textarea')){ t.style.height = 'auto'; t.style.height = Math.min(220, t.scrollHeight) + 'px'; return; }
-  if(t.id === 'hxq'){ const q = t.value.trim().toLowerCase(); let n = 0; document.querySelectorAll('.hfaq .hq').forEach(d => { const hit = !q || d.textContent.toLowerCase().includes(q); d.hidden = !hit; if(hit) n++; if(q && hit) d.open = true; }); let e = $('hxqE'); if(!n){ if(!e){ e = document.createElement('p'); e.id = 'hxqE'; e.className = 'sx-empty'; document.querySelector('.hfaq').appendChild(e); } e.textContent = 'No question matches “' + t.value + '”.'; } else if(e) e.remove(); return; }
+  if(t.id === 'hxq'){ const q = t.value.trim().toLowerCase(), root = document.querySelector('.hx2'); if(!root) return; root.classList.toggle('searching', !!q); let n = 0;
+    root.querySelectorAll('.hs-i').forEach(d => { const hit = !q || d.textContent.toLowerCase().includes(q); d.hidden = !hit; if(hit && q) n++; if(d.tagName === 'DETAILS') d.open = !!(q && hit); });
+    root.querySelectorAll('.hx2-sec').forEach(sec => { const items = sec.querySelectorAll('.hs-i'); sec.hidden = !!q && (!items.length || ![...items].some(i => !i.hidden)); });
+    const N = $('hxqN'), E0 = $('hxqE'); N.hidden = !q; N.textContent = n + ' result' + (n === 1 ? '' : 's') + ' for “' + t.value.trim() + '”';
+    E0.hidden = !q || !!n; if(q && !n) E0.textContent = 'Nothing matches “' + t.value.trim() + '”. Try fewer words — or search everything with Ctrl K.'; return; }
   if(t.id === 'iq'){ UI.iq = t.value; clearTimeout(tq); tq = setTimeout(() => { renderMain(); keep('iq'); }, 160); return; }
   if(t.id === 'refQ'){ UI.refQ = t.value; clearTimeout(tq); tq = setTimeout(() => { renderMain(); keep('refQ'); }, 160); return; }
   if(t.id === 'tlq'){ clearTimeout(tq); tq = setTimeout(() => { UI.q = t.value.trim(); UI.ast = E.parseQuery(UI.q); renderMain(); keep('tlq'); }, 200); return; }
@@ -518,7 +540,7 @@ document.addEventListener('keydown', ev => {
   if(typing || ev.ctrlKey || ev.metaKey || ev.altKey) return;
   if(ev.key === 'n' || ev.key === 'N'){ ev.preventDefault(); return openCapture(); }
   if(ev.key === 'e'){ ev.preventDefault(); return entryDlg(); }
-  if(ev.key === '/'){ ev.preventDefault(); return srchOpen(); }
+  if(ev.key === '/'){ ev.preventDefault(); const lq = $('tq') || $('hxq'); if(lq){ lq.focus(); lq.select(); return; } return srchOpen(); }
   if((ev.key === 'Delete' || ev.key === 'Backspace') && UI.route.tab === 'graph' && UI.sel){ ev.preventDefault(); document.querySelector('[data-act=gDelete]').click(); }
   if(/^[1-8]$/.test(ev.key) && UI.route.area === 'case') return go(caseHash(DB.active, CASE_TABS[+ev.key - 1][0]));
 });

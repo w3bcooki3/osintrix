@@ -3,7 +3,7 @@
    The mark: a lens (the O of OSINT) with a dotted thread running through it
    from a known point to a new lead (cyan). Gradient squircle, white line.
    ========================================================================== */
-const BRAND = {name:'OSINTrix', tagline:'Follow every thread.', version:'v1.9'};
+const BRAND = {name:'OSINTrix', tagline:'Follow every thread.', version:'v1.11'};
 function logoMark(size = 32, id = 'lg' + Math.random().toString(36).slice(2, 6)){
   return `<svg class="mark" width="${size}" height="${size}" viewBox="0 0 32 32" aria-hidden="true">
     <defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5468ff"/><stop offset=".6" stop-color="#7c5cff"/><stop offset="1" stop-color="#a855f7"/></linearGradient>

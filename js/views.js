@@ -25,7 +25,8 @@ function renderNav(){
 /* ---------- Dashboard ---------- */
 function feedMatches(){ const g = globalEnts(); return DB.feed.map(f => ({f, hits:E.extract(f.title + ' ' + f.body).map(entKey).filter(id => g.has(id))})).filter(x => x.hits.length); }
 function stat(icon, color, n, label, sub, act, spark){
-  const inner = `<span class="ic" style="color:${color};background:color-mix(in srgb,${color} 14%,transparent)">${ico(icon)}</span><div class="sx"><b>${n}</b><span>${label}</span>${sub ? `<small>${sub}</small>` : ''}</div>${spark ? `<div class="sp">${sparkline(spark, color)}</div>` : ''}`;
+  const tone = /red/.test(color) && +String(n).split('/')[0] > 0 ? ' bad' : '';
+  const inner = `<span class="st-l">${label}</span><b class="st-n${tone}">${n}</b>${sub ? `<small>${sub}</small>` : ''}`;
   return act.startsWith('#') ? `<a class="stat" href="${act}">${inner}</a>` : `<button class="stat" data-act="${act}">${inner}</button>`;
 }
 function perDay(list, f, days = 8){ const since = Date.parse('2026-09-08T00:00:00Z'), b = new Array(days).fill(0); for(const x of list){ const t = f(x); if(t >= since){ const i = Math.floor((t - since) / 864e5); if(i < days) b[i]++; } } return b; }
@@ -40,14 +41,11 @@ function viewHome(){
   const recSpark = perDay(DB.records, r => r.ts), entSpark = perDay(DB.entries, e => e.created);
   return `<div class="scroll"><div class="page">
     ${sampleBanner()}${backupBanner()}
-    <section class="hero">
-      <div class="hero-l"><div class="hero-date">${esc(new Date().toLocaleDateString(undefined, {weekday:'long', day:'numeric', month:'long'}))}</div>
-        <h1>${top ? `<span>${esc(top.name.split(' — ')[0])}</span> has ${openQ.filter(r => r.caseId === top.id).length} open questions and ${derive(top.id).entries.filter(e => entryVerdict(e) === 'malicious').length} confirmed-malicious entries.` : 'Start your first investigation.'}</h1>
-        <p>${cross.length ? `<b>${esc(cross[0].v)}</b> appears in ${cross[0].cases.size} cases. ` : ''}${fm.length ? `${fm.length} feed items mention your entities.` : ''}</p>
-        <div class="hero-acts"><button class="btn primary" data-act="capture">${ico('plus','sm')}Capture evidence <kbd>N</kbd></button>
-          ${top ? `<a class="btn" href="${caseHash(top.id, 'graph')}">${ico('waypoints','sm')}Open the graph</a>` : ''}<button class="btn" data-act="newCase">${ico('folder-open','sm')}New case</button></div></div>
-      ${top ? `<a class="hero-map" href="${caseHash(top.id, 'graph')}" aria-label="Open the ${esc(top.name)} graph">${caseMap(top.id, 420, 240)}<span class="cap">${esc(top.code)} · ${derive(top.id).entries.length} entries · ${derive(top.id).links.length} links</span></a>` : ''}
-    </section>
+    <header class="brief">
+      <div><span class="ix">${esc(new Date().toLocaleDateString(undefined, {weekday:'long', day:'numeric', month:'long', year:'numeric'}))}</span><h1>Dashboard</h1>
+        <p>${top ? `Most active: <a href="${caseHash(top.id)}">${esc(top.name.split(' — ')[0])}</a> — ${openQ.filter(r => r.caseId === top.id).length} open questions, ${derive(top.id).entries.filter(e => entryVerdict(e) === 'malicious').length} malicious entries.` : 'No investigations yet. Create a case or capture your first piece of evidence.'}${cross.length ? ` <span class="mono">${esc(cross[0].v)}</span> appears in ${cross[0].cases.size} cases.` : ''}${fm.length ? ` ${fm.length} feed item${fm.length > 1 ? 's' : ''} mention your entities.` : ''}</p></div>
+      <div class="brief-a">${top ? `<a class="btn" href="${caseHash(top.id, 'graph')}">${ico('waypoints','sm')}Open graph</a>` : ''}<button class="btn" data-act="newCase">${ico('folder-open','sm')}New case</button><button class="btn primary" data-act="capture">${ico('plus','sm')}Capture evidence<kbd>N</kbd></button></div>
+    </header>
     <div class="stats">
       ${stat('folder-open','var(--accent)', active.length, 'Open cases', DB.cases.filter(c => c.status === 'review').length + ' in review', '#/cases')}
       ${stat('layers','var(--t-identity)', DB.entries.length, 'Vault entries', 'across all cases', '#/cases', entSpark)}
@@ -59,7 +57,7 @@ function viewHome(){
         <section class="card"><header><h3>Open investigations</h3><a class="btn sm ghost" href="#/cases">All cases ${ico('chevron-right','sm')}</a></header><div class="body flush">
           ${active.map(c => { const D = derive(c.id), q = D.recs.filter(r => r.type === 'lead' && !r.answer).length, done = D.recs.filter(r => r.type === 'lead').length;
             const pct = done ? Math.round((done - q) / done * 100) : 0;
-            return `<a class="li" href="${caseHash(c.id)}"><span class="cicon" style="background:${esc(c.color)};width:42px;height:42px;border-radius:12px">${ico(c.icon)}</span>
+            return `<a class="li" href="${caseHash(c.id)}"><span class="cmark" style="--cc:${esc(c.color)}"></span>
               <div class="main2"><b>${esc(c.name)}</b><small>${esc(c.scope || 'No scope written yet')}</small>
                 ${done ? `<span class="prog" title="${pct}% of questions answered"><i style="width:${pct}%;background:${esc(c.color)}"></i></span>` : ''}</div>
               <div class="end hide-m">${statusTag(c.status)}<span class="chip sq">${D.entries.length} entries</span>${q ? `<span class="chip amber sq">${q} open</span>` : ''}</div></a>`; }).join('')}
@@ -101,9 +99,8 @@ function caseCard(c){
   const mal = D.entries.filter(e => entryVerdict(e) === 'malicious').length, pct = leads.length ? Math.round(done / leads.length * 100) : 0;
   return `<article class="case-card${c.status === 'closed' ? ' archived' : ''}" style="--cc:${esc(c.color)}">
     <a class="case-hit" href="${caseHash(c.id)}" aria-label="Open ${esc(c.name)}"></a>
-    <div class="case-map">${D.entries.length > 1 ? caseMap(c.id, 360, 120) : `<div class="case-empty">${ico(c.icon,'lg')}<span>No entries yet</span></div>`}</div>
     <div class="case-b">
-      <div class="case-meta"><span class="cicon sm" style="background:${esc(c.color)}">${ico(c.icon,'sm')}</span><span class="mono t3">${esc(c.code)}</span>${statusTag(c.status)}<span class="case-upd">${esc(E.fmtAgo(Math.max(0, Date.now() - c.updated)))}</span>
+      <div class="case-meta"><span class="cmark" style="--cc:${esc(c.color)}"></span><span class="mono t3">${esc(c.code)}</span>${statusTag(c.status)}<span class="case-upd">${esc(E.fmtAgo(Math.max(0, Date.now() - c.updated)))}</span>
         <button class="iconbtn case-more" data-act="caseMenu" data-id="${c.id}" aria-label="More actions for ${esc(c.name)}">${ico('ellipsis','sm')}</button></div>
       <h3>${esc(c.name)}</h3>
       <p>${esc(c.scope || 'No scope written yet.')}</p>
@@ -116,7 +113,7 @@ function viewCase(tab){
   const counts = {vault:D.entries.length, entities:caseEntList(c.id).length, timeline:D.recs.filter(r => r.ts).length, questions:D.recs.filter(r => r.type === 'lead' && !r.answer).length || null};
   const body = {map:caseMapView, overview:caseOverview, vault:caseVault, entities:caseEntities, timeline:caseTimeline, graph:caseGraph, questions:caseQuestions, report:caseReport}[tab] || caseOverview;
   return `<div class="chead${tab === 'graph' ? ' g' : ''}" style="--cc:${esc(c.color)}"><div class="crumb"><a href="#/cases">Cases</a>${ico('chevron-right','sm')}<span>${esc(c.code)}</span></div>
-    <div class="row1"><span class="cicon" style="background:${esc(c.color)}">${ico(c.icon)}</span>
+    <div class="row1"><span class="cicon" style="--cc:${esc(c.color)}">${ico(c.icon)}</span>
       <div style="flex:1;min-width:0"><h1>${esc(c.name)}</h1><div class="meta">${statusTag(c.status)}<span>${ico('calendar','sm')}Opened ${esc(E.fmtDate(c.created, tz()))}</span><span>${ico('user','sm')}${esc(c.owner)}</span></div></div>
       <div class="acts"><button class="btn" data-act="editCase" aria-label="Edit case">${ico('pencil','sm')}<span class="bl">Edit</span></button><button class="btn" data-act="addEntry">${ico('plus','sm')}<span class="bl">Add entry</span><span class="bm">Entry</span></button><button class="btn primary" data-act="capture">${ico('plus','sm')}Capture</button></div></div>
     <nav class="tabs" role="tablist">${CASE_TABS.map(([k, l, i]) => `<a class="tab" role="tab" href="${caseHash(c.id, k)}" aria-selected="${tab === k}">${ico(i,'sm')}${l}${counts[k] ? `<span class="cnt">${counts[k]}</span>` : ''}</a>`).join('')}</nav></div>

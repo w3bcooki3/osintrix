@@ -2765,3 +2765,62 @@ tr.dec .hb-ev{box-shadow:inset 3px 0 0 var(--amber)}
 }
 @keyframes marq{to{transform:translateX(-50%)}}
 @media (prefers-reduced-motion:reduce){ .lw-marq ul{animation:none} .lw.auto .lw-chips li{animation:none} }
+
+/* =====================================================================
+   v1.10 — engineering pass: remove decoration, keep information
+   - no pastel icon tiles, no decorative sparklines, no gradient card art
+   - hairline borders instead of drop shadows; one page-header pattern
+   ===================================================================== */
+.card,.stat,.case-card,.tk,.ic3,.pbk,.pbl-c,.hx-start button,.sx-sum,.ecard{box-shadow:none!important}
+.card:hover,.case-card:hover,.ic3:hover,.pbk:hover{box-shadow:none!important}
+/* KPI strip */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:0;border:1px solid var(--border-soft);border-radius:12px;background:var(--surface);overflow:hidden}
+.stats .stat{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:16px 20px;border:0;border-radius:0;background:transparent;min-width:0;color:inherit}
+.stats .stat+.stat{border-left:1px solid var(--border-soft)}
+.stats .stat:hover{background:var(--hover)}
+.stat .st-l{font:600 11px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--text-3);margin:0}
+.stat .st-n{font-size:28px;font-weight:650;letter-spacing:-.02em;line-height:1.15;margin-top:6px;font-variant-numeric:tabular-nums;color:var(--text)}
+.stat .st-n.bad{color:var(--red)}
+.stat small{font-size:12.5px;color:var(--text-3);margin-top:2px}
+.stat .ic,.stat .sp{display:none!important}
+@media (max-width:760px){ .stats{grid-template-columns:1fr 1fr} .stats .stat:nth-child(3){border-left:0} .stats .stat:nth-child(n+3){border-top:1px solid var(--border-soft)} .stat .st-n{font-size:23px} }
+/* dashboard briefing header */
+.brief{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;padding:4px 0 22px;margin-bottom:20px;border-bottom:1px solid var(--border-soft)}
+.brief>div:first-child{flex:1 1 460px;min-width:0}
+.brief h1{font-size:var(--fs-2xl);letter-spacing:-.025em;margin:8px 0 6px}
+.brief p{margin:0;color:var(--text-2);font-size:14.5px;line-height:1.6;max-width:760px}
+.brief p a{font-weight:600}
+.brief p .mono{font-size:13px;color:var(--text);background:var(--surface-2);padding:1px 6px;border-radius:5px;border:1px solid var(--border-soft)}
+.brief-a{display:flex;gap:8px;flex-wrap:wrap}
+.brief-a kbd{margin-left:6px}
+@media (max-width:760px){ .brief-a{width:100%} .brief-a .btn{flex:1 1 auto;justify-content:center} .brief-a .btn.primary{flex-basis:100%} .brief-a kbd{display:none} }
+/* case identity: a colour mark, not a filled icon tile */
+.cmark{width:10px;height:10px;border-radius:3px;background:var(--cc);flex:none;display:inline-block}
+.li>.cmark{width:4px;height:36px;border-radius:2px;margin-right:4px}
+.cicon{background:var(--surface)!important;border:1px solid var(--border);color:var(--cc,var(--text-2))!important;box-shadow:inset 3px 0 0 var(--cc,var(--accent))!important}
+/* entity type badges: line icon in a hairline square */
+.tb{background:transparent!important;border:1px solid var(--border-soft)}
+/* page headers: one pattern everywhere */
+.phd-ic{display:none!important}
+.phd-tt h1{font-size:var(--fs-2xl);letter-spacing:-.025em}
+/* case cards */
+.case-card{border-top:3px solid var(--cc)!important}
+.case-card .case-b{padding-top:16px}
+.case-new{border-top-width:1px!important;border-style:dashed!important}
+.case-new .nw{background:transparent!important;border:1px dashed var(--border)}
+/* empty states: no tinted blob behind the icon */
+.empty .ic,.empty>span:first-child{background:transparent!important;border:1px solid var(--border-soft)}
+/* chip tints softened to outline style */
+.chip.amber,.chip.green,.chip.red,.chip.accent{background:transparent!important}
+:root{--r-lg:10px;--r-xl:12px}
+.bars div{background:var(--accent)!important;border-radius:2px 2px 0 0!important;opacity:.85;filter:none!important}
+.bars div:hover{opacity:1}
+.bars{border-bottom:1px solid var(--border-soft)}
+.status{background:transparent!important;border:1px solid var(--border-soft);padding-left:8px!important;padding-right:9px!important}
+.dlg{border-radius:14px}
+.iv-ic,.iv-row>.tb,.iv-row .iv-ic{background:transparent!important;border:1px solid var(--border-soft)}
+.iv-hit,.iv-ents .ent,.iv-ex .ent{background:transparent!important}
+.iv-sample,.chip.sq{background:transparent!important}
+.iv-tile,.chal-ic{background:transparent!important;border:1px solid var(--border-soft)}
+.ent{background:var(--surface)!important;border-radius:6px!important}
+.ent.hit,.iv-hits .ent{border-color:color-mix(in srgb,var(--red) 35%,var(--border-soft))!important}
