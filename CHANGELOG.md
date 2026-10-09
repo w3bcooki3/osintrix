@@ -2,6 +2,30 @@
 
 How OSINTrix came together, newest first.
 
+## v1.11 — Toolbox and Help rebuilt
+
+- **Toolbox** has four views — List, Table, Cards and Compact A–Z — switched from the toolbar and remembered.
+  - Lists across the top: All tools, Favourites, Quick launch, Recently used, Added by you.
+  - Category chips with counts, sub-category chips, and sort by name, last used, most opened or recently added.
+  - List view opens a details panel: open, copy link, edit, look a value up with the tool, tags, use count, favourite, quick launch, delete. On phones it is a bottom sheet.
+  - Table view sorts by column and selects many tools at once for favourite, quick launch, export or delete.
+  - Tools remember when you last opened them. `/` focuses the toolbox search.
+- **Help** is a help centre: one search across questions, guides and areas, popular topics, three start-here guides with real screenshots, a map of every area, and backup, restore and reset in one place.
+- Removed the old prototype build (`build.py`, `src/`, `vendor/`) and the `_old-single-file` backup.
+
+## v1.10 — Engineering pass
+
+- Removed decoration that carried no information:
+  - Pastel icon tiles on stat cards and page headers.
+  - Sparklines.
+  - Gradient art on case cards and gradient chart bars.
+  - Drop shadows on cards.
+  - Filled status and chip pills.
+- **KPIs:** one hairline strip, each with a monospaced label, a number and a note. Malicious counts show in red only when non-zero.
+- **Dashboard:** a briefing header — date, title, and a one-line summary of the most active case — replaces the large coloured sentence and graph thumbnail.
+- **Cases:** marked by a thin colour bar or tab instead of filled icon squares.
+- Corner radius reduced to 10–12 px across cards.
+
 ## v1.9 — One visual language
 
 - **Welcome page:** the launch-post look. It cycles Night, Day and Indigo themes every 3 seconds, and the screenshots switch between light and dark to match. On phones the tags drift in two rows and the app sits in a phone frame. It stays still when reduced motion is on, and clicking a theme stops the cycle.
