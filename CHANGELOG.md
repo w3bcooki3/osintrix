@@ -11,6 +11,8 @@ How OSINTrix came together, newest first.
   - Table view sorts by column and selects many tools at once for favourite, quick launch, export or delete.
   - Tools remember when you last opened them. `/` focuses the toolbox search.
 - **Help** is a help centre: one search across questions, guides and areas, popular topics, three start-here guides with real screenshots, a map of every area, and backup, restore and reset in one place.
+- **Reference** has a dark field-guide header with one search, section tabs and counts, and a list beside a details panel: what it means, what to look for, the ATT&CK technique, search my evidence, copy. On phones the details open as a sheet.
+- **Security & audit** shows how many of four protections are in place — encryption, audit chain, signing key, a recent backup — with the action for each, the chain-of-custody report below, and the audit chain as a timeline in its own panel.
 - Removed the old prototype build (`build.py`, `src/`, `vendor/`) and the `_old-single-file` backup.
 
 ## v1.10 — Engineering pass

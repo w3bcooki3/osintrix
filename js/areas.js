@@ -171,20 +171,33 @@ function viewReference(){
   const match = r => (!q || r.slice(0, 5).join(' ').toLowerCase().includes(q)) && (!only || r[5]);
   const secs = Object.entries(REFDATA).filter(([k]) => cat === 'all' || cat === k).map(([k, S]) => [k, S, S.rows.filter(match)]).filter(x => x[2].length);
   const total = Object.values(REFDATA).reduce((n, S) => n + S.rows.length, 0), shown = secs.reduce((n, x) => n + x[2].length, 0);
-  const row = (k, r) => `<details class="rf-r"><summary><code class="rf-v">${esc(r[0])}</code><span class="rf-t">${esc(r[1])}</span>${r[5] ? '<span class="rf-hot">Worth a look</span>' : '<span></span>'}${r[4] ? `<span class="rf-att">${esc(r[4])}</span>` : '<span></span>'}${ico('chevron-down','sm')}</summary>
-    <div class="rf-b"><div><h5>What it means</h5><p>${esc(r[2])}</p></div><div><h5>What to look for</h5><p>${esc(r[3])}</p></div>
-      <div class="rf-a"><button class="btn xs" data-act="flagCopy" data-v="${esc(r[0])}">${ico('copy','sm')}Copy</button><button class="btn xs" data-act="refFind" data-v="${esc(r[0].replace(/^.*\\/, ''))}">${ico('search','sm')}Search my evidence</button>${r[4] ? `<a class="btn xs ghost" href="https://attack.mitre.org/techniques/${esc(r[4].replace('.', '/'))}/" target="_blank" rel="noopener noreferrer">MITRE ATT&amp;CK ${esc(r[4])}${ico('arrow-up-right','sm')}</a>` : ''}</div></div></details>`;
-  return `<div class="scroll"><div class="page">
-    ${libHead('Reference', 'An offline field guide: what an event ID, port, binary or code means, and what to check next. Click a row for the detail.', '', '')}
-    <div class="rf">
-      <nav class="rf-nav" aria-label="Sections"><button data-act="refCat" data-v="all" aria-pressed="${cat === 'all'}">${ico('book-open','sm')}<span>Everything</span><small>${total}</small></button>
-        ${Object.entries(REFDATA).map(([k, S]) => `<button data-act="refCat" data-v="${k}" aria-pressed="${cat === k}">${ico(S.icon,'sm')}<span>${esc(S.name)}</span><small>${S.rows.length}</small></button>`).join('')}</nav>
-      <div class="rf-main">
-        <div class="mpick"><label for="refSel" class="ix">Section</label><select id="refSel" class="gsel bord"><option value="all">Everything (${total})</option>${Object.entries(REFDATA).map(([k, S]) => `<option value="${k}"${cat === k ? ' selected' : ''}>${esc(S.name)} (${S.rows.length})</option>`).join('')}</select></div>
-        <div class="rf-tb"><div class="search-in">${ico('search')}<label class="sr" for="refQ">Filter</label><input id="refQ" class="inp" placeholder="4698, 4444, rundll32, kerberoast, T1059…" value="${esc(UI.refQ || '')}"></div>
-          <label class="chk"><input type="checkbox" data-act="refHot" ${only ? 'checked' : ''}> Only “worth a look”</label><span class="t3 small">${shown} of ${total}</span></div>
-        ${secs.map(([k, S, rows]) => `<section class="rf-sec"><header><h2>${ico(S.icon,'sm')}${esc(S.name)}</h2><p>${esc(S.note)}</p></header><div class="rf-list">${rows.map(r => row(k, r)).join('')}</div></section>`).join('') || `<div class="card" style="padding:28px;text-align:center"><p class="t3" style="margin:0">Nothing matches “${esc(UI.refQ || '')}”.</p></div>`}
-      </div></div></div></div>`;
+  const hot = Object.values(REFDATA).reduce((n, S) => n + S.rows.filter(r => r[5]).length, 0);
+  const key = (k, r) => k + ':' + r[0];
+  const flat = secs.flatMap(([k, S, rows]) => rows.map(r => [k, S, r]));
+  let cur = flat.find(([k, S, r]) => key(k, r) === UI.refRow) || flat[0];
+  const row = (k, r) => `<button class="rf2-r${cur && key(cur[0], cur[2]) === key(k, r) ? ' on' : ''}" data-act="refRow" data-v="${esc(key(k, r))}"><code>${esc(r[0])}</code><span class="rf2-t">${esc(r[1])}</span>${r[5] ? '<em>Worth a look</em>' : '<i></i>'}<span class="rf2-at">${esc(r[4] || '')}</span></button>`;
+  const det = cur ? (([k, S, r]) => `<aside class="rf2-d${UI.refOpen ? ' open' : ''}" aria-label="${esc(r[0])} details">
+      <div class="rf2-dh"><span class="ix">${ico(S.icon,'sm')}${esc(S.name)}</span><button class="iconbtn rf2-x" data-act="refRowX" aria-label="Close">${ico('x','sm')}</button></div>
+      <div class="rf2-k">${esc(r[0])}</div><h2>${esc(r[1])}</h2>
+      ${r[5] ? '<span class="rf2-hot">Worth a look</span>' : ''}
+      <h5>What it means</h5><p>${esc(r[2])}</p>
+      <h5>What to look for</h5><p>${esc(r[3])}</p>
+      ${r[4] ? `<h5>MITRE ATT&amp;CK</h5><p><a class="rf2-att" href="https://attack.mitre.org/techniques/${esc(r[4].replace('.', '/'))}/" target="_blank" rel="noopener noreferrer">${esc(r[4])} ${ico('arrow-up-right','sm')}</a></p>` : ''}
+      <div class="rf2-a"><button class="btn primary sm" data-act="refFind" data-v="${esc(r[0].replace(/^.*\\/, ''))}">${ico('search','sm')}Search my evidence</button><button class="btn sm" data-act="flagCopy" data-v="${esc(r[0])}">${ico('copy','sm')}Copy</button></div>
+      <p class="rf2-note">${esc(S.note)}</p></aside>`)(cur) : '';
+  return `<div class="scroll rf2-scroll"><div class="rf2">
+    <section class="rf2-ink"><div class="rf2-in">
+      <span class="ix">Knowledge · offline field guide</span><h1>Reference</h1><p>What an event ID, port, binary or code means — and what to check next.</p>
+      <div class="search-in rf2-q">${ico('search')}<label class="sr" for="refQ">Search the reference</label><input id="refQ" class="inp" placeholder="4769, 4444, rundll32, kerberoast, T1059…" value="${esc(UI.refQ || '')}" autocomplete="off">${UI.refQ ? `<button class="iconbtn" data-act="refClear" aria-label="Clear">${ico('x','sm')}</button>` : '<kbd>/</kbd>'}</div>
+      <div class="rf2-stat"><div><b>${total}</b><small>entries</small></div><div><b>${Object.keys(REFDATA).length}</b><small>sections</small></div><div><b>${hot}</b><small>worth a look</small></div></div>
+      <nav class="rf2-tabs" aria-label="Sections"><button data-act="refCat" data-v="all" aria-pressed="${cat === 'all'}">Everything<small>${total}</small></button>${Object.entries(REFDATA).map(([k, S]) => `<button data-act="refCat" data-v="${k}" aria-pressed="${cat === k}">${esc(S.name)}<small>${S.rows.length}</small></button>`).join('')}</nav>
+    </div></section>
+    <div class="rf2-in rf2-body">
+      <div class="rf2-tb"><span>${shown === total ? total + ' entries' : shown + ' of ' + total}${q ? ' matching “' + esc(UI.refQ) + '”' : ''}</span><label class="chk"><input type="checkbox" data-act="refHot" ${only ? 'checked' : ''}> Only “worth a look”</label></div>
+      ${flat.length ? `<div class="rf2-g"><div class="rf2-l">${secs.map(([k, S, rows]) => `${cat === 'all' ? `<div class="rf2-sh">${ico(S.icon,'sm')}${esc(S.name)}<small>${rows.length}</small></div>` : ''}${rows.map(r => row(k, r)).join('')}`).join('')}</div>${det}</div>`
+        : `<div class="hx2-empty">Nothing matches “${esc(UI.refQ || '')}”.${only ? ' Try turning off “Only worth a look”.' : ''}</div>`}
+      ${UI.refOpen ? '<div class="rf2-scrim" data-act="refRowX" aria-hidden="true"></div>' : ''}
+    </div></div></div>`;
 }
 function stub(title, sub, from, what){
   return `<div class="scroll"><div class="page narrow"><div class="ph"><div><h1>${title}</h1><div class="sub">${sub}</div></div></div>

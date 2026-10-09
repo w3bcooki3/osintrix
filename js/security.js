@@ -171,37 +171,41 @@ function viewSecurity(){
   if(!A.entries.length && !UI.auditV) UI.auditV = {ok:true, empty:true};
   const V = UI.auditV;
   if(!V && A.entries.length) auditQ.then(() => auditVerify(A.entries, A.base)).then(r => { UI.auditV = r; if(UI.route.area === 'security') renderMain(); });
-  const recent = A.entries.slice(-25).reverse(), lastB = DB.prefs && DB.prefs.lastExport;
-  const tile = (lbl, val, tone, sub) => `<div class="sx-t"><span>${lbl}</span><b class="${tone}">${val}</b><small>${sub}</small></div>`;
-  const row = (id, title, desc, body) => `<section class="sx-row" id="${id}"><div class="sx-l"><h2>${title}</h2><p>${desc}</p></div><div class="sx-r">${body}</div></section>`;
-  return `<div class="scroll"><div class="page">
-    ${libHead('Security & audit', 'Protect what this browser stores, and be able to prove later that your evidence was not changed.', '', '')}
-    <div class="sx-sum">
-      ${tile('Encryption', enc ? 'On' : 'Off', enc ? 'ok' : 'warn', enc ? 'AES-256-GCM · ' + (S.autolock ? 'locks after ' + S.autolock + ' min' : 'no auto-lock') : 'Data is readable by anyone using this browser profile')}
-      ${tile('Audit chain', V ? (V.empty ? 'Empty' : V.ok ? 'Intact' : 'Broken') : 'Checking…', V && !V.ok ? 'bad' : V && !V.empty ? 'ok' : '', A.entries.length + ' entr' + (A.entries.length === 1 ? 'y' : 'ies') + ' recorded')}
-      ${tile('Signing key', S.sign ? 'Ready' : 'Not created', S.sign ? 'ok' : '', S.sign ? 'ECDSA P-256 · used for custody reports' : 'Made with your first custody report')}
-      ${tile('Last backup', lastB ? esc(ago(lastB)) : 'Never', lastB ? '' : 'warn', 'Help → Export everything')}
-    </div>
-    <div class="sx">
-    ${row('enc', 'Workspace encryption', 'With encryption on, cases, notes, restore points and attached files are stored encrypted with a key made from your passphrase (PBKDF2, 310,000 rounds). The app opens locked. The passphrase is never stored — there is no recovery if you forget it.',
-      enc ? `<div class="sx-state ok">${ico('lock','sm')}<div><b>Encrypted</b><span>Everything in this browser is sealed with your passphrase.</span></div></div>
-        <div class="sx-ctl"><label for="secAuto">Lock automatically</label><select id="secAuto" class="gsel bord">${[[0,'Never'],[5,'After 5 minutes idle'],[15,'After 15 minutes idle'],[30,'After 30 minutes idle'],[60,'After 1 hour idle']].map(([v, l]) => `<option value="${v}"${+(S.autolock || 0) === v ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
-        <div class="sx-btns"><button class="btn" data-act="secLock">${ico('lock','sm')}Lock now</button><button class="btn" data-act="secChange">${ico('key-round','sm')}Change passphrase</button><button class="btn ghost sx-off" data-act="secOff">Turn off encryption</button></div>`
-      : `<div class="sx-state warn">${ico('lock-open','sm')}<div><b>Not encrypted</b><span>Anyone who can open this browser profile can read your cases.</span></div></div>
-        <div class="sx-btns"><button class="btn primary" data-act="secOn">${ico('lock','sm')}Encrypt this workspace…</button></div>`)}
-    ${row('bkp', 'Encrypted backups', 'Exports can be sealed with a passphrase of their own, separate from the workspace one. Importing asks for it. Keep one somewhere other than this computer.',
-      `<div class="sx-btns"><button class="btn" data-act="secBackup">${ico('file-lock','sm')}Export everything, encrypted</button></div><p class="sx-note">Case-by-case exports are on each case’s menu.</p>`)}
-    ${row('audit', 'Audit log', 'Every change is added to a hash chain: each entry’s hash includes the one before it, so editing or removing any past entry breaks the chain and shows where.',
-      `${V && !V.ok ? `<div class="sx-state bad">${ico('triangle-alert','sm')}<div><b>Chain broken</b><span>${esc(V.why)}</span></div></div>` : ''}
-       <div class="sx-btns"><button class="btn sm" data-act="auditCheck">${ico('shield-check','sm')}Verify now</button><button class="btn sm" data-act="auditCsv" ${A.entries.length ? '' : 'disabled'}>${ico('download','sm')}Export as CSV</button>${A.head && A.head !== 'genesis' ? `<span class="sx-note mono">head ${esc(A.head.slice(0, 16))}…</span>` : ''}</div>
-       <div class="sx-log">${recent.length ? `<div class="sx-lh"><span>Time</span><span>Change</span><span>Hash</span></div>` + recent.map(e => `<div class="aud"><span class="mono">${esc(E.fmtFull(e.at, tz()).slice(0, 19))}</span><span>${esc(e.what)}</span><span class="mono" title="${esc(e.h)}">${esc((e.h || '…').slice(0, 10))}</span></div>`).join('') : '<p class="sx-empty">No entries yet. Changes you make from now on are recorded here.</p>'}</div>`)}
-    ${row('custody', 'Chain-of-custody report', 'A signed JSON file listing every record in a case with its SHA-256, capture time and attached files, plus the audit chain. Anyone can check it here; any change after signing is detected.',
-      `<div class="sx-ctl"><label for="cusCase">Case</label><select id="cusCase" class="gsel bord">${DB.cases.map(c => `<option value="${c.id}"${c.id === DB.active ? ' selected' : ''}>${esc(c.code + ' · ' + c.name)}</option>`).join('')}</select></div>
-       <div class="sx-btns"><button class="btn primary" data-act="cusMake">${ico('stamp','sm')}Create signed report</button><button class="btn" data-act="cusVerify">${ico('badge-check','sm')}Verify a report…</button></div>
-       <p class="sx-note">${S.sign ? 'Signing key fingerprint: <span class="mono" id="keyFp">…</span>' : 'A signing key is created for this workspace the first time you make a report.'}</p>`)}
-    </div></div></div>`;
+  const recent = A.entries.slice(-40).reverse(), lastB = DB.prefs && DB.prefs.lastExport, fresh = lastB && Date.now() - lastB < 14 * 864e5;
+  const chainOk = V ? V.ok : null, n = A.entries.length;
+  const done = [enc, chainOk === true, !!S.sign, !!fresh], score = done.filter(Boolean).length;
+  const todo = [!enc && 'turn on encryption', chainOk === false && 'fix the audit chain', !S.sign && 'create a signing key', !fresh && (lastB ? 'make a fresh backup' : 'make a backup')].filter(Boolean);
+  const words = ['None','One','Two','Three','All four'];
+  const C = 2 * Math.PI * 26, ring = `<svg class="sx2-ring" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="26" class="bg"/><circle cx="32" cy="32" r="26" class="fg${score === 4 ? ' full' : ''}" stroke-dasharray="${(C * score / 4).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 32 32)"/></svg>`;
+  const st = (tone, icon) => `<span class="sx2-st ${tone}">${ico(icon,'sm')}</span>`;
+  const item = (id, tone, icon, title, desc, state, acts, more = '') => `<section class="sx2-i" id="${id}">${st(tone, icon)}<div class="sx2-m"><h3>${title}</h3><p>${desc}</p>${more}</div><div class="sx2-s"><span class="sx2-v ${tone}">${state}</span><div class="sx2-b">${acts}</div></div></section>`;
+  return `<div class="sx2">
+    <div class="sx2-main"><div class="scroll"><div class="sx2-in">
+      <header class="sx2-h"><span class="ix">Knowledge</span><h1>Security &amp; audit</h1><p>Protect what this browser stores, and prove later that your evidence was not changed.</p></header>
+      <div class="sx2-score">${ring}<b class="sx2-n">${score}<small>/4</small></b><div><h2>${score === 4 ? 'All four protections in place' : words[score] + ' of four protections in place'}</h2><p>${score === 4 ? 'Encrypted, chained, signed and backed up. Keep backing up every couple of weeks.' : 'To finish: ' + todo.join(', ') + '.'}</p></div></div>
+      <div class="sx2-list">
+      ${item('enc', enc ? 'ok' : 'warn', enc ? 'lock' : 'lock-open', 'Workspace encryption', 'AES-256-GCM, key from your passphrase (PBKDF2 · 310,000 rounds). The passphrase is never stored — there is no recovery.',
+        enc ? 'On' + (S.autolock ? ' · locks after ' + S.autolock + ' min' : '') : 'Off',
+        enc ? `<button class="btn sm" data-act="secLock">${ico('lock','sm')}Lock now</button>` : `<button class="btn primary sm" data-act="secOn">${ico('lock','sm')}Turn on…</button>`,
+        enc ? `<div class="sx2-x"><label for="secAuto">Lock automatically</label><select id="secAuto" class="gsel bord">${[[0,'Never'],[5,'After 5 minutes idle'],[15,'After 15 minutes idle'],[30,'After 30 minutes idle'],[60,'After 1 hour idle']].map(([v, l]) => `<option value="${v}"${+(S.autolock || 0) === v ? ' selected' : ''}>${l}</option>`).join('')}</select><button class="btn sm ghost" data-act="secChange">${ico('key-round','sm')}Change passphrase</button><button class="btn sm ghost sx-off" data-act="secOff">Turn off</button></div>` : '<p class="sx2-w">Anyone who can open this browser profile can read your cases.</p>')}
+      ${item('audit', chainOk === false ? 'bad' : chainOk ? 'ok' : 'idle', chainOk === false ? 'triangle-alert' : 'link-2', 'Audit chain', 'Every change is hashed into a chain. Editing or removing any past entry breaks it and shows where.',
+        V ? (V.empty ? 'Empty' : V.ok ? 'Intact · ' + n + ' entr' + (n === 1 ? 'y' : 'ies') : 'Broken') : 'Checking…',
+        `<button class="btn sm" data-act="auditCheck">${ico('shield-check','sm')}Verify</button>`, V && !V.ok ? `<p class="sx2-w bad">${esc(V.why)}</p>` : '')}
+      ${item('key', S.sign ? 'ok' : 'idle', 'key-round', 'Signing key', 'ECDSA P-256 key that signs chain-of-custody reports, so anyone can check them.',
+        S.sign ? 'Ready' : 'Not created', S.sign ? '' : `<button class="btn sm" data-act="secGo" data-v="custody">Create</button>`, S.sign ? `<p class="sx2-fp">Fingerprint <span class="mono" id="keyFp">…</span></p>` : '')}
+      ${item('bkp', fresh ? 'ok' : 'warn', 'download', 'Backup', 'One file with every case, note, tool and setting. Seal it with its own passphrase and keep it off this computer.',
+        lastB ? esc(ago(lastB)) + ' ago' : 'Never', `<button class="btn sm${fresh ? '' : ' primary'}" data-act="exportAll">${ico('download','sm')}Export</button><button class="btn sm" data-act="secBackup" title="Export everything, encrypted with its own passphrase">${ico('file-lock','sm')}Encrypted</button>`)}
+      </div>
+      <section class="sx2-cus" id="custody">${st('idle', 'stamp')}<div class="sx2-m"><h3>Chain-of-custody report</h3><p>A signed JSON file listing every record in a case with its SHA-256, capture time and attached files, plus the audit chain. Anyone can verify it here; any change after signing is detected.</p>
+        <div class="sx2-cr"><label class="sr" for="cusCase">Case</label><select id="cusCase" class="gsel bord">${DB.cases.map(c => `<option value="${c.id}"${c.id === DB.active ? ' selected' : ''}>${esc(c.code + ' · ' + c.name)}</option>`).join('')}</select><button class="btn primary" data-act="cusMake">${ico('stamp','sm')}Create signed report</button><button class="btn" data-act="cusVerify">${ico('badge-check','sm')}Verify a report…</button></div></div></section>
+    </div></div></div>
+    <aside class="sx2-log" aria-label="Audit log"><header><div><span class="ix">Audit chain</span><h2>${n} entr${n === 1 ? 'y' : 'ies'}${V && !V.empty ? ' · ' + (V.ok ? 'intact' : 'broken') : ''}</h2></div><button class="btn sm" data-act="auditCsv" ${n ? '' : 'disabled'}>${ico('download','sm')}CSV</button></header>
+      <div class="sx2-ll">${recent.length ? recent.map(e => `<div class="sx2-e"><i></i><div><b>${esc(e.what)}</b><span class="mono">${esc(E.fmtFull(e.at, tz()).slice(0, 19))} · <span title="${esc(e.h)}">${esc((e.h || '…').slice(0, 10))}</span></span></div></div>`).join('') : '<p class="sx2-none">No entries yet. Changes you make from now on are recorded here.</p>'}</div>
+      ${A.head && A.head !== 'genesis' ? `<footer class="mono">head ${esc(A.head.slice(0, 24))}…</footer>` : ''}</aside>
+  </div>`;
 }
 const SEC_ACTS = {
+  secGo:(id, v) => { const el = $(v); if(el){ el.scrollIntoView({behavior:'smooth', block:'center'}); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1200); } },
   secOn:() => passDlg('Encrypt this workspace', 'Choose a passphrase. You will need it every time you open ' + esc(BRAND.name) + ' in this browser. It cannot be recovered.', 'Encrypt', async p => { await encEnable(p); closeDlg(); renderAll(); toast('Encryption is on'); }, true),
   secChange:() => passDlg('Current passphrase', 'First, your current passphrase.', 'Next', async old => { const env = JSON.parse(localStorage.getItem(STORE_KEY) || (await IDB.get(STORE_KEY))); try{ const k = await deriveKey(old, b64d8(env.kdf.salt), env.kdf.iter); await openWith(k, env); }catch(e){ throw new Error('bad'); }
     closeDlg(); setTimeout(() => passDlg('New passphrase', 'Choose the new passphrase.', 'Change', async nw => { await encChange(old, nw); closeDlg(); renderAll(); toast('Passphrase changed'); }, true), 50); }, false),

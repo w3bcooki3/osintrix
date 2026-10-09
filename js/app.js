@@ -88,7 +88,10 @@ document.addEventListener('click', ev => {
       {label:'Trash & restore points', icon:'trash-2', fn:() => go('#/trash')},
       {sep:true}, {label:'Start fresh — delete everything…', icon:'triangle-alert', danger:true, fn:() => clickAct('freshStart')}], 'A restore point is saved first'); }
     case 'pbGo': return pbGo(v);
-    case 'refCat': UI.refCat = v; return renderMain();
+    case 'refCat': UI.refCat = v; UI.refRow = null; return renderMain();
+    case 'refRow': UI.refRow = v; UI.refOpen = true; return renderMain();
+    case 'refRowX': UI.refOpen = false; return renderMain();
+    case 'refClear': UI.refQ = ''; return renderMain();
     case 'refHot': UI.refHot = !UI.refHot; return renderMain();
     case 'refFind': return srchOpen(v);
     case 'welcomeDemo': closeWelcome(); return go(caseHash('c-lantern', 'overview'));
@@ -540,7 +543,7 @@ document.addEventListener('keydown', ev => {
   if(typing || ev.ctrlKey || ev.metaKey || ev.altKey) return;
   if(ev.key === 'n' || ev.key === 'N'){ ev.preventDefault(); return openCapture(); }
   if(ev.key === 'e'){ ev.preventDefault(); return entryDlg(); }
-  if(ev.key === '/'){ ev.preventDefault(); const lq = $('tq') || $('hxq'); if(lq){ lq.focus(); lq.select(); return; } return srchOpen(); }
+  if(ev.key === '/'){ ev.preventDefault(); const lq = $('tq') || $('hxq') || $('refQ'); if(lq){ lq.focus(); lq.select(); return; } return srchOpen(); }
   if((ev.key === 'Delete' || ev.key === 'Backspace') && UI.route.tab === 'graph' && UI.sel){ ev.preventDefault(); document.querySelector('[data-act=gDelete]').click(); }
   if(/^[1-8]$/.test(ev.key) && UI.route.area === 'case') return go(caseHash(DB.active, CASE_TABS[+ev.key - 1][0]));
 });
