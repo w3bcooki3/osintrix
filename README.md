@@ -30,6 +30,10 @@ OSINTrix is a workspace for OSINT analysts, threat researchers and blue teamers.
 
 It is a plain static site: HTML, CSS and JavaScript files with no framework, no build step and no server code. Open it from GitHub Pages or straight from your disk, and it works the same, offline included. Everything you enter is stored in your browser (IndexedDB) and nowhere else.
 
+## Interface
+
+Cases open on their board (the link graph); Evidence, Overview, Vault, Timeline, Map, Analysis and Report follow as tabs. Picking a node puts the next actions around it, and the time bar replays how the case grew. The sidebar collapses to an icon rail with the button at its foot or the `[` key, and the choice is remembered.
+
 ## Features
 
 ### 🔎 Search everything

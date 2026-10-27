@@ -4,6 +4,25 @@
    Each change has a type: "added" | "changed" | "fixed" | "removed". */
 const CHANGELOG_DATA = [
   {
+    "version": "1.16",
+    "name": "New design",
+    "date": "2026-10-27",
+    "summary": "A redesigned interface: cases open on their board, a collapsible sidebar, a rebuilt evidence timeline and a full light and dark colour system.",
+    "changes": [
+      {"type": "changed", "text": "Cases open on their board. Picking a node puts the next actions around it: expand from evidence, connect, find a path, mark malicious, show on the timeline."},
+      {"type": "added", "text": "The sidebar collapses to an icon rail with the button at its foot or the left-bracket key; the choice is remembered."},
+      {"type": "changed", "text": "A new design system: Geist and Geist Mono, colour for entity types, verdicts and cases, a deep-navy dark mode, and consistent buttons, tabs, tables and dialogs."},
+      {"type": "changed", "text": "The evidence timeline is rebuilt: a time rail with coloured event markers, event cards with host and source tags, verdict pills, readable evidence blocks and entity chips. Indicators are marked in the evidence text."},
+      {"type": "changed", "text": "Analysis, Report, Trash, What's new and Help use the full width of the screen; navigation is cases first with tools grouped under Kit and Intelligence."},
+      {"type": "changed", "text": "Cloud field guide commands show in full in code blocks that match the theme: light in light mode, dark in dark mode."},
+      {"type": "fixed", "text": "The details panel closes when you move to another page from the sidebar, instead of staying open over it."},
+      {"type": "fixed", "text": "Scratchpad, Security, Playbooks and the other pages use the full width instead of sitting in the middle of the screen."},
+      {"type": "fixed", "text": "Search and the Notes composer no longer draw a second focus outline inside their frame."},
+      {"type": "fixed", "text": "Selecting timeline records no longer puts the checkbox over the record title."},
+      {"type": "fixed", "text": "The dashboard no longer labels the all-time record count as \"captured this week\"."}
+    ]
+  },
+  {
     "version": "1.15",
     "name": "Cases, Reference & layout fixes",
     "date": "2026-10-26",

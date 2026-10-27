@@ -3,20 +3,8 @@
    ========================================================================== */
 function renderNav(){
   const r = UI.route, cur = a => r.area === a ? ' aria-current="page"' : '';
-  const openQ = DB.records.filter(x => x.type === 'lead' && !x.answer).length;
   const nv = (a, icon, label, cnt) => `<a class="nv" href="#/${a}"${cur(a)} title="${label}">${ico(icon)}<span class="lbl">${label}</span>${cnt != null ? `<span class="cnt">${cnt}</span>` : ''}</a>`;
-  $('sidenav').innerHTML = `
-    <div class="navg">${nv('home','layout-dashboard','Dashboard', openQ || null)}${nv('cases','folder-open','Cases', DB.cases.length)}</div>
-    ${(() => { const pins = DB.cases.filter(c => c.pinned); return `<div class="navg"><div class="caps">Pinned <button data-act="newCase" title="New case" aria-label="New case">${ico('plus','sm')}</button></div>
-      ${pins.length ? pins.map(c => `<a class="nv case" href="${caseHash(c.id)}"${r.area === 'case' && DB.active === c.id ? ' aria-current="page"' : ''} title="${esc(c.name)}">
-        <span class="dot" style="background:${esc(c.color)}"></span><span class="lbl">${esc(c.name.split(' — ')[0])}</span><span class="cnt">${derive(c.id).entries.length}</span></a>`).join('')
-        : `<a class="nv nav-hint" href="#/cases">${ico('pin','sm')}<span class="lbl">Pin a case to keep it here</span></a>`}</div>`; })()}
-    <div class="navg"><div class="caps">Workspace</div>${nv('notes','sticky-note','Notes', (DB.notes || []).reduce((s, n) => s + noteTasks(n).filter(t => !t.done).length, 0) || null)}${nv('pad','notebook-pen','Scratchpad')}</div>
-    <div class="navg"><div class="caps">Research</div>${nv('toolbox','wrench','Toolbox', DB.tools.length)}${nv('queries','scan-search','Query library', (DB.queries || []).length || null)}</div>
-    <div class="navg"><div class="caps">Lab</div>${nv('ctf','flag','CTF', DB.ctf ? DB.ctf.chals.filter(c => c.status !== 'solved').length || null : null)}${nv('lab','file-search','Forensics kit')}${nv('decoder','binary','Decoder')}${nv('cloud','cloud','Cloud')}</div>
-    <div class="navg"><div class="caps">Intelligence</div>${nv('feeds','rss','Threat Intel', DB.feed.length || null)}${nv('watch','eye','Watchlist', watchHits().length || null)}${nv('detections','file-code','Detections', (DB.rules || []).length || null)}${nv('entities','fingerprint','Entities')}</div>
-    <div class="navg"><div class="caps">Knowledge</div>${nv('reference','book-open','Reference')}${nv('playbooks','list-checks','Playbooks', (DB.playbooks || []).length || null)}</div>
-    <div class="navg">${(DB.trash || []).length ? nv('trash','trash-2','Trash', DB.trash.length) : ''}${nv('security', SEC.key ? 'lock' : 'shield-check', 'Security')}${nv('whatsnew','sparkles',"What's new")}${nv('help','circle-help','Help')}${nv('settings','settings','Settings')}</div>`;
+  $('sidenav').innerHTML = layoutNav(nv, cur);
   const b = $('bbar');
   b.innerHTML = `<a href="#/home"${cur('home')}>${ico('layout-dashboard')}Home</a><a href="#/cases"${r.area === 'cases' || r.area === 'case' ? ' aria-current="page"' : ''}>${ico('folder-open')}Cases</a>
     <button class="cap" data-act="capture" aria-label="Capture"><span class="b">${ico('plus')}</span></button>
@@ -27,7 +15,7 @@ function renderNav(){
 function feedMatches(){ const g = globalEnts(); return DB.feed.map(f => ({f, hits:E.extract(f.title + ' ' + f.body).map(entKey).filter(id => g.has(id))})).filter(x => x.hits.length); }
 function stat(icon, color, n, label, sub, act, spark){
   const tone = /red/.test(color) && +String(n).split('/')[0] > 0 ? ' bad' : '';
-  const inner = `<span class="st-l">${label}</span><b class="st-n${tone}">${n}</b>${sub ? `<small>${sub}</small>` : ''}`;
+  const inner = `<span class="st-ic" style="--c:${color}" aria-hidden="true">${ico(icon,'sm')}</span><span class="st-l">${label}</span><b class="st-n${tone}">${n}</b>${sub ? `<small>${sub}</small>` : ''}`;
   return act.startsWith('#') ? `<a class="stat" href="${act}">${inner}</a>` : `<button class="stat" data-act="${act}">${inner}</button>`;
 }
 function perDay(list, f, days = 8){ const since = Date.parse('2026-09-08T00:00:00Z'), b = new Array(days).fill(0); for(const x of list){ const t = f(x); if(t >= since){ const i = Math.floor((t - since) / 864e5); if(i < days) b[i]++; } } return b; }
@@ -51,7 +39,7 @@ function viewHome(){
       ${stat('folder-open','var(--accent)', active.length, 'Open cases', DB.cases.filter(c => c.status === 'review').length + ' in review', '#/cases')}
       ${stat('layers','var(--t-identity)', DB.entries.length, 'Vault entries', 'across all cases', '#/cases', entSpark)}
       ${stat('shield-alert','var(--red)', mal, 'Malicious', 'entities judged', 'goMal')}
-      ${stat('clock','var(--amber)', DB.records.length, 'Evidence records', 'captured this week', (DB.active && theCase() ? caseHash(DB.active, 'timeline') : '#/cases'), recSpark)}
+      ${stat('clock','var(--amber)', DB.records.length, 'Evidence records', 'captured so far', (DB.active && theCase() ? caseHash(DB.active, 'timeline') : '#/cases'), recSpark)}
     </div>
     <div class="grid cols-main" style="margin-top:18px">
       <div class="stack">
@@ -118,7 +106,7 @@ function viewCase(tab){
     <div class="row1"><span class="cicon" style="--cc:${esc(c.color)}">${ico(c.icon)}</span>
       <div style="flex:1;min-width:0"><h1>${esc(c.name)}</h1><div class="meta">${statusTag(c.status)}<span>${ico('calendar','sm')}Opened ${esc(E.fmtDate(c.created, tz()))}</span><span>${ico('user','sm')}${esc(c.owner)}</span></div></div>
       <div class="acts"><button class="btn" data-act="editCase" aria-label="Edit case">${ico('pencil','sm')}<span class="bl">Edit</span></button><button class="btn" data-act="addEntry">${ico('plus','sm')}<span class="bl">Add entry</span><span class="bm">Entry</span></button><button class="btn primary" data-act="capture">${ico('plus','sm')}Capture</button></div></div>
-    <nav class="tabs" role="tablist">${CASE_TABS.map(([k, l, i]) => `<a class="tab" role="tab" href="${caseHash(c.id, k)}" aria-selected="${tab === k}">${ico(i,'sm')}${l}${counts[k] ? `<span class="cnt">${counts[k]}</span>` : ''}</a>`).join('')}</nav></div>
+    <nav class="tabs" role="tablist">${caseTabs().map(([k, l, i]) => `<a class="tab" role="tab" href="${caseHash(c.id, k)}" aria-selected="${tab === k}">${ico(i,'sm')}${l}${counts[k] ? `<span class="cnt">${counts[k]}</span>` : ''}</a>`).join('')}</nav></div>
   ${body(c, D)}`;
 }
 
@@ -245,7 +233,7 @@ function evHTML(r, D, c){
     <span class="when"><span class="clk">${r.ts ? esc(E.fmtClock(r.ts, tz())) : '—'}</span>${rel ? `<span class="rl">${rel}</span>` : ''}</span>
     <span class="mk" style="--c:${col}">${c.t0 === r.id ? ico('crosshair','sm') : ico(ic,'sm')}</span>
     <span class="bd"><span class="ttl">${esc(r.title)}</span>${meta ? `<span class="meta">${meta}</span>` : ''}
-      ${r.body && r.body !== r.title ? `<span class="raw">${esc(r.body.split('\n')[0])}</span>` : ''}
+      ${r.body && r.body !== r.title ? `<span class="raw">${markEnts(r.body, r.ents)}</span>` : ''}
       ${ents.length ? `<span class="ents">${ents.map(id => { const {k, v} = entSplit(id); return `<span class="ent xs" data-v="${verdictOf(id)}">${kindBadge(k)}<span class="v">${esc(v)}</span></span>`; }).join('')}</span>` : ''}</span>
     <span class="bdg">${badges}</span></button>`;
 }

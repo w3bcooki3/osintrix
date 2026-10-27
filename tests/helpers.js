@@ -7,7 +7,7 @@ const fixture = name => path.resolve(__dirname, 'fixtures', name);
 async function open(page, hash = '#/home') {
   const errors = [];
   page.on('pageerror', e => errors.push('pageerror: ' + e.message));
-  page.on('console', m => { if (m.type() === 'error' && !/localStorage.*sandboxed|Blocked script execution in 'about:(srcdoc|blank)'|Refused to load the image 'https:/.test(m.text())) errors.push('console: ' + m.text()); });
+  page.on('console', m => { if (m.type() === 'error' && !/localStorage.*sandboxed|Blocked script execution in 'about:(srcdoc|blank)'|Refused to load the image 'https:|Loading the image 'https:[^']*' violates/.test(m.text())) errors.push('console: ' + m.text()); });
   await page.addInitScript(() => { try { localStorage.setItem('osintrix:welcomed', '1'); } catch (e) {} });
   await page.goto(APP + hash);
   // the app's Content Security Policy blocks eval, so poll with plain evaluate calls instead of waitForFunction

@@ -7,7 +7,7 @@ const TOOL_FOR = {ip:['ip-analysis'], domain:['domain-investigation','dns-analys
 const ihead = (label, extra = '') => `<div class="ihead"><span class="caps">${label}</span>${extra}<button class="iconbtn" data-act="closeInsp" aria-label="Close">${ico('x')}</button></div>`;
 
 function renderInsp(){
-  const el = $('insp'); el.classList.toggle('closed', !UI.inspOpen);
+  const el = $('insp'); el.classList.toggle('closed', !UI.inspOpen); UI.shownSel = UI.sel;
   if(!UI.inspOpen){ el.innerHTML = ''; return; }
   const s = UI.sel;
   try{

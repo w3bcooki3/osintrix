@@ -1,7 +1,7 @@
 /* ==========================================================================
    Render loop, events, keyboard, boot
    ========================================================================== */
-function applyPrefs(){ const h = document.documentElement, p = DB.prefs; h.dataset.theme = p.theme; try{ localStorage.setItem('osintrix:theme', p.theme); }catch(e){} h.dataset.size = p.size; h.dataset.density = p.density;
+function applyPrefs(){ const h = document.documentElement, p = DB.prefs; h.dataset.theme = p.theme; try{ localStorage.setItem('osintrix:theme', p.theme); }catch(e){} h.dataset.size = p.size; h.dataset.density = p.density; applyLayout();
   const t = $('themeBtn'); if(t) t.innerHTML = ico(p.theme === 'dark' ? 'sun' : 'moon'); }
 const isNarrow = () => window.innerWidth < 1440;
 function renderMain(){
@@ -16,7 +16,7 @@ function renderMain(){
   if(r.area === 'case' && r.tab === 'graph') requestAnimationFrame(mountGraph);
   if(r.area === 'case' && r.tab === 'map') requestAnimationFrame(mountMap);
   requestAnimationFrame(() => scrollHints($('main')));
-  { const at = el.querySelector('.tabs [aria-selected=true]'); if(at && at.parentElement.scrollWidth > at.parentElement.clientWidth) at.parentElement.scrollLeft = at.offsetLeft - 16; }
+  { const at = el.querySelector('.tabs [aria-selected=true]'); if(at && at.parentElement.scrollWidth > at.parentElement.clientWidth) at.parentElement.scrollLeft = at.getBoundingClientRect().left - at.parentElement.getBoundingClientRect().left + at.parentElement.scrollLeft - 16; }
   if(r.area === 'toolbox') paintBulk();
   if(r.area === 'queries') bindQueryPanel();
   if(r.area === 'decoder') bindDecoder();
@@ -28,8 +28,9 @@ function renderMain(){
   if(r.area === 'case' && r.tab === 'entities') bindCaseEnts();
   if(r.area === 'security') paintFp();
   el.classList.toggle('lock', !!el.querySelector('.drw'));
+  radialHide(); layoutFocus();
 }
-function renderAll(){ renderNav(); renderMain(); renderInsp(); paintLock(); $('inspBtn').classList.toggle('on', UI.inspOpen); }
+function renderAll(){ document.documentElement.dataset.area = UI.route.area; renderNav(); renderMain(); renderInsp(); paintLock(); $('inspBtn').classList.toggle('on', UI.inspOpen); }
 const TITLES = {security:'Security', watch:'Watchlist', trash:'Trash', ctf:'CTF', lab:'Forensics kit', help:'Help', home:'Dashboard', cases:'Cases', toolbox:'Toolbox', entities:'Entities', feeds:'Threat Intel', decoder:'Decoder', reference:'Reference', settings:'Settings', detections:'Detections', queries:'Query library', notes:'Notes', playbooks:'Playbooks', library:'Library', cloud:'Cloud', whatsnew:"What's new", pad:"Scratchpad"};
 function onRoute(){
   UI.route = parseHash(); $('side').classList.remove('open');
@@ -37,6 +38,8 @@ function onRoute(){
   const m = $('main'); m.classList.add('enter'); clearTimeout(onRoute.t); onRoute.t = setTimeout(() => m.classList.remove('enter'), 320);
   if(UI.route.area !== 'case' || UI.route.tab !== 'graph'){ UI.graph.mode = null; UI.graph.first = null; }
   if(UI.sel && UI.sel.kind === 'entry'){ const e = entryById(UI.sel.id); if(!e || e.caseId !== DB.active) UI.sel = null; }
+  { const where = UI.route.area === 'case' ? 'case:' + DB.active : UI.route.area;   // a new page closes the details panel
+    if(onRoute.where && onRoute.where !== where && UI.sel === UI.shownSel){ UI.sel = null; UI.inspOpen = false; } onRoute.where = where; }   // a selection made just before navigating (Open in timeline…) is kept
   renderAll(); const s = $('main').querySelector('.scroll'); if(s) s.scrollTop = 0;
 }
 function animInsp(){ const i = $('insp'); i.classList.add('enter'); setTimeout(() => i.classList.remove('enter'), 260); }
@@ -50,6 +53,7 @@ function select(kind, id){
   if(!UI.inspOpen) animInsp(); UI.sel = {kind, id}; UI.inspOpen = true; renderInsp(); $('inspBtn').classList.add('on');
   document.querySelectorAll('.ev[aria-selected=true]').forEach(x => x.setAttribute('aria-selected', 'false'));
   const ev = document.querySelector(`.ev[data-id="${CSS.escape(id)}"]`); if(ev) ev.setAttribute('aria-selected', 'true');
+  layoutFocus();
 }
 function promote(entId){
   const {k, v} = entSplit(entId), type = KIND_TO_TYPE[k]; if(!type) return;
@@ -64,6 +68,7 @@ document.addEventListener('click', ev => {
   const a = t.dataset.act, id = t.dataset.id, v = t.dataset.v;
   const needs = ['caseMenu','qDelAsk','rMenu','nMenu','nEdit','nColor','nColorPick','qStar','qEng','rStar','deleteCaseDlg','gLegend','gHide','star','toolPin','casePin','toolStar','toolEdit','pickType','pickColor','pickIcon','gExport','flagToChal','chStatus','pbIcon','pbMenu','iocMenu','printReport','linkFrom','gZoom','gFit','gConnect','gEdit','gDelete','gCo','gPng'];
   if(needs.includes(a)) ev.preventDefault();
+  if(LAYOUT_ACTS[a]) return LAYOUT_ACTS[a](id, v, t, ev);
   if(SAFE_ACTS[a]) return SAFE_ACTS[a](id, v, t, ev);
   if(TL_ACTS[a]) return TL_ACTS[a](id, v, t, ev);
   if(REP_ACTS[a]) return REP_ACTS[a](id, v, t, ev);
@@ -110,7 +115,7 @@ document.addEventListener('click', ev => {
     case 'srClearRecent': DB.prefs.recentQ = []; save(); $('srQ').focus(); return srchPaint();
     case 'theme': DB.prefs.theme = DB.prefs.theme === 'dark' ? 'light' : 'dark'; applyPrefs(); save(); return renderAll();
     case 'inspToggle': UI.inspOpen = !UI.inspOpen; return renderAll();
-    case 'closeInsp': UI.inspOpen = false; UI.sel = null; renderInsp(); $('inspBtn').classList.remove('on'); return refreshGraphTools();
+    case 'closeInsp': UI.inspOpen = false; UI.sel = null; renderInsp(); $('inspBtn').classList.remove('on'); layoutFocus(); return refreshGraphTools();
     case 'capture': return openCapture();
     case 'capSave': return capSave(false);
     case 'capSplit': return capSave(true);
@@ -552,10 +557,12 @@ document.addEventListener('keydown', ev => {
   if(ev.key === 'e'){ ev.preventDefault(); return entryDlg(); }
   if(ev.key === '/'){ ev.preventDefault(); const lq = $('tq') || $('hxq') || $('refQ'); if(lq){ lq.focus(); lq.select(); return; } return srchOpen(); }
   if((ev.key === 'Delete' || ev.key === 'Backspace') && UI.route.tab === 'graph' && UI.sel){ ev.preventDefault(); document.querySelector('[data-act=gDelete]').click(); }
-  if(/^[1-8]$/.test(ev.key) && UI.route.area === 'case') return go(caseHash(DB.active, CASE_TABS[+ev.key - 1][0]));
+  if(/^[1-8]$/.test(ev.key) && UI.route.area === 'case') return go(caseHash(DB.active, caseTabs()[+ev.key - 1][0]));
+  if((ev.key === 'j' || ev.key === 'k') && UI.route.area === 'case' && UI.route.tab === 'timeline'){ const evs = [...document.querySelectorAll('#main .ev')]; if(!evs.length) return;
+    const i = evs.findIndex(x => x.getAttribute('aria-selected') === 'true'), n = evs[i < 0 ? 0 : Math.max(0, Math.min(evs.length - 1, i + (ev.key === 'j' ? 1 : -1)))]; ev.preventDefault(); n.click(); n.scrollIntoView({block:'nearest'}); }
 });
 window.addEventListener('hashchange', onRoute);
-let rz = null; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if(cy) cy.resize(); }, 120); });
+let rz = null; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if(cy) cy.resize(); if(DB) renderInsp(); }, 120); });
 
 const WL_IMG = {'dashboard-dark':'assets/welcome/dashboard-dark.jpg', 'dashboard-light':'assets/welcome/dashboard-light.jpg', 'graph-dark':'assets/welcome/graph-dark.jpg', 'graph-light':'assets/welcome/graph-light.jpg', 'phone-dark':'assets/welcome/phone-dark.jpg', 'phone-light':'assets/welcome/phone-light.jpg'};
 const WL_THEMES = [['night','Night'],['day','Day'],['indigo','Indigo']];
@@ -599,7 +606,7 @@ function wlCycle(on){
 function closeWelcome(){ wlCycle(false); $('welcome').hidden = true; try{ localStorage.setItem('osintrix:welcomed', '1'); }catch(e){} }
 (async function boot(){
   $('splash').innerHTML = logoMark(64); $('brand').innerHTML = logoMark(32) + `<div class="txt">${wordmark()}<small>${esc(BRAND.tagline)}</small></div>`; $('fav').href = FAVICON;
-  try{ const th = localStorage.getItem('osintrix:theme'); if(th) document.documentElement.dataset.theme = th; }catch(e){}
+  try{ const th = localStorage.getItem('osintrix:theme'); if(th) document.documentElement.dataset.theme = th; document.documentElement.dataset.layout = 'pinboard'; document.documentElement.classList.add('ds'); document.documentElement.classList.toggle('nav-rail', localStorage.getItem('osintrix:navRail') !== '0'); }catch(e){}
   const loaded = await loadAll();
   if(loaded && loaded.__locked){ $('splash').classList.add('out'); setTimeout(() => $('splash').remove(), 320); return lockScreen(loaded.env, d => { DB = d; SEC.locked = false; bootRest(true); }); }
   DB = loaded || seedDB(); bootRest(false);

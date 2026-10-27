@@ -26,7 +26,7 @@ function seedDB(){
     pinned:!!t.isPinned, starred:!!t.isStarred, added:Date.parse(t.dateAdded) || Date.now(), uses:0, seed:true}));
   return {v:2, cases, records:recs, entries, links:DEMO_LINKS.map(([a, b, label, conf, src], i) => ({id:'l' + i, caseId:entries.find(e => e.id === a).caseId, a, b, label, conf, src})),
     verdicts, tools, feed:DEMO.feed.map(f => ({...f, ts:Date.parse(f.date)})), active:'c-lantern',
-    prefs:{theme:'light', size:'m', density:'comfortable', tz:'UTC'}, log:[], sample:true};
+    prefs:{theme:'light', size:'m', density:'comfortable', tz:'UTC', navRail:true}, log:[], sample:true};
 }
 function load(){ try{ const d = JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); if(d && d.v === 2 && Array.isArray(d.entries)) return d; }catch(e){} return null; }
 /* IndexedDB is the primary store: far more room than localStorage (~5 MB). localStorage keeps a mirror while it fits. */
@@ -144,11 +144,11 @@ const AREAS = ['security','watch','trash','help','ctf','lab','home','cases','cas
 const CASE_TABS = [['overview','Overview','layout-dashboard'],['vault','Vault','layers'],['entities','Entities','fingerprint'],['timeline','Timeline','clock'],['graph','Graph','waypoints'],['map','Map','map'],['questions','Analysis','scale'],['report','Report','file-chart-column']];
 function parseHash(){
   const p = (location.hash || '#/home').replace(/^#\/?/, '').split('/').map(decodeURIComponent);
-  if(p[0] === 'case' && DB.cases.some(c => c.id === p[1])){ DB.active = p[1]; return {area:'case', tab:CASE_TABS.some(t => t[0] === p[2]) ? p[2] : 'overview'}; }
+  if(p[0] === 'case' && DB.cases.some(c => c.id === p[1])){ DB.active = p[1]; return {area:'case', tab:CASE_TABS.some(t => t[0] === p[2]) ? p[2] : SHELL_HOME}; }
   if(p[0] === 'dorks') p[0] = 'queries';
   return {area:AREAS.includes(p[0]) && p[0] !== 'case' ? p[0] : 'home'};
 }
-const caseHash = (id, tab) => '#/case/' + encodeURIComponent(id || DB.active) + '/' + (tab || 'overview');
+const caseHash = (id, tab) => '#/case/' + encodeURIComponent(id || DB.active) + '/' + (tab || SHELL_HOME);
 function go(h){ if(location.hash === h) onRoute(); else location.hash = h; }
 
 async function hashRecords(){

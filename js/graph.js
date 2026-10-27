@@ -61,6 +61,7 @@ function graphElements(D){
 
 function mountGraph(){
   const el = $('cy'); if(!el || typeof cytoscape === 'undefined') return;
+  radialHide(); const gFont = cssVar('--font') || 'Inter, sans-serif';
   const D = derive(), text = cssVar('--text'), text2 = cssVar('--text-2'), bg = cssVar('--bg'), surface = cssVar('--surface'), accent = cssVar('--accent');
   const hasPos = D.entries.every(e => e.pos);
   const muted = cssVar('--text-3');
@@ -69,14 +70,14 @@ function mountGraph(){
     layout:hasPos ? {name:'preset'} : {name:'cose', animate:false, nodeRepulsion:() => 14000, idealEdgeLength:() => 95, nodeOverlap:20, padding:40, randomize:false, numIter:1500},
     style:[
       {selector:'node', style:{width:'data(w)', height:'data(w)', 'background-color':surface, 'background-image':'data(icon)', 'background-width':'62%', 'background-height':'62%',
-        'border-width':2.5, 'border-color':'data(ring)', label:'data(label)', color:text, 'font-family':'Inter, sans-serif', 'font-size':14.5, 'font-weight':600, 'min-zoomed-font-size':7,
+        'border-width':2.5, 'border-color':'data(ring)', label:'data(label)', color:text, 'font-family':gFont, 'font-size':14.5, 'font-weight':600, 'min-zoomed-font-size':7,
         'text-valign':'bottom', 'text-margin-y':8, 'text-background-color':bg, 'text-background-opacity':.85, 'text-background-padding':3, 'text-background-shape':'roundrectangle',
         'overlay-opacity':0, 'transition-property':'border-width, width, height', 'transition-duration':'120ms'}},
       {selector:'node[star = 1]', style:{'border-style':'double', 'border-width':5}},
       {selector:'node:selected', style:{'border-color':accent, 'border-width':4, 'underlay-color':accent, 'underlay-opacity':.22, 'underlay-padding':8, 'underlay-shape':'ellipse'}},
       {selector:'node.src', style:{'underlay-color':accent, 'underlay-opacity':.35, 'underlay-padding':10, 'underlay-shape':'ellipse'}},
-      {selector:'edge', style:{width:'data(w)', 'line-color':accent, 'target-arrow-color':accent, 'target-arrow-shape':'triangle', 'arrow-scale':.9, 'curve-style':'bezier', opacity:.75,
-        label:'data(label)', 'font-size':12.5, 'min-zoomed-font-size':8, 'font-family':'Inter, sans-serif', color:text2, 'text-rotation':'autorotate', 'text-background-color':bg, 'text-background-opacity':1,
+      {selector:'edge', style:{width:'data(w)', 'line-color':muted, 'target-arrow-color':muted, 'target-arrow-shape':'triangle', 'arrow-scale':.9, 'curve-style':'bezier', opacity:.75,
+        label:'data(label)', 'font-size':12.5, 'min-zoomed-font-size':8, 'font-family':gFont, color:text2, 'text-rotation':'autorotate', 'text-background-color':bg, 'text-background-opacity':1,
         'text-background-padding':2, 'overlay-opacity':0}},
       {selector:'edge[kind = "co"]', style:{'line-style':'dashed', 'line-color':text2, 'target-arrow-shape':'none', opacity:.35, width:1.2}},
       {selector:'edge:selected', style:{'line-color':cssVar('--amber'), 'target-arrow-color':cssVar('--amber'), opacity:1, width:3}},
@@ -92,7 +93,8 @@ function mountGraph(){
   const view = UI.graph.views && UI.graph.views[DB.active];
   let ready = !!view; const me = cy;
   if(view){ cy.zoom(view.z); cy.pan(view.p); } else { fitNice(); setTimeout(() => { if(cy === me){ fitNice(); ready = true; } }, 90); }
-  cy.on('viewport', () => { if(!ready || cy !== me) return; (UI.graph.views || (UI.graph.views = {}))[DB.active] = {z:cy.zoom(), p:{...cy.pan()}}; });
+  cy.on('viewport', () => { radialHide(); if(!ready || cy !== me) return; (UI.graph.views || (UI.graph.views = {}))[DB.active] = {z:cy.zoom(), p:{...cy.pan()}}; });
+  cy.on('grab', 'node', radialHide);
   cy.on('dragfree', 'node', ev => { const e = entryById(ev.target.id()); if(e){ e.pos = {...ev.target.position()}; save(); } });
   cy.on('tap', 'node', ev => {
     const id = ev.target.id();
@@ -102,10 +104,10 @@ function mountGraph(){
       if(UI.graph.first === id) return;
       const a = UI.graph.first; UI.graph.first = null; UI.graph.mode = null; return linkDlg({a, b:id});
     }
-    selectEntry(id, true);
+    selectEntry(id, true); radialFor(id);
   });
   cy.on('tap', 'edge', ev => { const id = ev.target.id(); if(id.startsWith('co-')) return; UI.sel = {kind:'link', id}; UI.inspOpen = true; renderInsp(); refreshGraphTools(); });
-  cy.on('tap', ev => { if(ev.target === cy){ if(UI.sel){ UI.sel = null; renderInsp(); refreshGraphTools(); } cy.elements().removeClass('faded'); } });
+  cy.on('tap', ev => { if(ev.target === cy){ radialHide(); if(UI.sel){ UI.sel = null; renderInsp(); refreshGraphTools(); } cy.elements().removeClass('faded'); } });
   cy.on('dbltap', ev => { if(ev.target === cy){ UI.graph.newPos = {...ev.position}; entryDlg(); } });
   const menuAt = (ev, fn) => { const oe = ev.originalEvent || {}, r = el.getBoundingClientRect(), rp = ev.renderedPosition || (ev.target.renderedPosition && ev.target.renderedPosition()) || {x:0, y:0};
     fn((oe.clientX != null ? oe.clientX : r.left + rp.x), (oe.clientY != null ? oe.clientY : r.top + rp.y)); };

@@ -221,7 +221,7 @@ function viewSettings(){
     <section class="card" style="margin-bottom:18px"><div class="body" style="padding:22px"><div class="about">${logoMark(64)}<div style="flex:1;min-width:220px"><h2>${wordmark().replace('wordmark','wordmark big')}</h2>
       <div class="t2" style="margin-top:4px">${esc(BRAND.tagline)} · <span class="mono">${esc(BRAND.version)}</span></div>
       <div class="wrap" style="align-items:center"><button class="btn" data-act="showWelcome">${ico('eye','sm')}Show welcome</button></div></div>
-      <p class="t3" style="margin:16px 0 0;font-size:13px">A private, browser-only OSINT workspace. Inter and JetBrains Mono (OFL 1.1) · Lucide icons (ISC) · Cytoscape.js (MIT) · jsQR (Apache-2.0) · IEEE OUI list via oui-data (BSD-2) — all bundled, nothing loads from the network. <a href="#/help">Help &amp; FAQ</a></p></div></section>
+      <p class="t3" style="margin:16px 0 0;font-size:13px">A private, browser-only OSINT workspace. Geist, Geist Mono, Inter and JetBrains Mono (OFL 1.1) · Lucide icons (ISC) · Cytoscape.js (MIT) · jsQR (Apache-2.0) · IEEE OUI list via oui-data (BSD-2) — all bundled, nothing loads from the network. <a href="#/help">Help &amp; FAQ</a></p></div></section>
     <div class="grid cols-2" style="align-items:start">
       <section class="card"><header><h3>Appearance</h3></header><div class="body">
         <div class="field"><span class="label">Theme</span>${seg('theme', [['dark','Dark','moon'],['light','Light','sun']])}</div>
