@@ -698,5 +698,113 @@ const RULE_SEED = [
     "created": "2023-07-11T00:00:00Z",
     "modified": "2023-07-11T00:00:00Z",
     "starred": false
+  },
+  {
+    "id": "sig-cloud-001",
+    "type": "sigma",
+    "title": "CloudTrail logging disabled",
+    "description": "CloudTrail StopLogging or DeleteTrail \u2014 a classic defence-evasion step after a cloud account compromise.",
+    "code": "logsource:\n    product: aws\n    service: cloudtrail\ndetection:\n    selection:\n        eventSource: cloudtrail.amazonaws.com\n        eventName:\n            - StopLogging\n            - DeleteTrail\n            - UpdateTrail\n    condition: selection\nlevel: high",
+    "severity": "high",
+    "category": "threat-intelligence",
+    "technique": "T1562.008",
+    "author": "OSINTrix",
+    "platform": "AWS",
+    "tags": [
+      "cloud",
+      "aws",
+      "defense-evasion"
+    ],
+    "references": [],
+    "created": "2026-10-25",
+    "modified": "2026-10-25",
+    "starred": false
+  },
+  {
+    "id": "sig-cloud-002",
+    "type": "sigma",
+    "title": "IAM privilege escalation attempt",
+    "description": "IAM changes that commonly grant the caller more access: attaching admin policies, new policy versions, access-key creation.",
+    "code": "logsource:\n    product: aws\n    service: cloudtrail\ndetection:\n    selection:\n        eventName:\n            - AttachUserPolicy\n            - AttachRolePolicy\n            - PutUserPolicy\n            - PutRolePolicy\n            - CreatePolicyVersion\n            - SetDefaultPolicyVersion\n            - CreateAccessKey\n    condition: selection\nlevel: high",
+    "severity": "high",
+    "category": "threat-intelligence",
+    "technique": "T1098.003",
+    "author": "OSINTrix",
+    "platform": "AWS",
+    "tags": [
+      "cloud",
+      "aws",
+      "privilege-escalation",
+      "iam"
+    ],
+    "references": [],
+    "created": "2026-10-25",
+    "modified": "2026-10-25",
+    "starred": false
+  },
+  {
+    "id": "sig-cloud-003",
+    "type": "sigma",
+    "title": "S3 bucket made public",
+    "description": "Bucket policy or public-access-block changes that can expose an S3 bucket to the internet.",
+    "code": "logsource:\n    product: aws\n    service: cloudtrail\ndetection:\n    selection:\n        eventName:\n            - PutBucketPolicy\n            - PutBucketAcl\n            - DeletePublicAccessBlock\n            - PutAccountPublicAccessBlock\n    condition: selection\nlevel: medium",
+    "severity": "medium",
+    "category": "threat-intelligence",
+    "technique": "T1530",
+    "author": "OSINTrix",
+    "platform": "AWS",
+    "tags": [
+      "cloud",
+      "aws",
+      "s3",
+      "exposure"
+    ],
+    "references": [],
+    "created": "2026-10-25",
+    "modified": "2026-10-25",
+    "starred": false
+  },
+  {
+    "id": "sig-cloud-004",
+    "type": "sigma",
+    "title": "Access from EC2 instance role outside AWS",
+    "description": "Temporary instance-role credentials (ASIA...) used from an IP that is not AWS \u2014 a sign the IMDS creds were stolen via SSRF and used off-box.",
+    "code": "logsource:\n    product: aws\n    service: cloudtrail\ndetection:\n    selection:\n        userIdentity.type: AssumedRole\n        userIdentity.arn|contains: ':assumed-role/'\n    filter:\n        sourceIPAddress|cidr: '10.0.0.0/8'\n    condition: selection and not filter\nlevel: high",
+    "severity": "high",
+    "category": "threat-intelligence",
+    "technique": "T1552.005",
+    "author": "OSINTrix",
+    "platform": "AWS",
+    "tags": [
+      "cloud",
+      "aws",
+      "imds",
+      "credential-theft"
+    ],
+    "references": [],
+    "created": "2026-10-25",
+    "modified": "2026-10-25",
+    "starred": false
+  },
+  {
+    "id": "sig-cloud-005",
+    "type": "sigma",
+    "title": "Azure role assignment granted",
+    "description": "A new Azure RBAC role assignment \u2014 watch for Owner/Contributor granted to unexpected principals.",
+    "code": "logsource:\n    product: azure\n    service: activitylogs\ndetection:\n    selection:\n        operationName: Microsoft.Authorization/roleAssignments/write\n    condition: selection\nlevel: medium",
+    "severity": "medium",
+    "category": "threat-intelligence",
+    "technique": "T1098.003",
+    "author": "OSINTrix",
+    "platform": "Azure",
+    "tags": [
+      "cloud",
+      "azure",
+      "iam"
+    ],
+    "references": [],
+    "created": "2026-10-25",
+    "modified": "2026-10-25",
+    "starred": false
   }
 ];

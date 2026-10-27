@@ -9,7 +9,7 @@ const ico = (n, cls = '') => `<svg class="i ${cls}" viewBox="0 0 24 24" fill="no
 
 let DB = null;
 const UI = {route:{area:'home'}, q:'', ast:null, sel:null, inspOpen:false, navOpen:false, vcat:'all', vq:'', vview:'grid',
-  tcat:'all', tsub:null, tq:'', tlMode:'events', facet:{}, pivot:null, graph:{mode:null, first:null}, entKind:null};
+  tcat:'all', tsub:null, tq:'', cloudTab:'guide', cgCat:'all', wnQ:'', wnType:null, padText:null, padSel:null, tlMode:'events', facet:{}, pivot:null, graph:{mode:null, first:null}, entKind:null};
 
 /* ---------- seed ---------- */
 function seedDB(){
@@ -140,7 +140,7 @@ function passes(r){
 }
 
 /* ---------- routing ---------- */
-const AREAS = ['security','watch','trash','help','ctf','lab','home','cases','case','toolbox','entities','feeds','decoder','reference','settings','detections','playbooks','queries','notes'];
+const AREAS = ['security','watch','trash','help','ctf','lab','home','cases','case','toolbox','entities','feeds','decoder','reference','settings','detections','playbooks','queries','notes','cloud','whatsnew','pad'];
 const CASE_TABS = [['overview','Overview','layout-dashboard'],['vault','Vault','layers'],['entities','Entities','fingerprint'],['timeline','Timeline','clock'],['graph','Graph','waypoints'],['map','Map','map'],['questions','Analysis','scale'],['report','Report','file-chart-column']];
 function parseHash(){
   const p = (location.hash || '#/home').replace(/^#\/?/, '').split('/').map(decodeURIComponent);

@@ -1522,5 +1522,203 @@ const TOOLS_SEED = [
     "isPinned": false,
     "isStarred": false,
     "dateAdded": "2024-12-19"
-  }
+  },
+{
+  "id": 95,
+  "name": "Prowler",
+  "url": "https://github.com/prowler-cloud/prowler",
+  "parentCategory": "network-security",
+  "childCategory": "cloud-security",
+  "description": "Open-source multi-cloud security assessment for AWS, Azure, GCP and Kubernetes against CIS and other benchmarks.",
+  "tags": [
+    "aws",
+    "azure",
+    "gcp",
+    "audit",
+    "cspm"
+  ],
+  "isPinned": false,
+  "isStarred": false,
+  "dateAdded": "2026-10-25"
+},
+{
+  "id": 96,
+  "name": "ScoutSuite",
+  "url": "https://github.com/nccgroup/ScoutSuite",
+  "parentCategory": "network-security",
+  "childCategory": "cloud-security",
+  "description": "Multi-cloud security auditing tool; produces an HTML report of misconfigurations across AWS, Azure and GCP.",
+  "tags": [
+    "aws",
+    "azure",
+    "gcp",
+    "audit"
+  ],
+  "isPinned": false,
+  "isStarred": false,
+  "dateAdded": "2026-10-25"
+},
+{
+  "id": 97,
+  "name": "Pacu",
+  "url": "https://github.com/RhinoSecurityLabs/pacu",
+  "parentCategory": "network-security",
+  "childCategory": "cloud-security",
+  "description": "Offensive AWS exploitation framework for testing the security posture of an AWS account.",
+  "tags": [
+    "aws",
+    "offensive",
+    "privesc"
+  ],
+  "isPinned": false,
+  "isStarred": false,
+  "dateAdded": "2026-10-25"
+},
+{
+  "id": 98,
+  "name": "CloudSploit",
+  "url": "https://github.com/aquasecurity/cloudsploit",
+  "parentCategory": "network-security",
+  "childCategory": "cloud-security",
+  "description": "Open-source cloud security configuration scanner for AWS, Azure, GCP and Oracle.",
+  "tags": [
+    "aws",
+    "azure",
+    "gcp",
+    "cspm"
+  ],
+  "isPinned": false,
+  "isStarred": false,
+  "dateAdded": "2026-10-25"
+},
+{
+  "id": 99,
+  "name": "Checkov",
+  "url": "https://www.checkov.io",
+  "parentCategory": "network-security",
+  "childCategory": "cloud-security",
+  "description": "Static analysis for Terraform, CloudFormation, Kubernetes, ARM and more \u2014 finds misconfigurations in IaC.",
+  "tags": [
+    "iac",
+    "terraform",
+    "kubernetes",
+    "static"
+  ],
+  "isPinned": false,
+  "isStarred": false,
+  "dateAdded": "2026-10-25"
+},
+{
+  "id": 100,
+  "name": "tfsec",
+  "url": "https://github.com/aquasecurity/tfsec",
+  "parentCategory": "network-security",
+  "childCategory": "cloud-security",
+  "description": "Static analysis security scanner for Terraform code.",
+  "tags": [
+    "terraform",
+    "iac",
+    "static"
+  ],
+  "isPinned": false,
+  "isStarred": false,
+  "dateAdded": "2026-10-25"
+},
+{
+  "id": 101,
+  "name": "Trivy",
+  "url": "https://trivy.dev",
+  "parentCategory": "network-security",
+  "childCategory": "cloud-security",
+  "description": "Scanner for containers, filesystems and IaC \u2014 vulnerabilities, misconfigurations and secrets.",
+  "tags": [
+    "containers",
+    "iac",
+    "vulnerabilities",
+    "secrets"
+  ],
+  "isPinned": false,
+  "isStarred": false,
+  "dateAdded": "2026-10-25"
+},
+{
+  "id": 102,
+  "name": "kube-bench",
+  "url": "https://github.com/aquasecurity/kube-bench",
+  "parentCategory": "network-security",
+  "childCategory": "cloud-security",
+  "description": "Checks whether Kubernetes is deployed securely against the CIS Kubernetes Benchmark.",
+  "tags": [
+    "kubernetes",
+    "cis",
+    "audit"
+  ],
+  "isPinned": false,
+  "isStarred": false,
+  "dateAdded": "2026-10-25"
+},
+{
+  "id": 103,
+  "name": "kube-hunter",
+  "url": "https://github.com/aquasecurity/kube-hunter",
+  "parentCategory": "network-security",
+  "childCategory": "cloud-security",
+  "description": "Hunts for security weaknesses in Kubernetes clusters.",
+  "tags": [
+    "kubernetes",
+    "offensive"
+  ],
+  "isPinned": false,
+  "isStarred": false,
+  "dateAdded": "2026-10-25"
+},
+{
+  "id": 104,
+  "name": "Stratus Red Team",
+  "url": "https://github.com/DataDog/stratus-red-team",
+  "parentCategory": "network-security",
+  "childCategory": "cloud-security",
+  "description": "Emulates common cloud attack techniques (mapped to MITRE ATT&CK) for detection testing.",
+  "tags": [
+    "aws",
+    "detection",
+    "attack-simulation"
+  ],
+  "isPinned": false,
+  "isStarred": false,
+  "dateAdded": "2026-10-25"
+},
+{
+  "id": 105,
+  "name": "CloudMapper",
+  "url": "https://github.com/duo-labs/cloudmapper",
+  "parentCategory": "network-security",
+  "childCategory": "cloud-security",
+  "description": "Builds diagrams of AWS environments and audits for security issues.",
+  "tags": [
+    "aws",
+    "audit",
+    "visualisation"
+  ],
+  "isPinned": false,
+  "isStarred": false,
+  "dateAdded": "2026-10-25"
+},
+{
+  "id": 106,
+  "name": "Cartography",
+  "url": "https://github.com/lyft/cartography",
+  "parentCategory": "network-security",
+  "childCategory": "cloud-security",
+  "description": "Maps cloud and infrastructure assets and their relationships into a graph for analysis.",
+  "tags": [
+    "aws",
+    "gcp",
+    "graph",
+    "asset-inventory"
+  ],
+  "isPinned": false,
+  "isStarred": false,
+  "dateAdded": "2026-10-25"
+}
 ];

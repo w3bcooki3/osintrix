@@ -109,6 +109,16 @@ const PB_SEED = [
     ['Look for deleted backups and shadow copies', 'vssadmin and wbadmin commands (see Reference → LOLBins).'],
     ['Hunt the indicators across the estate and block them', 'Detections → Generate from case gives a starting rule.'],
     ['Record decisions and timeline for legal and insurers', 'The report and a signed custody file help here.']]},
+  {id:'pb-cloudir', name:'Cloud account compromise', cat:'ir', icon:'cloud', desc:'From a suspected exposed cloud credential to containment, scope and lessons.', steps:[
+    ['Confirm which identity is involved and whether the keys are still valid', 'AWS: sts get-caller-identity. Azure: az account show. GCP: gcloud auth list.'],
+    ['Pull the audit log for that identity', 'CloudTrail / Azure Activity / GCP Audit — then open it in Cloud → Log hunting.'],
+    ['Flag the high-signal actions', 'New access keys, policy changes, PassRole, logging turned off, secret reads — the Log-hunting tab marks these.'],
+    ['Scope what the credential could reach', 'Check attached policies and roles; Cloud → Field guide → enumeration has the commands.'],
+    ['Contain: disable the key and revoke active sessions', 'Field guide → Cloud defence has the per-provider commands. Do not delete until evidence is captured.'],
+    ['Check for persistence', 'New IAM users/roles, access keys, Lambda/functions, trust-policy changes, OAuth grants.'],
+    ['Look for exfiltration', 'Public bucket changes, snapshot/image sharing, large reads from storage.'],
+    ['Scan the IaC that defined the exposed resource', 'Cloud → Misconfig scanner on the Terraform / CloudFormation — the gap that allowed it may still be in the templates.'],
+    ['Rotate everything the identity could read, and record the timeline', 'Send the flagged log events to the case timeline for the report.']]},
 ];
 const pbSteps = p => p.steps.map(s => Array.isArray(s) ? {t:s[0], h:s[1] || ''} : s);
 function ensurePlaybooks(){

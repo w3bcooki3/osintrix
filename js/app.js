@@ -7,7 +7,7 @@ const isNarrow = () => window.innerWidth < 1440;
 function renderMain(){
   const r = UI.route, el = $('main');
   const V = {security:viewSecurity, watch:viewWatch, trash:viewTrash, ctf:viewCTF, lab:viewLab, help:viewHelp, home:viewHome, cases:viewCases, toolbox:viewToolbox, entities:viewEntities, feeds:viewIntel, decoder:viewDecoder, reference:viewReference, settings:viewSettings,
-    detections:viewDetections, queries:viewQueries, notes:viewNotes, playbooks:viewPlaybooks};
+    detections:viewDetections, queries:viewQueries, notes:viewNotes, playbooks:viewPlaybooks, cloud:viewCloud, whatsnew:viewWhatsNew, pad:viewPad};
   if(cy && !(r.area === 'case' && r.tab === 'graph')){ cy.destroy(); cy = null; }
   const key = r.area + '/' + (r.tab || ''), sc = el.querySelector('.scroll'), keepY = renderMain.key === key && sc ? sc.scrollTop : 0; renderMain.key = key;
   try{ el.innerHTML = r.area === 'case' ? viewCase(r.tab) : (V[r.area] || viewHome)(); }
@@ -21,13 +21,16 @@ function renderMain(){
   if(r.area === 'queries') bindQueryPanel();
   if(r.area === 'decoder') bindDecoder();
   if(r.area === 'lab') bindLab();
+  if(r.area === 'cloud') bindCloud();
+  if(r.area === 'whatsnew') bindWhatsNew();
+  if(r.area === 'pad') bindPad();
   if(r.area === 'detections') bindRuleEditor();
   if(r.area === 'case' && r.tab === 'entities') bindCaseEnts();
   if(r.area === 'security') paintFp();
   el.classList.toggle('lock', !!el.querySelector('.drw'));
 }
 function renderAll(){ renderNav(); renderMain(); renderInsp(); paintLock(); $('inspBtn').classList.toggle('on', UI.inspOpen); }
-const TITLES = {security:'Security', watch:'Watchlist', trash:'Trash', ctf:'CTF', lab:'Forensics kit', help:'Help', home:'Dashboard', cases:'Cases', toolbox:'Toolbox', entities:'Entities', feeds:'Threat Intel', decoder:'Decoder', reference:'Reference', settings:'Settings', detections:'Detections', queries:'Query library', notes:'Notes', playbooks:'Playbooks', library:'Library'};
+const TITLES = {security:'Security', watch:'Watchlist', trash:'Trash', ctf:'CTF', lab:'Forensics kit', help:'Help', home:'Dashboard', cases:'Cases', toolbox:'Toolbox', entities:'Entities', feeds:'Threat Intel', decoder:'Decoder', reference:'Reference', settings:'Settings', detections:'Detections', queries:'Query library', notes:'Notes', playbooks:'Playbooks', library:'Library', cloud:'Cloud', whatsnew:"What's new", pad:"Scratchpad"};
 function onRoute(){
   UI.route = parseHash(); $('side').classList.remove('open');
   document.title = (UI.route.area === 'case' ? theCase().name.split(' — ')[0] + ' · ' + CASE_TABS.find(t => t[0] === UI.route.tab)[1] : TITLES[UI.route.area] || 'OSINTrix') + ' — OSINTrix';
@@ -59,7 +62,7 @@ document.addEventListener('click', ev => {
   if($('side').classList.contains('open') && !ev.target.closest('#side') && !ev.target.closest('[data-act=navToggle]')){ $('side').classList.remove('open'); return; }
   const t = ev.target.closest('[data-act]'); if(!t) return;
   const a = t.dataset.act, id = t.dataset.id, v = t.dataset.v;
-  const needs = ['caseMenu','qDelAsk','rMenu','nMenu','nEdit','nColor','nColorPick','qStar','qEng','rStar','deleteCaseDlg','gLegend','gHide','star','toolPin','toolStar','toolEdit','pickType','pickColor','pickIcon','gExport','flagToChal','chStatus','pbIcon','pbMenu','iocMenu','printReport','linkFrom','gZoom','gFit','gConnect','gEdit','gDelete','gCo','gPng'];
+  const needs = ['caseMenu','qDelAsk','rMenu','nMenu','nEdit','nColor','nColorPick','qStar','qEng','rStar','deleteCaseDlg','gLegend','gHide','star','toolPin','casePin','toolStar','toolEdit','pickType','pickColor','pickIcon','gExport','flagToChal','chStatus','pbIcon','pbMenu','iocMenu','printReport','linkFrom','gZoom','gFit','gConnect','gEdit','gDelete','gCo','gPng'];
   if(needs.includes(a)) ev.preventDefault();
   if(SAFE_ACTS[a]) return SAFE_ACTS[a](id, v, t, ev);
   if(TL_ACTS[a]) return TL_ACTS[a](id, v, t, ev);
@@ -74,6 +77,9 @@ document.addEventListener('click', ev => {
   if(PCAP_ACTS[a]) return PCAP_ACTS[a](id, v, t, ev);
   if(SQL_ACTS[a]) return SQL_ACTS[a](id, v, t, ev);
   if(SEC_ACTS[a]) return SEC_ACTS[a](id, v, t, ev);
+  if(CLOUD_ACTS[a]) return CLOUD_ACTS[a](id, v, t, ev);
+  if(WN_ACTS[a]) return WN_ACTS[a](id, v, t, ev);
+  if(PAD_ACTS[a]) return PAD_ACTS[a](id, v, t, ev);
   if(a === 'toolRun') return toolRunDlg(id);
   if(a === 'trPick'){ $('trV').value = v; return $('trV').focus(); }
   switch(a){
@@ -118,9 +124,11 @@ document.addEventListener('click', ev => {
     case 'caseMenu': { const c = theCase(id), r0 = t.getBoundingClientRect(); if(!c) return; return showMenu(Math.max(8, r0.right - 220), r0.bottom + 6, [
       {label:'Open case', icon:'folder-open', fn:() => go(caseHash(c.id))},
       {label:'Edit details…', icon:'pencil', fn:() => { DB.active = c.id; caseDlg(true); }},
+      {label:c.pinned ? 'Unpin from sidebar' : 'Pin to sidebar', icon:'pin', fn:() => clickAct('casePin', c.id)},
       {label:c.status === 'closed' ? 'Reopen' : 'Archive', icon:c.status === 'closed' ? 'archive-restore' : 'archive', fn:() => { c.status = c.status === 'closed' ? 'active' : 'closed'; c.updated = Date.now(); mutate((c.status === 'closed' ? 'archived ' : 'reopened ') + c.code); renderAll(); toast(c.status === 'closed' ? c.code + ' archived' : c.code + ' reopened'); }},
       {label:'Export as JSON', icon:'download', fn:() => clickAct('exportCase', c.id)},
       {sep:true}, {label:'Delete case…', icon:'trash-2', danger:true, fn:() => deleteCaseDlg(c.id)}], c.code); }
+    case 'casePin': { const c = theCase(id); if(!c) return; c.pinned = !c.pinned; mutate((c.pinned ? 'pinned ' : 'unpinned ') + c.code); renderAll(); return toast(c.pinned ? c.code + ' pinned to the sidebar' : c.code + ' unpinned'); }
     case 'confirmOk': { const fn = UI.confirmFn; UI.confirmFn = null; closeDlg(); if(fn) fn(); return; }
     case 'deleteCaseDlg': return deleteCaseDlg(id || DB.active);
     case 'deleteCase': { const c = theCase(id); if(!c || $('delConfirm').value.trim() !== c.code) return;
@@ -128,8 +136,7 @@ document.addEventListener('click', ev => {
       DB.cases = DB.cases.filter(x => x !== c); DB.entries = DB.entries.filter(e => e.caseId !== c.id); DB.links = DB.links.filter(l => l.caseId !== c.id); DB.records = DB.records.filter(r => r.caseId !== c.id);
       if(DB.notes) DB.notes = DB.notes.filter(n => n.caseId !== c.id);
       const tx = trashPut('case', c.name, {c:snap.c, entries:snap.entries, links:snap.links, records:snap.records, notes:snap.notes}, c.id);
-      if(!DB.cases.length) DB.cases.push({id:uid('c'), name:'Untitled case', code:'TN-2026-100', status:'active', owner:'You', created:Date.now(), updated:Date.now(), scope:'', color:CASE_COLORS[7], icon:'briefcase'});
-      if(DB.active === c.id) DB.active = DB.cases[0].id; UI.sel = null; mutate('deleted case ' + c.code); closeDlg(); go('#/cases');
+      if(DB.active === c.id) DB.active = DB.cases.length ? DB.cases[0].id : null; UI.sel = null; mutate('deleted case ' + c.code); closeDlg(); go('#/cases');
       return toast('Deleted ' + c.name + ' — it is in the trash', 'Undo', () => { DB.trash = DB.trash.filter(x => x !== tx); DB.cases.splice(snap.idx, 0, snap.c); DB.entries.push(...snap.entries); DB.links.push(...snap.links); DB.records.push(...snap.records); if(DB.notes) DB.notes.push(...snap.notes); mutate('restored case ' + c.code); renderAll(); }); }
     case 'pickColor': window.__caseDraft.color = v; document.querySelectorAll('#sw button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === v))); return;
     case 'pickIcon': window.__caseDraft.icon = v; document.querySelectorAll('#ip button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === v))); return;

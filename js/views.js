@@ -7,19 +7,20 @@ function renderNav(){
   const nv = (a, icon, label, cnt) => `<a class="nv" href="#/${a}"${cur(a)} title="${label}">${ico(icon)}<span class="lbl">${label}</span>${cnt != null ? `<span class="cnt">${cnt}</span>` : ''}</a>`;
   $('sidenav').innerHTML = `
     <div class="navg">${nv('home','layout-dashboard','Dashboard', openQ || null)}${nv('cases','folder-open','Cases', DB.cases.length)}</div>
-    <div class="navg"><div class="caps">Open cases <button data-act="newCase" title="New case" aria-label="New case">${ico('plus','sm')}</button></div>
-      ${DB.cases.filter(c => c.status !== 'closed').map(c => `<a class="nv case" href="${caseHash(c.id)}"${r.area === 'case' && DB.active === c.id ? ' aria-current="page"' : ''} title="${esc(c.name)}">
-        <span class="dot" style="background:${esc(c.color)}"></span><span class="lbl">${esc(c.name.split(' — ')[0])}</span><span class="cnt">${derive(c.id).entries.length}</span></a>`).join('')}</div>
-    <div class="navg"><div class="caps">Workspace</div>${nv('notes','sticky-note','Notes', (DB.notes || []).reduce((s, n) => s + noteTasks(n).filter(t => !t.done).length, 0) || null)}</div>
+    ${(() => { const pins = DB.cases.filter(c => c.pinned); return `<div class="navg"><div class="caps">Pinned <button data-act="newCase" title="New case" aria-label="New case">${ico('plus','sm')}</button></div>
+      ${pins.length ? pins.map(c => `<a class="nv case" href="${caseHash(c.id)}"${r.area === 'case' && DB.active === c.id ? ' aria-current="page"' : ''} title="${esc(c.name)}">
+        <span class="dot" style="background:${esc(c.color)}"></span><span class="lbl">${esc(c.name.split(' — ')[0])}</span><span class="cnt">${derive(c.id).entries.length}</span></a>`).join('')
+        : `<a class="nv nav-hint" href="#/cases">${ico('pin','sm')}<span class="lbl">Pin a case to keep it here</span></a>`}</div>`; })()}
+    <div class="navg"><div class="caps">Workspace</div>${nv('notes','sticky-note','Notes', (DB.notes || []).reduce((s, n) => s + noteTasks(n).filter(t => !t.done).length, 0) || null)}${nv('pad','notebook-pen','Scratchpad')}</div>
     <div class="navg"><div class="caps">Research</div>${nv('toolbox','wrench','Toolbox', DB.tools.length)}${nv('queries','scan-search','Query library', (DB.queries || []).length || null)}</div>
-    <div class="navg"><div class="caps">Lab</div>${nv('ctf','flag','CTF', DB.ctf ? DB.ctf.chals.filter(c => c.status !== 'solved').length || null : null)}${nv('lab','file-search','Forensics kit')}${nv('decoder','binary','Decoder')}</div>
+    <div class="navg"><div class="caps">Lab</div>${nv('ctf','flag','CTF', DB.ctf ? DB.ctf.chals.filter(c => c.status !== 'solved').length || null : null)}${nv('lab','file-search','Forensics kit')}${nv('decoder','binary','Decoder')}${nv('cloud','cloud','Cloud')}</div>
     <div class="navg"><div class="caps">Intelligence</div>${nv('feeds','rss','Threat Intel', DB.feed.length || null)}${nv('watch','eye','Watchlist', watchHits().length || null)}${nv('detections','file-code','Detections', (DB.rules || []).length || null)}${nv('entities','fingerprint','Entities')}</div>
     <div class="navg"><div class="caps">Knowledge</div>${nv('reference','book-open','Reference')}${nv('playbooks','list-checks','Playbooks', (DB.playbooks || []).length || null)}</div>
-    <div class="navg">${(DB.trash || []).length ? nv('trash','trash-2','Trash', DB.trash.length) : ''}${nv('security', SEC.key ? 'lock' : 'shield-check', 'Security')}${nv('help','circle-help','Help')}${nv('settings','settings','Settings')}</div>`;
+    <div class="navg">${(DB.trash || []).length ? nv('trash','trash-2','Trash', DB.trash.length) : ''}${nv('security', SEC.key ? 'lock' : 'shield-check', 'Security')}${nv('whatsnew','sparkles',"What's new")}${nv('help','circle-help','Help')}${nv('settings','settings','Settings')}</div>`;
   const b = $('bbar');
   b.innerHTML = `<a href="#/home"${cur('home')}>${ico('layout-dashboard')}Home</a><a href="#/cases"${r.area === 'cases' || r.area === 'case' ? ' aria-current="page"' : ''}>${ico('folder-open')}Cases</a>
     <button class="cap" data-act="capture" aria-label="Capture"><span class="b">${ico('plus')}</span></button>
-    <a href="${caseHash(DB.active, 'graph')}"${r.tab === 'graph' ? ' aria-current="page"' : ''}>${ico('waypoints')}Graph</a><a href="#/toolbox"${cur('toolbox')}>${ico('wrench')}Tools</a>`;
+    <a href="${DB.active && theCase() ? caseHash(DB.active, 'graph') : '#/cases'}"${r.tab === 'graph' ? ' aria-current="page"' : ''}>${ico('waypoints')}Graph</a><a href="#/toolbox"${cur('toolbox')}>${ico('wrench')}Tools</a>`;
 }
 
 /* ---------- Dashboard ---------- */
@@ -50,7 +51,7 @@ function viewHome(){
       ${stat('folder-open','var(--accent)', active.length, 'Open cases', DB.cases.filter(c => c.status === 'review').length + ' in review', '#/cases')}
       ${stat('layers','var(--t-identity)', DB.entries.length, 'Vault entries', 'across all cases', '#/cases', entSpark)}
       ${stat('shield-alert','var(--red)', mal, 'Malicious', 'entities judged', 'goMal')}
-      ${stat('clock','var(--amber)', DB.records.length, 'Evidence records', 'captured this week', caseHash(DB.active, 'timeline'), recSpark)}
+      ${stat('clock','var(--amber)', DB.records.length, 'Evidence records', 'captured this week', (DB.active && theCase() ? caseHash(DB.active, 'timeline') : '#/cases'), recSpark)}
     </div>
     <div class="grid cols-main" style="margin-top:18px">
       <div class="stack">
@@ -72,11 +73,11 @@ function viewHome(){
           ${fm.map(({f, hits}) => `<button class="li" data-act="selFeed" data-id="${f.id}" style="align-items:flex-start"><span class="tb sm" style="--c:var(--red)">${ico('rss')}</span>
             <div class="main2"><b style="white-space:normal">${esc(f.title)}</b><small>${esc(f.source)} · ${hits.length} match${hits.length > 1 ? 'es' : ''}</small></div></button>`).join('') || empty('rss', 'No matches', 'No feed item mentions an entity from your cases.')}</div></section>
         <section class="card"><header><h3>Seen in more than one case</h3></header><div class="body">
-          ${cross.map(e => `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${entPill(e.id)}<span class="t3" style="font-size:13px">${[...e.cases].map(id => esc(theCase(id).code)).join(' · ')}</span></div>`).join('') || '<span class="t3">Nothing shared yet.</span>'}
+          ${cross.map(e => `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${entPill(e.id)}<span class="t3" style="font-size:13px">${[...e.cases].map(id => theCase(id) && esc(theCase(id).code)).filter(Boolean).join(' · ')}</span></div>`).join('') || '<span class="t3">Nothing shared yet.</span>'}
           <p class="heur">An exact match on the normalised value. A lead, not an attribution.</p></div></section>
         ${(DB.notes || []).some(n => n.pinned) ? `<section class="card"><header><h3>Pinned notes</h3><a class="btn sm ghost" href="#/notes">All notes ${ico('chevron-right','sm')}</a></header><div class="body"><div class="board mini">${DB.notes.filter(n => n.pinned).slice(0, 3).map(n => noteCard(n)).join('')}</div></div></section>` : ''}
         <section class="card"><header><h3>Open questions</h3><span class="t3">${openQ.length}</span></header><div class="body flush">
-          ${openQ.slice(0, 5).map(r => `<button class="li" data-act="selRec" data-id="${r.id}"><span class="t3">${ico('circle-dot','sm')}</span><div class="main2"><b style="font-weight:520">${esc(r.title)}</b></div><span class="end mono">${esc(theCase(r.caseId).code)}</span></button>`).join('')}</div></section>
+          ${openQ.slice(0, 5).map(r => `<button class="li" data-act="selRec" data-id="${r.id}"><span class="t3">${ico('circle-dot','sm')}</span><div class="main2"><b style="font-weight:520">${esc(r.title)}</b></div><span class="end mono">${theCase(r.caseId) ? esc(theCase(r.caseId).code) : ''}</span></button>`).join('')}</div></section>
       </div></div>
   </div></div>`;
 }
@@ -101,6 +102,7 @@ function caseCard(c){
     <a class="case-hit" href="${caseHash(c.id)}" aria-label="Open ${esc(c.name)}"></a>
     <div class="case-b">
       <div class="case-meta"><span class="cmark" style="--cc:${esc(c.color)}"></span><span class="mono t3">${esc(c.code)}</span>${statusTag(c.status)}<span class="case-upd">${esc(E.fmtAgo(Math.max(0, Date.now() - c.updated)))}</span>
+        <button class="iconbtn case-pin${c.pinned ? ' on' : ''}" data-act="casePin" data-id="${c.id}" aria-label="${c.pinned ? 'Unpin' : 'Pin'} ${esc(c.name)}" title="${c.pinned ? 'Unpin from sidebar' : 'Pin to sidebar'}">${ico('pin','sm')}</button>
         <button class="iconbtn case-more" data-act="caseMenu" data-id="${c.id}" aria-label="More actions for ${esc(c.name)}">${ico('ellipsis','sm')}</button></div>
       <h3>${esc(c.name)}</h3>
       <p>${esc(c.scope || 'No scope written yet.')}</p>

@@ -190,12 +190,19 @@ function viewReference(){
       <span class="ix">Knowledge · offline field guide</span><h1>Reference</h1><p>What an event ID, port, binary or code means — and what to check next.</p>
       <div class="search-in rf2-q">${ico('search')}<label class="sr" for="refQ">Search the reference</label><input id="refQ" class="inp" placeholder="4769, 4444, rundll32, kerberoast, T1059…" value="${esc(UI.refQ || '')}" autocomplete="off">${UI.refQ ? `<button class="iconbtn" data-act="refClear" aria-label="Clear">${ico('x','sm')}</button>` : '<kbd>/</kbd>'}</div>
       <div class="rf2-stat"><div><b>${total}</b><small>entries</small></div><div><b>${Object.keys(REFDATA).length}</b><small>sections</small></div><div><b>${hot}</b><small>worth a look</small></div></div>
-      <nav class="rf2-tabs" aria-label="Sections"><button data-act="refCat" data-v="all" aria-pressed="${cat === 'all'}">Everything<small>${total}</small></button>${Object.entries(REFDATA).map(([k, S]) => `<button data-act="refCat" data-v="${k}" aria-pressed="${cat === k}">${esc(S.name)}<small>${S.rows.length}</small></button>`).join('')}</nav>
     </div></section>
     <div class="rf2-in rf2-body">
+      <div class="rf2-wrap">
+      <aside class="rf2-rail" aria-label="Sections">
+        <div class="rf2-rail-h"><span class="ix">Sections</span></div>
+        <button class="rf2-nav${cat === 'all' ? ' on' : ''}" data-act="refCat" data-v="all" aria-pressed="${cat === 'all'}">${ico('book-open','sm')}<span class="rf2-nav-l">Everything</span><span class="rf2-nav-n">${total}</span></button>
+        ${Object.entries(REFDATA).map(([k, S]) => `<button class="rf2-nav${cat === k ? ' on' : ''}" data-act="refCat" data-v="${k}" aria-pressed="${cat === k}">${ico(S.icon,'sm')}<span class="rf2-nav-l">${esc(S.name)}</span><span class="rf2-nav-n">${S.rows.length}</span></button>`).join('')}
+      </aside>
+      <div class="rf2-main">
       <div class="rf2-tb"><span>${shown === total ? total + ' entries' : shown + ' of ' + total}${q ? ' matching “' + esc(UI.refQ) + '”' : ''}</span><label class="chk"><input type="checkbox" data-act="refHot" ${only ? 'checked' : ''}> Only “worth a look”</label></div>
       ${flat.length ? `<div class="rf2-g"><div class="rf2-l">${secs.map(([k, S, rows]) => `${cat === 'all' ? `<div class="rf2-sh">${ico(S.icon,'sm')}${esc(S.name)}<small>${rows.length}</small></div>` : ''}${rows.map(r => row(k, r)).join('')}`).join('')}</div>${det}</div>`
         : `<div class="hx2-empty">Nothing matches “${esc(UI.refQ || '')}”.${only ? ' Try turning off “Only worth a look”.' : ''}</div>`}
+      </div></div>
       ${UI.refOpen ? '<div class="rf2-scrim" data-act="refRowX" aria-hidden="true"></div>' : ''}
     </div></div></div>`;
 }
@@ -263,7 +270,7 @@ function viewHelp(){
     ['helpWelcome','phone','Take the welcome tour','What OSINTrix is for, how your data stays private, and where everything lives.','1 min']];
   const dir = [['Investigate',[['#/home','Dashboard','Open cases, activity and pinned notes'],['#/cases','Cases','Vault, timeline, graph, questions and report'],['#/notes','Notes','Sticky notes and to-dos'],['#/entities','Entities','Every indicator across every case'],['#/trash','Trash & restore points','Deleted items and snapshots']]],
     ['Research',[['#/toolbox','Toolbox','Your library of OSINT and security tools'],['#/queries','Query library','Search recipes filled from your vault'],['#/playbooks','Playbooks','Investigation checklists for a case'],['#/feeds','Threat Intel','News checked against your entities'],['#/watch','Watchlist','Entities you track']]],
-    ['Lab',[['#/lab','Forensics kit','Files, PCAP, SQLite, images, email headers'],['#/decoder','Decoder','Decode, encode, defang, hash, JWT'],['#/ctf','CTF','Challenges, flags and write-ups'],['#/detections','Detections','Sigma and YARA, tested on your evidence']]],
+    ['Lab',[['#/lab','Forensics kit','Files, PCAP, SQLite, images, email headers'],['#/decoder','Decoder','Decode, encode, defang, hash, JWT'],['#/cloud','Cloud','Misconfig scanner, cloud log hunting, cloud & CTF field guide'],['#/ctf','CTF','Challenges, flags and write-ups'],['#/detections','Detections','Sigma and YARA, tested on your evidence']]],
     ['Data & security',[['#/security','Security & audit','Encryption, audit chain, signed reports'],['#/reference','Reference','Ports, event IDs, LOLBins, ATT&CK'],['#/settings','Settings & about','Time zone, theme and version'],['#hx-data','Back up and restore','Export, import and reset this browser']]]];
   const pop = [['backup','Back up and restore'],['another computer','Move to another computer'],['encrypt','Encrypt the workspace'],['pcap','Read a packet capture'],['share','Share a case'],['offline','Works offline?']];
   return `<div class="scroll"><div class="hx2">

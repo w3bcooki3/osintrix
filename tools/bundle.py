@@ -21,8 +21,8 @@ def js(src):
     assert '</script' not in code.lower(), src
     return '<script>' + code + '</script>'
 
-html = re.sub(r'<link rel="stylesheet" href="([^"]+)">', lambda m: css(m.group(1)), html)
-html = re.sub(r'<script src="([^"]+)"></script>', lambda m: js(m.group(1)), html)
+html = re.sub(r'<link rel="stylesheet" href="([^"]+)">', lambda m: css(m.group(1).split('?')[0]), html)
+html = re.sub(r'<script src="([^"]+)"></script>', lambda m: js(m.group(1).split('?')[0]), html)
 # everything is inline now, so the policy allows inline code and data: fonts instead of files
 html = re.sub(r'content="default-src[^"]*"', "content=\"default-src 'none'; script-src 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob: https://*.basemaps.cartocdn.com https://server.arcgisonline.com; font-src data:; "
               "connect-src https://api.rss2json.com; form-action 'none'; base-uri 'none'\"", html)

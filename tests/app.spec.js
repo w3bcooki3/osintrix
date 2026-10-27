@@ -2,7 +2,7 @@
 const { test, expect } = require('@playwright/test');
 const { open, capture, fixture, noErrors } = require('./helpers');
 
-const ROUTES = ['#/home', '#/cases', '#/case/c-lantern/overview', '#/case/c-lantern/vault', '#/case/c-lantern/entities', '#/case/c-lantern/timeline',
+const ROUTES = ['#/home', '#/cases', '#/cloud', '#/pad', '#/whatsnew', '#/case/c-lantern/overview', '#/case/c-lantern/vault', '#/case/c-lantern/entities', '#/case/c-lantern/timeline',
   '#/case/c-lantern/graph', '#/case/c-lab/map', '#/case/c-lantern/questions', '#/case/c-lantern/report', '#/toolbox', '#/queries', '#/detections',
   '#/notes', '#/playbooks', '#/ctf', '#/lab', '#/decoder', '#/feeds', '#/watch', '#/entities', '#/reference', '#/trash', '#/security', '#/help', '#/settings'];
 
@@ -198,7 +198,7 @@ test('clicks every control on the main screens without an error', async ({ page 
   test.setTimeout(240_000);
   const errors = await open(page);
   const SKIP = new Set(['exportAll', 'resetDemo', 'freshStart', 'removeSample', 'importAll', 'importCase', 'secOn', 'secLock', 'secOff', 'secChange', 'capFiles', 'capLog', 'capWeb', 'attAdd', 'attOpen', 'attDl', 'rsAll', 'printReport', 'helpWelcome', 'refFind', 'pbGo']);
-  for (const r of ['#/home', '#/case/c-lantern/overview', '#/case/c-lantern/entities', '#/case/c-lantern/timeline', '#/case/c-lantern/graph', '#/case/c-lab/map', '#/case/c-lantern/questions', '#/toolbox', '#/lab', '#/security', '#/reference', '#/playbooks', '#/help']) {
+  for (const r of ['#/home', '#/case/c-lantern/overview', '#/case/c-lantern/entities', '#/case/c-lantern/timeline', '#/case/c-lantern/graph', '#/case/c-lab/map', '#/case/c-lantern/questions', '#/toolbox', '#/lab', '#/security', '#/reference', '#/playbooks', '#/help', '#/cloud', '#/whatsnew', '#/pad']) {
     await page.evaluate(h => { location.hash = h; renderMain(); }, r); await page.waitForTimeout(200);
     const acts = await page.evaluate(() => [...document.querySelectorAll('#main [data-act]')].map((e, i) => [i, e.dataset.act]));
     for (const [i, a] of acts.slice(0, 60)) {
@@ -208,4 +208,34 @@ test('clicks every control on the main screens without an error', async ({ page 
     }
   }
   noErrors(errors);
+});
+
+test('cloud scanner flags IaC and logs, and sends to a case', async ({ page }) => {
+  await open(page, "#/cloud");
+  // run the Terraform sample
+  await page.evaluate(() => CLOUD_ACTS.cloudSample(0, 'Terraform (open SG + public RDS)'));
+  await expect(page.locator('.cld-f')).not.toHaveCount(0);
+  const n = await page.locator('.cld-f').count();
+  expect(n).toBeGreaterThanOrEqual(3);
+  // critical SG finding present
+  await expect(page.locator('.cld-f.critical').first()).toContainText(/0\.0\.0\.0\/0/);
+  // log hunting on CloudTrail sample flags StopLogging
+  await page.evaluate(() => CLOUD_ACTS.cloudSample(0, 'CloudTrail (suspicious burst)'));
+  await expect(page.locator('.cld-ev')).not.toHaveCount(0);
+  await expect(page.locator('.cld-ev', { hasText: 'StopLogging' })).toHaveCount(1);
+  // guide copy action is wired (no throw)
+  await page.evaluate(() => { UI.cloudTab = 'guide'; renderMain(); });
+  await expect(page.locator('.cg-c')).not.toHaveCount(0);
+});
+
+test('scratchpad detects indicators and groups them into lanes', async ({ page }) => {
+  await open(page, "#/pad");
+  await page.fill('#padText', 'src=203.0.113.9 dport=4444 proto=TCP\nc2 update-lamp.test CVE-2024-3400 sha256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
+  await page.waitForTimeout(400);
+  await expect(page.locator('.pad-lane')).not.toHaveCount(0);
+  await expect(page.locator('.pad-chip', { hasText: '4444' })).toHaveCount(1);
+  await expect(page.locator('.pad-chip', { hasText: 'TCP' })).toHaveCount(1);
+  await expect(page.locator('.pad-chip', { hasText: 'CVE-2024-3400' })).toHaveCount(1);
+  await page.locator('.pad-chip').first().click();
+  await expect(page.locator('#padBulk')).toBeVisible();
 });
