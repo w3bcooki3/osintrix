@@ -239,3 +239,83 @@ test('scratchpad detects indicators and groups them into lanes', async ({ page }
   await page.locator('.pad-chip').first().click();
   await expect(page.locator('#padBulk')).toBeVisible();
 });
+
+/* ---------- release blockers: data safety and imports ---------- */
+const seedStore = async (page, raw) => page.evaluate(async raw => {
+  if (typeof TABS !== 'undefined') TABS.writer = false;   // stop this page saving over the seeded data as it unloads
+  localStorage.setItem('osintrix-poc:v4', raw);
+  await new Promise(res => { const r = indexedDB.open('osintrix', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onsuccess = () => { const tx = r.result.transaction('kv', 'readwrite'); tx.objectStore('kv').put(raw, 'osintrix-poc:v4'); tx.oncomplete = () => { r.result.close(); res(); }; }; });
+}, raw);
+const readStore = page => page.evaluate(() => new Promise(res => { const r = indexedDB.open('osintrix', 1);
+  r.onsuccess = () => { const q = r.result.transaction('kv').objectStore('kv').get('osintrix-poc:v4'); q.onsuccess = () => res([q.result, localStorage.getItem('osintrix-poc:v4')]); }; }));
+
+test('never overwrites a workspace it cannot read', async ({ page }) => {
+  await open(page);
+  const newer = JSON.stringify({ v: 3, marker: 'keep-me', cases: [] });
+  await seedStore(page, newer);
+  await page.reload();
+  await expect(page.locator('.recover')).toBeVisible();
+  await expect(page.locator('.recover')).toContainText('newer version');
+  await page.waitForTimeout(800);
+  const [idb, ls] = await readStore(page);
+  expect(idb).toBe(newer); expect(ls).toBe(newer);
+  // damaged data: same, and starting fresh keeps the old copy aside
+  await seedStore(page, '{"v":2,"cases":[');
+  await page.reload();
+  await expect(page.locator('.recover')).toContainText('damaged');
+  await page.click('#recFresh');
+  await expect.poll(() => page.evaluate(() => typeof DB !== 'undefined' && !!DB && DB.cases.length > 0)).toBe(true);
+  const kept = await page.evaluate(() => new Promise(res => { const r = indexedDB.open('osintrix', 1);
+    r.onsuccess = () => { const q = r.result.transaction('kv').objectStore('kv').getAllKeys(); q.onsuccess = () => res(q.result.filter(k => String(k).includes(':kept:')).length); }; }));
+  expect(kept).toBeGreaterThan(0);
+});
+
+test('a second tab is read-only until it takes over', async ({ page, context }) => {
+  const errors = await open(page);
+  const two = await context.newPage();
+  await two.goto(page.url());
+  await expect(two.locator('#rotab')).toBeVisible();
+  await two.evaluate(() => { DB.cases[0].name = 'Edited in tab two'; mutate('rename'); flush(); });
+  await page.waitForTimeout(500);
+  expect((await readStore(page))[1]).not.toContain('Edited in tab two');
+  // tab one saves; tab two follows
+  await page.evaluate(() => { DB.cases[0].name = 'Edited in tab one'; mutate('rename'); flush(); });
+  await expect.poll(() => two.evaluate(() => DB.cases[0].name)).toBe('Edited in tab one');
+  // take over: tab two becomes the writer, tab one turns read-only
+  await two.click('#rotabGo');
+  await expect.poll(() => page.evaluate(() => !!document.getElementById('rotab'))).toBe(true);
+  await expect.poll(() => two.evaluate(() => typeof TABS !== 'undefined' && TABS.writer)).toBe(true);
+  noErrors(errors);
+});
+
+test('imports are checked: bad IDs are refused, markup in names stays text, files never overwrite', async ({ page }) => {
+  const errors = await open(page, '#/case/c-lantern/timeline');
+  const feed = (page, obj) => page.evaluate(t => { window.pickFile = (a, cb) => cb(t); }, JSON.stringify(obj));
+  // a backup whose IDs try to break out of an attribute
+  const bad = await page.evaluate(() => { const d = JSON.parse(JSON.stringify(DB)); d.tools[0].id = '"><a href=https://evil.example style=position:fixed;inset:0>'; return d; });
+  await feed(page, bad); await page.evaluate(() => clickAct('importAll'));
+  await expect(page.locator('#toast')).toContainText('was not imported');
+  expect(await page.evaluate(() => DB.tools.some(t => t.id.includes('"')))).toBe(false);
+  // a case file with markup in its code and name, and an attachment ID that already exists here
+  const fid = await page.evaluate(async () => { const m = await storeFile(new File(['original bytes'], 'keep.txt', { type: 'text/plain' })); DB.records[0].att = [m]; return m.id; });
+  await feed(page, { format: 'osintrix-case', case: { id: 'c1', name: 'Imported <img src=x onerror=alert(1)>', code: '<b>X</b>' }, entries: [{ id: 'v1', type: 'ip', fields: { ip: '192.0.2.9' } }],
+    records: [{ id: 'r1', title: 'With file', body: '', att: [{ id: fid, name: 'evil.pdf', type: 'application/pdf', size: 4, sha256: '' }] }], files: { [fid]: 'data:text/html,<script>alert(1)</script>' } });
+  await page.evaluate(() => importCase()); await page.waitForTimeout(600);
+  expect(await page.evaluate(async fid => (await fileBlob(fid)).text(), fid)).toBe('original bytes');
+  const att = await page.evaluate(() => DB.records.find(r => r.title === 'With file').att[0].id);
+  expect(att).not.toBe(fid);
+  // the context menu shows the code as text
+  await page.evaluate(() => { const c = DB.cases[DB.cases.length - 1]; showMenu(10, 10, [{ label: 'x', fn: () => {} }], ico('folder', 'sm') + esc(c.code) + c.name); });
+  expect(await page.locator('#ctx .ctx-title img, #ctx .ctx-title b').count()).toBe(0);
+  await expect(page.locator('#ctx .ctx-title')).toContainText('<b>X</b>');
+  // the "PDF" that is really HTML is not opened as a page
+  expect(await page.evaluate(async att => sniffKind(await fileBlob(att)), att)).toBe('markup');
+  noErrors(errors);
+});
+
+test('extractor stays fast on hostile input', async ({ page }) => {
+  await open(page);
+  const ms = await page.evaluate(() => { const t = performance.now(); Engine.extract('a.'.repeat(50000)); Engine.extract('1.'.repeat(50000)); Engine.extract('a-'.repeat(50000) + '@'); return performance.now() - t; });
+  expect(ms).toBeLessThan(1500);
+});

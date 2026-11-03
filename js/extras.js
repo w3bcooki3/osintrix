@@ -116,15 +116,16 @@ function printReport(){
 function importCase(){
   pickFile('.json,application/json', raw => maybeDecrypt(raw, txt => { let d; try{ d = JSON.parse(txt); }catch(e){ return toast('That file is not JSON'); }
     if(!d || d.format !== 'osintrix-case' || !d.case || !Array.isArray(d.entries)) return toast('Not an OSINTrix case — export one from a case menu');
+    { const errs = checkImport(d, 'case'); if(errs.length) return importRefused('The case', errs); }
     const map = new Map(), nid = (old, p) => { const n = uid(p); map.set(old, n); return n; };
     const c = {...d.case, id:uid('c'), updated:Date.now()}; if(DB.cases.some(x => x.code === c.code)) c.code = nextCaseCode(); if(clash(DB.cases, c.name)) c.name = nextName(String(c.name || 'Imported case').trim() + ' (imported)', DB.cases.map(x => x.name));
-    const entries = d.entries.map(e => ({...e, id:nid(e.id, 'v'), caseId:c.id}));
-    const records = (d.records || []).map(r => ({...r, id:nid(r.id, 'r'), caseId:c.id}));
+    const entries = d.entries.map(e => normEntry({...e, id:nid(e.id, 'v'), caseId:c.id}));
+    const records = (d.records || []).map(r => normRecord({...r, id:nid(r.id, 'r'), caseId:c.id}));
     const links = (d.links || []).map(l => ({...l, id:uid('l'), caseId:c.id, a:map.get(l.a) || l.a, b:map.get(l.b) || l.b, src:map.get(l.src) || l.src}));
     for(const e of entries) if(e.src) e.src = map.get(e.src) || '';
     if(c.t0) c.t0 = map.get(c.t0) || null;
     DB.cases.push(c); DB.entries.push(...entries); DB.records.push(...records); DB.links.push(...links.filter(l => entries.some(e => e.id === l.a) && entries.some(e => e.id === l.b)));
-    if(d.files) filesFromImport(d.files);
+    if(d.files) rekeyFiles(d.files, records).then(() => renderAll());
     mutate('imported case ' + c.code); hashRecords(); ensurePositions(); DB.active = c.id; go(caseHash(c.id));
     toast(`Imported ${c.code} — ${entries.length} entries, ${records.length} records`); }));
 }

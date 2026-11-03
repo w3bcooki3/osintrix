@@ -633,3 +633,10 @@ html.ds[data-theme=dark] .cg-term{background:#070b14;border-color:#1c2740}
 html.ds[data-theme=dark] .cg-term{background:#0b1220!important;border-color:var(--border-soft)!important}
 html.ds[data-theme=dark] .cg-term code{color:#dbe4ff!important}
 html.ds[data-theme=dark] .cg-copy{background:transparent!important}
+.recover p{max-width:52ch}
+.recover-a{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:18px 0 6px}
+.rotab{position:fixed;left:50%;bottom:calc(16px + var(--bottom,0px));transform:translateX(-50%);z-index:130;display:flex;align-items:center;gap:10px;max-width:calc(100vw - 24px);
+  padding:8px 8px 8px 14px;border-radius:12px;background:var(--surface);color:var(--text);box-shadow:var(--shadow);border:1px solid var(--amber-line);font-size:13.5px}
+.rotab>svg.i{color:var(--amber);flex:none}
+.rotab b{font-weight:650}
+@media (max-width:760px){ .rotab{flex-wrap:wrap;left:12px;right:12px;transform:none} }

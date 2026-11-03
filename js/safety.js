@@ -142,7 +142,12 @@ async function attAct(a, rid, fid){
   if(a === 'attAdd') return pickFiles('', fs => attachFiles(fs, rid));
   if(!m) return;
   if(a === 'attOpen'){ if(/html|xml|svg|mhtml|multipart|message\/rfc822|^image\//i.test(m.type) || /\.(html?|xhtml|svg|xml|mhtml?|mht)$/i.test(m.name)) return safeView(rid, fid);
-    const u = await fileURL(fid); return u ? window.open(u, '_blank', 'noopener') : toast('That file is missing from this browser'); }
+    // open by what the bytes are, never by the type the file claimed: markup goes to the sandbox, the rest opens with a fixed safe type
+    const b = await fileBlob(fid); if(!b) return toast('That file is missing from this browser');
+    const kind = await sniffKind(b);
+    if(kind === 'markup' || kind === 'image') return safeView(rid, fid);
+    if(kind === 'binary') return attAct('attDl', rid, fid);
+    const u = URL.createObjectURL(new Blob([b], {type:kind === 'pdf' ? 'application/pdf' : 'text/plain;charset=utf-8'})); window.open(u, '_blank', 'noopener'); setTimeout(() => URL.revokeObjectURL(u), 60000); return; }
   if(a === 'attDl'){ const b = await fileBlob(fid); if(!b) return toast('That file is missing from this browser'); const u = URL.createObjectURL(b), l = document.createElement('a'); l.href = u; l.download = m.name; document.body.appendChild(l); l.click(); setTimeout(() => { URL.revokeObjectURL(u); l.remove(); }, 200); return; }
   if(a === 'attKit'){ const b = await fileBlob(fid); if(!b) return toast('That file is missing from this browser'); go('#/lab'); UI.labTab = 'file'; return labLoad(new File([b], m.name, {type:m.type, lastModified:m.modified})); }
   if(a === 'attDel') return confirmDlg('Remove ' + m.name + '?', 'The file is removed from this record and deleted from the browser. The record stays.', 'Remove file', () => { r.att = r.att.filter(x => x !== m); if(!fileInUse(fid) && !(DB.trash || []).some(x => filesOfItem(x).includes(fid))) IDB.del('file:' + fid); mutate('removed file ' + m.name); renderAll(); });

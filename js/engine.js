@@ -124,7 +124,10 @@ const FILE_EXT_TLD = /\.(exe|dll|sys|ps1|bat|cmd|vbs|js|hta|scr|jar|lnk|iso|zip|
 function extract(text){
   if(!text) return [];
   if(text.length > 400000) text = text.slice(0, 400000);
-  let work = refang(text);
+  // Very long runs without whitespace (minified blobs, base64, crafted "a.a.a…" strings) make the domain, email and
+  // host:port patterns retry from every position, which is quadratic. Real indicators are far shorter than 400
+  // characters, so such runs are cut into 256-character pieces before matching.
+  let work = refang(text).replace(/\S{400,}/g, run => run.replace(/(.{256})/g, '$1 '));
   const out = [], seen = new Set();
   const push = (k, raw) => {
     let v = trimEdge(String(raw).trim()); if(!v) return;

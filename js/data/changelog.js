@@ -4,6 +4,22 @@
    Each change has a type: "added" | "changed" | "fixed" | "removed". */
 const CHANGELOG_DATA = [
   {
+    "version": "1.17",
+    "name": "Data safety",
+    "date": "2026-11-03",
+    "summary": "Your workspace can no longer be overwritten by accident: unreadable data is kept, a second tab is read-only, imports are checked and the offline copy only runs its own code.",
+    "changes": [
+      {"type": "fixed", "text": "Saved data this version cannot read (damaged, or from a newer version) is no longer replaced with the demo. A recovery screen lets you download it or start fresh, and the old data is always kept aside."},
+      {"type": "fixed", "text": "Two open tabs no longer overwrite each other. The second tab is read-only, follows the first tab's saves, and can take the workspace over with one click."},
+      {"type": "fixed", "text": "Backup, case, tool and query imports are checked before anything changes. Files with malformed or unsafe IDs are refused with a clear reason."},
+      {"type": "fixed", "text": "Importing a case gives its files fresh IDs, so it can never overwrite another case's evidence."},
+      {"type": "fixed", "text": "Attachments open by what their bytes are, not the type they claim: markup always opens in the sandboxed viewer."},
+      {"type": "fixed", "text": "Names and codes shown in menu titles are always plain text."},
+      {"type": "fixed", "text": "The offline single-file copy only runs its own scripts (listed by hash); it no longer allows inline script."},
+      {"type": "fixed", "text": "Pasting very long strings without spaces no longer freezes the app: 100 KB of hostile input takes about a tenth of a second instead of half a minute."}
+    ]
+  },
+  {
     "version": "1.16",
     "name": "New design",
     "date": "2026-10-27",

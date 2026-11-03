@@ -222,9 +222,11 @@ document.addEventListener('click', ev => {
       const prev = DB.tools.slice(), prevGone = (DB.deletedSeed || []).slice(); DB.tools = DB.tools.filter(z => !UI.tpick.has(z.id)); DB.deletedSeed = prevGone.concat(xs.filter(z => z.seed).map(z => z.url)); UI.tpick = new Set(); mutate('deleted ' + xs.length + ' tools'); renderAll();
       toast(xs.length + ' tools deleted', 'Undo', () => { DB.tools = prev; DB.deletedSeed = prevGone; mutate('restored tools'); renderAll(); }); }); }
     case 'importAll': return pickFile('.json,application/json', raw => maybeDecrypt(raw, txt => { let d; try{ d = JSON.parse(txt); }catch(e){ return toast('That file is not JSON'); }
-      if(!d || d.v !== 2 || !Array.isArray(d.cases) || !Array.isArray(d.entries) || !Array.isArray(d.records)) return toast('Not an OSINTrix backup — use a file from “Export everything”');
+      if(!d || !Array.isArray(d.cases) || !Array.isArray(d.entries) || !Array.isArray(d.records)) return toast('Not an OSINTrix backup — use a file from “Export everything”');
+      { const errs = checkImport(d, 'backup'); if(errs.length) return importRefused('The backup', errs); }
       confirmDlg('Replace everything with this backup?', 'Your current cases, notes, tools and rules in this browser are replaced by the ' + d.cases.length + ' case' + (d.cases.length === 1 ? '' : 's') + ' in the file. You can undo right after.', 'Import backup', async () => {
-        await snapshot('Before importing a backup'); if(d.files){ await filesFromImport(d.files); delete d.files; }
+        await snapshot('Before importing a backup'); if(d.files){ await rekeyFiles(d.files, d.records, d.trash); delete d.files; }
+        d.records.forEach(normRecord); d.entries.forEach(normEntry);
         const prev = DB; DB = d; DB.prefs = Object.assign({}, prev.prefs, d.prefs || {}); ensureTools(); ensurePlaybooks(); ensureIntel(); ensureQueries(); ensureRules(); ensureNotes(); if(!DB.cases.some(c => c.id === DB.active)) DB.active = DB.cases[0] && DB.cases[0].id;
         await hashRecords(); ensurePositions(); mutate('imported backup'); UI.sel = null; applyPrefs(); renderAll(); toast('Backup imported', 'Undo', () => { DB = prev; mutate('undo import'); applyPrefs(); renderAll(); }); }); }));
     case 'freshStart': return confirmDlg('Start fresh?', 'Deletes every case, vault entry, evidence record and note in this browser. Tools, queries, rules and settings stay. Export first if you might need them. You can undo right after.', 'Delete my cases', async () => {
@@ -233,7 +235,7 @@ document.addEventListener('click', ev => {
       toast('All cases deleted', 'Undo', () => { DB = prev; mutate('undo fresh start'); renderAll(); }); });
     case 'toolOpen': { const x = DB.tools.find(z => z.id === id); if(x){ x.uses = (x.uses || 0) + 1; x.last = Date.now(); save(); } return; }
     case 'toolImport': return pickFile('.json,application/json', txt => { let d; try{ d = JSON.parse(txt); }catch(e){ return toast('Not a JSON file'); }
-      if(!Array.isArray(d)) return toast('Expected a list of tools, like tools.json'); let n = 0;
+      if(!Array.isArray(d)) return toast('Expected a list of tools, like tools.json'); { const errs = checkImport(d, 'tools'); if(errs.length) return importRefused('The tool list', errs); } let n = 0;
       for(const t of d){ if(!t || !t.name || !E.safeUrl(t.url) || DB.tools.some(x => x.url === t.url)) continue;
         DB.tools.push({id:uid('t'), name:String(t.name).slice(0, 80), url:t.url, cat:TOOL_CATS[t.parentCategory] ? t.parentCategory : 'osint', sub:t.childCategory || '', desc:String(t.description || '').slice(0, 400), tags:Array.isArray(t.tags) ? t.tags.slice(0, 8).map(String) : [], pinned:false, starred:false, added:Date.now(), uses:0}); n++; }
       mutate('imported ' + n + ' tools'); renderAll(); toast(n + ' tools imported'); });
@@ -262,7 +264,7 @@ document.addEventListener('click', ev => {
       if($('qLog').checked) DB.records.push({id:uid('r'), caseId:DB.active, type:'note', title:'Searched ' + ENGINES[UI.runEng][0] + ': ' + x.name, body:q, tsRaw:new Date().toISOString(), tsZone:'explicit', ts:Date.now(), source:'query:' + UI.runEng, host:'', tags:['research'], ents:E.extract(q), answer:'', addedBy:'You', addedAt:Date.now(), hash:''});
       mutate('ran query ' + x.name); hashRecords(); setTimeout(() => { renderNav(); renderMain(); }, 50); return toast('Opened in ' + ENGINES[UI.runEng][0] + ($('qLog').checked ? ' · logged to ' + theCase().code : '')); }
     case 'qExport': return download('osintrix-queries.json', JSON.stringify(DB.queries.map(({id, uses, ...r}) => r), null, 2), 'application/json');
-    case 'qImport': return pickFile('.json,application/json', txt => { let d; try{ d = JSON.parse(txt); }catch(e){ return toast('Not a JSON file'); } if(!Array.isArray(d)) return toast('Expected a list of queries'); let n = 0;
+    case 'qImport': return pickFile('.json,application/json', txt => { let d; try{ d = JSON.parse(txt); }catch(e){ return toast('Not a JSON file'); } if(!Array.isArray(d)) return toast('Expected a list of queries'); { const errs = checkImport(d, 'tools'); if(errs.length) return importRefused('The query list', errs); } let n = 0;
       for(const r of d){ const query = String(r.query || '').slice(0, 2000); if(!query || DB.queries.some(z => z.query === query)) continue;
         DB.queries.push({id:uid('q'), name:importName(String(r.name || 'Imported query').slice(0, 110), DB.queries.map(x => x.name)), desc:String(r.description || r.desc || '').slice(0, 400), query, cat:QCATS[r.category || r.cat] ? (r.category || r.cat) : 'custom', engines:(Array.isArray(r.engines) ? r.engines : ['google']).filter(e => ENGINES[e]).slice(0, 9).concat([]).filter((e, i, a) => a.indexOf(e) === i).length ? (r.engines || []).filter(e => ENGINES[e]) : ['google'], tags:Array.isArray(r.tags) ? r.tags.map(String).slice(0, 10) : [], starred:false, uses:0, custom:true}); n++; }
       mutate('imported ' + n + ' queries'); renderAll(); toast(n + ' queries imported'); });
@@ -607,8 +609,10 @@ function closeWelcome(){ wlCycle(false); $('welcome').hidden = true; try{ localS
 (async function boot(){
   $('splash').innerHTML = logoMark(64); $('brand').innerHTML = logoMark(32) + `<div class="txt">${wordmark()}<small>${esc(BRAND.tagline)}</small></div>`; $('fav').href = FAVICON;
   try{ const th = localStorage.getItem('osintrix:theme'); if(th) document.documentElement.dataset.theme = th; document.documentElement.dataset.layout = 'pinboard'; document.documentElement.classList.add('ds'); document.documentElement.classList.toggle('nav-rail', localStorage.getItem('osintrix:navRail') !== '0'); }catch(e){}
+  await claimWriter(false);
   const loaded = await loadAll();
   if(loaded && loaded.__locked){ $('splash').classList.add('out'); setTimeout(() => $('splash').remove(), 320); return lockScreen(loaded.env, d => { DB = d; SEC.locked = false; bootRest(true); }); }
+  if(loaded && loaded.__bad){ $('splash').classList.add('out'); return recoveryScreen(loaded.copies); }
   DB = loaded || seedDB(); bootRest(false);
 })();
 async function bootRest(unlocked){

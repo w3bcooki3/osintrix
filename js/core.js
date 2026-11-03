@@ -28,7 +28,16 @@ function seedDB(){
     verdicts, tools, feed:DEMO.feed.map(f => ({...f, ts:Date.parse(f.date)})), active:'c-lantern',
     prefs:{theme:'light', size:'m', density:'comfortable', tz:'UTC', navRail:true}, log:[], sample:true};
 }
-function load(){ try{ const d = JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); if(d && d.v === 2 && Array.isArray(d.entries)) return d; }catch(e){} return null; }
+/* A stored workspace is "usable" only if this version understands it. Anything else is kept, never overwritten. */
+const usable = d => !!(d && d.v === 2 && Array.isArray(d.entries) && Array.isArray(d.cases) && Array.isArray(d.records));
+function readCopy(raw){
+  if(raw == null || raw === '') return {state:'empty'};
+  let d; try{ d = JSON.parse(raw); }catch(e){ return {state:'bad', why:'it could not be read (the stored data is damaged)', raw}; }
+  if(usable(d)) return {state:'ok', d};
+  if(d && typeof d.v === 'number' && d.v > 2) return {state:'bad', why:'it was saved by a newer version of OSINTrix', raw, newer:true};
+  return {state:'bad', why:'it is not in a format this version understands', raw};
+}
+function load(){ try{ const c = readCopy(localStorage.getItem(STORE_KEY)); return c.state === 'ok' ? c.d : null; }catch(e){} return null; }
 /* IndexedDB is the primary store: far more room than localStorage (~5 MB). localStorage keeps a mirror while it fits. */
 const IDB = {db:null,
   open(){ return new Promise(res => { try{ const r = indexedDB.open('osintrix', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => { IDB.db = r.result; res(true); }; r.onerror = () => res(false); r.onblocked = () => res(false); }catch(e){ res(false); } }); },
@@ -37,10 +46,15 @@ const IDB = {db:null,
 const STORE = {idb:false, ls:false, persisted:false, bytes:0, quota:0, lastSaved:0};
 async function loadAll(){
   STORE.idb = await IDB.open();
-  let a = null, envs = []; if(STORE.idb){ const raw = await IDB.get(STORE_KEY); if(isEnv(raw)) envs.push(raw); else { try{ a = raw ? JSON.parse(raw) : null; }catch(e){ a = null; } if(!(a && a.v === 2 && Array.isArray(a.entries))) a = null; } }
-  try{ const ls = localStorage.getItem(STORE_KEY); if(isEnv(ls)) envs.push(ls); }catch(e){}
+  let a = null, envs = [], ca = {state:'empty'}, cb = {state:'empty'};
+  if(STORE.idb){ const raw = await IDB.get(STORE_KEY); if(isEnv(raw)) envs.push(raw); else { ca = readCopy(raw); if(ca.state === 'ok') a = ca.d; } }
+  let lsRaw = null; try{ lsRaw = localStorage.getItem(STORE_KEY); if(isEnv(lsRaw)) envs.push(lsRaw); else cb = readCopy(lsRaw); }catch(e){}
   if(envs.length){ try{ if(navigator.storage && navigator.storage.persisted) STORE.persisted = await navigator.storage.persisted(); }catch(e){} const env = envs.sort((x, y) => (JSON.parse(y).at || 0) - (JSON.parse(x).at || 0))[0]; SEC.locked = true; return {__locked:true, env}; }
-  const b = load();
+  const b = cb.state === 'ok' ? cb.d : null;
+  // a copy from a newer version, or no readable copy at all: stop and let the person decide; nothing is written
+  const bad = [ca, cb].filter(c => c.state === 'bad');
+  if(bad.some(c => c.newer) || (bad.length && !a && !b)) return {__bad:true, copies:bad};
+  if(bad.length) await IDB.set(STORE_KEY + ':damaged:' + Date.now(), bad[0].raw);   // the readable copy wins, the other is kept aside
   const pick = a && b ? ((a.savedAt || 0) >= (b.savedAt || 0) ? a : b) : (a || b);
   try{ if(navigator.storage && navigator.storage.persist) STORE.persisted = await navigator.storage.persisted() || await navigator.storage.persist(); }catch(e){}
   return pick;
@@ -48,13 +62,13 @@ async function loadAll(){
 async function storageEstimate(){ try{ if(navigator.storage && navigator.storage.estimate){ const e = await navigator.storage.estimate(); STORE.quota = e.quota || 0; STORE.usage = e.usage || 0; } }catch(e){} return STORE; }
 let saveT = null, storageOK = true;
 function save(){ clearTimeout(saveT); saveT = setTimeout(flush, 250); }
-function flush(){ clearTimeout(saveT); if(!DB || SEC.locked) return; DB.savedAt = Date.now(); const json = JSON.stringify(DB);
+function flush(){ clearTimeout(saveT); if(!DB || SEC.locked) return; if(!TABS.writer){ paintSaved(); return; } DB.savedAt = Date.now(); const json = JSON.stringify(DB);
   if(SEC.key) return flushSealed(json);
   STORE.bytes = json.length * 2;
   let ok = false; try{ if(json.length < 2400000){ localStorage.setItem(STORE_KEY, json); STORE.ls = true; ok = true; } else { localStorage.removeItem(STORE_KEY); STORE.ls = false; } }catch(e){ STORE.ls = false; }
   if(STORE.idb){ ok = true; IDB.set(STORE_KEY, json).then(r => { if(!r && !STORE.ls){ storageOK = false; paintSaved(); } }); }
-  storageOK = ok; STORE.lastSaved = Date.now(); paintSaved(); }
-function paintSaved(){ const s = $('saved'); if(s) s.innerHTML = storageOK ? '<i></i><span>Saved in this browser</span>' : '<i style="background:var(--red)"></i><span>Not saved</span>'; s.title = storageOK ? 'Saved in this browser' : 'Not saved — this browser blocks storage'; }
+  storageOK = ok; STORE.lastSaved = Date.now(); paintSaved(); tabSaved(); }
+function paintSaved(){ const s = $('saved'); if(s && !TABS.writer){ s.innerHTML = '<i style="background:var(--amber)"></i><span>Read-only in this tab</span>'; s.title = 'This workspace is open in another tab'; return; } if(s) s.innerHTML = storageOK ? '<i></i><span>Saved in this browser</span>' : '<i style="background:var(--red)"></i><span>Not saved</span>'; s.title = storageOK ? 'Saved in this browser' : 'Not saved — this browser blocks storage'; }
 window.addEventListener('pagehide', flush); document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'hidden') flush(); });
 let rev = 0, cache = {};
 function mutate(what){ rev++; cache = {}; auditAdd(what); DB.log.unshift({at:Date.now(), what}); DB.log.length = Math.min(DB.log.length, 200); save(); }

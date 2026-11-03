@@ -23,9 +23,6 @@ def js(src):
 
 html = re.sub(r'<link rel="stylesheet" href="([^"]+)">', lambda m: css(m.group(1).split('?')[0]), html)
 html = re.sub(r'<script src="([^"]+)"></script>', lambda m: js(m.group(1).split('?')[0]), html)
-# everything is inline now, so the policy allows inline code and data: fonts instead of files
-html = re.sub(r'content="default-src[^"]*"', "content=\"default-src 'none'; script-src 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob: https://*.basemaps.cartocdn.com https://server.arcgisonline.com; font-src data:; "
-              "connect-src https://api.rss2json.com; form-action 'none'; base-uri 'none'\"", html)
 # welcome-screen pictures become data: URIs so the one-file copy has no loose files
 for n in ('dashboard-dark', 'dashboard-light', 'graph-dark', 'graph-light', 'phone-dark', 'phone-light'):
     f = root / 'assets' / 'welcome' / (n + '.jpg')
@@ -33,5 +30,15 @@ for n in ('dashboard-dark', 'dashboard-light', 'graph-dark', 'graph-light', 'pho
 # engines loaded on demand (the SQLite viewer) ride along as inert text and are started from it when needed
 LAZY = ['js/vendor/sql-wasm.js', 'js/vendor/sql-wasm-b64.js']
 html = html.replace('</body>', ''.join('<script type="text/plain" id="lazy:' + p + '">' + (root / p).read_text(encoding='utf-8') + '</script>' for p in LAZY) + '</body>')
+# The policy allows exactly the scripts in this file, by hash: no 'unsafe-inline', so markup that
+# ends up in the page (an imported name, a saved web page) can never run as script.
+import hashlib
+def sha(code): return "'sha256-" + base64.b64encode(hashlib.sha256(code.encode('utf-8')).digest()).decode() + "'"
+hashes = [sha(m.group(1)) for m in re.finditer(r'<script>(.*?)</script>', html, flags=re.S)]
+hashes += [sha((root / p).read_text(encoding='utf-8')) for p in LAZY]          # started later from their text
+csp = ("default-src 'none'; script-src " + ' '.join(dict.fromkeys(hashes)) + " 'wasm-unsafe-eval'; style-src 'unsafe-inline'; "
+       "img-src data: blob: https://*.basemaps.cartocdn.com https://server.arcgisonline.com; font-src data:; "
+       "connect-src https://api.rss2json.com; form-action 'none'; base-uri 'none'; object-src 'none'")
+html = re.sub(r'content="default-src[^"]*"', lambda m: 'content="' + csp + '"', html, count=1)
 out = root / 'dist' / 'osintrix-offline.html'; out.parent.mkdir(exist_ok=True); out.write_text(html, encoding='utf-8')
 print(len(html) // 1024, 'KB  ->', out.relative_to(root))
