@@ -189,28 +189,61 @@ function wuImport(){
 }
 
 /* ---------- cheatsheets ---------- */
+/* ---------- cheatsheets: built for looking things up mid-CTF ----------
+   One search across every category, one-line commands that copy on click, your own target and file
+   names filled into every command, and the first-moves checklist always beside it. */
+const CS_VARS = [['target', 'Target', 'target or 10.10.10.5'], ['file', 'File', 'chal.bin'], ['wordlist', 'Wordlist', 'rockyou.txt'], ['ip', 'Your IP', '$IP'], ['port', 'Port', '$PORT']];
+const CS_RE = {target:/\btarget\b/g, file:/\b(?:file\.(?:png|jpg|jpeg|pdf|doc|docx|txt|b64|b32|bin|zip|wav|gif|bmp)|chal\.bin|mem\.raw|disk\.img|img\.(?:png|jpg))\b/g, wordlist:/\b(?:rockyou\.txt|wordlist\.txt)\b/g, ip:/\$IP\b/g, port:/\$PORT\b/g};
+const csVars = () => (DB.ctf.vars || (DB.ctf.vars = {}));
+/* Escape, then fill in (or highlight) the placeholders the user can change. */
+function csCmd(cmd){
+  const V = csVars(); let h = esc(cmd);
+  for(const [k, re] of Object.entries(CS_RE)) h = h.replace(re, m => V[k] ? `<b class="csv on">${esc(V[k])}</b>` : `<b class="csv">${m}</b>`);
+  return h;
+}
+const csFill = cmd => { const V = csVars(); let t = String(cmd); for(const [k, re] of Object.entries(CS_RE)) if(V[k]) t = t.replace(re, V[k]); return t; };
+const csCatOf = k => { const S = CHEATS()[k] || {}; return [S.name || ctfCat(k)[0], ctfCat(k)[1]]; };
+function csBody(){
+  const S = CHEATS(), keys = Object.keys(CTF_CATS).filter(k => S[k]), cat = S[UI.csCat] ? UI.csCat : keys[0], C = S[cat];
+  const q = (UI.csq || '').trim().toLowerCase(), words = q.split(/\s+/).filter(Boolean), has = t => words.every(w => String(t).toLowerCase().includes(w));
+  const cmdRow = (k, [g, l, cmd], tag) => `<button class="csr" data-act="csCopy" data-v="${esc(cmd)}" title="Click to copy">${tag ? `<span class="cs-tag" style="--cc:${csCatOf(k)[1]}"><i></i>${esc(csCatOf(k)[0])}</span>` : ''}<span class="csr-l">${esc(l)}</span><code>${csCmd(cmd)}</code><span class="csr-c">${ico('copy','sm')}</span></button>`;
+  const recRow = (k, [a, b, c], tag) => `<div class="csrec">${tag ? `<span class="cs-tag" style="--cc:${csCatOf(k)[1]}"><i></i>${esc(csCatOf(k)[0])}</span>` : ''}<code>${esc(a)}</code><b>${esc(b)}</b><span>${esc(c)}</span></div>`;
+  if(words.length){
+    const cmds = [], recs = [], gots = [];
+    for(const k of keys){ for(const c of S[k].cmds || []) if(has(c.join(' ') + ' ' + S[k].name)) cmds.push([k, c]); for(const r of S[k].recog || []) if(has(r.join(' '))) recs.push([k, r]); for(const g of S[k].gotchas || []) if(has(g)) gots.push([k, g]); }
+    if(!cmds.length && !recs.length && !gots.length) return `<div class="hx2-empty">Nothing matches “${esc(UI.csq)}” in any cheatsheet.</div>`;
+    return `${cmds.length ? `<section class="cs-blk"><h3>${ico('terminal','sm')}Commands<small>${cmds.length}</small></h3><div class="csl">${cmds.slice(0, 80).map(([k, c]) => cmdRow(k, c, true)).join('')}</div></section>` : ''}
+      ${recs.length ? `<section class="cs-blk"><h3>${ico('eye','sm')}Recognise it<small>${recs.length}</small></h3><div class="csl">${recs.slice(0, 60).map(([k, r]) => recRow(k, r, true)).join('')}</div></section>` : ''}
+      ${gots.length ? `<section class="cs-blk"><h3>${ico('lightbulb','sm')}Gotchas<small>${gots.length}</small></h3><ul class="cs-got">${gots.map(([k, g]) => `<li><span class="cs-tag" style="--cc:${csCatOf(k)[1]}"><i></i>${esc(csCatOf(k)[0])}</span>${esc(g)}</li>`).join('')}</ul></section>` : ''}`;
+  }
+  const view = ['cmds', 'recog', 'gotchas'].includes(UI.csView) ? UI.csView : 'cmds', groups = [...new Set((C.cmds || []).map(c => c[0]))], grp = groups.includes(UI.csGrp) ? UI.csGrp : '';
+  const seg = `<div class="seg cs-view" role="group" aria-label="Show">${[['cmds', 'Commands', 'terminal', (C.cmds || []).length], ['recog', 'Recognise it', 'eye', (C.recog || []).length], ['gotchas', 'Gotchas', 'lightbulb', (C.gotchas || []).length]].map(([k, l, i, n]) => `<button data-act="csView" data-v="${k}" aria-pressed="${view === k}">${ico(i,'sm')}${l}<small>${n}</small></button>`).join('')}</div>`;
+  let body = '';
+  if(view === 'cmds') body = `<div class="cs-groups">${['', ...groups].map(g => `<button class="rf3-s${grp === g ? ' on' : ''}" data-act="csGrp" data-v="${esc(g)}">${g ? esc(g) : 'All'}<small>${g ? C.cmds.filter(c => c[0] === g).length : C.cmds.length}</small></button>`).join('')}</div>
+      <div class="csl">${(grp ? [grp] : groups).map(g => `${grp ? '' : `<div class="csl-h">${esc(g)}</div>`}${C.cmds.filter(c => c[0] === g).map(c => cmdRow(cat, c)).join('')}`).join('')}</div>`;
+  else if(view === 'recog') body = `<div class="csl"><div class="csrec hd"><span>You see</span><span>It is probably</span><span>Try</span></div>${(C.recog || []).map(r => recRow(cat, r)).join('')}</div>`;
+  else body = `<ul class="cs-got big">${(C.gotchas || []).map(g => `<li>${esc(g)}</li>`).join('')}</ul>`;
+  return `<div class="cs-bar">${seg}<p class="cs-blurb">${esc(C.blurb || '')}</p></div>${body}`;
+}
+function csSide(){
+  const S = CHEATS(), keys = Object.keys(CTF_CATS).filter(k => S[k]), cat = S[UI.csCat] ? UI.csCat : keys[0], C = S[cat], done = (DB.ctf.fm || {})[cat] || [];
+  return `<section class="card fmc"><div class="ws-h">${ico('list-checks','sm')}First moves<span class="sp"></span>${done.length ? `<button class="linkbtn" data-act="csFmReset">Reset</button>` : ''}<span class="t3 small">${done.length}/${(C.first || []).length}</span></div>
+      <ol class="fm">${(C.first || []).map((f, i) => `<li class="${done.includes(i) ? 'done' : ''}"><button class="cb" data-act="csFm" data-v="${i}" aria-pressed="${done.includes(i)}" aria-label="Done">${done.includes(i) ? ico('check','sm') : ''}</button><span>${esc(f)}</span></li>`).join('')}</ol></section>`;
+}
 function ctfCheatsView(){
   const S = CHEATS(), keys = Object.keys(CTF_CATS).filter(k => S[k]);
   if(!keys.length) return empty('book-open', 'Cheatsheets are not loaded', 'The cheatsheet data file is missing from this copy of OSINTrix.');
-  const q = (UI.csq || '').trim().toLowerCase(), words = q.split(/\s+/).filter(Boolean), m = t => words.every(w => String(t).toLowerCase().includes(w));
-  const cat = S[UI.csCat] ? UI.csCat : keys[0];
-  const size = k => (S[k].recog || []).length + (S[k].cmds || []).length;
-  const shown = words.length ? keys : [cat];
-  const sec = k => { const s = S[k], rec = (s.recog || []).filter(r => !words.length || m(r.join(' '))), cmds = (s.cmds || []).filter(c => !words.length || m(c.join(' '))), got = (s.gotchas || []).filter(g => !words.length || m(g));
-    if(words.length && !rec.length && !cmds.length && !got.length) return '';
-    const groups = [...new Set(cmds.map(c => c[0]))];
-    return `<section class="cs-sec">${words.length ? `<h2 class="cs-h" style="--cc:${ctfCat(k)[1]}"><i></i>${esc(s.name || ctfCat(k)[0])}</h2>` : `<p class="cs-blurb">${esc(s.blurb || '')}</p>`}
-      ${rec.length ? `<h3>Recognise it</h3><div class="card cs-tbl"><table><thead><tr><th>You see</th><th>It is probably</th><th>Try</th></tr></thead><tbody>${rec.map(([a, b, c]) => `<tr><td class="mono">${esc(a)}</td><td>${esc(b)}</td><td>${esc(c)}</td></tr>`).join('')}</tbody></table></div>` : ''}
-      ${cmds.length ? `<h3>Commands</h3>${groups.map(g => `<div class="cs-g"><div class="caps">${esc(g)}</div><div class="cmdgrid">${cmds.filter(c => c[0] === g).map(([, l, cmd]) => `<div class="cmd"><b>${esc(l)}</b><div class="cg-term"><code>${esc(cmd)}</code><button class="cg-copy" data-act="flagCopy" data-v="${esc(cmd)}" aria-label="Copy" title="Copy">${ico('copy','sm')}</button></div></div>`).join('')}</div></div>`).join('')}` : ''}
-      ${words.length && got.length ? `<h3>Gotchas</h3><ul class="cs-got">${got.map(g => `<li>${esc(g)}</li>`).join('')}</ul>` : ''}</section>`; };
-  const s = S[cat];
-  return `<div class="cs">
-    <nav class="card cs-nav" aria-label="Categories">${keys.map(k => `<button class="${!words.length && k === cat ? 'on' : ''}" data-act="ctfCheat" data-v="${k}" style="--cc:${ctfCat(k)[1]}"><i></i>${esc(S[k].name || ctfCat(k)[0])}<small>${size(k)}</small></button>`).join('')}</nav>
-    <div class="cs-main"><div class="search-in cs-q">${ico('search')}<label class="sr" for="csq">Search cheatsheets</label><input id="csq" class="inp" placeholder="Search every cheatsheet — steghide, ==, JWT, 89 50 4E 47…" value="${esc(UI.csq || '')}" autocomplete="off"></div>
-      ${shown.map(sec).join('') || `<div class="hx2-empty">Nothing matches “${esc(UI.csq)}”.</div>`}</div>
-    ${words.length ? '' : `<aside class="cs-side">
-      ${(s.first || []).length ? `<section class="card fmc"><div class="ws-h">${ico('list-checks','sm')}First moves · ${esc(s.name || ctfCat(cat)[0])}</div><ol class="fm plain">${s.first.map(f => `<li><span>${esc(f)}</span></li>`).join('')}</ol></section>` : ''}
-      ${(s.gotchas || []).length ? `<section class="card fmc"><div class="ws-h">${ico('lightbulb','sm')}Gotchas</div><ul class="cs-got">${s.gotchas.map(g => `<li>${esc(g)}</li>`).join('')}</ul></section>` : ''}</aside>`}
+  const cat = S[UI.csCat] ? UI.csCat : keys[0], V = csVars(), searching = !!(UI.csq || '').trim();
+  const n = k => (S[k].cmds || []).length + (S[k].recog || []).length;
+  return `<div class="cs3">
+    <aside class="cs3-rail" aria-label="Categories"><div class="cs3-rh">Categories</div>${keys.map(k => `<button data-act="ctfCheat" data-v="${k}" class="${!searching && k === cat ? 'on' : ''}" style="--cc:${ctfCat(k)[1]}"><span class="cs3-ic">${ico(ctfCat(k)[2],'sm')}</span><span class="cs3-l">${esc(S[k].name || ctfCat(k)[0])}</span><small>${n(k)}</small></button>`).join('')}</aside>
+    <div class="cs3-main">
+      <div class="cs-tools">
+        <div class="search-in cs-q">${ico('search')}<label class="sr" for="csq">Search every cheatsheet</label><input id="csq" class="inp" placeholder="Search all cheatsheets — steghide, ==, jwt, 89 50 4E 47, rop…" value="${esc(UI.csq || '')}" autocomplete="off">${UI.csq ? `<button class="iconbtn" data-act="csClear" aria-label="Clear">${ico('x','sm')}</button>` : '<kbd>/</kbd>'}</div>
+        <div class="cs-vars" role="group" aria-label="Your values"><span class="t3 small">Fill in</span>${CS_VARS.map(([k, l, ph]) => `<label class="csvar${V[k] ? ' set' : ''}"><span>${l}</span><input data-csvar="${k}" value="${esc(V[k] || '')}" placeholder="${esc(ph)}" autocomplete="off" spellcheck="false"></label>`).join('')}</div>
+      </div>
+      <div class="cs-grid"><div class="cs-main" id="csBody">${csBody()}</div><aside class="cs-side" id="csSide">${csSide()}</aside></div>
+    </div>
   </div>`;
 }
 function ctfFirstView(){
@@ -239,7 +272,14 @@ const CTF2_ACTS = {
     toast('Entry removed', 'Undo', () => { c.log.splice(+v, 0, x); mutate('restored log entry'); renderMain(); }); },
   ctfLogCopy:() => { const c = DB.ctf.chals.find(x => x.id === UI.ctfSel); if(c) copyText(c.log.map(x => `- ${(LOG_KIND[x.kind] || LOG_KIND.note)[0]}: ${x.text}${x.cmd ? '\n  `' + x.cmd + '`' : ''}`).join('\n')); },
   ctfFirst:(id, v) => { const c = DB.ctf.chals.find(x => x.id === UI.ctfSel); if(!c) return; const i = +v; c.firstDone = c.firstDone.includes(i) ? c.firstDone.filter(x => x !== i) : [...c.firstDone, i]; mutate('checklist'); renderMain(); },
-  ctfCheat:(id, v) => { UI.csCat = v; UI.csq = ''; UI.ctfTab = 'cheats'; UI.ctfSel = null; renderMain(); const s = document.querySelector('#main .scroll'); if(s) s.scrollTop = 0; },
+  csCopy:(id, v) => copyText(csFill(v)),
+  csView:(id, v) => { UI.csView = v; const b = $('csBody'); if(b) b.innerHTML = csBody(); },
+  csGrp:(id, v) => { UI.csGrp = v; const b = $('csBody'); if(b) b.innerHTML = csBody(); },
+  csClear:() => { UI.csq = ''; renderMain(); refocus('csq'); },
+  csFm:(id, v) => { const cat = CHEATS()[UI.csCat] ? UI.csCat : Object.keys(CTF_CATS).find(k => CHEATS()[k]); DB.ctf.fm = DB.ctf.fm || {}; const d = DB.ctf.fm[cat] || [], i = +v;
+    DB.ctf.fm[cat] = d.includes(i) ? d.filter(x => x !== i) : [...d, i]; save(); const s2 = $('csSide'); if(s2) s2.innerHTML = csSide(); },
+  csFmReset:() => { const cat = CHEATS()[UI.csCat] ? UI.csCat : Object.keys(CTF_CATS).find(k => CHEATS()[k]); if(DB.ctf.fm) delete DB.ctf.fm[cat]; save(); const s2 = $('csSide'); if(s2) s2.innerHTML = csSide(); },
+  ctfCheat:(id, v) => { UI.csCat = v; UI.csq = ''; UI.csGrp = ''; UI.ctfTab = 'cheats'; UI.ctfSel = null; renderMain(); const s = document.querySelector('#main .scroll'); if(s) s.scrollTop = 0; },
   ctfSolve:() => { const c = DB.ctf.chals.find(x => x.id === UI.ctfSel), f = $('ctfFlagIn'); if(!c || !f || !f.value.trim()) return;
     c.flag = f.value.trim().slice(0, 400); c.status = 'solved'; c.solvedAt = Date.now(); UI.ctfFlag = null; mutate('solved ' + c.name); renderMain(); toast('Solved — nice work', 'Write it up', () => CTF2_ACTS.wuFromChal(c.id)); },
   ctfReopen:() => { const c = DB.ctf.chals.find(x => x.id === UI.ctfSel); if(!c) return; c.status = 'working'; c.solvedAt = 0; mutate('reopened ' + c.name); renderMain(); },
@@ -261,7 +301,11 @@ document.addEventListener('input', ev => { const t = ev.target;
   else if(t.id === 'ctfFlagIn'){ const c = DB.ctf.chals.find(x => x.id === UI.ctfSel); if(!c) return; UI.ctfFlag = t.value; UI.ctfFlagFor = c.id; const ok = flagOk(c, t.value.trim()), box = t.parentElement;
     box.classList.toggle('ok', !!ok); box.classList.toggle('bad', ok === false); const p = box.nextElementSibling; if(p) p.textContent = ok ? 'Matches the event’s flag format.' : ok === false ? 'Does not match the event’s flag format yet.' : 'Paste the flag to check its format.';
     const b = document.querySelector('.ws-solve'); if(b) b.disabled = !t.value.trim(); }
-  else if(t.id === 'wuq' || t.id === 'csq'){ UI[t.id] = t.value; clearTimeout(ctfQT); ctfQT = setTimeout(() => { renderMain(); refocus(t.id); }, 160); }
+  else if(t.id === 'csq'){ UI.csq = t.value; clearTimeout(ctfQT); ctfQT = setTimeout(() => { const b = $('csBody'); if(b) b.innerHTML = csBody();
+      document.querySelectorAll('.cs3-rail button').forEach(x => x.classList.toggle('on', !t.value.trim() && x.dataset.v === (CHEATS()[UI.csCat] ? UI.csCat : Object.keys(CTF_CATS).find(k => CHEATS()[k])))); }, 120); }
+  else if(t.dataset && t.dataset.csvar){ const V = csVars(); V[t.dataset.csvar] = t.value.trim().slice(0, 200); t.parentElement.classList.toggle('set', !!V[t.dataset.csvar]); clearTimeout(ctfQT);
+    ctfQT = setTimeout(() => { save(); const b = $('csBody'); if(b) b.innerHTML = csBody(); }, 120); }
+  else if(t.id === 'wuq'){ UI[t.id] = t.value; clearTimeout(ctfQT); ctfQT = setTimeout(() => { renderMain(); refocus(t.id); }, 160); }
 });
 let ctfQT = null;
 document.addEventListener('change', ev => { if(ev.target.id === 'wuCatSel'){ UI.wuCat = ev.target.value; renderMain(); } });

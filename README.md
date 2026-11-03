@@ -32,7 +32,7 @@ It is a plain static site: HTML, CSS and JavaScript files with no framework, no 
 
 ## Interface
 
-Cases open on their board (the link graph); Evidence, Overview, Vault, Timeline, Map, Analysis and Report follow as tabs. Picking a node puts the next actions around it, and the time bar replays how the case grew. The sidebar collapses to an icon rail with the button at its foot or the `[` key, and the choice is remembered.
+Cases open on their board (the link graph); Overview, Vault, Entities, Timeline, Places, Analysis and Report follow as tabs. Picking a node puts the next actions around it, and the time bar replays how the case grew. The sidebar collapses to an icon rail with the button at its foot or the `[` key, and the choice is remembered.
 
 ## Features
 
@@ -58,12 +58,17 @@ Press `Ctrl K` or `/`, or click the search bar, to search the whole app at once:
   - **Before you save,** every indicator is checked against all your cases, your verdicts, your watchlist and the offline context lists (cloud provider, Tor exit, disposable email, dynamic DNS, URL shortener, paste site, phone country).
   - **Saved web pages:** drop an `.html` or `.mhtml` page you saved with the browser. Its URL, title, author, dates, text, outbound links and email links are archived as evidence with the file's SHA-256. The original opens in a sandbox with scripts off.
   - **Screenshots and files:** paste or drop them in. Each is hashed (SHA-256), stored in the browser and shown with a preview on its record.
+  - **Windows event logs (.evtx):** drop a Security, System, Sysmon, PowerShell or any other `.evtx` file. It is read in the browser (tens of thousands of events in a few seconds), every Sigma rule runs against the events it was written for (its log source maps to the right event IDs and channels), and you see the most frequent events and the matches before importing. Events land on the timeline with every field kept; matches are tagged `sigma-match`, show the rule names, and the rules are linked to the case.
   - **Log import:** CSV, TSV, JSON or NDJSON exports (Sysmon, firewall, proxy, EDR…). Pick the time, title and host columns; each row becomes a record, with every column kept so detections can test it.
 - **Entities per case:** every indicator in the case, with first and last seen, record counts and which other cases share it. Filter by kind or verdict, then set verdicts, add to the vault or export in bulk.
 - **Timeline:** every record in order, with day headers, event markers and filters. Search with `host:`, `verdict:`, `type:`, `tag:`, `after:` and `before:`.
   - **Activity heatmap** (day × hour): click a cell to see just that hour.
   - **Multi-select:** tag, mark as key evidence, export to CSV or delete many records at once.
-- **Case map:** a pan-and-zoom map (Leaflet) with every place in the case. Points come from Location entries, coordinates in evidence and photo GPS. Countries are shaded from country fields, phone country codes and log fields. A numbered movement path shows legs in time order, with distance, time and speed, and flags impossible travel. The default outline map works offline. Street and light maps (CARTO) and satellite imagery (Esri) load tiles only after you agree, because those servers see the area you view. If tiles can't be loaded (offline, or blocked on your network), the map says so and falls back to the outline map.
+- **Places:** every location in the case on one page. Points come from Location entries, coordinates in evidence and photo GPS; countries come from country fields, phone country codes and log fields.
+  - An offline overview map (Natural Earth borders) shows where everything is, with the movement path in time order.
+  - Each place opens in Google Maps, Street View, Google Earth, OpenStreetMap, Bing aerial, Apple Maps, Yandex, Mapillary, Sentinel satellite history, Wikimapia, Overpass turbo or SunCalc (sun position at the time of the evidence). Links open in a new tab; nothing is fetched by OSINTrix.
+  - Legs between timed places show distance, time and speed, and flag impossible travel.
+  - Geolocation helpers, and export to KML (Google Earth) or CSV.
 - **Hypothesis board (Analysis tab):** analysis of competing hypotheses. List the explanations, rate every piece of evidence against each (++ + · – ––), weighted by credibility and relevance. Hypotheses are ranked by how much evidence *contradicts* them. Non-diagnostic evidence and evidence that alone decides the ranking are flagged. The ranking goes into the report.
 - **Link graph:**
   - **Not on the graph yet?** The graph shows vault entries. It tells you how many entities from the evidence are missing, and **Add from evidence** lets you tick exactly which ones to add.
@@ -77,7 +82,7 @@ Press `Ctrl K` or `/`, or click the search bar, to search the whole app at once:
   - **Shortest path** between any two entries.
   - **"As of" time slider** that replays how the picture grew.
   - Automatic layouts, and export as PNG, GraphML (Gephi, yEd, Maltego) or CSV.
-- **Questions and playbooks:** track what you still don't know, or run a playbook (phishing triage, username OSINT, domain & infrastructure, malware triage, crypto tracing, IR first hour, photo geolocation, packet capture review, browser artefacts, ransomware first look…) and every step becomes an open question.
+- **Questions and playbooks:** track what you still don't know, or run one of 55 playbooks and every step becomes an open question. They cover OSINT (subject profiles with a legal-basis step, company due diligence, email, phone, image and video verification, Telegram, transport tracking), incident response (BEC, webshells, lateral movement, AD compromise, edge devices, supply chain), threat analysis, cloud (AWS, Entra, M365, Kubernetes, leaked keys), forensics (memory, Windows timeline, Linux, macOS, mobile, acquisition) and fraud. Each shows its level and a time estimate.
 - **Reports and exports:**
   - A cited report with four templates (full, executive, technical, CTF write-up), a relationship map, and a **redact** switch that masks emails, phones, IPs, handles and names. Print it, save it as PDF, or export it as Markdown.
   - Every indicator as CSV, a defanged text list, or a STIX 2.1 bundle.
@@ -87,7 +92,7 @@ Press `Ctrl K` or `/`, or click the search bar, to search the whole app at once:
 
 ![Graph](docs/graph.png)
 
-![Case map](docs/map.png)
+![Places](docs/places.png)
 
 ![Hypothesis board](docs/hypotheses.png)
 
@@ -100,16 +105,26 @@ Press `Ctrl K` or `/`, or click the search bar, to search the whole app at once:
 - **Query library:** 68 saved search recipes with `{{BLANKS}}` that fill from your case entries.
   - Runs in Google, Bing, DuckDuckGo, Shodan, Censys, GitHub, ZoomEye, FOFA and Intelligence X.
   - Each search can be logged to the case.
-- **Reference:** an offline field guide with 128 entries — Windows and Sysmon event IDs, logon types, ports, LOLBins, auth failure codes and persistence locations. Each has what it means, what to look for, an ATT&CK link and a one-click search of your evidence.
+- **Reference:** an offline field guide with 1,216 entries in 40 sections, grouped by area:
+  - **Windows:** event IDs, logon types, Sysmon, LOLBins, auth failure codes, persistence, registry and file artefacts, well-known SIDs and PowerShell red flags.
+  - **Linux & macOS:** logs and artefacts, persistence, suspicious commands, auditd and macOS artefacts.
+  - **Network & web:** ports, HTTP status codes and headers, DNS, e-mail headers, TLS fingerprints and user-agent tells.
+  - **Cloud & identity:** CloudTrail events, Entra AADSTS codes, M365 audit operations, GCP and Kubernetes audit.
+  - **Forensics:** file signatures, hashes and encodings, timestamp formats, Volatility 3 plugins and browser artefacts.
+  - **OSINT:** search operators for Google, Bing, GitHub, Shodan and Censys, pivot sources, geolocation and EXIF fields.
+  - **Malware & crypto:** packers, wallet address formats, ransomware conventions and ATT&CK tactics.
+  - Each entry has what it means, what to look for, an ATT&CK link and a one-click search of your evidence. Search ranks the best matches first, highlights them and moves with the arrow keys.
 
 ![Toolbox](docs/toolbox.png)
 
 ![Playbooks](docs/playbooks.png)
 
 ### 🧪 Lab (CTFs, forensics, OSINT challenges)
-- **CTF tracker:** events with their own flag format, and challenges on a board (to do, working, solved).
-  - Each challenge has points, category, flag, notes and a linked case.
-  - A progress bar per category, and write-ups exported as Markdown.
+- **CTF:** four tabs.
+  - **Challenges:** events with their own flag format, and challenges on a board (to do, working, solved). Each challenge opens a workspace with a work log (what worked, dead ends, ideas, with the commands), a first-moves checklist for its category, the entities found in your notes, a live flag-format check and a linked case.
+  - **Write-ups:** turn a solved challenge's work log into a write-up in one click, or import Markdown. Search, filter, read with the flag hidden until you show it, and export as Markdown.
+  - **Cheatsheets:** web, crypto, forensics, stego, OSINT, reversing, pwn, network and misc. Each has a recognise-it table (what you see, what it probably is, what to try), one-line commands that copy on click, and gotchas. Fill in your target, file, wordlist, IP and port once and every command uses them. One search covers every cheatsheet.
+  - **First moves:** the first ten minutes for each category, as checklists.
 - **Flag finder:** flag-shaped strings (`FLAG{…}`, `picoCTF{…}`, `HTB{…}`, or your event's own format) are picked out automatically in the Decoder and File inspector, and saved to a challenge with one click.
 - **File inspector:** drop in any file; it is read locally and never uploaded. It shows:
   - the true file type from its magic bytes, with a warning when the extension lies;
@@ -138,16 +153,27 @@ Press `Ctrl K` or `/`, or click the search bar, to search the whole app at once:
 - **Username and email generator:** likely handles and addresses from a person's name, ready to check.
 - **Hash identifier:** MD5 / NTLM, SHA family, bcrypt, the Unix crypt formats, NetNTLMv1 and v2, Kerberoast / AS-REP, JWT and more, each with its hashcat mode.
 - **Coordinates:** reads decimal degrees, DMS or a Google Maps link, and converts between formats. Links to Google Maps, Street View, OpenStreetMap, Google Earth, Bing and Mapillary.
+- **Cloud:**
+  - **Field guide:** 98 techniques for cloud, bug bounty and CTF work: recon, web bugs, secrets, SSRF and metadata, AWS, Azure and Entra, GCP, Kubernetes, CI/CD, serverless and cloud incident response. Each has numbered commands, what to look for, how defenders see it and how to fix it. Filter by provider and level.
+  - **Misconfiguration scanner:** paste or drop AWS IAM and resource policies, GCP IAM policies, Azure role definitions, Terraform (including plan and state JSON), CloudFormation, ARM templates or Kubernetes manifests. It lists weak settings with severity and the fix, and never changes anything.
+  - **Log hunting:** CloudTrail, Azure Activity and GCP Audit logs are parsed into one view with notable events flagged, and can be sent to a case timeline.
 - **Decoder:** 25 operations, plus an auto-decode that recognises and peels layered encodings (Base64, hex, Base32, Base58, URL, HTML, escapes, binary, char codes, gzip, JWT, Morse, ROT13). Beyond the basics there are Base32, Base58, binary, character codes, `\x` / `\u` unescaping, all 25 Caesar shifts, single-byte XOR brute force, Morse and gunzip / inflate.
+
+![CTF challenge workspace](docs/ctf.png)
+
+![CTF cheatsheets](docs/ctf-cheatsheets.png)
 
 ![PCAP reader](docs/lab.png)
 
 ![SQLite viewer](docs/sqlite.png)
 
+![Cloud field guide](docs/cloud.png)
+
 ### 🛡️ Intelligence
 - **Watchlist:** watch any indicator. New evidence, log imports and news that mention it are flagged, with a notice, a Dashboard card and a list of sightings.
 - **Around this time:** every record shows what else happened within ±5 minutes, on any host, one click from a filtered timeline.
-- **Detections:** write, keep and import Sigma and YARA rules.
+- **Detections:** 405 built-in Sigma and YARA rules, common and advanced, across Windows, Linux, macOS, AWS, Azure, GCP, Kubernetes, M365, Okta, network and web. Write, keep and import your own.
+  - Filter by type, severity, platform and level; search title, technique and rule content.
   - Editor with syntax highlighting and a live structure check.
   - **Test a rule** against a case's evidence (Sigma and YARA) or against a file (YARA). The engines are subsets that run in the page; anything they cannot evaluate is reported, never silently passed.
   - Link a rule to a case, or generate starter rules from a case's malicious indicators.
@@ -170,15 +196,16 @@ Press `Ctrl K` or `/`, or click the search bar, to search the whole app at once:
 
 - **Encrypted workspace:** AES-256-GCM with a key from your passphrase (PBKDF2-SHA-256, 310,000 rounds). It covers cases, notes, restore points and attached files, and can auto-lock when idle. The passphrase is never stored.
 - **Encrypted backups and case exports:** these use a passphrase of their own. Importing asks for it.
-- **Tamper-evident audit log:** every change is chained by hash, and Verify shows exactly where a chain was edited.
-- **Signed chain-of-custody reports:** every record of a case with its SHA-256, capture time and files, plus the audit chain, signed with the workspace's ECDSA P-256 key. Anyone can verify one in the app.
+- **Tamper-evident audit log:** every change is chained and sealed with an HMAC key the browser keeps and cannot export, so editing, removing or reordering entries in the saved data is detected. Verify shows exactly where a chain was edited.
+- **Signed chain-of-custody reports:** every record of a case with its SHA-256, capture time and files, plus the audit chain, signed with an ECDSA P-256 key held by the browser (never stored in the workspace or in backups). Reports show the signer's fingerprint, and a report signed by a key you have not trusted is flagged even when its signature is valid.
+- **Safe storage:** data this version cannot read is never overwritten; a recovery screen lets you download it. A second open tab is read-only until you move the workspace to it. Imports are checked before anything changes.
 
 ## Privacy by design
 
 | | |
 |---|---|
 | **Where your data lives** | Only in this browser (IndexedDB, with a localStorage copy). Nothing is uploaded. There is no backend and no analytics. |
-| **Network access** | The page's Content Security Policy blocks every outside connection except two, both opt-in: `api.rss2json.com` if you turn on live Threat Intel feeds (only feed addresses are sent), and map tiles from CARTO or Esri if you pick the streets, light or satellite map (the tile server sees the area you view, never your case). The default outline map, the PCAP reader and the SQLite viewer work fully offline. |
+| **Network access** | The page's Content Security Policy blocks every outside connection except one, and it is opt-in: `api.rss2json.com` if you turn on live Threat Intel feeds (only feed addresses are sent). Places, the PCAP reader and the SQLite viewer work fully offline. Map and lookup links open other sites in a new tab only when you click them. |
 | **Untrusted content** | Feed articles and pasted evidence are shown as plain text. Links open only when you click them, in a new tab with no referrer. |
 | **Storage** | Saved in **IndexedDB**, with a localStorage copy while it fits. Every change is written within about 250 ms, and again when you switch tabs or close the page. Room depends on the browser and free disk space: usually hundreds of MB or more, compared with roughly 5 MB for localStorage alone. Help shows how much you are using. |
 | **One browser, one address** | Data belongs to one browser profile *and* one address. A copy opened from disk (`file://`) and the GitHub Pages copy each keep their own data, and so do Chrome and Firefox. Private windows and embedded previews keep nothing; a red banner warns you when saving is blocked. |
@@ -203,31 +230,42 @@ Everything is plain files, so you edit them and reload the page. The scripts are
 osintrix/
 ├── index.html              ← page skeleton, Content Security Policy, script order
 ├── css/
-│   ├── app.css             ← design system and every component
-│   └── fonts.css           ← @font-face rules
-├── fonts/                  ← Inter and JetBrains Mono (woff2)
+│   ├── app.css · theme.css ← base components
+│   ├── design.css          ← the design system: tokens, light and dark, every screen
+│   └── fonts.css           ← @font-face rules (fonts inlined)
+├── fonts/                  ← Geist, Geist Mono, Inter and JetBrains Mono (woff2)
 ├── js/
 │   ├── data/
 │   │   ├── tools.js            ← default toolbox (JSON after the "=")
 │   │   ├── query-templates.js  ← default query library
-│   │   └── detection-rules.js  ← default Sigma / YARA rules
-│   ├── vendor/             ← cytoscape, Leaflet, world outlines, sql.js (loaded on demand), jsQR, IEEE MAC vendors, offline context lists
+│   │   ├── detection-rules.js · detections-pack.js  ← built-in Sigma / YARA rules
+│   │   ├── playbooks-pack.js   ← built-in playbooks
+│   │   ├── reference.js · reference-pack.js  ← Reference page
+│   │   ├── cloudguide.js · cloudguide-pack.js ← Cloud field guide
+│   │   ├── ctf-cheats.js       ← CTF cheatsheets
+│   │   └── changelog.js        ← release history (What's new and CHANGELOG.md)
+│   ├── vendor/             ← cytoscape, world outlines, sql.js (loaded on demand), jsQR, IEEE MAC vendors, offline context lists
 │   ├── icons.js            ← Lucide icon set
 │   ├── engine.js           ← indicator extraction, time parsing, search syntax
 │   ├── brand.js · model.js · demo.js   ← name and logo, entry types, sample cases
-│   ├── core.js             ← state, storage (IndexedDB), routing
+│   ├── core.js             ← state, storage (IndexedDB, saved in pieces for big workspaces), routing
+│   ├── layouts.js          ← the shell: sidebar, case tabs, actions around a board node
+│   ├── integrity.js        ← import checks, recovery screen, one writer across tabs
 │   ├── views.js            ← dashboard, cases, timeline
 │   ├── graph.js            ← Cytoscape graph, paths, time slider, exports
 │   ├── areas.js            ← toolbox, entities, decoder, reference, settings, help
 │   ├── insp.js             ← details panel, dialogs, capture
 │   ├── intel.js · queries.js · detections.js · notes.js · playbooks.js
 │   ├── extras.js           ← pivots, IOC export, print, case import, decoder
-│   ├── lab.js · kit.js     ← CTF tracker, forensics kit, file parsers, YARA / Sigma engines
+│   ├── lab.js · kit.js     ← forensics kit, file parsers, YARA / Sigma engines
+│   ├── ctf.js              ← CTF challenges, work logs, write-ups, cheatsheets
+│   ├── cloud.js · cloudscan.js · cloudlogs.js ← Cloud field guide, misconfiguration scanner, log hunting
 │   ├── search.js           ← search everything
 │   ├── safety.js           ← trash, restore points, backups, attachments, log import
+│   ├── evtx.js             ← Windows event log (.evtx) reader and import with Sigma matching
 │   ├── tl.js · report.js   ← timeline heatmap and multi-select, report templates
 │   ├── caseents.js         ← the Entities tab inside each case
-│   ├── map.js · ach.js     ← case map, hypothesis board
+│   ├── map.js · ach.js     ← case places, hypothesis board
 │   ├── pcap.js · sqlite.js ← packet capture reader, SQLite viewer
 │   ├── validate.js         ← form checks, duplicate names
 │   ├── security.js         ← encryption, audit chain, signed custody reports
@@ -260,12 +298,20 @@ The tests open the real app from disk and check that:
 - saved web pages never run scripts;
 - photo GPS lands on the map;
 - the hypothesis board ranks by evidence against;
+- a Windows event log is read field for field, Sigma rules respect their log source, and events import with their matches;
+- no serious accessibility problems (axe, WCAG 2.1 AA) on 26 screens in light and dark;
 - a packet capture yields its DNS, HTTP, TLS server names and JA3, cleartext logins and beacon findings (pcap and pcapng);
 - a Chrome history database opens with decoded times, recovered deleted text and a SQL console that cannot change it;
 - forms show inline errors and refuse duplicate names, and copies are numbered;
+- a second tab stays read-only until it takes over, and unreadable data is never overwritten;
+- imports with unsafe IDs are refused and can never overwrite other evidence;
+- the audit log and custody reports cannot be forged by editing the saved data;
+- big workspaces save in pieces and 2,000-node boards open without freezing;
+- a CTF work log becomes a write-up, flags are checked, and cheatsheet commands use your values;
+- Places links, the Reference pack and the other content packs load;
 - every control can be clicked without an error.
 
-GitHub Actions runs them on every push.
+GitHub Actions runs them on every push and pull request (`.github/workflows/test.yml`). It also checks that the one-file offline copy builds and that `CHANGELOG.md` matches `js/data/changelog.js`.
 
 ### One-file offline copy (optional)
 
@@ -292,6 +338,10 @@ Add entries to `js/data/tools.js` and reload. When people load the new version, 
 | `Ctrl` `S` | Save the rule you're editing |
 | `Ctrl` `Enter` | Save a capture or note |
 | `Shift` `F10` | Graph menu for the selected node |
+| `[` | Collapse or expand the sidebar |
+| `J` / `K` | Next / previous record on the timeline |
+| `↑` / `↓` | Move through Reference results, even while typing |
+| `Ctrl` `Enter` (CTF) | Add a work-log entry |
 | `Esc` | Close a panel or dialog |
 
 ## Roadmap
@@ -303,7 +353,10 @@ Add entries to `js/data/tools.js` and reload. When people load the new version, 
 - [x] Optional encrypted backup files
 - [x] PCAP reader (conversations, DNS, HTTP, TLS, cleartext logins) and SQLite / browser-history viewer
 - [ ] Crypto-currency tracing (needs a blockchain API)
-- [ ] Library: a personal knowledge base of articles and write-ups
+- [x] CTF write-ups, cheatsheets and work logs
+- [x] Places: case locations with links to every major map service
+- [x] Built-in content: 405 detection rules, 55 playbooks, 1,216 reference entries, 98 cloud techniques
+- [x] Windows event log (.evtx) import with Sigma matching
 - [x] Evidence attachments (screenshots, files) stored locally
 - [x] Bulk log import, report templates and redaction, trash and restore points
 
@@ -314,12 +367,12 @@ Vanilla JavaScript and CSS, with no framework. Everything is bundled so it runs 
 | Component | License |
 |---|---|
 | [Cytoscape.js](https://js.cytoscape.org/) 3.30 | MIT |
+| [Geist and Geist Mono](https://vercel.com/font) | SIL Open Font License 1.1 |
 | [Inter](https://rsms.me/inter/) | SIL Open Font License 1.1 |
 | [JetBrains Mono](https://www.jetbrains.com/lp/mono/) | SIL Open Font License 1.1 |
 | [Lucide](https://lucide.dev/) icons | ISC |
 | [jsQR](https://github.com/cozmo/jsQR) 1.4 | Apache-2.0 |
 | IEEE OUI list via [oui-data](https://github.com/silverwind/oui-data) | BSD-2-Clause |
-| [Leaflet](https://leafletjs.com/) 1.9 | BSD-2-Clause |
 | [sql.js](https://sql.js.org/) 1.13 (SQLite in WebAssembly, loaded only when the SQLite viewer opens) | MIT |
 | [Natural Earth](https://www.naturalearthdata.com/) country outlines via world-atlas | Public domain / ISC |
 | Cloud IPv4 ranges via [lord-alfred/ipranges](https://github.com/lord-alfred/ipranges) | CC0-1.0 |

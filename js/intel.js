@@ -89,7 +89,7 @@ function viewIntel(){
   const hitsHTML = hits => hits.length ? `<div class="iv-hits"><span>${ico('crosshair','sm')}In your cases</span>${hits.slice(0, 4).map(id => entPill(id)).join('')}${hits.length > 4 ? `<span class="t3">+${hits.length - 4}</span>` : ''}</div>` : '';
   let lastDay = '';
   const rowHTML = ({f, hits, iocs}) => { const m = catMeta(f.cat), d = dayLabel(f.ts), head = d !== lastDay ? `<h3 class="iv-day">${esc(d)}</h3>` : ''; lastDay = d;
-    return head + `<article class="iv-row${hits.length ? ' hit' : ''}" aria-selected="${!!(UI.sel && UI.sel.id === f.id)}">
+    return head + `<article class="iv-row${hits.length ? ' hit' : ''}" aria-current="${!!(UI.sel && UI.sel.id === f.id)}">
       <span class="iv-tile" style="--c:${m.col}" aria-hidden="true">${ico(CAT_ICON[f.cat] || 'newspaper')}</span>
       <button class="iv-body" data-act="selFeed" data-id="${f.id}">
         <span class="iv-meta"><b>${esc(f.source)}</b><i></i>${esc(ago(f.ts))}${catTag(f)}${sevTag(f)}${f.live ? '' : '<span class="iv-sample">Sample</span>'}</span>

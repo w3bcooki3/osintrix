@@ -37,7 +37,7 @@ def sha(code): return "'sha256-" + base64.b64encode(hashlib.sha256(code.encode('
 hashes = [sha(m.group(1)) for m in re.finditer(r'<script>(.*?)</script>', html, flags=re.S)]
 hashes += [sha((root / p).read_text(encoding='utf-8')) for p in LAZY]          # started later from their text
 csp = ("default-src 'none'; script-src " + ' '.join(dict.fromkeys(hashes)) + " 'wasm-unsafe-eval'; style-src 'unsafe-inline'; "
-       "img-src data: blob: https://*.basemaps.cartocdn.com https://server.arcgisonline.com; font-src data:; "
+       "img-src data: blob:; font-src data:; "
        "connect-src https://api.rss2json.com; form-action 'none'; base-uri 'none'; object-src 'none'")
 html = re.sub(r'content="default-src[^"]*"', lambda m: 'content="' + csp + '"', html, count=1)
 out = root / 'dist' / 'osintrix-offline.html'; out.parent.mkdir(exist_ok=True); out.write_text(html, encoding='utf-8')

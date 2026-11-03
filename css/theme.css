@@ -70,7 +70,7 @@ html[data-theme=dark] .btn.primary:hover{background:color-mix(in srgb,var(--acce
 .seg{border-radius:8px;padding:2px;background:var(--surface-2);border-color:var(--border-soft)}
 .seg button{border-radius:6px;height:28px;font-weight:540}
 .seg button[aria-pressed=true]{box-shadow:0 0 0 1px var(--border)!important}
-.tabs button[aria-selected=true],.labtabs button[aria-selected=true]{border-bottom-color:var(--text)!important}
+.tabs button:is([aria-selected=true],[aria-current=true]),.labtabs button:is([aria-selected=true],[aria-current=true]){border-bottom-color:var(--text)!important}
 .tabs button,.labtabs button{font-weight:520}
 .chip,.pill,.status,.cxt,.tc-badge{border-radius:5px!important;background:transparent!important;border:1px solid var(--border-soft)}
 .status{color:var(--text-2)!important;font-weight:540}
@@ -90,7 +90,7 @@ html[data-theme=dark] .btn.primary:hover{background:color-mix(in srgb,var(--acce
 .ic3::before,.pbk::before{display:none!important}
 .case-card{border-top-width:1px!important;border-top-color:var(--border-soft)!important}
 .case-card:hover{border-top-color:var(--border)!important}
-.ide-i[aria-selected=true]{box-shadow:none!important;background:var(--active)!important}
+.ide-i:is([aria-selected=true],[aria-current=true]){box-shadow:none!important;background:var(--active)!important}
 tr.dec .hb-ev{box-shadow:none!important}
 .li>.cmark{width:8px!important;height:8px!important;border-radius:50%!important;margin:0 4px 0 2px}
 .cmark{border-radius:50%!important;width:8px;height:8px}

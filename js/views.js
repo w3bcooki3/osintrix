@@ -130,7 +130,7 @@ function caseOverview(c, D){
     <div class="grid cols-main" style="margin-top:18px">
       <div class="stack">
         <a class="card mapcard" href="${caseHash(c.id,'graph')}"><header><h3>Case map</h3><span class="t3">${D.entries.length} entries · ${D.links.length} relationships</span><span class="btn sm ghost" style="margin-left:auto">Open graph ${ico('chevron-right','sm')}</span></header><div class="body">${caseMap(c.id, 720, 260)}</div></a>
-        <section class="card"><header><h3>Key entries</h3><a class="btn sm ghost" href="${caseHash(c.id,'vault')}">Open vault ${ico('chevron-right','sm')}</a></header><div class="kel" role="list">${key.map(keyRow).join('')}</div></section>
+        <section class="card"><header><h3>Key entries</h3><a class="btn sm ghost" href="${caseHash(c.id,'vault')}">Open vault ${ico('chevron-right','sm')}</a></header><div class="kel">${key.map(keyRow).join('')}</div></section>
         <section class="card"><header><h3>What the evidence adds up to</h3><span class="t3">heuristic</span></header><div class="body">
           ${[...byTag.entries()].map(([tag, l]) => `<div class="note amber obs"><span class="ic">${ico('triangle-alert','sm')}</span><div><b>${esc(tag[0].toUpperCase() + tag.slice(1))}</b> — ${esc(l[0].o.t)} <button class="btn xs" data-act="selRec" data-id="${l[0].r.id}" style="margin-left:6px">Open</button>${l.length > 1 ? ` <span class="t3" style="font-size:12.5px">+${l.length - 1} more</span>` : ''}</div></div>`).join('') || '<span class="t3">Nothing combined yet.</span>'}
           <p class="heur">These point at combinations worth a look. They never set a verdict.</p></div></section>
@@ -149,20 +149,20 @@ function caseOverview(c, D){
 /* ---------- vault ---------- */
 function keyRow(e){
   const t = TYPES[e.type], v = entryVerdict(e), m = entryMentions(e).length, f = t.fields.slice(1).find(([n]) => e.fields[n] && e.fields[n] !== '—');
-  return `<button class="kel-r" role="listitem" data-act="selEntry" data-id="${e.id}" aria-selected="${!!(UI.sel && UI.sel.id === e.id)}">
+  return `<button class="kel-r" data-act="selEntry" data-id="${e.id}" aria-current="${!!(UI.sel && UI.sel.id === e.id)}">
     <span class="kel-t">${ico(t.icon,'sm')}${esc(t.label)}</span>
     <span class="kel-v"><b class="${MONO_TYPES.has(e.type) ? 'mono' : ''}" title="${esc(primary(e))}">${esc(primary(e))}</b>${f ? `<small>${esc(f[1])}: ${esc(e.fields[f[0]])}</small>` : ''}</span>
     <span class="kel-s">${v ? `<span class="kel-vd ${v}">${esc(v[0].toUpperCase() + v.slice(1))}</span>` : '<span class="kel-vd">No verdict</span>'}<span class="kel-p ${e.priority}">${esc(e.priority[0].toUpperCase() + e.priority.slice(1))}</span></span>
-    <span class="kel-m" title="Records that mention it">${m ? m + ' rec' : ''}</span>${e.starred ? `<span class="kel-star" aria-label="Starred">${ico('star','sm')}</span>` : '<span></span>'}</button>`;
+    <span class="kel-m" title="Records that mention it">${m ? m + ' rec' : ''}</span>${e.starred ? `<span class="kel-star" role="img" aria-label="Starred">${ico('star','sm')}</span>` : '<span></span>'}</button>`;
 }
 function entryCard(e){
   const t = TYPES[e.type], v = entryVerdict(e), m = entryMentions(e).length;
   const extra = t.fields.slice(1).filter(([n]) => e.fields[n]).slice(0, 2);
-  return `<button class="ecard" data-act="selEntry" data-id="${e.id}" aria-selected="${!!(UI.sel && UI.sel.id === e.id)}">
+  return `<div class="ecard" data-id="${e.id}" aria-current="${!!(UI.sel && UI.sel.id === e.id)}"><button class="gcard-hit" data-act="selEntry" data-id="${e.id}" aria-label="${esc(t.label + ': ' + primary(e))}"></button>
     <div class="h">${tbadge(e.type)}<div class="tt"><div class="kind">${esc(t.label)}</div><div class="val${MONO_TYPES.has(e.type) ? ' mono' : ''}" title="${esc(primary(e))}">${esc(primary(e))}</div></div>
       <span class="star${e.starred ? ' on' : ''}" data-act="star" data-id="${e.id}" role="button" tabindex="0" aria-label="${e.starred ? 'Unstar' : 'Star'}">${ico('star','sm')}</span></div>
     ${extra.length ? `<dl>${extra.map(([n, l]) => `<dt>${esc(l)}</dt><dd>${esc(e.fields[n])}</dd>`).join('')}</dl>` : ''}
-    <div class="f">${prioLabel(e.priority)}${v ? vdLabel(v) : ''}<span class="sp"></span>${m ? `<span title="Records that mention it">${ico('file-text','sm')} ${m}</span>` : ''}${e.tags.slice(0, 1).map(tg => `<span class="chip sq" style="height:22px;font-size:12px">#${esc(tg)}</span>`).join('')}</div></button>`;
+    <div class="f">${prioLabel(e.priority)}${v ? vdLabel(v) : ''}<span class="sp"></span>${m ? `<span title="Records that mention it">${ico('file-text','sm')} ${m}</span>` : ''}${e.tags.slice(0, 1).map(tg => `<span class="chip sq" style="height:22px;font-size:12px">#${esc(tg)}</span>`).join('')}</div></div>`;
 }
 function caseVault(c, D){
   const q = UI.vq.toLowerCase(), cat = UI.vcat;
@@ -229,12 +229,13 @@ function evHTML(r, D, c){
   const ents = [...new Set(r.ents.map(entKey))].filter(id => { const k = entSplit(id).k; return !['eventid','file','path','regkey','hostport'].includes(k) && verdictOf(id) !== 'benign'; }).slice(0, 4);
   const meta = [r.host ? `<span>${ico('cpu','sm')}${esc(r.host)}</span>` : '', r.source ? `<span>${ico('scroll-text','sm')}${esc(r.source)}</span>` : '', r.ents.length ? `<span>${ico('fingerprint','sm')}${r.ents.length} entities</span>` : ''].filter(Boolean).join('');
   const badges = [mal.length ? `<span class="chip red sq">${ico('shield-alert','sm')}${mal.length} malicious</span>` : '', ob.length ? `<span class="chip amber sq" title="${esc(ob.map(o => o.t).join(' · '))}">${esc(ob[0].tag[0].toUpperCase() + ob[0].tag.slice(1))}${ob.length > 1 ? ' +' + (ob.length - 1) : ''}</span>` : '', r.type !== 'evidence' ? `<span class="chip sq">${tl}</span>` : '', r.tags.includes('key-evidence') ? `<span class="chip accent sq">${ico('star','sm')}Key</span>` : '', (r.att || []).length ? `<span class="chip sq">${ico('paperclip','sm')}${r.att.length}</span>` : ''].join('');
-  return `<button class="ev${c.t0 === r.id ? ' t0' : ''}${mal.length ? ' mal' : ''}" data-act="selRec" data-id="${r.id}" aria-selected="${!!(UI.sel && UI.sel.id === r.id)}">
+  return `<button class="ev${c.t0 === r.id ? ' t0' : ''}${mal.length ? ' mal' : ''}" data-act="selRec" data-id="${r.id}" aria-current="${!!(UI.sel && UI.sel.id === r.id)}">
     <span class="when"><span class="clk">${r.ts ? esc(E.fmtClock(r.ts, tz())) : '—'}</span>${rel ? `<span class="rl">${rel}</span>` : ''}</span>
     <span class="mk" style="--c:${col}">${c.t0 === r.id ? ico('crosshair','sm') : ico(ic,'sm')}</span>
     <span class="bd"><span class="ttl">${esc(r.title)}</span>${meta ? `<span class="meta">${meta}</span>` : ''}
       ${r.body && r.body !== r.title ? `<span class="raw">${markEnts(r.body, r.ents)}</span>` : ''}
-      ${ents.length ? `<span class="ents">${ents.map(id => { const {k, v} = entSplit(id); return `<span class="ent xs" data-v="${verdictOf(id)}">${kindBadge(k)}<span class="v">${esc(v)}</span></span>`; }).join('')}</span>` : ''}</span>
+      ${ents.length ? `<span class="ents">${ents.map(id => { const {k, v} = entSplit(id); return `<span class="ent xs" data-v="${verdictOf(id)}">${kindBadge(k)}<span class="v">${esc(v)}</span></span>`; }).join('')}</span>` : ''}
+      ${(r.det || []).length ? `<span class="evdet">${ico('file-code','sm')}${r.det.slice(0, 3).map(d => `<span class="sevt" style="--c:${sevOf(d.sev)[1]}">${esc(d.title)}</span>`).join('')}${r.det.length > 3 ? `<span class="t3">+${r.det.length - 3}</span>` : ''}</span>` : ''}</span>
     <span class="bdg">${badges}</span></button>`;
 }
 function storyHTML(D){
@@ -264,7 +265,7 @@ function caseQuestions(c, D){
   const sec = g => { const d = g.items.filter(l => l.answer).length; return `<section class="card qsec"><header><span class="qsec-ic">${ico(g.icon,'sm')}</span><h3>${esc(g.name)}${g.pb ? ' <span class="pill" style="--c:#8b5cf6">Playbook</span>' : ''}</h3><span style="flex:1"></span><span class="pb-prog"><i style="width:${g.items.length ? Math.round(d / g.items.length * 100) : 0}%"></i></span><span class="t3 mono">${d}/${g.items.length}</span></header>
     <div class="body flush">${g.items.map(row).join('')}</div></section>`; };
   const qv = UI.qView === 'hyp' ? 'hyp' : 'q', A = c.ach || {hyps:[]};
-  const seg = `<div class="seg qseg" role="tablist"><button data-act="qView" data-v="q" aria-pressed="${qv === 'q'}">${ico('list-checks','sm')}Open questions <span class="segn">${leads.length - done}</span></button><button data-act="qView" data-v="hyp" aria-pressed="${qv === 'hyp'}">${ico('scale','sm')}Hypotheses <span class="segn">${A.hyps.length}</span></button></div>`;
+  const seg = `<div class="seg qseg" role="group" aria-label="Show"><button data-act="qView" data-v="q" aria-pressed="${qv === 'q'}">${ico('list-checks','sm')}Open questions <span class="segn">${leads.length - done}</span></button><button data-act="qView" data-v="hyp" aria-pressed="${qv === 'hyp'}">${ico('scale','sm')}Hypotheses <span class="segn">${A.hyps.length}</span></button></div>`;
   if(qv === 'hyp') return `<div class="scroll"><div class="page">${seg}${achHTML(c, D)}</div></div>`;
   return `<div class="scroll"><div class="page narrow">${seg}
     <div class="qtop card"><div class="qring" style="--p:${pct}"><b>${pct}%</b></div><div style="flex:1;min-width:0"><h3>${done} of ${leads.length} questions answered</h3><p class="t3">Every open question is something the case does not know yet.</p></div>

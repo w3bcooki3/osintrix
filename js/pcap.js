@@ -297,7 +297,7 @@ function labPcap(){
   return `${flagBox(A.flags || [])}<section class="card pc-head"><header><span class="fi-ic">${ico('network')}</span><div style="min-width:0;flex:1"><h3>${esc(A.name)}</h3>
       <p class="t3">${esc(A.fmt)} · ${esc(A.links.map(l => PC_LINKS[l] || 'link type ' + l).join(', '))} · ${A.n.toLocaleString()} packets · ${fmtBytes(A.bytes)} · ${A.first ? pcDur(A.last - A.first) : 'no timestamps'}</p></div>
       <div class="wrap"><button class="btn sm" data-act="pcSave">${ico('plus','sm')}Save to ${esc(theCase().code)}</button><button class="btn sm" data-act="pcEvents">${ico('list-plus','sm')}Send events to timeline</button><button class="btn sm" data-act="pcClear">${ico('x','sm')}Another file</button></div></header></section>
-    <nav class="seg pc-tabs" role="tablist">${PC_TABS.map(([k, l]) => `<button role="tab" data-act="pcTab" data-v="${k}" aria-pressed="${t === k}">${l}${cnt[k] != null ? ` <small>${cnt[k].toLocaleString()}</small>` : ''}</button>`).join('')}</nav>
+    <nav class="seg pc-tabs" aria-label="Capture views">${PC_TABS.map(([k, l]) => `<button data-act="pcTab" data-v="${k}" aria-pressed="${t === k}">${l}${cnt[k] != null ? ` <small>${cnt[k].toLocaleString()}</small>` : ''}</button>`).join('')}</nav>
     ${t === 'sum' ? '' : `<div class="pc-filter search-in">${ico('search')}<label class="sr" for="pcq">Filter</label><input id="pcq" class="inp" placeholder="Filter this table…" value="${esc(UI.pcq || '')}"></div>`}
     <div id="pcBody">${pcTable(A, t)}</div>`;
 }

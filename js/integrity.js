@@ -178,7 +178,10 @@ function paintReadOnly(){
   if(TABS.writer){ if(b) b.remove(); return; }
   if(!b){ b = document.createElement('div'); b.id = 'rotab'; b.className = 'rotab'; b.setAttribute('role', 'status'); document.body.appendChild(b); }
   b.innerHTML = `${ico('lock','sm')}<span><b>Read-only.</b> This workspace is open in another tab, so changes here are not saved.</span><button class="btn sm" id="rotabGo" type="button">Use it in this tab</button>`;
-  $('rotabGo').onclick = async () => { await claimWriter(true); location.reload(); };
+  $('rotabGo').onclick = async () => { const go = $('rotabGo'); if(go) go.disabled = true;
+    await claimWriter(true);                                   // the other tab turns read-only
+    try{ const d = await loadAll(); if(d && !d.__locked && !d.__bad && usable(d)){ DB = d; cache = {}; renderAll(); } else location.reload(); }catch(e){ location.reload(); }
+    if(typeof paintSaved === 'function') paintSaved(); toast('This tab now saves the workspace'); };
 }
 function tabSaved(){ try{ TABS.ch && TABS.ch.postMessage({t:'saved', at:Date.now()}); }catch(e){} }
 if(TABS.ch) TABS.ch.onmessage = async ev => {

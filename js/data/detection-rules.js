@@ -245,8 +245,8 @@ const RULE_SEED = [
     "id": "sig-2026-cred-010",
     "type": "sigma",
     "title": "LSASS Credential Dump Attempt",
-    "description": "Detects access to LSASS memory, a strong indicator of credential dumping by malware or ransomware operators.",
-    "code": "logsource:\n    category: process_access\n    product: windows\ndetection:\n    selection:\n        TargetImage|endswith: '\\lsass.exe'\n    condition: selection\nlevel: high",
+    "description": "A process outside the Windows and Program Files folders opens LSASS memory with the access rights credential dumpers use (for example Mimikatz, procdump or comsvcs MiniDump). Normal system processes reading LSASS are excluded.",
+    "code": "title: LSASS Credential Dump Attempt\nstatus: stable\ndescription: A process outside the Windows and Program Files folders opens LSASS with the access rights credential dumpers need.\nlogsource:\n    category: process_access\n    product: windows\ndetection:\n    selection:\n        TargetImage|endswith: '\\lsass.exe'\n        GrantedAccess|endswith:\n            - '1010'\n            - '1410'\n            - '1438'\n            - '143a'\n            - '1f3fff'\n            - '1fffff'\n    filter_system:\n        SourceImage|startswith:\n            - 'C:\\Windows\\System32\\'\n            - 'C:\\Windows\\SysWOW64\\'\n            - 'C:\\Program Files\\'\n            - 'C:\\Program Files (x86)\\'\n            - 'C:\\ProgramData\\Microsoft\\Windows Defender\\'\n    condition: selection and not filter_system\nfalsepositives:\n    - Security and monitoring agents installed outside Program Files\n    - Admin tools such as Process Explorer or Procmon run from a user folder\nlevel: high",
     "severity": "high",
     "category": "credential-access",
     "technique": "T1003.001",
@@ -258,8 +258,11 @@ const RULE_SEED = [
     ],
     "references": [],
     "created": "2026-01-25T00:00:00Z",
-    "modified": "2026-01-25T00:00:00Z",
-    "starred": true
+    "modified": "2026-11-03T00:00:00Z",
+    "starred": true,
+    "replaces": [
+      "logsource:\n    category: process_access\n    product: windows\ndetection:\n    selection:\n        TargetImage|endswith: '\\lsass.exe'\n    condition: selection\nlevel: high"
+    ]
   },
   {
     "id": "sig-2026-lat-010",
@@ -703,7 +706,7 @@ const RULE_SEED = [
     "id": "sig-cloud-001",
     "type": "sigma",
     "title": "CloudTrail logging disabled",
-    "description": "CloudTrail StopLogging or DeleteTrail \u2014 a classic defence-evasion step after a cloud account compromise.",
+    "description": "CloudTrail StopLogging or DeleteTrail — a classic defence-evasion step after a cloud account compromise.",
     "code": "logsource:\n    product: aws\n    service: cloudtrail\ndetection:\n    selection:\n        eventSource: cloudtrail.amazonaws.com\n        eventName:\n            - StopLogging\n            - DeleteTrail\n            - UpdateTrail\n    condition: selection\nlevel: high",
     "severity": "high",
     "category": "threat-intelligence",
@@ -768,7 +771,7 @@ const RULE_SEED = [
     "id": "sig-cloud-004",
     "type": "sigma",
     "title": "Access from EC2 instance role outside AWS",
-    "description": "Temporary instance-role credentials (ASIA...) used from an IP that is not AWS \u2014 a sign the IMDS creds were stolen via SSRF and used off-box.",
+    "description": "Temporary instance-role credentials (ASIA...) used from an IP that is not AWS — a sign the IMDS creds were stolen via SSRF and used off-box.",
     "code": "logsource:\n    product: aws\n    service: cloudtrail\ndetection:\n    selection:\n        userIdentity.type: AssumedRole\n        userIdentity.arn|contains: ':assumed-role/'\n    filter:\n        sourceIPAddress|cidr: '10.0.0.0/8'\n    condition: selection and not filter\nlevel: high",
     "severity": "high",
     "category": "threat-intelligence",
@@ -790,7 +793,7 @@ const RULE_SEED = [
     "id": "sig-cloud-005",
     "type": "sigma",
     "title": "Azure role assignment granted",
-    "description": "A new Azure RBAC role assignment \u2014 watch for Owner/Contributor granted to unexpected principals.",
+    "description": "A new Azure RBAC role assignment — watch for Owner/Contributor granted to unexpected principals.",
     "code": "logsource:\n    product: azure\n    service: activitylogs\ndetection:\n    selection:\n        operationName: Microsoft.Authorization/roleAssignments/write\n    condition: selection\nlevel: medium",
     "severity": "medium",
     "category": "threat-intelligence",

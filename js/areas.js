@@ -33,7 +33,7 @@ function paintBulk(){
     <button class="btn xs rd" data-act="bulkDel">${ico('trash-2','sm')}Delete</button><button class="iconbtn" data-act="bulkClear" aria-label="Clear selection">${ico('x','sm')}</button>`;
 }
 function tRow(t){
-  return `<div class="tr2-r${UI.tsel === t.id ? ' on' : ''}" data-act="toolSel" data-id="${t.id}" data-pick="${t.id}" role="button" tabindex="0" aria-label="${esc(t.name)} — show details">
+  return `<div class="tr2-r${UI.tsel === t.id ? ' on' : ''}" data-id="${t.id}" data-pick="${t.id}"><button class="gcard-hit" data-act="toolSel" data-id="${t.id}" aria-label="${esc(t.name)} — show details"></button>
     ${tPick(t)}<div class="tr2-n">${tmono(t, 32)}<div><b>${esc(t.name)}</b><small>${esc(hostOf(t.url))}</small></div></div>
     <p class="tr2-d">${esc(t.desc || '')}</p>
     <span class="tr2-c"><i class="cdot" style="background:${catCol(t.cat)}"></i>${esc(toolSub(t))}</span>
@@ -188,48 +188,67 @@ function refScore(x, words, q){
   return s;
 }
 const refMark = (text, words) => { let h = esc(text); if(!words.length) return h; const re = new RegExp('(' + words.map(w => esc(w).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')', 'gi'); return h.replace(re, '<mark>$1</mark>'); };
-function viewReference(){
-  const A = refAll(), q = (UI.refQ || '').trim().toLowerCase(), words = q.split(/\s+/).filter(Boolean), cat = A.secs[UI.refCat] ? UI.refCat : 'all', only = !!UI.refHot;
-  const scored = Object.entries(A.secs).map(([k, S]) => [k, S, S.idx.map(x => [x, refScore(x, words, q)]).filter(([x, sc]) => sc && (!only || x.r[5]))]);
-  const hitsBy = Object.fromEntries(scored.map(([k, , h]) => [k, h.length]));
-  let secs = scored.filter(([k, , h]) => (cat === 'all' || cat === k) && h.length);
-  if(words.length) secs = secs.map(([k, S, h]) => [k, S, h.sort((a, b) => b[1] - a[1])]).sort((a, b) => b[2][0][1] - a[2][0][1]);
-  const total = Object.values(A.secs).reduce((n, S) => n + S.rows.length, 0), shown = secs.reduce((n, x) => n + x[2].length, 0);
-  const hot = Object.values(A.secs).reduce((n, S) => n + S.rows.filter(r => r[5]).length, 0);
-  const key = (k, r) => k + ':' + r[0];
-  const LIM = UI.refLim || 300; let left = LIM;
-  const flat = secs.flatMap(([k, S, h]) => h.map(([x]) => [k, S, x.r]));
-  let cur = flat.find(([k, S, r]) => key(k, r) === UI.refRow) || flat[0]; if(cur) UI.refRow = key(cur[0], cur[2]);
-  const row = (k, r) => `<button class="rf2-r${cur && key(cur[0], cur[2]) === key(k, r) ? ' on' : ''}" data-act="refRow" data-v="${esc(key(k, r))}"><code>${refMark(r[0], words)}</code><span class="rf2-t">${refMark(r[1], words)}</span>${r[5] ? '<em>Worth a look</em>' : '<i></i>'}<span class="rf2-at">${esc(r[4] || '')}</span></button>`;
-  const det = cur ? (([k, S, r]) => `<aside class="rf2-d${UI.refOpen ? ' open' : ''}" aria-label="${esc(r[0])} details">
+function refDetail(cur){
+  if(!cur) return ''; const [k, S, r] = cur;
+  return `<aside class="rf2-d${UI.refOpen ? ' open' : ''}" id="refDet" aria-label="${esc(r[0])} details">
       <div class="rf2-dh"><span class="ix">${ico(S.icon,'sm')}${esc(S.name)}</span><button class="iconbtn rf2-x" data-act="refRowX" aria-label="Close">${ico('x','sm')}</button></div>
-      <div class="rf2-k${String(r[0]).length > 14 ? ' long' : ''}">${esc(r[0])}</div><h2>${esc(r[1])}</h2>
+      <div class="rf2-k${String(r[0]).length > 14 ? ' long' : ''}">${esc(String(r[0])).replace(/([\\/])/g, '$1​')}</div><h2>${esc(r[1])}</h2>
       ${r[5] ? '<span class="rf2-hot">Worth a look</span>' : ''}
       <h5>What it means</h5><p>${esc(r[2])}</p>
       <h5>What to look for</h5><p>${esc(r[3])}</p>
       ${r[4] ? `<h5>MITRE ATT&amp;CK</h5><p><a class="rf2-att" href="https://attack.mitre.org/${/^TA/.test(r[4]) ? 'tactics' : 'techniques'}/${esc(r[4].replace('.', '/'))}/" target="_blank" rel="noopener noreferrer">${esc(r[4])} ${ico('arrow-up-right','sm')}</a></p>` : ''}
       ${r[6] ? `<h5>Also known as</h5><p class="rf2-aka">${String(r[6]).split(/\s*[,;]\s*|\s{2,}/).filter(Boolean).slice(0, 12).map(w => `<button class="chip" data-act="refAka" data-v="${esc(w)}">${esc(w)}</button>`).join('')}</p>` : ''}
       <div class="rf2-a"><button class="btn primary sm" data-act="refFind" data-v="${esc(String(r[0]).replace(/^.*\\/, ''))}">${ico('search','sm')}Search my evidence</button><button class="btn sm" data-act="flagCopy" data-v="${esc(r[0])}">${ico('copy','sm')}Copy</button></div>
-      ${S.note ? `<p class="rf2-note">${esc(S.note)}</p>` : ''}</aside>`)(cur) : '';
-  const nav = (k, S) => { const n = words.length || only ? hitsBy[k] : S.rows.length; return `<button class="rf2-nav${cat === k ? ' on' : ''}" data-act="refCat" data-v="${k}" aria-pressed="${cat === k}"${n ? '' : ' disabled'}>${ico(S.icon,'sm')}<span class="rf2-nav-l">${esc(S.name)}</span><span class="rf2-nav-n">${n}</span></button>`; };
+      ${S.note ? `<p class="rf2-note">${esc(S.note)}</p>` : ''}</aside>`;
+}
+/* Picking a row updates only the row highlight and the details panel, so the page doesn't redraw. */
+function refSelect(v, open){
+  const i = v.indexOf(':'), k = v.slice(0, i), val = v.slice(i + 1), S = refAll().secs[k], r = S && S.rows.find(x => String(x[0]) === val); if(!r) return;
+  UI.refRow = v; if(open) UI.refOpen = true;
+  document.querySelectorAll('.rf2-r.on').forEach(b => b.classList.remove('on')); const btn = [...document.querySelectorAll('.rf2-r')].find(b => b.dataset.v === v); if(btn) btn.classList.add('on');
+  const d = $('refDet'); if(d){ d.outerHTML = refDetail([k, S, r]); const n = $('refDet'); if(n) n.scrollTop = 0; }
+  if(UI.refOpen && !document.querySelector('.rf2-scrim')){ const sc = document.createElement('div'); sc.className = 'rf2-scrim'; sc.dataset.act = 'refRowX'; const body = document.querySelector('.rf2-body'); if(body) body.appendChild(sc); }
+  return btn;
+}
+function viewReference(){
+  const A = refAll(), q = (UI.refQ || '').trim().toLowerCase(), words = q.split(/\s+/).filter(Boolean), only = !!UI.refHot;
+  const grp = A.groups.includes(UI.refGrp) ? UI.refGrp : 'all', cat = A.secs[UI.refCat] && (grp === 'all' || A.secs[UI.refCat].group === grp) ? UI.refCat : 'all';
+  const scored = Object.entries(A.secs).map(([k, S]) => [k, S, S.idx.map(x => [x, refScore(x, words, q)]).filter(([x, sc]) => sc && (!only || x.r[5]))]);
+  const hitsBy = Object.fromEntries(scored.map(([k, , h]) => [k, h.length]));
+  const inGrp = S => grp === 'all' || S.group === grp;
+  let secs = scored.filter(([k, S, h]) => inGrp(S) && (cat === 'all' || cat === k) && h.length);
+  if(words.length) secs = secs.map(([k, S, h]) => [k, S, h.sort((a, b) => b[1] - a[1])]).sort((a, b) => b[2][0][1] - a[2][0][1]);
+  const total = Object.values(A.secs).reduce((n, S) => n + S.rows.length, 0), shown = secs.reduce((n, x) => n + x[2].length, 0);
+  const hot = Object.values(A.secs).reduce((n, S) => n + S.rows.filter(r => r[5]).length, 0);
+  const filt = words.length || only, cnt = k => filt ? hitsBy[k] : A.secs[k].rows.length;
+  const grpN = g => Object.entries(A.secs).filter(([, S]) => g === 'all' || S.group === g).reduce((n, [k]) => n + cnt(k), 0);
+  const key = (k, r) => k + ':' + r[0];
+  const LIM = UI.refLim || 300; let left = LIM;
+  const flat = secs.flatMap(([k, S, h]) => h.map(([x]) => [k, S, x.r]));
+  let cur = flat.find(([k, S, r]) => key(k, r) === UI.refRow) || flat[0]; if(cur) UI.refRow = key(cur[0], cur[2]);
+  const brk = h => h.replace(/([\\/])(?![^<]*>)/g, '$1​');
+  const VW = {}; const vw = k => VW[k] || (VW[k] = Math.round(Math.min(34, Math.max(5, ...A.secs[k].rows.map(r => Math.max(...String(r[0]).split(/[\\/ ]/).map(w => w.length), Math.min(String(r[0]).length, 34) * .62)))) * 7.7 + 10));
+  const row = (k, r) => `<button style="--vw:${vw(k)}px" class="rf2-r${cur && key(cur[0], cur[2]) === key(k, r) ? ' on' : ''}" data-act="refRow" data-v="${esc(key(k, r))}"><code>${brk(refMark(r[0], words))}</code><span class="rf2-t">${refMark(r[1], words)}</span>${r[5] ? '<em>Worth a look</em>' : '<i></i>'}<span class="rf2-at">${esc(r[4] || '')}</span></button>`;
   const list = secs.map(([k, S, h]) => { if(left <= 0) return ''; const rows = h.slice(0, left); left -= rows.length;
     return `${cat === 'all' ? `<div class="rf2-sh">${ico(S.icon,'sm')}${esc(S.name)}<small>${h.length}</small></div>` : ''}${rows.map(([x]) => row(k, x.r)).join('')}`; }).join('');
+  const grpKs = grp === 'all' ? [] : Object.entries(A.secs).filter(([, S]) => S.group === grp);
   return `<div class="scroll rf2-scroll"><div class="rf2">
     <section class="rf2-ink"><div class="rf2-in">
       <span class="ix">Knowledge · offline field guide</span><h1>Reference</h1><p>What an event ID, port, path, code, file signature or search operator means, and what to check next.</p>
       <div class="search-in rf2-q">${ico('search')}<label class="sr" for="refQ">Search the reference</label><input id="refQ" class="inp" placeholder="4769, 4444, rundll32, AADSTS50126, 89 50 4E 47, site:, shimcache…" value="${esc(UI.refQ || '')}" autocomplete="off">${UI.refQ ? `<button class="iconbtn" data-act="refClear" aria-label="Clear search">${ico('x','sm')}</button>` : '<kbd>/</kbd>'}</div>
       <div class="rf2-stat"><div><b>${total.toLocaleString()}</b><small>entries</small></div><div><b>${Object.keys(A.secs).length}</b><small>sections</small></div><div><b>${hot}</b><small>worth a look</small></div><div class="rf2-keys"><kbd>↑</kbd><kbd>↓</kbd><small>move through results</small></div></div>
     </div></section>
-    <div class="rf2-in rf2-body">
-      <div class="rf2-wrap">
-      <aside class="rf2-rail" aria-label="Sections">
-        <button class="rf2-nav${cat === 'all' ? ' on' : ''}" data-act="refCat" data-v="all" aria-pressed="${cat === 'all'}">${ico('book-open','sm')}<span class="rf2-nav-l">Everything</span><span class="rf2-nav-n">${words.length || only ? shown : total}</span></button>
-        ${A.groups.map(g => { const ks = Object.entries(A.secs).filter(([k, S]) => S.group === g && (!(words.length || only) || hitsBy[k] || cat === k)); return ks.length ? `<div class="rf2-rail-h"><span class="ix">${esc(g)}</span></div>${ks.map(([k, S]) => nav(k, S)).join('')}` : ''; }).join('')}
+    <div class="rf2-in rf2-body"><div class="rf4">
+      <aside class="rf4-rail" aria-label="Sections">
+        <button class="rf4-all${grp === 'all' ? ' on' : ''}" data-act="refGrp" data-v="all">${ico('book-open','sm')}<span>Everything</span><small>${grpN('all').toLocaleString()}</small></button>
+        ${A.groups.map(g => { const n = grpN(g), open = grp === g || (filt && n && grp === 'all' && UI.refExp === g); const ks = Object.entries(A.secs).filter(([, S]) => S.group === g);
+          return `<div class="rf4-g${open ? ' open' : ''}${grp === g ? ' cur' : ''}"><button class="rf4-gh" data-act="refGrp" data-v="${esc(g)}" aria-expanded="${open}"${n ? '' : ' disabled'}>${ico('chevron-right','sm')}<span>${esc(g)}</span><small>${n.toLocaleString()}</small></button>
+            ${open ? `<div class="rf4-gb">${ks.map(([k, S]) => `<button class="rf4-s${cat === k ? ' on' : ''}" data-act="refCat" data-v="${k}"${cnt(k) ? '' : ' disabled'}>${ico(S.icon,'sm')}<span>${esc(S.name)}</span><small>${cnt(k)}</small></button>`).join('')}</div>` : ''}</div>`; }).join('')}
       </aside>
-      <div class="rf2-main">
+      <div class="rf4-main">
       <div class="rf2-tb"><span>${shown === total ? total.toLocaleString() + ' entries' : shown.toLocaleString() + ' of ' + total.toLocaleString()}${q ? ' matching “' + esc(UI.refQ) + '”' : ''}${words.length ? ' · best matches first' : ''}</span><label class="chk"><input type="checkbox" data-act="refHot" ${only ? 'checked' : ''}> Only “worth a look”</label></div>
-      ${flat.length ? `<div class="rf2-g"><div class="rf2-l">${list}${shown > LIM ? `<div class="dmore"><span class="t3">Showing ${LIM} of ${shown}</span><button class="btn" data-act="refMore">Show more</button></div>` : ''}</div>${det}</div>`
-        : `<div class="hx2-empty">Nothing matches “${esc(UI.refQ || '')}”.${only ? ' Try turning off “Only worth a look”.' : ' Try fewer words, or search the evidence instead.'}</div>`}
+      ${flat.length ? `<div class="rf2-g"><div class="rf2-l">${list}${shown > LIM ? `<div class="dmore"><span class="t3">Showing ${LIM} of ${shown}</span><button class="btn" data-act="refMore">Show more</button></div>` : ''}</div>${refDetail(cur)}</div>`
+        : `<div class="hx2-empty">Nothing matches “${esc(UI.refQ || '')}”${grp !== 'all' ? ' in ' + esc(grp) + '. <button class="linkbtn" data-act="refGrp" data-v="all">Search everything</button>' : '.'}${only ? ' Try turning off “Only worth a look”.' : ''}</div>`}
       </div></div>
       ${UI.refOpen ? '<div class="rf2-scrim" data-act="refRowX" aria-hidden="true"></div>' : ''}
     </div></div></div>`;

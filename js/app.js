@@ -45,14 +45,14 @@ function onRoute(){
 function animInsp(){ const i = $('insp'); i.classList.add('enter'); setTimeout(() => i.classList.remove('enter'), 260); }
 function selectEntry(id, fromGraph){
   if(!UI.inspOpen) animInsp(); UI.sel = {kind:'entry', id}; UI.inspOpen = true; renderInsp(); $('inspBtn').classList.add('on');
-  document.querySelectorAll('.ecard[aria-selected=true]').forEach(x => x.setAttribute('aria-selected', 'false'));
-  const c = document.querySelector(`.ecard[data-id="${CSS.escape(id)}"]`); if(c) c.setAttribute('aria-selected', 'true');
+  document.querySelectorAll('.ecard[aria-current=true]').forEach(x => x.setAttribute('aria-current', 'false'));
+  const c = document.querySelector(`.ecard[data-id="${CSS.escape(id)}"]`); if(c) c.setAttribute('aria-current', 'true');
   if(fromGraph) refreshGraphTools();
 }
 function select(kind, id){
   if(!UI.inspOpen) animInsp(); UI.sel = {kind, id}; UI.inspOpen = true; renderInsp(); $('inspBtn').classList.add('on');
-  document.querySelectorAll('.ev[aria-selected=true]').forEach(x => x.setAttribute('aria-selected', 'false'));
-  const ev = document.querySelector(`.ev[data-id="${CSS.escape(id)}"]`); if(ev) ev.setAttribute('aria-selected', 'true');
+  document.querySelectorAll('.ev[aria-current=true]').forEach(x => x.setAttribute('aria-current', 'false'));
+  const ev = document.querySelector(`.ev[data-id="${CSS.escape(id)}"]`); if(ev) ev.setAttribute('aria-current', 'true');
   layoutFocus();
 }
 function promote(entId){
@@ -99,9 +99,10 @@ document.addEventListener('click', ev => {
       {label:'Trash & restore points', icon:'trash-2', fn:() => go('#/trash')},
       {sep:true}, {label:'Start fresh — delete everything…', icon:'triangle-alert', danger:true, fn:() => clickAct('freshStart')}], 'A restore point is saved first'); }
     case 'pbGo': return pbGo(v);
-    case 'refCat': UI.refCat = v; UI.refRow = null; return renderMain();
-    case 'refRow': UI.refRow = v; UI.refOpen = true; return renderMain();
-    case 'refRowX': UI.refOpen = false; return renderMain();
+    case 'refGrp': UI.refGrp = UI.refGrp === v && v !== 'all' && UI.refCat === 'all' ? 'all' : v; UI.refCat = 'all'; UI.refRow = null; UI.refLim = 0; return renderMain();
+    case 'refCat': UI.refCat = v; if(v !== 'all' && refAll().secs[v]) UI.refGrp = refAll().secs[v].group; UI.refRow = null; UI.refLim = 0; return renderMain();
+    case 'refRow': return refSelect(v, true);
+    case 'refRowX': { UI.refOpen = false; const d = $('refDet'); if(d) d.classList.remove('open'); document.querySelectorAll('.rf2-scrim').forEach(x => x.remove()); return; }
     case 'refClear': UI.refQ = ''; return renderMain();
     case 'refHot': UI.refHot = !UI.refHot; return renderMain();
     case 'refMore': UI.refLim = (UI.refLim || 300) + 400; return renderMain();
@@ -568,7 +569,7 @@ document.addEventListener('keydown', ev => {
   if((ev.key === 'Delete' || ev.key === 'Backspace') && UI.route.tab === 'graph' && UI.sel){ ev.preventDefault(); document.querySelector('[data-act=gDelete]').click(); }
   if(/^[1-8]$/.test(ev.key) && UI.route.area === 'case') return go(caseHash(DB.active, caseTabs()[+ev.key - 1][0]));
   if((ev.key === 'j' || ev.key === 'k') && UI.route.area === 'case' && UI.route.tab === 'timeline'){ const evs = [...document.querySelectorAll('#main .ev')]; if(!evs.length) return;
-    const i = evs.findIndex(x => x.getAttribute('aria-selected') === 'true'), n = evs[i < 0 ? 0 : Math.max(0, Math.min(evs.length - 1, i + (ev.key === 'j' ? 1 : -1)))]; ev.preventDefault(); n.click(); n.scrollIntoView({block:'nearest'}); }
+    const i = evs.findIndex(x => x.getAttribute('aria-current') === 'true'), n = evs[i < 0 ? 0 : Math.max(0, Math.min(evs.length - 1, i + (ev.key === 'j' ? 1 : -1)))]; ev.preventDefault(); n.click(); n.scrollIntoView({block:'nearest'}); }
 });
 function refocus(id){ const x = $(id); if(x){ x.focus(); x.setSelectionRange(x.value.length, x.value.length); } }
 /* Reference: arrow keys move through the results, even while typing in the search box. */
@@ -577,8 +578,7 @@ document.addEventListener('keydown', ev => {
   if(ev.target.tagName === 'INPUT' && ev.target.id !== 'refQ' || ev.target.tagName === 'TEXTAREA') return;
   const rows = [...document.querySelectorAll('.rf2-r')]; if(!rows.length) return; ev.preventDefault();
   const i = rows.findIndex(r => r.classList.contains('on')), n = rows[Math.max(0, Math.min(rows.length - 1, i + (ev.key === 'ArrowDown' ? 1 : -1)))];
-  UI.refRow = n.dataset.v; const typing = ev.target.id === 'refQ'; renderMain(); if(typing) refocus('refQ');
-  const on = document.querySelector('.rf2-r.on'); if(on) on.scrollIntoView({block:'nearest'});
+  const b = refSelect(n.dataset.v, false); if(b) b.scrollIntoView({block:'nearest'});
 });
 window.addEventListener('hashchange', onRoute);
 let rz = null; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if(cy) cy.resize(); if(DB) renderInsp(); }, 120); });

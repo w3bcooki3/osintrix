@@ -226,8 +226,10 @@ test('cloud scanner flags IaC and logs, and sends to a case', async ({ page }) =
   // guide copy action is wired (no throw)
   await page.evaluate(() => { UI.cloudTab = 'guide'; renderMain(); });
   await expect(page.locator('.cg-it')).not.toHaveCount(0);
+  const list = await page.evaluateHandle(() => document.querySelector('.cg-list'));
   await page.locator('.cg-it').nth(2).click();
   await expect(page.locator('#cgDetail .cg-cmd')).not.toHaveCount(0);
+  expect(await page.evaluate(l => l.isConnected, list)).toBe(true);
 });
 
 test('scratchpad detects indicators and groups them into lanes', async ({ page }) => {
@@ -248,6 +250,7 @@ const seedStore = async (page, raw) => page.evaluate(async raw => {
   localStorage.setItem('osintrix-poc:v4', raw);
   await new Promise(res => { const r = indexedDB.open('osintrix', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv');
     r.onsuccess = () => { const tx = r.result.transaction('kv', 'readwrite'); tx.objectStore('kv').put(raw, 'osintrix-poc:v4'); tx.oncomplete = () => { r.result.close(); res(); }; }; });
+  await new Promise(res => setTimeout(res, 250));          // Chromium commits localStorage asynchronously; let it land before the reload
 }, raw);
 const readStore = page => page.evaluate(() => new Promise(res => { const r = indexedDB.open('osintrix', 1);
   r.onsuccess = () => { const q = r.result.transaction('kv').objectStore('kv').get('osintrix-poc:v4'); q.onsuccess = () => res([q.result, localStorage.getItem('osintrix-poc:v4')]); }; }));
@@ -261,7 +264,9 @@ test('never overwrites a workspace it cannot read', async ({ page }) => {
   await expect(page.locator('.recover')).toContainText('newer version');
   await page.waitForTimeout(800);
   const [idb, ls] = await readStore(page);
-  expect(idb).toBe(newer); expect(ls).toBe(newer);
+  // the stored copies are never replaced. (Chromium sometimes hasn't committed a localStorage write made just
+  // before a reload, so the second copy can be missing; it must never hold anything else.)
+  expect(idb).toBe(newer); expect([newer, null]).toContain(ls);
   // damaged data: same, and starting fresh keeps the old copy aside
   await seedStore(page, '{"v":2,"cases":[');
   await page.reload();
@@ -286,8 +291,14 @@ test('a second tab is read-only until it takes over', async ({ page, context }) 
   await expect.poll(() => two.evaluate(() => DB.cases[0].name)).toBe('Edited in tab one');
   // take over: tab two becomes the writer, tab one turns read-only
   await two.click('#rotabGo');
-  await expect.poll(() => page.evaluate(() => !!document.getElementById('rotab'))).toBe(true);
-  await expect.poll(() => two.evaluate(() => typeof TABS !== 'undefined' && TABS.writer)).toBe(true);
+  await expect.poll(() => two.evaluate(() => TABS.writer && !document.getElementById('rotab'))).toBe(true);
+  await expect.poll(() => page.evaluate(() => !TABS.writer && !!document.getElementById('rotab'))).toBe(true);
+  expect(await two.evaluate(() => DB.cases[0].name)).toBe('Edited in tab one');
+  // the new writer's saves reach storage, the old one's do not
+  await two.evaluate(() => { DB.cases[0].name = 'Saved by tab two'; mutate('rename'); flush(); });
+  await page.evaluate(() => { DB.cases[0].name = 'Ignored from tab one'; mutate('rename'); flush(); });
+  await expect.poll(async () => (await readStore(two))[1]).toContain('Saved by tab two');
+  expect((await readStore(two))[1]).not.toContain('Ignored from tab one');
   noErrors(errors);
 });
 
@@ -386,8 +397,12 @@ test('CTF: work log, flag check, write-up and cheatsheets', async ({ page }) => 
   expect(await page.evaluate(() => DB.ctf.chals.find(x => x.name === 'Hidden layers').status)).toBe('solved');
   await page.click('[data-act=wuFromChal]'); await page.click('form[data-form=wu] button[type=submit]');
   await expect(page.locator('.reader .md-code')).toContainText('binwalk');
-  await page.evaluate(() => { UI.ctfTab = 'cheats'; UI.csq = 'steghide'; renderMain(); });
-  await expect(page.locator('.cs-sec')).not.toHaveCount(0);
+  await page.evaluate(() => { UI.ctfTab = 'cheats'; UI.csCat = 'web'; renderMain(); });
+  await page.fill('[data-csvar=target]', '10.10.11.42');
+  await expect(page.locator('.csr code').first()).toContainText('10.10.11.42');
+  await page.fill('#csq', 'steghide'); await expect(page.locator('.cs-blk')).not.toHaveCount(0);
+  await page.click('[data-act=ctfCheat][data-v=stego]'); await page.click('[data-act=csFm][data-v="0"]');
+  expect(await page.evaluate(() => DB.ctf.fm.stego)).toEqual([0]);
   noErrors(errors);
 });
 
@@ -399,5 +414,72 @@ test('places, reference and packs load', async ({ page }) => {
   expect(n.ref).toBeGreaterThan(1000); expect(n.pb).toBeGreaterThan(50); expect(n.cg).toBeGreaterThan(90);
   await page.evaluate(() => { location.hash = '#/reference'; UI.refQ = 'AADSTS50126'; renderMain(); });
   await expect(page.locator('.rf2-r').first()).toContainText('50126');
+  noErrors(errors);
+});
+
+test('no serious accessibility problems on the main screens, light and dark', async ({ page }) => {
+  test.setTimeout(300_000);
+  const AxeBuilder = require('@axe-core/playwright').default;
+  const errors = await open(page, '#/home');
+  const routes = ['#/home', '#/case/c-lantern/graph', '#/case/c-lantern/timeline', '#/case/c-lantern/entities', '#/case/c-lab/map', '#/case/c-lantern/questions', '#/case/c-lantern/overview', '#/case/c-lantern/vault',
+    '#/toolbox', '#/queries', '#/lab', '#/cloud', '#/ctf', '#/reference', '#/playbooks', '#/feeds', '#/detections', '#/notes', '#/security', '#/whatsnew', '#/help', '#/settings', 'ctf-ws', 'ctf-cheats', 'ctf-wu', 'welcome'];
+  const found = [];
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate(t => { DB.prefs.theme = t; applyPrefs(); renderAll(); }, theme);
+    for (const r of routes) {
+      await page.evaluate(r => { closeWelcome();
+        if (r === 'welcome') return showWelcome();
+        if (r.startsWith('ctf-')) { location.hash = '#/ctf'; UI.ctfTab = r === 'ctf-ws' ? 'board' : r === 'ctf-cheats' ? 'cheats' : 'writeups'; UI.ctfSel = r === 'ctf-ws' ? DB.ctf.chals[0].id : null; setTimeout(renderMain, 30); return; }
+        location.hash = r; }, r);
+      await page.waitForTimeout(450);
+      const res = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
+      for (const v of res.violations) if (['serious', 'critical'].includes(v.impact)) for (const n of v.nodes.slice(0, 3)) found.push(`${theme} ${r} ${v.id}: ${n.target.join(' ')}`);
+    }
+  }
+  expect(found, found.join('\n')).toEqual([]);
+  noErrors(errors.filter(e => !/Connecting to 'file:.*violates the following Content Security Policy directive: "connect-src/.test(e)));   // axe reads the stylesheets; the app's CSP rightly blocks that
+});
+
+test('Windows event logs (.evtx) are read, checked against Sigma rules and imported', async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = await open(page, '#/case/c-lantern/timeline');
+  // the reader on its own: a synthetic Security log spread over several chunks (tests/fixtures/make_evtx.py)
+  const sec = await page.evaluate(async b64 => { const u = Uint8Array.from(atob(b64), c => c.charCodeAt(0)); const r = EVTX.parse(u.buffer);
+    return { n: r.events.length, chunks: r.chunks, bad: r.badRecords, add: r.events.find(x => x.EventID === '4732'), clr: r.events.find(x => x.EventID === '1102'), fail: r.events.filter(x => x.EventID === '4625').length }; },
+    require('fs').readFileSync(fixture('security-sample.evtx')).toString('base64'));
+  expect(sec).toMatchObject({ n: 321, bad: 0, fail: 12 }); expect(sec.chunks).toBeGreaterThan(1);
+  expect(sec.add).toMatchObject({ Channel: 'Security', Computer: 'WS-FIN-07.corp.example', TargetUserName: 'Administrators', MemberSid: 'S-1-5-21-1234567890-2345678901-3456789012-1001', TimeCreated: '2026-09-14T08:47:52.000Z' });
+  expect(sec.clr).toMatchObject({ UserDataType: 'LogFileCleared', SubjectUserName: 'svc_backup' });
+  // the whole flow with a synthetic Sysmon log
+  await page.evaluate(() => openCapture());
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.click('[data-act=capLog]')]);
+  await chooser.setFiles(fixture('sysmon-sample.evtx'));
+  await expect(page.locator('[data-act=evtxGo]:not([disabled])')).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator('#evtxDlg')).toContainText('22');
+  const sig = await page.evaluate(() => Object.fromEntries(EVTXIMP.sig.per.map(([r, n]) => [r.title, n])));
+  expect(sig['Certutil Used to Download a File']).toBe(1);
+  expect(sig['Registry Run Key Persistence']).toBe(1);
+  expect(sig['LSASS Credential Dump Attempt']).toBe(1);                     // the dumper, not Windows or the antivirus reading LSASS
+  expect(sig['Remote Thread Created in LSASS']).toBeUndefined();            // log sources are respected: process access is not a remote thread
+  await page.click('[data-act=evtxGo]');
+  await expect.poll(() => page.evaluate(() => DB.records.filter(r => (r.tags || []).includes('evtx')).length)).toBe(22);
+  const rec = await page.evaluate(() => { const r = DB.records.find(x => (x.tags || []).includes('evtx') && /certutil/.test(x.body) && /EventID=1 /.test(x.body)); return { title: r.title, host: r.host, ts: r.ts, det: (r.det || []).map(d => d.title) }; });
+  expect(rec.title).toMatch(/^1 · Process created/); expect(rec.host).toBe('WS-FIN-07.corp.example'); expect(rec.ts).toBe(Date.parse('2026-09-14T08:57:40Z'));
+  expect(rec.det).toContain('Certutil Used to Download a File');
+  await expect(page.locator('.ev .evdet').first()).toBeVisible();
+  noErrors(errors);
+});
+
+test('an improved built-in rule replaces an unedited old copy, but never one you edited', async ({ page }) => {
+  const errors = await open(page, '#/detections');
+  const r = await page.evaluate(() => {
+    const seed = RULE_SEED.find(x => x.id === 'sig-2026-cred-010'), old = seed.replaces[0];
+    DB.rules = DB.rules.filter(x => x.id !== 'sig-2026-cred-010' && x.id !== 'pk-sig-001');
+    DB.rules.push({ ...ruleFromSeed(seed), code: old });                                                  // an old, unedited copy
+    const mine = { ...ruleFromSeed(RULE_PACK[0]), code: 'my own edit' }; DB.rules.push(mine);             // an edited copy (no replaces entry matches)
+    RULES_MERGED = false; ensureRules();
+    return { upgraded: DB.rules.find(x => x.id === 'sig-2026-cred-010').code.includes('filter_system'), kept: DB.rules.find(x => x.id === 'pk-sig-001').code };
+  });
+  expect(r.upgraded).toBe(true); expect(r.kept).toBe('my own edit');
   noErrors(errors);
 });

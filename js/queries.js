@@ -74,7 +74,7 @@ function viewQueries(){
       <nav class="ide-tree" aria-label="Query folders"><div class="ide-h">Library</div>${node('all','All queries',DB.queries.length,'layers')}${node('fav','Favourites',DB.queries.filter(x => x.starred).length,'star')}${node('mine','My queries',DB.queries.filter(x => x.custom).length,'pencil')}
         <div class="ide-h">Categories</div>${cats.map(([c, n]) => node(c, qcat(c)[0], n, '', qcat(c)[1])).join('')}</nav>
       <div class="ide-list"><div class="ide-lh">${search}<button class="iconbtn" data-act="qNew" aria-label="New query" title="New query">${ico('plus','sm')}</button></div>
-        <div class="ide-items">${list.map(x => `<button class="ide-i" data-act="qSel" data-id="${x.id}" aria-selected="${!!(cur && cur.id === x.id)}"><b>${esc(x.name)}${x.starred ? ` <span class="tstar">${ico('star','sm')}</span>` : ''}</b><code>${esc(x.query)}</code></button>`).join('') || '<p class="t3" style="padding:16px">No queries match.</p>'}</div></div>
+        <div class="ide-items">${list.map(x => `<button class="ide-i" data-act="qSel" data-id="${x.id}" aria-current="${!!(cur && cur.id === x.id)}"><b>${esc(x.name)}${x.starred ? ` <span class="tstar">${ico('star','sm')}</span>` : ''}</b><code>${esc(x.query)}</code></button>`).join('') || '<p class="t3" style="padding:16px">No queries match.</p>'}</div></div>
       <section class="ide-ed">${cur ? queryPanel(cur) : none}</section></div></div>`;
   }
 
@@ -88,7 +88,7 @@ function viewQueries(){
           <div class="gcard-f">${engs(x)}<span style="flex:1"></span><span class="gcard-go">Open ${ico('arrow-right','sm')}</span></div></article>`; }).join('')}</div>`
     : `<div class="card dtw"><table class="dt"><thead><tr><th class="c-star"></th>${sortTh('qSort','name',sk,sd,'Name')}${sortTh('qSort','cat',sk,sd,'Category','c-cat')}<th class="c-eng">Engines</th>${sortTh('qSort','blanks',sk,sd,'Blanks','c-num')}${sortTh('qSort','uses',sk,sd,'Runs','c-num')}<th class="c-act"></th></tr></thead><tbody>
       ${list.map(x => { const [cn, col] = qcat(x.cat), vs = varsOf(x.query);
-        return `<tr data-act="qSel" data-id="${x.id}" aria-selected="${!!(open && cur.id === x.id)}" tabindex="0">
+        return `<tr data-act="qSel" data-id="${x.id}" aria-current="${!!(open && cur.id === x.id)}" tabindex="0">
           <td class="c-star"><button class="tb-ic${x.starred ? ' on star' : ''}" data-act="qStar" data-id="${x.id}" aria-label="Favourite">${ico('star','sm')}</button></td>
           <td class="c-name"><b>${esc(x.name)}</b><code>${esc(x.query)}</code></td>
           <td class="c-cat"><span class="pill" style="--c:${col}">${esc(cn)}</span></td>

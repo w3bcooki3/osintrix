@@ -176,7 +176,7 @@ function bindCaptureFiles(){
   d.ondragover = e => { if([...(e.dataTransfer.types || [])].includes('Files')){ e.preventDefault(); d.classList.add('dropping'); } };
   d.ondragleave = e => { if(e.target === d) d.classList.remove('dropping'); };
   d.ondrop = e => { if(!e.dataTransfer.files.length) return; e.preventDefault(); d.classList.remove('dropping'); const fs = [...e.dataTransfer.files];
-    if(fs.length === 1 && /\.(csv|tsv|json|ndjson|jsonl|log|txt)$/i.test(fs[0].name) && !/^image\//.test(fs[0].type)) return logImportFile(fs[0]); attachFiles(fs); };
+    if(fs.length === 1 && /\.(csv|tsv|json|ndjson|jsonl|log|txt|evtx)$/i.test(fs[0].name) && !/^image\//.test(fs[0].type)) return logImportFile(fs[0]); attachFiles(fs); };
   d.onpaste = e => { const fs = [...(e.clipboardData && e.clipboardData.files || [])]; if(fs.length){ e.preventDefault(); attachFiles(fs.map((f, i) => f.name && f.name !== 'image.png' ? f : new File([f], 'screenshot-' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-') + (i ? '-' + i : '') + '.png', {type:f.type}))); } };
 }
 
@@ -212,6 +212,7 @@ function logTime(raw){
 }
 let LOGIMP = null;
 function logImportFile(f){
+  if(/\.evtx$/i.test(f.name)) return evtxImportFile(f);
   if(f.size > 25 * 1048576) return toast('Log files over 25 MB are too big for one import — split it first');
   const fr = new FileReader(); fr.onload = () => { const P = logParse(String(fr.result), f.name); if(!P.rows.length) return toast('No rows found in that file');
     const cols = [...new Set(P.rows.slice(0, 200).flatMap(r => Object.keys(r)))];
@@ -250,5 +251,5 @@ const SAFE_ACTS = {
   bkpLater:() => { DB.prefs.remindAt = Date.now() + 7 * 864e5; save(); renderMain(); },
   recDel:id => delRecord(id),
   attAdd:(id, v, t) => attAct('attAdd', id, v), attOpen:(id, v) => attAct('attOpen', id, v), attDl:(id, v) => attAct('attDl', id, v), attKit:(id, v) => attAct('attKit', id, v), attDel:(id, v) => attAct('attDel', id, v),
-  capFiles:() => pickFiles('', fs => attachFiles(fs)), capWeb:() => pickFiles('.mhtml,.mht,.html,.htm,.xhtml', fs => importWebPages(fs)), capLog:() => pickFiles('.csv,.tsv,.json,.ndjson,.jsonl,.log,.txt', fs => logImportFile(fs[0]), false), logGo:() => logGo()
+  evtxGo:() => evtxGo(), capFiles:() => pickFiles('', fs => attachFiles(fs)), capWeb:() => pickFiles('.mhtml,.mht,.html,.htm,.xhtml', fs => importWebPages(fs)), capLog:() => pickFiles('.evtx,.csv,.tsv,.json,.ndjson,.jsonl,.log,.txt', fs => logImportFile(fs[0]), false), logGo:() => logGo()
 };
