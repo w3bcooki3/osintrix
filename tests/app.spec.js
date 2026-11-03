@@ -76,10 +76,10 @@ test('audit chain detects edits and custody reports detect tampering', async ({ 
   const errors = await open(page, '#/home');
   await capture(page, 'evidence for the chain 203.0.113.9');
   const res = await page.evaluate(async () => {
-    const m = await custodyManifest(DB.active); const ok = await custodyVerify(m);
-    const bad = JSON.parse(JSON.stringify(m)); bad.records[0].sha256 = '0'.repeat(64); const tampered = await custodyVerify(bad);
+    const m = await custodyManifest(DB.active); const ok = (await custodyVerify(m)).res;
+    const bad = JSON.parse(JSON.stringify(m)); bad.records[0].sha256 = '0'.repeat(64); const tampered = (await custodyVerify(bad)).res;
     await auditQ; DB.audit.entries[0].what = 'rewritten history'; const chain = await auditVerify(DB.audit.entries, DB.audit.base);
-    return { ok: ok.every(x => x[0]), tampered: tampered[0][0], chain: chain.ok };
+    return { ok: ok.every(x => x[0] === true), tampered: tampered[0][0], chain: chain.ok };
   });
   expect(res).toEqual({ ok: true, tampered: false, chain: false });
   noErrors(errors);
@@ -318,4 +318,57 @@ test('extractor stays fast on hostile input', async ({ page }) => {
   await open(page);
   const ms = await page.evaluate(() => { const t = performance.now(); Engine.extract('a.'.repeat(50000)); Engine.extract('1.'.repeat(50000)); Engine.extract('a-'.repeat(50000) + '@'); return performance.now() - t; });
   expect(ms).toBeLessThan(1500);
+});
+
+test('the audit chain and custody reports cannot be forged by editing data', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  await capture(page, 'first record 198.51.100.1'); await capture(page, 'second record 198.51.100.2');
+  const r = await page.evaluate(async () => {
+    await auditQ; const A = DB.audit;
+    // forge: drop an entry, then recompute every link with plain SHA-256, as an editor of the stored JSON would
+    const forged = JSON.parse(JSON.stringify(A.entries)); forged.splice(1, 1); let prev = A.base || 'genesis';
+    for (const [k, e] of forged.entries()) { e.i = k; e.d = await sha256hex(`${e.i}|${e.at}|${e.c}|${e.what}`); e.h = await sha256hex(prev + '|' + e.d); delete e.m; prev = e.h; }
+    const forgedLooksPlain = (await auditVerify(forged, A.base)).ok;
+    // keyed entries rewritten without the key
+    const keyed = JSON.parse(JSON.stringify(A.entries)); keyed.splice(1, 1); prev = A.base || 'genesis';
+    for (const [k, e] of keyed.entries()) { e.i = k; e.d = await sha256hex(`${e.i}|${e.at}|${e.c}|${e.what}`); e.h = await sha256hex(prev + '|' + e.d); prev = e.h; }
+    const keyedForged = (await auditVerify(keyed, A.base)).ok;
+    const real = await auditVerify(A.entries, A.base);
+    // a report re-signed with a fresh key: valid signature, but not trusted
+    const m = await custodyManifest(DB.active); m.records[0].title = 'edited';
+    const kp = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']); const jwk = await crypto.subtle.exportKey('jwk', kp.publicKey);
+    m.key = { alg: 'ECDSA-P256-SHA256', jwk: { kty: 'EC', crv: jwk.crv, x: jwk.x, y: jwk.y }, fingerprint: await keyFp(jwk) };
+    const { signature, ...body } = m; m.signature = b64e8(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, kp.privateKey, new TextEncoder().encode(canon(body))));
+    const resigned = await custodyVerify(m);
+    // the private key is not in the workspace or a backup
+    let saved = null; window.download = (n, text) => { saved = text; }; await exportEverything(false);
+    return { real: real.ok, keyedEntries: real.keyed > 0, keyedForged, forgedPlainHasNoKeyedEntries: forgedLooksPlain,
+      resignedFirst: resigned.res[0][0], privInDB: JSON.stringify(DB).includes('"d":"') && !!(DB.security.sign || {}).priv, privInBackup: /"priv"/.test(saved || '') };
+  });
+  expect(r.forgedPlainHasNoKeyedEntries).toBe(false); expect(r.real).toBe(true); expect(r.keyedEntries).toBe(true); expect(r.keyedForged).toBe(false);
+  expect(r.resignedFirst).toBe('warn'); expect(r.privInDB).toBe(false); expect(r.privInBackup).toBe(false);
+  noErrors(errors);
+});
+
+test('large cases save in pieces and open on the board without freezing', async ({ page }) => {
+  test.setTimeout(90000);
+  const errors = await open(page, '#/home');
+  const r = await page.evaluate(async () => {
+    const c = DB.active || DB.cases[0].id, t = Date.now(), ip = i => `10.${(i >> 16) & 255}.${(i >> 8) & 255}.${i & 255}`;
+    for (let i = 0; i < 2400; i++) DB.records.push({ id: 'big' + i, caseId: c, type: 'note', at: t - i * 1000, created: t, title: 'host ' + ip(i), text: `seen ${ip(i)} with ${ip(i + 1)}`, ents: [{ k: 'ipv4', v: ip(i) }, { k: 'ipv4', v: ip(i + 1) }], tags: [] });
+    flush(); await new Promise(res => setTimeout(res, 400));
+    let core = await IDB.get(STORE_KEY); if (typeof core === 'string') core = JSON.parse(core); const chunks = core && core.__rc ? core.__rc.n : 0;
+    DB.records.find(x => x.id === 'big5').title = 'changed'; const t0 = performance.now(); flush(); const ms = performance.now() - t0;
+    await new Promise(res => setTimeout(res, 400));
+    const back = await loadAll(), n = back.records.length, changed = back.records.find(x => x.id === 'big5').title;
+    const types = ['ip', 'domain', 'email', 'username', 'person'];
+    for (let i = 0; i < 2000; i++) { const ty = types[i % 5]; DB.entries.push({ id: 'g' + i, caseId: c, type: ty, fields: { [TYPES[ty].fields[0][0]]: 'n' + i + '.example' }, priority: 'medium', tags: [], notes: '', created: t }); }
+    for (let i = 1; i < 2000; i++) DB.links.push({ id: 'gl' + i, caseId: c, a: 'g' + i, b: 'g' + Math.floor(i / 3), label: 'rel', conf: 2 });
+    cache = {}; DB.active = c; location.hash = '#/home'; await new Promise(res => setTimeout(res, 200));
+    const g0 = performance.now(); location.hash = '#/case/' + c + '/graph'; for (let i = 0; i < 750 && !(cy && cy.nodes().length > 1000); i++) await new Promise(res => setTimeout(res, 20));
+    return { chunks, ms, n, changed, graphMs: performance.now() - g0, nodes: cy ? cy.nodes().length : 0 };
+  });
+  expect(r.chunks).toBeGreaterThan(1); expect(r.ms).toBeLessThan(250); expect(r.n).toBeGreaterThan(2400); expect(r.changed).toBe('changed');
+  expect(r.nodes).toBeGreaterThan(1000); expect(r.graphMs).toBeLessThan(15000);
+  noErrors(errors);
 });

@@ -268,7 +268,7 @@ function graphInsights(){
   return {hubs, bridges, clusters, next, lonely, lab};
 }
 const CLUSTER_COLS = ['#5470f5','#e8590c','#0ea5a4','#d6336c','#2f9e44','#8b5cf6','#e0a800','#64748b'];
-function applyClusters(){ if(!cy) return; cy.nodes().removeStyle('underlay-color underlay-opacity underlay-padding underlay-shape'); if(!UI.graph.clusters) return;
+function applyClusters(){ if(!cy) return; if(!UI.graph.clusters && !UI.graph.clustered) return; cy.batch(() => cy.nodes().removeStyle('underlay-color underlay-opacity underlay-padding underlay-shape')); UI.graph.clustered = false; if(!UI.graph.clusters) return; UI.graph.clustered = true;
   const I = graphInsights(); if(!I) return; I.clusters.forEach((g, i) => g.forEach(id => cy.getElementById(id).style({'underlay-color':CLUSTER_COLS[i % CLUSTER_COLS.length], 'underlay-opacity':.28, 'underlay-padding':12, 'underlay-shape':'ellipse'}))); }
 
 /* side panel inside the graph: Suggestions | Insights */

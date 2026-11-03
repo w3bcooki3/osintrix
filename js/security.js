@@ -113,56 +113,100 @@ function maybeDecrypt(txt, then){
     let out; try{ const key = await deriveKey(pass, b64d8(d.kdf.salt), d.kdf.iter); out = await openWith(key, d); }catch(e){ throw new Error('bad'); } closeDlg(); then(out); }, false);
 }
 
-/* ---------- tamper-evident audit log ---------- */
+/* ---------- tamper-evident audit log ----------
+   Each entry has a content hash d = SHA-256(index|time|case|action) that anyone can recompute, and a chain
+   link h. Entries written from v1.17 on (marked m:1) link with HMAC-SHA-256 under a key that is created in
+   this browser as a non-extractable CryptoKey and kept in IndexedDB, never in the workspace JSON or a backup.
+   So editing the stored data or a backup cannot rewrite the chain: that needs code running in this browser
+   with this key. Older entries keep their plain SHA-256 links and are checked as before. */
 const sha256hex = async s => [...new Uint8Array(await crypto.subtle.digest('SHA-256', typeof s === 'string' ? new TextEncoder().encode(s) : s))].map(x => x.toString(16).padStart(2, '0')).join('');
+const KEYS = {audit:null, sign:null};
+async function deviceKey(name, make){
+  if(KEYS[name]) return KEYS[name];
+  if(!IDB.db) await IDB.open();
+  let k = await IDB.get('key:' + name);
+  if(!k && make){ k = await make(); if(!await IDB.set('key:' + name, k)) return null; }
+  return KEYS[name] = k || null;
+}
+const auditKey = make => deviceKey('audit', make ? () => crypto.subtle.generateKey({name:'HMAC', hash:'SHA-256'}, false, ['sign', 'verify']) : null);
+async function hmacHex(key, s){ return [...new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(s)))].map(x => x.toString(16).padStart(2, '0')).join(''); }
 let auditQ = Promise.resolve();
 function auditAdd(what){
   if(!DB) return; const A = DB.audit || (DB.audit = {entries:[], head:'genesis', n:0});
   const e = {i:A.n++, at:Date.now(), what:String(what).slice(0, 200), c:DB.active || '', d:'', h:''}; A.entries.push(e);
-  auditQ = auditQ.then(async () => { const prev = A.entries[A.entries.indexOf(e) - 1]; e.d = await sha256hex(`${e.i}|${e.at}|${e.c}|${e.what}`); e.h = await sha256hex((prev ? prev.h : A.base || 'genesis') + '|' + e.d); A.head = e.h;
+  auditQ = auditQ.then(async () => { const prev = A.entries[A.entries.indexOf(e) - 1]; e.d = await sha256hex(`${e.i}|${e.at}|${e.c}|${e.what}`);
+    const key = await auditKey(true), link = (prev ? prev.h : A.base || 'genesis') + '|' + e.d;
+    if(key){ e.h = await hmacHex(key, link); e.m = 1; if(KEYS.from == null){ const f = await IDB.get('key:audit-from'); KEYS.from = f ? +f : null; if(KEYS.from == null){ KEYS.from = e.i; IDB.set('key:audit-from', String(e.i)); } } } else e.h = await sha256hex(link);
+    A.head = e.h;
     if(A.entries.length > 20000){ const cut = A.entries.splice(0, 5000); A.base = cut[cut.length - 1].h; A.baseI = cut[cut.length - 1].i; } });
 }
-async function auditVerify(entries, base){
-  let prev = base || 'genesis';
+/* mode 'local': keyed links are checked with this browser's key (or reported as written elsewhere).
+   mode 'report': for a signed custody report, where keyed links are covered by the signature instead. */
+async function auditVerify(entries, base, mode = 'local'){
+  let prev = base || 'genesis', key = null, foreign = 0, keyed = 0;
+  let from = null;   // in this browser, every entry from this index on must be keyed: stripping the marks is a rewrite
+  if(mode === 'local'){ key = await auditKey(false); if(key){ const f = await IDB.get('key:audit-from'); from = f ? +f : null; } }
   for(let k = 0; k < entries.length; k++){ const e = entries[k]; const d = e.what != null ? await sha256hex(`${e.i}|${e.at}|${e.c}|${e.what}`) : e.d;
     if(d !== e.d) return {ok:false, at:k, why:'Entry ' + e.i + ' was edited after it was written'};
-    const h = await sha256hex(prev + '|' + d); if(h !== e.h) return {ok:false, at:k, why:'The chain breaks at entry ' + e.i + ' — an entry before it was changed, removed or reordered'};
-    if(k && e.i !== entries[k - 1].i + 1) return {ok:false, at:k, why:'Entry ' + (entries[k - 1].i + 1) + ' is missing'}; prev = h; }
-  return {ok:true, head:prev, n:entries.length};
+    if(k && e.i !== entries[k - 1].i + 1) return {ok:false, at:k, why:'Entry ' + (entries[k - 1].i + 1) + ' is missing'};
+    if(!e.m && from != null && e.i >= from) return {ok:false, at:k, why:'Entry ' + e.i + ' lost its key mark — the log was rewritten outside this browser'};
+    if(e.m){ keyed++;
+      if(mode === 'local'){ if(!key){ foreign++; } else if(await hmacHex(key, prev + '|' + d) !== e.h) return {ok:false, at:k, why:'The chain breaks at entry ' + e.i + ' — an entry was changed, removed or reordered, or the log was rewritten outside this browser'}; }
+    } else { const h = await sha256hex(prev + '|' + d); if(h !== e.h) return {ok:false, at:k, why:'The chain breaks at entry ' + e.i + ' — an entry before it was changed, removed or reordered'}; }
+    prev = e.h; }
+  return {ok:true, head:prev, n:entries.length, keyed, foreign};
 }
-/* workspace signing key (ECDSA P-256), created on first use; the private half lives inside the (optionally encrypted) workspace */
+/* Workspace signing key (ECDSA P-256). The private half is a non-extractable CryptoKey in this browser's
+   IndexedDB; the workspace keeps only the public half. Older workspaces that carried the private key in their
+   JSON are moved over on first use and the copy in the JSON is removed. */
 async function signingKey(){
   DB.security = DB.security || {};
-  if(!DB.security.sign){ const kp = await crypto.subtle.generateKey({name:'ECDSA', namedCurve:'P-256'}, true, ['sign', 'verify']);
-    DB.security.sign = {pub:await crypto.subtle.exportKey('jwk', kp.publicKey), priv:await crypto.subtle.exportKey('jwk', kp.privateKey), made:Date.now()}; save(); }
-  const s = DB.security.sign; return {pub:s.pub, priv:await crypto.subtle.importKey('jwk', s.priv, {name:'ECDSA', namedCurve:'P-256'}, false, ['sign']), fp:(await sha256hex(JSON.stringify({crv:s.pub.crv, x:s.pub.x, y:s.pub.y}))).slice(0, 32)};
+  const old = DB.security.sign && DB.security.sign.priv;
+  const pair = await deviceKey('sign', async () => {
+    if(old){ const priv = await crypto.subtle.importKey('jwk', old, {name:'ECDSA', namedCurve:'P-256'}, false, ['sign']); return {priv, pub:DB.security.sign.pub}; }
+    const kp = await crypto.subtle.generateKey({name:'ECDSA', namedCurve:'P-256'}, false, ['sign', 'verify']);
+    return {priv:kp.privateKey, pub:await crypto.subtle.exportKey('jwk', kp.publicKey)}; });
+  if(!pair) throw new Error('This browser blocked key storage');
+  if(!DB.security.sign || old || JSON.stringify(DB.security.sign.pub) !== JSON.stringify(pair.pub)){ DB.security.sign = {pub:pair.pub, made:(DB.security.sign && DB.security.sign.made) || Date.now()}; save(); }
+  const fp = await keyFp(pair.pub); trustKey(fp, 'This workspace', true);
+  return {pub:pair.pub, priv:pair.priv, fp};
 }
+const keyFp = async j => (await sha256hex(JSON.stringify({crv:j.crv, x:j.x, y:j.y}))).slice(0, 32);
+/* Keys you have confirmed out of band. A valid signature from any other key is reported, never passed. */
+function trustKey(fp, label, quiet){
+  DB.security = DB.security || {}; const T = DB.security.trusted || (DB.security.trusted = []);
+  if(T.some(t => t.fp === fp)) return; T.push({fp, label:String(label || 'Trusted key').slice(0, 80), added:Date.now()}); if(!quiet) mutate('trusted signing key ' + fp.slice(0, 8)); else save();
+}
+const trustedKey = fp => ((DB.security || {}).trusted || []).find(t => t.fp === fp) || null;
 const canon = o => JSON.stringify(o, Object.keys(flatKeys(o)).sort());
 function flatKeys(o, out = {}){ if(o && typeof o === 'object'){ for(const k of Object.keys(o)){ out[k] = 1; flatKeys(o[k], out); } } return out; }
 async function custodyManifest(caseId){
   await auditQ; await hashRecords(); const K = await signingKey(), c = theCase(caseId), A = DB.audit || {entries:[]};
   const recs = DB.records.filter(r => r.caseId === caseId).map(r => ({id:r.id, title:r.title, captured:new Date(r.addedAt).toISOString(), event_time:r.ts ? new Date(r.ts).toISOString() : null, source:r.source || '', sha256:r.hash, files:(r.att || []).map(a => ({name:a.name, size:a.size, sha256:a.sha256}))}));
-  const chain = A.entries.map(e => e.c === caseId || !e.c ? {i:e.i, at:e.at, c:e.c, what:e.what, d:e.d, h:e.h} : {i:e.i, at:e.at, d:e.d, h:e.h});
-  const body = {format:'osintrix-custody', v:1, generated:new Date().toISOString(), tool:BRAND.name + ' ' + BRAND.version, case:{id:c.id, code:c.code, name:c.name},
+  const chain = A.entries.map(e => Object.assign(e.c === caseId || !e.c ? {i:e.i, at:e.at, c:e.c, what:e.what, d:e.d, h:e.h} : {i:e.i, at:e.at, d:e.d, h:e.h}, e.m ? {m:1} : {}));
+  const body = {format:'osintrix-custody', v:2, generated:new Date().toISOString(), tool:BRAND.name + ' ' + BRAND.version, case:{id:c.id, code:c.code, name:c.name},
     records:recs, audit:{base:A.base || 'genesis', head:A.head, entries:chain}, key:{alg:'ECDSA-P256-SHA256', fingerprint:K.fp, jwk:{kty:K.pub.kty, crv:K.pub.crv, x:K.pub.x, y:K.pub.y}}};
   const sig = await crypto.subtle.sign({name:'ECDSA', hash:'SHA-256'}, K.priv, new TextEncoder().encode(canon(body)));
   return Object.assign(body, {signature:b64e8(sig)});
 }
+/* Each result: [state, text] where state is true (pass), false (fail) or 'warn' (needs your judgement). */
 async function custodyVerify(m){
   const out = []; const push = (ok, t) => out.push([ok, t]);
-  if(!m || m.format !== 'osintrix-custody') return [[false, 'Not an OSINTrix custody report']];
-  const {signature, ...body} = m; let pub;
-  try{ pub = await crypto.subtle.importKey('jwk', {...m.key.jwk, ext:true}, {name:'ECDSA', namedCurve:'P-256'}, false, ['verify']);
-    const ok = await crypto.subtle.verify({name:'ECDSA', hash:'SHA-256'}, pub, b64d8(signature), new TextEncoder().encode(canon(body)));
-    push(ok, ok ? 'Signature valid — the report has not been changed since it was signed.' : 'Signature does NOT match — the report was edited after signing.'); }catch(e){ push(false, 'Could not check the signature: ' + e.message); }
-  const fp = (await sha256hex(JSON.stringify({crv:m.key.jwk.crv, x:m.key.jwk.x, y:m.key.jwk.y}))).slice(0, 32);
-  push(fp === m.key.fingerprint, 'Signing key fingerprint ' + m.key.fingerprint + (fp === m.key.fingerprint ? '' : ' (does not match the key!)') + '. Compare it with the one the sender gave you.');
-  const v = await auditVerify(m.audit.entries, m.audit.base); push(v.ok, v.ok ? `Audit chain intact — ${v.n} entries, head ${String(v.head).slice(0, 16)}…` : v.why);
+  if(!m || m.format !== 'osintrix-custody' || !m.key || !m.key.jwk || !m.audit || !Array.isArray(m.records)) return [[false, 'Not an OSINTrix custody report']];
+  const {signature, ...body} = m; let sigOk = false;
+  try{ const pub = await crypto.subtle.importKey('jwk', {kty:'EC', crv:m.key.jwk.crv, x:m.key.jwk.x, y:m.key.jwk.y, ext:true}, {name:'ECDSA', namedCurve:'P-256'}, false, ['verify']);
+    sigOk = await crypto.subtle.verify({name:'ECDSA', hash:'SHA-256'}, pub, b64d8(signature), new TextEncoder().encode(canon(body))); }catch(e){ push(false, 'Could not check the signature: ' + e.message); }
+  const fp = await keyFp(m.key.jwk), t = trustedKey(fp), fpTxt = fp.replace(/(.{4})/g, '$1 ').trim();
+  if(!sigOk) push(false, 'Signature does NOT match — the report was edited after signing, or signed with a different key.');
+  else if(t) push(true, `Signed by a key you trust (${t.label}) and not changed since. Fingerprint ${fpTxt}.`);
+  else push('warn', `The signature is valid, but the key is not one you have confirmed, so anyone could have made this report. Ask the sender for their key fingerprint and compare: ${fpTxt}.`);
+  if(fp !== m.key.fingerprint) push(false, 'The fingerprint written in the report does not belong to its key.');
+  const v = await auditVerify(m.audit.entries || [], m.audit.base, 'report'); push(v.ok, v.ok ? `Audit chain complete — ${v.n} entries in order, none edited${v.keyed ? ' (their links are covered by the signature)' : ''}.` : v.why);
   if(v.ok && m.audit.head && v.head !== m.audit.head) push(false, 'The chain head does not match the one recorded in the report.');
   const here = DB.records.filter(r => m.records.some(x => x.id === r.id));
-  if(here.length){ const bad = here.filter(r => r.hash !== m.records.find(x => x.id === r.id).sha256); push(!bad.length, bad.length ? `${bad.length} record${bad.length > 1 ? 's' : ''} in this browser differ from the report: ${bad.slice(0, 3).map(r => r.title).join(', ')}` : `${here.length} records in this browser match the report exactly.`); }
+  if(here.length){ const bad = here.filter(r => r.hash !== m.records.find(x => x.id === r.id).sha256); push(!bad.length, bad.length ? `${bad.length} record${bad.length > 1 ? 's' : ''} in this browser differ from the report: ${bad.slice(0, 3).map(r => r.title).join(', ')}` : `${here.length} records in this browser match the report.`); }
   else push(true, `${m.records.length} records listed with their SHA-256 (none of them are in this browser to compare).`);
-  return out;
+  return {res:out, fp, sigOk, trusted:!!t};
 }
 
 /* ---------- Security page ---------- */
@@ -188,10 +232,10 @@ function viewSecurity(){
         enc ? 'On' + (S.autolock ? ' · locks after ' + S.autolock + ' min' : '') : 'Off',
         enc ? `<button class="btn sm" data-act="secLock">${ico('lock','sm')}Lock now</button>` : `<button class="btn primary sm" data-act="secOn">${ico('lock','sm')}Turn on…</button>`,
         enc ? `<div class="sx2-x"><label for="secAuto">Lock automatically</label><select id="secAuto" class="gsel bord">${[[0,'Never'],[5,'After 5 minutes idle'],[15,'After 15 minutes idle'],[30,'After 30 minutes idle'],[60,'After 1 hour idle']].map(([v, l]) => `<option value="${v}"${+(S.autolock || 0) === v ? ' selected' : ''}>${l}</option>`).join('')}</select><button class="btn sm ghost" data-act="secChange">${ico('key-round','sm')}Change passphrase</button><button class="btn sm ghost sx-off" data-act="secOff">Turn off</button></div>` : '<p class="sx2-w">Anyone who can open this browser profile can read your cases.</p>')}
-      ${item('audit', chainOk === false ? 'bad' : chainOk ? 'ok' : 'idle', chainOk === false ? 'triangle-alert' : 'link-2', 'Audit chain', 'Every change is hashed into a chain. Editing or removing any past entry breaks it and shows where.',
-        V ? (V.empty ? 'Empty' : V.ok ? 'Intact · ' + n + ' entr' + (n === 1 ? 'y' : 'ies') : 'Broken') : 'Checking…',
+      ${item('audit', chainOk === false ? 'bad' : chainOk ? 'ok' : 'idle', chainOk === false ? 'triangle-alert' : 'link-2', 'Audit chain', 'Every change is chained with a key kept only in this browser. Editing, removing or rewriting any past entry — in the stored data or a backup — breaks it and shows where.',
+        V ? (V.empty ? 'Empty' : V.ok ? (V.foreign ? 'Intact · ' + V.foreign + ' written elsewhere' : 'Intact · ' + n + ' entr' + (n === 1 ? 'y' : 'ies')) : 'Broken') : 'Checking…',
         `<button class="btn sm" data-act="auditCheck">${ico('shield-check','sm')}Verify</button>`, V && !V.ok ? `<p class="sx2-w bad">${esc(V.why)}</p>` : '')}
-      ${item('key', S.sign ? 'ok' : 'idle', 'key-round', 'Signing key', 'ECDSA P-256 key that signs chain-of-custody reports, so anyone can check them.',
+      ${item('key', S.sign ? 'ok' : 'idle', 'key-round', 'Signing key', 'ECDSA P-256 key that signs chain-of-custody reports. The private half never leaves this browser and is not in backups; share the fingerprint so others can confirm reports came from you.',
         S.sign ? 'Ready' : 'Not created', S.sign ? '' : `<button class="btn sm" data-act="secGo" data-v="custody">Create</button>`, S.sign ? `<p class="sx2-fp">Fingerprint <span class="mono" id="keyFp">…</span></p>` : '')}
       ${item('bkp', fresh ? 'ok' : 'warn', 'download', 'Backup', 'One file with every case, note, tool and setting. Seal it with its own passphrase and keep it off this computer.',
         lastB ? esc(ago(lastB)) + ' ago' : 'Never', `<button class="btn sm${fresh ? '' : ' primary'}" data-act="exportAll">${ico('download','sm')}Export</button><button class="btn sm" data-act="secBackup" title="Export everything, encrypted with its own passphrase">${ico('file-lock','sm')}Encrypted</button>`)}
@@ -215,8 +259,12 @@ const SEC_ACTS = {
   auditCheck:() => { UI.auditV = null; renderMain(); },
   auditCsv:() => { const A = DB.audit || {entries:[]}; download('osintrix-audit-' + new Date().toISOString().slice(0, 10) + '.csv', ['index,time,case,action,entry_hash,chain_hash'].concat(A.entries.map(e => [e.i, new Date(e.at).toISOString(), (theCase(e.c) || {}).code || '', e.what, e.d, e.h].map(csvCell).join(','))).join('\n'), 'text/csv'); },
   cusMake:async () => { const id = $('cusCase').value, m = await custodyManifest(id), c = theCase(id); download(slug(c.name) + '-custody.json', JSON.stringify(m, null, 2), 'application/json'); renderMain(); },
-  cusVerify:() => pickFile('.json,application/json', txt => maybeDecrypt(txt, async t => { let m; try{ m = JSON.parse(t); }catch(e){ return toast('Not a JSON file'); } const res = await custodyVerify(m);
-    openDlg(dhead('Custody report check') + `<div class="in"><p class="t2" style="margin:0 0 12px">${esc(m.case ? m.case.code + ' · ' + m.case.name : '')} · signed ${esc(m.generated || '')}</p>${res.map(([ok, t]) => `<div class="vres ${ok ? 'ok' : 'bad'}">${ico(ok ? 'circle-check' : 'triangle-alert','sm')}<span>${esc(t)}</span></div>`).join('')}</div><footer><button class="btn primary" data-act="dclose">Close</button></footer>`); }))
+  cusVerify:() => pickFile('.json,application/json', txt => maybeDecrypt(txt, async t => { let m; try{ m = JSON.parse(t); }catch(e){ return toast('Not a JSON file'); } const V = await custodyVerify(m), res = Array.isArray(V) ? V : V.res;
+    UI.cusTrust = !Array.isArray(V) && V.sigOk && !V.trusted ? V.fp : null;
+    const row = ([ok, t]) => `<div class="vres ${ok === true ? 'ok' : ok === 'warn' ? 'warn' : 'bad'}">${ico(ok === true ? 'circle-check' : 'triangle-alert','sm')}<span>${esc(t)}</span></div>`;
+    openDlg(dhead('Custody report check') + `<div class="in"><p class="t2" style="margin:0 0 12px">${esc(m && m.case ? m.case.code + ' · ' + m.case.name : '')}${m && m.generated ? ' · signed ' + esc(m.generated) : ''}</p>${res.map(row).join('')}
+      ${UI.cusTrust ? `<form class="cus-trust" data-form="cusTrust"><label for="cusTL">Confirmed the fingerprint with the sender? Name this key to trust it from now on.</label><div><input id="cusTL" class="inp" placeholder="e.g. Priya — IR team laptop" autocomplete="off" required><button class="btn" type="submit">${ico('key-round','sm')}Trust this key</button></div></form>` : ''}</div>
+      <footer><button class="btn primary" data-act="dclose">Close</button></footer>`); })),
 };
 function paintLock(){ let b = $('lockBtn'); if(SEC.key && !b){ b = document.createElement('button'); b.id = 'lockBtn'; b.className = 'iconbtn'; b.dataset.act = 'secLock'; b.title = 'Lock now'; b.setAttribute('aria-label', 'Lock the workspace'); b.innerHTML = ico('lock'); $('themeBtn').before(b); } if(!SEC.key && b) b.remove(); }
 async function paintFp(){ const el = $('keyFp'); if(!el || !DB.security || !DB.security.sign) return; const s = DB.security.sign.pub; el.textContent = (await sha256hex(JSON.stringify({crv:s.crv, x:s.x, y:s.y}))).slice(0, 32).replace(/(.{4})/g, '$1 ').trim(); }

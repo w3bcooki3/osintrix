@@ -4,6 +4,19 @@
    Each change has a type: "added" | "changed" | "fixed" | "removed". */
 const CHANGELOG_DATA = [
   {
+    "version": "1.18",
+    "name": "Trust and scale",
+    "date": "2026-11-03",
+    "summary": "The audit log and signed custody reports can no longer be forged by editing saved data, big cases save quickly, and boards with thousands of nodes open in seconds.",
+    "changes": [
+      {"type": "fixed", "text": "The audit log is sealed with a key kept by the browser that cannot be read out, so editing, removing or reordering entries in the saved data is detected. Entries made before this version are still checked as before."},
+      {"type": "fixed", "text": "The custody signing key is now held by the browser and is never stored in the workspace or in backups. Old keys are moved over on first start."},
+      {"type": "added", "text": "Custody reports show whose key signed them. A report signed by a key you have not marked as trusted is flagged, even if its signature is valid, and you can trust a colleague's key by its fingerprint."},
+      {"type": "changed", "text": "Cases with 2,000 or more records are saved in pieces and only the changed pieces are written: a save on a 20,000-record workspace takes about 45 ms and writes a few hundred KB instead of the whole workspace."},
+      {"type": "fixed", "text": "Boards with thousands of nodes no longer freeze. A faster layout places large graphs, and edges hide while you pan and zoom: a 2,000-node board opens in about two seconds instead of forty."}
+    ]
+  },
+  {
     "version": "1.17",
     "name": "Data safety",
     "date": "2026-11-03",

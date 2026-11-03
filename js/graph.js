@@ -4,6 +4,33 @@
    the canvas to add one, Connect to draw a relationship, select to edit.
    ========================================================================== */
 let cy = null;
+/* Force layout for big graphs. Cytoscape's cose compares every pair of nodes on every step, so 2,000 nodes took
+   about 40 s. This one only repels nodes in neighbouring grid cells (spatial hash), which makes a step linear:
+   2,000 nodes lay out in well under a second. Starts from rings by degree so the result is stable. */
+const BIG_GRAPH = 300;
+function fastLayout(ids, edges, opt = {}){
+  const n = ids.length, idx = new Map(ids.map((id, i) => [id, i])), E2 = edges.map(([a, b]) => [idx.get(a), idx.get(b)]).filter(([a, b]) => a != null && b != null && a !== b);
+  const deg = new Array(n).fill(0); for(const [a, b] of E2){ deg[a]++; deg[b]++; }
+  const L = opt.edge || 110, X = new Float64Array(n), Y = new Float64Array(n), DX = new Float64Array(n), DY = new Float64Array(n);
+  const order = [...ids.keys()].sort((a, b) => deg[b] - deg[a]);
+  order.forEach((i, k) => { const ring = Math.floor(Math.sqrt(k)), a = k * 2.399963; X[i] = Math.cos(a) * ring * L * .9; Y[i] = Math.sin(a) * ring * L * .9; });   // golden-angle spiral, hubs in the middle
+  const cell = L * 2.2, iters = opt.iters || (n > 1500 ? 160 : 240);
+  for(let it = 0; it < iters; it++){
+    const t = L * 2.5 * (1 - it / iters) + 2;
+    DX.fill(0); DY.fill(0);
+    const grid = new Map();
+    for(let i = 0; i < n; i++){ const k = Math.floor(X[i] / cell) + ',' + Math.floor(Y[i] / cell); let c = grid.get(k); if(!c) grid.set(k, c = []); c.push(i); }
+    for(let i = 0; i < n; i++){ const gx = Math.floor(X[i] / cell), gy = Math.floor(Y[i] / cell);
+      for(let ox = -1; ox <= 1; ox++) for(let oy = -1; oy <= 1; oy++){ const c = grid.get((gx + ox) + ',' + (gy + oy)); if(!c) continue;
+        for(const j of c){ if(j <= i) continue; let dx = X[i] - X[j], dy = Y[i] - Y[j], d2 = dx * dx + dy * dy; if(d2 < .01){ dx = Math.random() - .5; dy = Math.random() - .5; d2 = .5; }
+          const f = L * L / d2; DX[i] += dx * f; DY[i] += dy * f; DX[j] -= dx * f; DY[j] -= dy * f; } } }
+    for(const [a, b] of E2){ const dx = X[a] - X[b], dy = Y[a] - Y[b], d = Math.sqrt(dx * dx + dy * dy) || .1, f = d / L * .6;
+      DX[a] -= dx * f; DY[a] -= dy * f; DX[b] += dx * f; DY[b] += dy * f; }
+    for(let i = 0; i < n; i++){ DX[i] -= X[i] * .004; DY[i] -= Y[i] * .004;   // light gravity keeps components together
+      const d = Math.sqrt(DX[i] * DX[i] + DY[i] * DY[i]) || 1, m = Math.min(d, t); X[i] += DX[i] / d * m; Y[i] += DY[i] / d * m; }
+  }
+  const out = new Map(); ids.forEach((id, i) => out.set(id, {x:X[i], y:Y[i]})); return out;
+}
 const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const nodeIcon = (icon, color) => 'data:image/svg+xml;utf8,' + encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="-6 -6 36 36" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${LUCIDE[icon] || ''}</svg>`);
@@ -63,10 +90,12 @@ function mountGraph(){
   const el = $('cy'); if(!el || typeof cytoscape === 'undefined') return;
   radialHide(); const gFont = cssVar('--font') || 'Inter, sans-serif';
   const D = derive(), text = cssVar('--text'), text2 = cssVar('--text-2'), bg = cssVar('--bg'), surface = cssVar('--surface'), accent = cssVar('--accent');
-  const hasPos = D.entries.every(e => e.pos);
+  let hasPos = D.entries.every(e => e.pos);
+  const big = D.entries.length > BIG_GRAPH;
+  if(!hasPos && big){ const P = fastLayout(D.entries.map(e => e.id), D.links.map(l => [l.a, l.b])); for(const e of D.entries) if(!e.pos) e.pos = P.get(e.id); hasPos = true; save(); }
   const muted = cssVar('--text-3');
   if(cy){ cy.destroy(); cy = null; }
-  cy = cytoscape({container:el, elements:graphElements(D), minZoom:.2, maxZoom:3, boxSelectionEnabled:false,
+  cy = cytoscape({container:el, elements:graphElements(D), minZoom:big ? .05 : .2, maxZoom:3, boxSelectionEnabled:false, hideEdgesOnViewport:big, textureOnViewport:big, pixelRatio:big ? 1 : 'auto',
     layout:hasPos ? {name:'preset'} : {name:'cose', animate:false, nodeRepulsion:() => 14000, idealEdgeLength:() => 95, nodeOverlap:20, padding:40, randomize:false, numIter:1500},
     style:[
       {selector:'node', style:{width:'data(w)', height:'data(w)', 'background-color':surface, 'background-image':'data(icon)', 'background-width':'62%', 'background-height':'62%',
@@ -130,6 +159,8 @@ function mountGraph(){
 }
 function runLayout(name){
   const opts = {name, animate:true, animationDuration:450, padding:40, fit:true};
+  if(name === 'cose' && cy.nodes().length > BIG_GRAPH){ const P = fastLayout(cy.nodes().map(n => n.id()), cy.edges().filter(e => !e.id().startsWith('co-')).map(e => [e.source().id(), e.target().id()]));
+    Object.assign(opts, {name:'preset', positions:n => P.get(n.id()), animate:cy.nodes().length < 1500}); }
   if(name === 'cose') Object.assign(opts, {nodeRepulsion:() => 14000, idealEdgeLength:() => 95, nodeOverlap:20, randomize:true, numIter:1500});
   if(name === 'concentric') Object.assign(opts, {concentric:n => n.degree(), levelWidth:() => 2, minNodeSpacing:30});
   if(name === 'breadthfirst') Object.assign(opts, {directed:true, spacingFactor:1.1, roots:cy.nodes().filter(n => n.indegree() === 0 && n.outdegree() > 0).slice(0, 3)});

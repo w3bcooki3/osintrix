@@ -3,7 +3,7 @@
    The mark: a lens (the O of OSINT) with a dotted thread running through it
    from a known point to a new lead (cyan). Gradient squircle, white line.
    ========================================================================== */
-const BRAND = {name:'OSINTrix', tagline:'Follow every thread.', version:'v1.17'};
+const BRAND = {name:'OSINTrix', tagline:'Follow every thread.', version:'v1.18'};
 function logoMark(size = 32, id = 'lg' + Math.random().toString(36).slice(2, 6)){
   return `<svg class="mark" width="${size}" height="${size}" viewBox="0 0 32 32" aria-hidden="true">
     <defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5468ff"/><stop offset=".6" stop-color="#7c5cff"/><stop offset="1" stop-color="#a855f7"/></linearGradient>
@@ -57,6 +57,7 @@ function ensurePositions(){
   if(typeof cytoscape === 'undefined') return;
   for(const c of DB.cases){
     const ents = DB.entries.filter(e => e.caseId === c.id); if(!ents.length || ents.every(e => e.pos)) continue;
+    if(ents.length > BIG_GRAPH){ const P = fastLayout(ents.map(e => e.id), DB.links.filter(l => l.caseId === c.id).map(l => [l.a, l.b])); for(const e of ents) if(!e.pos) e.pos = P.get(e.id); continue; }
     const h = cytoscape({headless:true, styleEnabled:true, style:[{selector:'node', style:{width:56, height:56}}], elements:[...ents.map(e => ({data:{id:e.id}, position:e.pos || undefined})),
       ...DB.links.filter(l => l.caseId === c.id).map(l => ({data:{id:l.id, source:l.a, target:l.b}}))]});
     h.layout({name:'cose', animate:false, randomize:true, nodeRepulsion:() => 40000, idealEdgeLength:() => 110, nodeOverlap:40, numIter:2500, gravity:.6, componentSpacing:120}).run();

@@ -164,7 +164,7 @@ async function exportEverything(enc){
   const all = DB.records.concat((DB.trash || []).flatMap(x => x.kind === 'record' ? [x.data.r] : x.kind === 'case' ? x.data.records : []));
   const files = await filesForExport(all), n = Object.keys(files).length;
   DB.prefs.lastExport = Date.now(); DB.prefs.remindAt = 0; save();
-  const name = 'osintrix-' + new Date().toISOString().slice(0, 10) + '.json', obj = n ? Object.assign({}, DB, {files}) : DB;
+  const name = 'osintrix-' + new Date().toISOString().slice(0, 10) + '.json', obj = Object.assign({}, DB, n ? {files} : {}, DB.security && DB.security.sign ? {security:Object.assign({}, DB.security, {sign:{pub:DB.security.sign.pub, made:DB.security.sign.made}})} : {});   // the signing key's private half never goes into a backup
   if(enc) return downloadEncrypted(name, obj);
   download(name, JSON.stringify(obj, null, 2), 'application/json');
   if(UI.route.area === 'home') renderMain();

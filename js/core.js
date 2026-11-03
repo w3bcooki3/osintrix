@@ -42,12 +42,13 @@ function load(){ try{ const c = readCopy(localStorage.getItem(STORE_KEY)); retur
 const IDB = {db:null,
   open(){ return new Promise(res => { try{ const r = indexedDB.open('osintrix', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => { IDB.db = r.result; res(true); }; r.onerror = () => res(false); r.onblocked = () => res(false); }catch(e){ res(false); } }); },
   get(k){ return new Promise(res => { if(!IDB.db) return res(null); try{ const q = IDB.db.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); }catch(e){ res(null); } }); },
+  setMany(pairs, dels = []){ return new Promise(res => { if(!IDB.db) return res(false); try{ const tx = IDB.db.transaction('kv', 'readwrite'), st = tx.objectStore('kv'); for(const [k, v] of pairs) st.put(v, k); for(const k of dels) st.delete(k); tx.oncomplete = () => res(true); tx.onerror = tx.onabort = () => res(false); }catch(e){ res(false); } }); },
   set(k, v){ return new Promise(res => { if(!IDB.db) return res(false); try{ const tx = IDB.db.transaction('kv', 'readwrite'); tx.objectStore('kv').put(v, k); tx.oncomplete = () => res(true); tx.onerror = tx.onabort = () => res(false); }catch(e){ res(false); } }); }};
 const STORE = {idb:false, ls:false, persisted:false, bytes:0, quota:0, lastSaved:0};
 async function loadAll(){
   STORE.idb = await IDB.open();
   let a = null, envs = [], ca = {state:'empty'}, cb = {state:'empty'};
-  if(STORE.idb){ const raw = await IDB.get(STORE_KEY); if(isEnv(raw)) envs.push(raw); else { ca = readCopy(raw); if(ca.state === 'ok') a = ca.d; } }
+  if(STORE.idb){ const raw = await IDB.get(STORE_KEY); if(isEnv(raw)) envs.push(raw); else { ca = readCopy(raw); if(ca.state === 'ok'){ a = ca.d; if(a.__rc && !await joinChunks(a)){ ca = {state:'bad', why:'part of it is missing (the stored data is damaged)', raw}; a = null; } } } }
   let lsRaw = null; try{ lsRaw = localStorage.getItem(STORE_KEY); if(isEnv(lsRaw)) envs.push(lsRaw); else cb = readCopy(lsRaw); }catch(e){}
   if(envs.length){ try{ if(navigator.storage && navigator.storage.persisted) STORE.persisted = await navigator.storage.persisted(); }catch(e){} const env = envs.sort((x, y) => (JSON.parse(y).at || 0) - (JSON.parse(x).at || 0))[0]; SEC.locked = true; return {__locked:true, env}; }
   const b = cb.state === 'ok' ? cb.d : null;
@@ -59,10 +60,32 @@ async function loadAll(){
   try{ if(navigator.storage && navigator.storage.persist) STORE.persisted = await navigator.storage.persisted() || await navigator.storage.persist(); }catch(e){}
   return pick;
 }
+/* Large workspaces store their records in chunks of CHUNK, and a save rewrites only the chunks whose text
+   changed. Core + changed chunks go in one IndexedDB transaction, so a save is all-or-nothing. */
+const CHUNK = 500, CHUNKED_FROM = 2000, LAST = {chunks:[], n:0};
+async function joinChunks(d){
+  const n = d.__rc.n, recs = [];
+  for(let i = 0; i < n; i++){ const t = await IDB.get(STORE_KEY + ':r:' + i); if(typeof t !== 'string') return false; let part; try{ part = JSON.parse(t); }catch(e){ return false; } if(!Array.isArray(part)) return false; LAST.chunks[i] = t; recs.push(...part); }
+  LAST.n = n; d.records = recs; delete d.__rc; return true;
+}
+function flushChunked(){
+  const R = DB.records, n = Math.ceil(R.length / CHUNK), puts = [], dels = [];
+  for(let i = 0; i < n; i++){ let t = '['; for(let j = i * CHUNK, e = Math.min(R.length, j + CHUNK); j < e; j++) t += (j > i * CHUNK ? ',' : '') + JSON.stringify(R[j]); t += ']';
+    if(LAST.chunks[i] !== t){ puts.push([STORE_KEY + ':r:' + i, t]); LAST.chunks[i] = t; } }
+  for(let i = n; i < LAST.n; i++){ dels.push(STORE_KEY + ':r:' + i); delete LAST.chunks[i]; }
+  LAST.n = n;
+  const core = JSON.stringify(Object.assign({}, DB, {records:[], __rc:{n}}));
+  puts.push([STORE_KEY, core]);
+  try{ localStorage.removeItem(STORE_KEY); }catch(e){} STORE.ls = false; STORE.bytes = core.length * 2;
+  return IDB.setMany(puts, dels).then(r => { if(!r){ LAST.chunks = []; storageOK = false; paintSaved(); } return r; });
+}
 async function storageEstimate(){ try{ if(navigator.storage && navigator.storage.estimate){ const e = await navigator.storage.estimate(); STORE.quota = e.quota || 0; STORE.usage = e.usage || 0; } }catch(e){} return STORE; }
 let saveT = null, storageOK = true;
 function save(){ clearTimeout(saveT); saveT = setTimeout(flush, 250); }
-function flush(){ clearTimeout(saveT); if(!DB || SEC.locked) return; if(!TABS.writer){ paintSaved(); return; } DB.savedAt = Date.now(); const json = JSON.stringify(DB);
+function flush(){ clearTimeout(saveT); if(!DB || SEC.locked) return; if(!TABS.writer){ paintSaved(); return; } DB.savedAt = Date.now();
+  if(!SEC.key && STORE.idb && DB.records.length >= CHUNKED_FROM){ storageOK = true; flushChunked(); STORE.lastSaved = Date.now(); paintSaved(); tabSaved(); return; }
+  if(LAST.n){ IDB.setMany([], Array.from({length:LAST.n}, (_, i) => STORE_KEY + ':r:' + i)); LAST.n = 0; LAST.chunks = []; }   // back to one piece
+  const json = JSON.stringify(DB);
   if(SEC.key) return flushSealed(json);
   STORE.bytes = json.length * 2;
   let ok = false; try{ if(json.length < 2400000){ localStorage.setItem(STORE_KEY, json); STORE.ls = true; ok = true; } else { localStorage.removeItem(STORE_KEY); STORE.ls = false; } }catch(e){ STORE.ls = false; }

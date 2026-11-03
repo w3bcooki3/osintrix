@@ -509,6 +509,7 @@ document.addEventListener('submit', ev => {
     if(DB.feedSources.some(x => x.url.replace(/\/+$/, '') === url.replace(/\/+$/, ''))) return fieldErr('srcUrl', 'This feed is already in your sources.'); if(clash(DB.feedSources, sn)) return fieldErr('srcName', `A source called “${sn}” already exists.`); if(!checkLen('srcName', sn, 60, 'Name')) return;
     DB.feedSources.push({id:uid('s'), name:sn, url, on:true, status:'', last:0}); mutate('added source'); return sourcesDlg(); }
   if(k === 'answer'){ const r = recById(f.dataset.id); if(!checkLen('ansIn', $('ansIn').value.trim(), LIMITS.body, 'Answer')) return; r.answer = $('ansIn').value.trim(); mutate('answered a question'); renderAll(); return toast('Answer saved'); }
+  if(k === 'cusTrust'){ const l = $('cusTL').value.trim(); if(!l || !UI.cusTrust) return; trustKey(UI.cusTrust, l); UI.cusTrust = null; closeDlg(); return toast('Key trusted: ' + l); }
   if(k === 'addQ'){ const q = $('newQ').value.trim().replace(/\s+/g, ' '); if(!q) return fieldErr('newQ', 'Type the question first.'); if(!checkLen('newQ', q, 300, 'Question')) return;
     if(DB.records.some(r => r.caseId === DB.active && r.type === 'lead' && normName(r.title) === normName(q))) return fieldErr('newQ', 'This question is already on the list.');
     DB.records.push({id:uid('q'), caseId:DB.active, type:'lead', title:q, body:'', tsRaw:'', ts:null, source:'checklist', host:'', tags:[], ents:E.extract(q), answer:'', addedBy:'You', addedAt:Date.now(), hash:''});
@@ -623,6 +624,7 @@ async function bootRest(unlocked){
   let seen = false; try{ seen = !!localStorage.getItem('osintrix:welcomed'); }catch(e){}
   if(!unlocked) setTimeout(() => { $('splash').classList.add('out'); setTimeout(() => $('splash').remove(), 320); if(!seen) showWelcome(); }, 350);
   armAutolock();
+  if(DB.security && DB.security.sign && DB.security.sign.priv) signingKey().catch(() => {});   // move an older in-JSON private key into this browser's key store
 }
 
 function newRule(type){ ensureRules(); const now = Date.now(); const r = {id:uid('r'), type, title:nextName(type === 'sigma' ? 'New Sigma rule' : 'New YARA rule', DB.rules.map(x => x.title)), desc:'', code:RULE_TPL[type].replace('00000000-0000-4000-8000-000000000000', crypto.randomUUID ? crypto.randomUUID() : uid('sig')), severity:'medium', category:'', technique:'', author:'You', platform:'', tags:[], refs:[], created:now, modified:now, starred:false, caseId:null};
