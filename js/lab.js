@@ -124,7 +124,7 @@ function ctfSubmit(f){
     flag:$('chF').value.trim().slice(0, 400), notes:$('chW').value.slice(0, 20000), status});
   if(c.flag && c.status !== 'solved' && !f.dataset.status) c.status = 'solved';
   if(c.status === 'solved' && !c.solvedAt) c.solvedAt = Date.now(); if(c.status !== 'solved') c.solvedAt = 0;
-  mutate('saved challenge ' + c.name); renderMain(); toast(c.status === 'solved' ? 'Solved — nice work' : 'Challenge saved');
+  UI.ctfEdit = false; mutate('saved challenge ' + c.name); renderMain(); toast(c.status === 'solved' ? 'Solved — nice work' : 'Challenge saved');
 }
 function ctfEventDlg(id){
   const e = id ? DB.ctf.events.find(x => x.id === id) : {name:'', flagRe:'', url:''};

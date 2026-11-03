@@ -83,31 +83,53 @@ function cloudLogsView(){
 }
 
 /* ---------------- Field guide (left rail of sections + right content) ---------------- */
-const CG_PROV = {aws:['AWS', '#ff9900'], azure:['Azure', '#2f9bff'], gcp:['GCP', '#4f8cff'], k8s:['K8s', '#4f7cff'], web:['Web', '#22c55e']};
+const CG_PROV = {aws:['AWS', '#ff9900'], azure:['Azure', '#2f9bff'], gcp:['GCP', '#34a853'], k8s:['Kubernetes', '#4f7cff'], web:['Web', '#22c55e'], linux:['Linux', '#e5a50a'], windows:['Windows', '#0ea5e9']};
+const CG_LVL = {basic:['Basic', 1], intermediate:['Intermediate', 2], advanced:['Advanced', 3]};
+let CG_ALL = null;
+/* The guide = cloudguide.js plus the optional pack (new groups, extra cards, and look/detect/fix notes for existing cards). */
+function cgAll(){
+  if(CG_ALL) return CG_ALL;
+  const P = typeof CLOUDGUIDE_PACK !== 'undefined' ? CLOUDGUIDE_PACK : {}, en = P.enrich || {}, add = P.add || {};
+  const groups = CLOUDGUIDE.map(g => ({...g, cards:g.cards.concat(add[g.name] || []).map(c => ({...c, ...(en[c.t] || {})}))})).concat((P.groups || []).map(g => ({...g, cards:g.cards.slice()})));
+  const seen = new Set(); for(const g of groups) for(const c of g.cards){ let k = c.t; while(seen.has(k)) k += ' '; seen.add(k); c.k = k; c.g = g.name;
+    c.hay = [c.t, c.body, c.look, c.detect, c.fix, c.provider, c.att, g.name, ...(c.cmds || []).map(x => x.join(' '))].join(' ').toLowerCase(); }
+  return CG_ALL = groups;
+}
 function cloudGuideView(){
-  const q = (UI.cgQ || '').trim().toLowerCase();
-  const matchCard = c => !q || (c.t + ' ' + c.body + ' ' + c.cmds.map(x => x.join(' ')).join(' ') + ' ' + (c.provider || '')).toLowerCase().includes(q);
-  const groupHits = CLOUDGUIDE.map(g => [g, g.cards.filter(matchCard)]);
-  const total = CLOUDGUIDE.reduce((n, g) => n + g.cards.length, 0);
-  const cur = !q && CLOUDGUIDE.some(g => g.name === UI.cgCat) ? UI.cgCat : (q ? 'all' : (UI.cgCat || 'all'));
-  const railItem = (k, label, icon, n, on) => `<button class="cg-nav${on ? ' on' : ''}" data-act="cgCat" data-v="${esc(k)}" aria-pressed="${on}"${n === 0 ? ' disabled' : ''}>${icon ? ico(icon, 'sm') : `<span class="cg-nav-dot"></span>`}<span class="cg-nav-l">${esc(label)}</span><span class="cg-nav-n">${n}</span></button>`;
+  const G = cgAll(), q = (UI.cgQ || '').trim().toLowerCase(), words = q.split(/\s+/).filter(Boolean), pv = UI.cgProv || '', lv = UI.cgLvl || '';
+  const match = c => (!words.length || words.every(w => c.hay.includes(w))) && (!pv || c.provider === pv) && (!lv || (c.level || 'basic') === lv);
+  const hits = G.map(g => [g, g.cards.filter(match)]), total = G.reduce((n, g) => n + g.cards.length, 0), nHit = hits.reduce((n, x) => n + x[1].length, 0);
+  const cur = (q || pv || lv) && !UI.cgCatPinned ? 'all' : (G.some(g => g.name === UI.cgCat) ? UI.cgCat : 'all');
+  const list = hits.filter(([g]) => cur === 'all' || g.name === cur);
+  const flat = list.flatMap(([, cs]) => cs);
+  let sel = flat.find(c => c.k === UI.cgSel) || flat[0] || null; if(sel) UI.cgSel = sel.k;
+  const provs = [...new Set(G.flatMap(g => g.cards.map(c => c.provider)).filter(p => CG_PROV[p]))];
+  const railItem = (k, label, icon, n, on) => `<button class="cg-nav${on ? ' on' : ''}" data-act="cgCat" data-v="${esc(k)}" aria-pressed="${on}"${n === 0 ? ' disabled' : ''}>${icon ? ico(icon, 'sm') : ''}<span class="cg-nav-l">${esc(label)}</span><span class="cg-nav-n">${n}</span></button>`;
   const rail = `<aside class="cg-rail" aria-label="Field-guide sections">
-      <div class="cg-rail-h"><span class="ix">Field guide</span><span class="cg-rail-c">${q ? groupHits.reduce((n, x) => n + x[1].length, 0) + ' of ' + total : total}</span></div>
-      ${railItem('all', 'All sections', 'layers', q ? groupHits.reduce((n, x) => n + x[1].length, 0) : total, cur === 'all')}
-      ${groupHits.map(([g, cards]) => railItem(g.name, g.name, g.icon, q ? cards.length : g.cards.length, cur === g.name)).join('')}
-    </aside>`;
-  const cmdRow = ([l, cmd]) => `<div class="cg-cmd"><div class="cg-cmd-l">${esc(l)}</div><div class="cg-term"><span class="cg-pr" aria-hidden="true">$</span><code>${esc(cmd)}</code><button class="cg-copy" data-act="cloudCopy" data-v="${esc(cmd)}" aria-label="Copy: ${esc(l)}" title="Copy">${ico('copy','sm')}</button></div></div>`;
-  const card = c => `<article class="cg-c">
-    <header>${c.provider && CG_PROV[c.provider] ? `<span class="cg-p"><i style="background:${CG_PROV[c.provider][1]}"></i>${CG_PROV[c.provider][0]}</span>` : ''}<h3>${esc(c.t)}</h3>${c.att ? `<a class="cg-att" href="https://attack.mitre.org/techniques/${esc(c.att.replace('.', '/'))}/" target="_blank" rel="noopener noreferrer">${esc(c.att)} ${ico('arrow-up-right','sm')}</a>` : ''}</header>
-    <p>${esc(c.body)}</p>
-    <div class="cg-cmds">${c.cmds.map(cmdRow).join('')}</div></article>`;
-  const visible = groupHits.filter(([g, cards]) => (cur === 'all' || g.name === cur) && cards.length);
-  const main = visible.length ? visible.map(([g, cards]) => `<section class="cg-sec" id="cg-${esc(g.name.replace(/\W+/g, '-'))}"><header class="cg-sh"><div class="cg-sh-t">${ico(g.icon, 'sm')}<h2>${esc(g.name)}</h2><span class="cg-sh-n">${cards.length}</span></div><p>${esc(g.note)}</p></header><div class="cg-grid">${cards.map(card).join('')}</div></section>`).join('')
-    : `<div class="hx2-empty">Nothing matches “${esc(UI.cgQ || '')}”.</div>`;
+      ${railItem('all', 'All sections', 'layers', nHit, cur === 'all')}
+      ${hits.map(([g, cs]) => railItem(g.name, g.name, g.icon, cs.length, cur === g.name)).join('')}</aside>`;
+  const prov = c => c.provider && CG_PROV[c.provider] ? `<span class="cg-p" style="--pc:${CG_PROV[c.provider][1]}"><i></i>${CG_PROV[c.provider][0]}</span>` : '';
+  const lvl = c => c.level && CG_LVL[c.level] ? `<span class="cg-lv l${CG_LVL[c.level][1]}" title="${CG_LVL[c.level][0]}"><i></i><i></i><i></i>${CG_LVL[c.level][0]}</span>` : '';
+  const item = c => `<button class="cg-it${sel && sel.k === c.k ? ' on' : ''}" data-act="cgSel" data-v="${esc(c.k)}" aria-pressed="${!!(sel && sel.k === c.k)}">
+      <span class="cg-it-h">${prov(c)}${lvl(c)}</span><b>${esc(c.t)}</b><small>${esc(c.body)}</small></button>`;
+  const listHtml = list.filter(([, cs]) => cs.length).map(([g, cs]) => `${cur === 'all' ? `<div class="cg-lh">${ico(g.icon, 'sm')}${esc(g.name)}<span>${cs.length}</span></div>` : `<div class="cg-lnote">${esc(g.note || '')}</div>`}${cs.map(item).join('')}`).join('')
+    || `<div class="cg-none">Nothing matches. Try fewer words or clear the filters.</div>`;
+  const cmdRow = ([l, cmd], i) => `<li class="cg-cmd"><div class="cg-cmd-l"><span>${i + 1}</span>${esc(l)}</div><div class="cg-term"><code>${esc(cmd)}</code><button class="cg-copy" data-act="cloudCopy" data-v="${esc(cmd)}" aria-label="Copy: ${esc(l)}" title="Copy">${ico('copy','sm')}</button></div></li>`;
+  const note = (icon, h, t, cls) => t ? `<section class="cg-n ${cls}"><h4>${ico(icon,'sm')}${h}</h4><p>${esc(t)}</p></section>` : '';
+  const detail = sel ? `<article class="cg-d${UI.cgOpen ? ' open' : ''}" id="cgDetail">
+      <button class="btn ghost cg-back" data-act="cgBack">${ico('arrow-left','sm')}All techniques</button>
+      <header><div class="cg-d-m">${prov(sel)}${lvl(sel)}<span class="cg-d-g">${esc(sel.g)}</span>${sel.att ? `<a class="cg-att" href="https://attack.mitre.org/techniques/${esc(sel.att.replace('.', '/'))}/" target="_blank" rel="noopener noreferrer">ATT&amp;CK ${esc(sel.att)} ${ico('arrow-up-right','sm')}</a>` : ''}</div>
+        <h2>${esc(sel.t)}</h2><p>${esc(sel.body)}</p></header>
+      ${sel.cmds && sel.cmds.length ? `<section class="cg-ds"><h3>Commands</h3><ol class="cg-cmds">${sel.cmds.map(cmdRow).join('')}</ol></section>` : ''}
+      <div class="cg-ns">${note('eye', 'What to look for', sel.look, 'look')}${note('radar', 'How defenders see it', sel.detect, 'det')}${note('shield-check', 'How to fix it', sel.fix, 'fix')}</div>
+      ${sel.refs && sel.refs.length ? `<section class="cg-ds"><h3>Read more</h3><div class="cg-refs">${sel.refs.map(([l, u]) => /^https:\/\//.test(u) ? `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(l)}${ico('arrow-up-right','sm')}</a>` : '').join('')}</div></section>` : ''}
+    </article>` : '<div class="cg-d cg-none">Pick a technique.</div>';
   return `<section class="cld-pane cg">
-    <div class="cg-top"><div class="search-in cg-q">${ico('search')}<label class="sr" for="cgQ">Search the guide</label><input id="cgQ" class="inp" placeholder="Search ${total} techniques — ssrf, s3, idor, kubectl, nuclei…" value="${esc(UI.cgQ || '')}" autocomplete="off">${UI.cgQ ? `<button class="iconbtn" data-act="cgClear" aria-label="Clear">${ico('x','sm')}</button>` : '<kbd>/</kbd>'}</div>
-      <div class="note accent cg-note"><span class="ic">${ico('shield-check','sm')}</span><div>For CTFs, bug bounty and systems you are authorised to test. Commands are enumeration and triage starting points — nothing runs from here.</div></div></div>
-    <div class="cg-layout">${rail}<div class="cg-main" id="cgMain">${main}</div></div></section>`;
+    <div class="cg-top"><div class="search-in cg-q">${ico('search')}<label class="sr" for="cgQ">Search the guide</label><input id="cgQ" class="inp" placeholder="Search ${total} techniques — ssrf, s3, passrole, kubectl, consent…" value="${esc(UI.cgQ || '')}" autocomplete="off">${UI.cgQ ? `<button class="iconbtn" data-act="cgClear" aria-label="Clear">${ico('x','sm')}</button>` : '<kbd>/</kbd>'}</div>
+      <div class="cg-filt"><div class="seg" role="group" aria-label="Provider"><button data-act="cgProv" data-v="" aria-pressed="${!pv}">All</button>${provs.map(p => `<button data-act="cgProv" data-v="${p}" aria-pressed="${pv === p}">${CG_PROV[p][0]}</button>`).join('')}</div>
+        <label class="sr" for="cgLvl">Level</label><select id="cgLvl" class="gsel bord"><option value="">Any level</option>${Object.entries(CG_LVL).map(([k, [l]]) => `<option value="${k}"${lv === k ? ' selected' : ''}>${l}</option>`).join('')}</select></div></div>
+    <p class="cg-scope">${ico('shield-check','sm')}For CTFs, bug bounty and systems you are authorised to test. Nothing runs from here; commands are copied as text.</p>
+    <div class="cg-layout">${rail}<div class="cg-list" id="cgMain">${listHtml}</div>${detail}</div></section>`;
 }
 
 /* ---------------- actions ---------------- */
@@ -148,12 +170,17 @@ function bindCloud(){
     el.ondragover = e => { e.preventDefault(); el.classList.add('over'); }; el.ondragleave = () => el.classList.remove('over');
     el.ondrop = e => { e.preventDefault(); el.classList.remove('over'); cloudReadFile(e.dataTransfer.files[0], run); }; };
   wire('csDrop', cloudRunScan); wire('clDrop', cloudRunLogs);
+  const lvs = $('cgLvl'); if(lvs) lvs.onchange = () => { UI.cgLvl = lvs.value; UI.cgSel = null; renderMain(); };
   const cg = $('cgQ'); if(cg) cg.oninput = () => { UI.cgQ = cg.value; clearTimeout(bindCloud.t); bindCloud.t = setTimeout(() => { renderMain(); const x = $('cgQ'); if(x){ x.focus(); x.setSelectionRange(x.value.length, x.value.length); } }, 150); };
 }
 
 const CLOUD_ACTS = {
   cloudTab:(id, v) => { UI.cloudTab = v; renderMain(); },
-  cgCat:(id, v) => { UI.cgCat = v; renderMain(); const m = $('cgMain'); if(m) m.scrollTop = 0; },
+  cgCat:(id, v) => { UI.cgCat = v; UI.cgCatPinned = v !== 'all'; UI.cgSel = null; renderMain(); const m = $('cgMain'); if(m) m.scrollTop = 0; },
+  cgSel:(id, v) => { UI.cgSel = v; UI.cgOpen = true; document.querySelectorAll('.cg-it').forEach(b => { const on = b.dataset.v === v; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+    const sc = $('cgMain') ? $('cgMain').scrollTop : 0; renderMain(); const m = $('cgMain'); if(m) m.scrollTop = sc; const d = $('cgDetail'); if(d) d.scrollTop = 0; },
+  cgBack:() => { UI.cgOpen = false; const d = $('cgDetail'); if(d) d.classList.remove('open'); },
+  cgProv:(id, v) => { UI.cgProv = v; UI.cgSel = null; renderMain(); },
   cgClear:() => { UI.cgQ = ''; renderMain(); },
   cloudScanText:() => { const t = $('csText'); cloudRunScan(t ? t.value : '', 'Pasted config'); },
   cloudLogText:() => { const t = $('clText'); cloudRunLogs(t ? t.value : '', 'Pasted log'); },

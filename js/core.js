@@ -178,7 +178,7 @@ function passes(r){
 
 /* ---------- routing ---------- */
 const AREAS = ['security','watch','trash','help','ctf','lab','home','cases','case','toolbox','entities','feeds','decoder','reference','settings','detections','playbooks','queries','notes','cloud','whatsnew','pad'];
-const CASE_TABS = [['overview','Overview','layout-dashboard'],['vault','Vault','layers'],['entities','Entities','fingerprint'],['timeline','Timeline','clock'],['graph','Graph','waypoints'],['map','Map','map'],['questions','Analysis','scale'],['report','Report','file-chart-column']];
+const CASE_TABS = [['overview','Overview','layout-dashboard'],['vault','Vault','layers'],['entities','Entities','fingerprint'],['timeline','Timeline','clock'],['graph','Graph','waypoints'],['map','Places','map-pin'],['questions','Analysis','scale'],['report','Report','file-chart-column']];
 function parseHash(){
   const p = (location.hash || '#/home').replace(/^#\/?/, '').split('/').map(decodeURIComponent);
   if(p[0] === 'case' && DB.cases.some(c => c.id === p[1])){ DB.active = p[1]; return {area:'case', tab:CASE_TABS.some(t => t[0] === p[2]) ? p[2] : SHELL_HOME}; }

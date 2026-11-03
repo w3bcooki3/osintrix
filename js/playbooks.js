@@ -4,7 +4,7 @@
    work happens. Ships with a starter set; analysts can write, edit, import
    and export their own.
    ========================================================================== */
-const PB_CATS = {osint:['OSINT','#8b5cf6'], ir:['Incident response','#f97316'], threat:['Threat analysis','#e5484d'], fraud:['Fraud & finance','#eab308'], custom:['My playbooks','#5468ff']};
+const PB_CATS = {osint:['OSINT','#8b5cf6'], ir:['Incident response','#f97316'], threat:['Threat analysis','#e5484d'], fraud:['Fraud & finance','#eab308'], cloud:['Cloud','#0ea5e9'], forensics:['Forensics','#14b8a6'], custom:['My playbooks','#5468ff']};
 const PB_SEED = [
   {id:'pb-phish', name:'Phishing email triage', cat:'ir', icon:'mail', desc:'From a reported email to a verdict, scope and block list.', steps:[
     ['Get the original message with full headers (.eml / .msg)', 'Screenshots lose the headers you need.'],
@@ -120,6 +120,7 @@ const PB_SEED = [
     ['Scan the IaC that defined the exposed resource', 'Cloud → Misconfig scanner on the Terraform / CloudFormation — the gap that allowed it may still be in the templates.'],
     ['Rotate everything the identity could read, and record the timeline', 'Send the flagged log events to the case timeline for the report.']]},
 ];
+if(typeof PB_PACK !== 'undefined') PB_SEED.push(...PB_PACK);
 const pbSteps = p => p.steps.map(s => Array.isArray(s) ? {t:s[0], h:s[1] || ''} : s);
 function ensurePlaybooks(){
   if(!DB.playbooks) DB.playbooks = PB_SEED.map(p => ({...p, steps:pbSteps(p), custom:false, created:Date.now()}));
@@ -175,12 +176,14 @@ function viewPlaybooks(){
   const cur = DB.playbooks.find(p => p.id === UI.pb);
   if(cur) return pbDetail(cur);
   const q = (UI.pbq || '').toLowerCase(), f = UI.pbf || 'all', view = UI.pbView || DB.prefs.pbView || 'grid';
-  const list = DB.playbooks.filter(p => (f === 'all' || p.cat === f) && (!q || (p.name + ' ' + p.desc + ' ' + p.steps.map(s => s.t).join(' ')).toLowerCase().includes(q)));
+  const lv = UI.pbl || 'all', words = q.split(/\s+/).filter(Boolean);
+  const list = DB.playbooks.filter(p => (f === 'all' || p.cat === f) && (lv === 'all' || (p.level || 'core') === lv) && (!words.length || ((t) => words.every(w => t.includes(w)))((p.name + ' ' + p.desc + ' ' + p.steps.map(s => s.t + ' ' + (s.h || '')).join(' ')).toLowerCase())));
   const cats = countBy(DB.playbooks, p => p.cat), code = esc(theCase().code);
   const num = p => 'PB-' + String(DB.playbooks.indexOf(p) + 1).padStart(2, '0');
   const card = p => { const [cn, col] = PB_CATS[p.cat] || PB_CATS.custom, a = pbProgress(p, DB.active), used = pbCases(p);
     return `<article class="pbk" style="--cc:${col}"><button class="gcard-hit" data-act="pbOpen" data-id="${p.id}" aria-label="Open ${esc(p.name)}"></button>
       <header><span class="ix">${num(p)} · ${esc(cn)}${p.custom ? ' · custom' : ''}</span>${ico(p.icon || 'list-checks','sm')}</header>
+      ${p.time || p.level ? `<div class="pbk-m">${p.level === 'advanced' ? '<span class="pbk-lv adv">Advanced</span>' : p.level ? '<span class="pbk-lv">Core</span>' : ''}${p.time ? `<span>${ico('clock','sm')}${esc(p.time)}</span>` : ''}</div>` : ''}
       <h3>${esc(p.name)}</h3><p>${esc(p.desc)}</p>
       <div class="pbk-th">${pbThread(p, DB.active)}<span>${a.total ? `${a.done} of ${a.total} answered on ${code}` : `${p.steps.length} steps${used.length ? ' · used in ' + used.length + ' case' + (used.length > 1 ? 's' : '') : ''}`}</span></div>
       <footer><button class="pbk-run" data-act="pbRun" data-id="${p.id}">${ico('play','sm')}${a.total ? 'Add missing steps to' : 'Run on'} ${code}</button><span class="pbk-open">Open${ico('arrow-right','sm')}</span></footer></article>`; };
@@ -193,8 +196,9 @@ function viewPlaybooks(){
     ${libHead('Playbooks', `${DB.playbooks.length} investigation checklists. Run one on a case and each step becomes an open question there; the dots fill in as you answer them.`,
       `<button class="btn" data-act="pbImport">${ico('upload','sm')}Import</button><button class="btn" data-act="pbExport">${ico('download','sm')}Export</button><button class="btn primary" data-act="pbNew">${ico('plus','sm')}New playbook</button>`, '')}
     <div class="toolbar ltb pb-tb"><div class="search-in">${ico('search')}<label class="sr" for="pbq">Search playbooks</label><input id="pbq" class="inp" placeholder="Search playbooks and steps…" value="${esc(UI.pbq || '')}"></div>
-      <label class="sr" for="pbfSel">Category</label><select id="pbfSel" class="gsel bord"><option value="all">All categories (${DB.playbooks.length})</option>${cats.map(([c, n]) => `<option value="${c}"${f === c ? ' selected' : ''}>${esc((PB_CATS[c] || PB_CATS.custom)[0])} (${n})</option>`).join('')}</select>
+      <div class="seg" role="group" aria-label="Level">${[['all','Any level'],['core','Core'],['advanced','Advanced']].map(([k, l]) => `<button data-act="pbLevel" data-v="${k}" aria-pressed="${lv === k}">${l}</button>`).join('')}</div>
       <span style="flex:1"></span>${layoutSeg('pbView', view, [['grid','layout-grid','Cards'],['list','rows-3','List']])}</div>
+    <div class="pbcats" role="group" aria-label="Category"><button class="pbcat${f === 'all' ? ' on' : ''}" data-act="pbCat" data-v="all">All<small>${DB.playbooks.length}</small></button>${cats.map(([c, n]) => `<button class="pbcat${f === c ? ' on' : ''}" data-act="pbCat" data-v="${c}" style="--cc:${(PB_CATS[c] || PB_CATS.custom)[1]}"><i></i>${esc((PB_CATS[c] || PB_CATS.custom)[0])}<small>${n}</small></button>`).join('')}</div>
     ${list.length ? (view === 'list' ? `<div class="pbrs card" role="table">${list.map(row).join('')}</div>` : `<div class="pbks">${list.map(card).join('')}</div>`)
       : empty('list-checks','No playbooks match','Try another search, or write your own checklist.', `<button class="btn primary" data-act="pbNew">${ico('plus','sm')}New playbook</button>`)}
   </div></div>`;

@@ -24,7 +24,7 @@ def js(src):
 html = re.sub(r'<link rel="stylesheet" href="([^"]+)">', lambda m: css(m.group(1).split('?')[0]), html)
 html = re.sub(r'<script src="([^"]+)"></script>', lambda m: js(m.group(1).split('?')[0]), html)
 # welcome-screen pictures become data: URIs so the one-file copy has no loose files
-for n in ('dashboard-dark', 'dashboard-light', 'graph-dark', 'graph-light', 'phone-dark', 'phone-light'):
+for n in ('dashboard-dark', 'dashboard-light', 'graph-dark', 'graph-light', 'phone-dark', 'phone-light', 'timeline-dark', 'timeline-light'):
     f = root / 'assets' / 'welcome' / (n + '.jpg')
     if f.exists(): html = html.replace('assets/welcome/' + n + '.jpg', 'data:image/jpeg;base64,' + base64.b64encode(f.read_bytes()).decode())
 # engines loaded on demand (the SQLite viewer) ride along as inert text and are started from it when needed

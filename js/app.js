@@ -77,6 +77,7 @@ document.addEventListener('click', ev => {
   if(WATCH_ACTS[a]) return WATCH_ACTS[a](id, v, t, ev);
   if(PARSE_ACTS[a]) return PARSE_ACTS[a](id, v, t, ev);
   if(MAP_ACTS[a]) return MAP_ACTS[a](id, v, t, ev);
+  if(typeof CTF2_ACTS !== 'undefined' && CTF2_ACTS[a]) return CTF2_ACTS[a](id, v, t, ev);
   if(RS_ACTS[a]) return RS_ACTS[a](id, v, t, ev);
   if(ACH_ACTS[a]) return ACH_ACTS[a](id, v, t, ev);
   if(PCAP_ACTS[a]) return PCAP_ACTS[a](id, v, t, ev);
@@ -89,7 +90,6 @@ document.addEventListener('click', ev => {
   if(a === 'trPick'){ $('trV').value = v; return $('trV').focus(); }
   switch(a){
     case 'navToggle': return $('side').classList.toggle('open');
-    case 'wlTheme': { wlCycle(false); const l = document.querySelector('.lw'); if(l) l.classList.remove('auto'); return wlSet(v); }
     case 'helpGo': { const el = $(v); if(el) el.scrollIntoView({behavior:'smooth', block:'start'}); return; }
     case 'helpWelcome': return showWelcome();
     case 'helpQ': { const i = $('hxq'); if(!i) return; i.value = v; i.dispatchEvent(new Event('input', {bubbles:true})); i.focus(); return; }
@@ -104,6 +104,8 @@ document.addEventListener('click', ev => {
     case 'refRowX': UI.refOpen = false; return renderMain();
     case 'refClear': UI.refQ = ''; return renderMain();
     case 'refHot': UI.refHot = !UI.refHot; return renderMain();
+    case 'refMore': UI.refLim = (UI.refLim || 300) + 400; return renderMain();
+    case 'refAka': UI.refQ = v; UI.refRow = null; UI.refLim = 0; renderMain(); return refocus('refQ');
     case 'refFind': return srchOpen(v);
     case 'welcomeDemo': closeWelcome(); return go(caseHash('c-lantern', 'overview'));
     case 'welcomeClose': closeWelcome(); return go('#/home');
@@ -269,7 +271,7 @@ document.addEventListener('click', ev => {
         DB.queries.push({id:uid('q'), name:importName(String(r.name || 'Imported query').slice(0, 110), DB.queries.map(x => x.name)), desc:String(r.description || r.desc || '').slice(0, 400), query, cat:QCATS[r.category || r.cat] ? (r.category || r.cat) : 'custom', engines:(Array.isArray(r.engines) ? r.engines : ['google']).filter(e => ENGINES[e]).slice(0, 9).concat([]).filter((e, i, a) => a.indexOf(e) === i).length ? (r.engines || []).filter(e => ENGINES[e]) : ['google'], tags:Array.isArray(r.tags) ? r.tags.map(String).slice(0, 10) : [], starred:false, uses:0, custom:true}); n++; }
       mutate('imported ' + n + ' queries'); renderAll(); toast(n + ' queries imported'); });
     /* detections */
-    case 'dtype': UI.dtype = v; UI.dcat = ''; return renderMain();
+    case 'dtype': UI.dtype = v; UI.dcat = ''; UI.dlim = 0; return renderMain();
     case 'rSel': if(id === UI.rule && (UI.ropen || rLay() === 'ide')) return; if(ruleDirty()) return confirmDlg('Discard unsaved changes?', 'You have edits to this rule that are not saved yet.', 'Discard changes', () => clickAct('rSel', id), true); UI.rule = id; UI.ropen = true; renderMain(); { const r = document.querySelector('.wb-main'); if(r && window.innerWidth <= 1180) r.scrollIntoView({block:'start'}); } return;
     case 'rNew': { const r0 = t.getBoundingClientRect(); return showMenu(r0.left, r0.bottom + 6, [
       {label:'Sigma rule (log detection)', icon:'file-code', fn:() => newRule('sigma')}, {label:'YARA rule (file / memory)', icon:'binary', fn:() => newRule('yara')}], 'New rule'); }
@@ -287,10 +289,11 @@ document.addEventListener('click', ev => {
       {label:'Copy rule text', icon:'file-code', fn:() => clickAct('rCopy', id)},
       {label:'Download .' + (r.type === 'sigma' ? 'yml' : 'yar'), icon:'download', fn:() => clickAct('rExport', id)},
       {sep:true}, {label:'Delete rule', icon:'trash-2', danger:true, fn:() => confirmDlg('Delete “' + r.title + '”?', 'The rule is removed from your library. You can undo right after.', 'Delete rule', () => clickAct('rDel', id))}], 'Rule'); }
+    case 'dMore': UI.dlim = (UI.dlim || 120) + 200; return renderMain();
     case 'rStar': { const r = DB.rules.find(z => z.id === id); r.starred = !r.starred; mutate('star rule'); return renderMain(); }
-    case 'rDel': { const r = DB.rules.find(z => z.id === id); if(!r) return; DB.rules = DB.rules.filter(z => z.id !== id); UI.rule = null; mutate('deleted rule'); renderAll();
-      return toast('Deleted “' + r.title + '”', 'Undo', () => { DB.rules.unshift(r); UI.rule = r.id; mutate('restored rule'); renderAll(); }); }
-    case 'rDup': { const r = DB.rules.find(z => z.id === id); const c2 = {...r, id:uid('r'), title:copyName(r.title, DB.rules.map(x => x.title)), created:Date.now(), modified:Date.now(), starred:false}; DB.rules.unshift(c2); UI.rule = c2.id; mutate('duplicated rule'); return renderMain(); }
+    case 'rDel': { const r = DB.rules.find(z => z.id === id); if(!r) return; DB.rules = DB.rules.filter(z => z.id !== id); if(r.builtin) DB.deletedRules = [...new Set([...(DB.deletedRules || []), r.id])]; UI.rule = null; mutate('deleted rule'); renderAll();
+      return toast('Deleted “' + r.title + '”', 'Undo', () => { DB.rules.unshift(r); if(DB.deletedRules) DB.deletedRules = DB.deletedRules.filter(x => x !== r.id); UI.rule = r.id; mutate('restored rule'); renderAll(); }); }
+    case 'rDup': { const r = DB.rules.find(z => z.id === id); const c2 = {...r, builtin:false, id:uid('r'), title:copyName(r.title, DB.rules.map(x => x.title)), created:Date.now(), modified:Date.now(), starred:false}; DB.rules.unshift(c2); UI.rule = c2.id; mutate('duplicated rule'); return renderMain(); }
     case 'rCopy': { const r = DB.rules.find(z => z.id === id); return copyText(ruleText(r, $('rCode') ? $('rCode').value : r.code)); }
     case 'rExport': { const r = DB.rules.find(z => z.id === id); return download(slug(r.title) + (r.type === 'sigma' ? '.yml' : '.yar'), ruleText(r, $('rCode') ? $('rCode').value : r.code), 'text/plain'); }
     case 'rExportAll': return download('osintrix-detections.json', JSON.stringify(DB.rules.map(r => ({type:r.type, title:r.title, description:r.desc, code:ruleText(r), severity:r.severity, category:r.category, technique:r.technique, author:r.author, platform:r.platform, tags:r.tags})), null, 2), 'application/json');
@@ -345,11 +348,11 @@ document.addEventListener('click', ev => {
       if(!open.length) return toast('No open challenges — add one in CTF');
       return showMenu(Math.max(8, Math.min(r0.left, innerWidth - 300)), r0.bottom + 6, open.slice(0, 14).map(c => ({label:c.name + ' · ' + ctfCat(c.cat)[0], icon:ctfCat(c.cat)[2], fn:() => { c.flag = v; c.status = 'solved'; c.solvedAt = Date.now(); mutate('flag saved to ' + c.name); renderNav(); toast('Saved to “' + c.name + '” and marked solved', 'Open', () => { UI.ctfSel = c.id; go('#/ctf'); }); }})), 'Save flag to…'); }
     /* ctf */
-    case 'ctfSel': UI.ctfSel = id; return renderMain();
-    case 'ctfClose': UI.ctfSel = null; return renderMain();
+    case 'ctfSel': UI.ctfSel = id; UI.ctfTab = 'board'; UI.ctfEdit = false; return renderMain();
+    case 'ctfClose': if(UI.ctfEdit) UI.ctfEdit = false; else UI.ctfSel = null; return renderMain();
     case 'ctfCat': UI.ctfCat = v; return renderMain();
     case 'ctfNew': { ensureCTF(); let ev = DB.ctf.events.find(e => e.id === UI.ctfEv) || DB.ctf.events[0]; if(!ev){ ev = {id:uid('ev'), name:'My CTF', flagRe:'', url:'', created:Date.now()}; DB.ctf.events.push(ev); }
-      const c = {id:uid('ch'), eventId:ev.id, name:nextName('New challenge', DB.ctf.chals.filter(x => x.eventId === ev.id).map(x => x.name)), cat:'osint', points:100, status:'todo', flag:'', notes:'', caseId:null, created:Date.now(), solvedAt:0}; DB.ctf.chals.unshift(c); UI.ctfSel = c.id; mutate('new challenge'); renderAll();
+      const c = {id:uid('ch'), eventId:ev.id, name:nextName('New challenge', DB.ctf.chals.filter(x => x.eventId === ev.id).map(x => x.name)), cat:'osint', points:100, status:'todo', flag:'', notes:'', caseId:null, created:Date.now(), solvedAt:0}; DB.ctf.chals.unshift(c); UI.ctfSel = c.id; UI.ctfTab = 'board'; UI.ctfEdit = true; c.log = []; c.firstDone = []; mutate('new challenge'); renderAll();
       setTimeout(() => { const x = $('chN'); if(x){ x.focus(); x.select(); } }, 60); return; }
     case 'ctfEvNew': return ctfEventDlg();
     case 'ctfEvEdit': return ctfEventDlg(id);
@@ -397,6 +400,8 @@ document.addEventListener('click', ev => {
     case 'pbOpen': UI.pb = id; renderMain(); { const s2 = $('main').querySelector('.scroll'); if(s2) s2.scrollTop = 0; } return;
     case 'pbBack': UI.pb = null; return renderMain();
     case 'pbf': UI.pbf = v; return renderMain();
+    case 'pbCat': UI.pbf = v; return renderMain();
+    case 'pbLevel': UI.pbl = v; return renderMain();
     case 'pbView': UI.pbView = v; DB.prefs.pbView = v; save(); return renderMain();
     case 'pbRun': return runPlaybook(id, DB.active);
     case 'pbRunSel': return runPlaybook(id, $('pbCase').value);
@@ -495,6 +500,7 @@ document.addEventListener('submit', ev => {
     mutate('saved rule ' + r.title); renderAll(); const iss = validateRule(r.type, r.code, r.title); return toast(iss.length ? 'Saved — with ' + iss.length + ' structure warning' + (iss.length > 1 ? 's' : '') : 'Rule saved'); }
   if(k === 'pb') return pbSubmit(f);
   if(k === 'chal') return ctfSubmit(f);
+  if(k === 'wu') return wuSubmit(f);
   if(k === 'ctfEv'){ const vals = {name:$('evN').value.trim().replace(/\s+/g, ' '), flagRe:$('evR').value.trim(), url:$('evU').value.trim()}; if(!vals.name) return fieldErr('evN', 'Name is required.');
     if(!checkLen('evN', vals.name, 100, 'Name') || !checkLen('evR', vals.flagRe, 200, 'Flag format')) return; if(clash(DB.ctf.events, vals.name, 'name', f.dataset.id || null)) return fieldErr('evN', `An event called “${vals.name}” already exists.`);
     if(vals.flagRe && !checkRegex('evR', vals.flagRe)) return; if(vals.url && !E.safeUrl(vals.url)) return fieldErr('evU', 'Enter a full address starting with http:// or https://.');
@@ -522,7 +528,7 @@ document.addEventListener('input', ev => {
   if(t.id === 'vq'){ UI.vq = t.value; clearTimeout(tq); tq = setTimeout(() => { renderMain(); keep('vq'); }, 160); return; }
   if(t.id === 'tq'){ UI.tq = t.value; clearTimeout(tq); tq = setTimeout(() => { renderMain(); keep('tq'); }, 160); return; }
   if(t.id === 'qq'){ UI.qq = t.value; clearTimeout(tq); tq = setTimeout(() => { renderMain(); keep('qq'); }, 160); return; }
-  if(t.id === 'dq'){ UI.dq = t.value; clearTimeout(tq); tq = setTimeout(() => { renderMain(); keep('dq'); }, 160); return; }
+  if(t.id === 'dq'){ UI.dq = t.value; UI.dlim = 0; clearTimeout(tq); tq = setTimeout(() => { renderMain(); keep('dq'); }, 160); return; }
   if(t.id === 'ctfq'){ UI.ctfq = t.value; clearTimeout(tq); tq = setTimeout(() => { renderMain(); keep('ctfq'); }, 160); return; }
   if(t.id === 'pbq'){ UI.pbq = t.value; clearTimeout(tq); tq = setTimeout(() => { renderMain(); keep('pbq'); }, 160); return; }
   if(t.id === 'entq'){ UI.entq = t.value; clearTimeout(tq); tq = setTimeout(() => { renderMain(); keep('entq'); }, 160); return; }
@@ -534,11 +540,11 @@ document.addEventListener('input', ev => {
     const N = $('hxqN'), E0 = $('hxqE'); N.hidden = !q; N.textContent = n + ' result' + (n === 1 ? '' : 's') + ' for “' + t.value.trim() + '”';
     E0.hidden = !q || !!n; if(q && !n) E0.textContent = 'Nothing matches “' + t.value.trim() + '”. Try fewer words — or search everything with Ctrl K.'; return; }
   if(t.id === 'iq'){ UI.iq = t.value; clearTimeout(tq); tq = setTimeout(() => { renderMain(); keep('iq'); }, 160); return; }
-  if(t.id === 'refQ'){ UI.refQ = t.value; clearTimeout(tq); tq = setTimeout(() => { renderMain(); keep('refQ'); }, 160); return; }
+  if(t.id === 'refQ'){ UI.refQ = t.value; UI.refRow = null; UI.refLim = 0; clearTimeout(tq); tq = setTimeout(() => { renderMain(); keep('refQ'); }, 160); return; }
   if(t.id === 'tlq'){ clearTimeout(tq); tq = setTimeout(() => { UI.q = t.value.trim(); UI.ast = E.parseQuery(UI.q); renderMain(); keep('tlq'); }, 200); return; }
   if(t.id === 'gq'){ clearTimeout(tq); tq = setTimeout(() => { UI.q = t.value.trim(); UI.ast = E.parseQuery(UI.q); if(UI.q && !(UI.route.area === 'case' && UI.route.tab === 'timeline')){ UI.tlMode = 'events'; go(caseHash(DB.active, 'timeline')); } else renderMain(); }, 200); }
 });
-document.addEventListener('change', ev => { if(ev.target.id === 'secAuto'){ DB.security = DB.security || {}; DB.security.autolock = +ev.target.value; mutate('auto-lock ' + ev.target.value + ' min'); armAutolock(); return; } if(ev.target.id === 'entCase'){ UI.entCase = ev.target.value; return renderMain(); } if(ev.target.id === 'labSel'){ UI.labTab = ev.target.value; return renderMain(); } if(ev.target.id === 'refSel'){ UI.refCat = ev.target.value; return renderMain(); } if(ev.target.id === 'txSel'){ UI.txOp = ev.target.value; return renderMain(); } if(ev.target.id === 'pbfSel'){ UI.pbf = ev.target.value; return renderMain(); } if(ev.target.id === 'qcatSel'){ UI.qcat = ev.target.value; UI.qsel = null; return renderMain(); } if(ev.target.id === 'ctfEvSel'){ UI.ctfEv = ev.target.value; return renderMain(); } if(ev.target.id === 'tcatSel2'){ UI.tcat = ev.target.value; UI.tsub = null; return renderMain(); } if(ev.target.id === 'dsev'){ UI.dsev = ev.target.value; return renderMain(); } if(ev.target.id === 'isrc'){ UI.isrc = ev.target.value; return renderMain(); } if(ev.target.id === 'tSort'){ UI.tsort = ev.target.value; return renderMain(); } if(ev.target.dataset.pref){ DB.prefs[ev.target.dataset.pref] = ev.target.value; mutate('time zone'); renderAll(); } });
+document.addEventListener('change', ev => { if(ev.target.id === 'secAuto'){ DB.security = DB.security || {}; DB.security.autolock = +ev.target.value; mutate('auto-lock ' + ev.target.value + ' min'); armAutolock(); return; } if(ev.target.id === 'entCase'){ UI.entCase = ev.target.value; return renderMain(); } if(ev.target.id === 'labSel'){ UI.labTab = ev.target.value; return renderMain(); } if(ev.target.id === 'refSel'){ UI.refCat = ev.target.value; return renderMain(); } if(ev.target.id === 'txSel'){ UI.txOp = ev.target.value; return renderMain(); } if(ev.target.id === 'pbfSel'){ UI.pbf = ev.target.value; return renderMain(); } if(ev.target.id === 'qcatSel'){ UI.qcat = ev.target.value; UI.qsel = null; return renderMain(); } if(ev.target.id === 'ctfEvSel'){ UI.ctfEv = ev.target.value; return renderMain(); } if(ev.target.id === 'tcatSel2'){ UI.tcat = ev.target.value; UI.tsub = null; return renderMain(); } if(ev.target.id === 'dsev'){ UI.dsev = ev.target.value; UI.dlim = 0; return renderMain(); } if(ev.target.id === 'dplat'){ UI.dplat = ev.target.value; UI.dlim = 0; return renderMain(); } if(ev.target.id === 'dlvl'){ UI.dlvl = ev.target.value; UI.dlim = 0; return renderMain(); } if(ev.target.id === 'isrc'){ UI.isrc = ev.target.value; return renderMain(); } if(ev.target.id === 'tSort'){ UI.tsort = ev.target.value; return renderMain(); } if(ev.target.dataset.pref){ DB.prefs[ev.target.dataset.pref] = ev.target.value; mutate('time zone'); renderAll(); } });
 new MutationObserver(() => document.documentElement.classList.toggle('modal', !$('scrim').hidden || !$('welcome').hidden)).observe(document.body, {attributes:true, subtree:true, attributeFilter:['hidden']});
 $('scrim').addEventListener('mousedown', ev => { if(ev.target.id === 'scrim') closeDlg(); });
 
@@ -564,49 +570,58 @@ document.addEventListener('keydown', ev => {
   if((ev.key === 'j' || ev.key === 'k') && UI.route.area === 'case' && UI.route.tab === 'timeline'){ const evs = [...document.querySelectorAll('#main .ev')]; if(!evs.length) return;
     const i = evs.findIndex(x => x.getAttribute('aria-selected') === 'true'), n = evs[i < 0 ? 0 : Math.max(0, Math.min(evs.length - 1, i + (ev.key === 'j' ? 1 : -1)))]; ev.preventDefault(); n.click(); n.scrollIntoView({block:'nearest'}); }
 });
+function refocus(id){ const x = $(id); if(x){ x.focus(); x.setSelectionRange(x.value.length, x.value.length); } }
+/* Reference: arrow keys move through the results, even while typing in the search box. */
+document.addEventListener('keydown', ev => {
+  if((ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp') || UI.route.area !== 'reference' || !$('scrim').hidden) return;
+  if(ev.target.tagName === 'INPUT' && ev.target.id !== 'refQ' || ev.target.tagName === 'TEXTAREA') return;
+  const rows = [...document.querySelectorAll('.rf2-r')]; if(!rows.length) return; ev.preventDefault();
+  const i = rows.findIndex(r => r.classList.contains('on')), n = rows[Math.max(0, Math.min(rows.length - 1, i + (ev.key === 'ArrowDown' ? 1 : -1)))];
+  UI.refRow = n.dataset.v; const typing = ev.target.id === 'refQ'; renderMain(); if(typing) refocus('refQ');
+  const on = document.querySelector('.rf2-r.on'); if(on) on.scrollIntoView({block:'nearest'});
+});
 window.addEventListener('hashchange', onRoute);
 let rz = null; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if(cy) cy.resize(); if(DB) renderInsp(); }, 120); });
 
-const WL_IMG = {'dashboard-dark':'assets/welcome/dashboard-dark.jpg', 'dashboard-light':'assets/welcome/dashboard-light.jpg', 'graph-dark':'assets/welcome/graph-dark.jpg', 'graph-light':'assets/welcome/graph-light.jpg', 'phone-dark':'assets/welcome/phone-dark.jpg', 'phone-light':'assets/welcome/phone-light.jpg'};
-const WL_THEMES = [['night','Night'],['day','Day'],['indigo','Indigo']];
-let WL_T = null;
-/* welcome page — the launch-post look; it cycles Night → Day → Indigo every 3 s (still when reduced motion is on) */
+const WL_IMG = {'dashboard-dark':'assets/welcome/dashboard-dark.jpg', 'dashboard-light':'assets/welcome/dashboard-light.jpg', 'graph-dark':'assets/welcome/graph-dark.jpg', 'graph-light':'assets/welcome/graph-light.jpg', 'phone-dark':'assets/welcome/phone-dark.jpg', 'phone-light':'assets/welcome/phone-light.jpg', 'timeline-dark':'assets/welcome/timeline-dark.jpg', 'timeline-light':'assets/welcome/timeline-light.jpg'};
+/* Welcome page: follows the app's light or dark theme; product shots match it. */
 function showWelcome(){
-  const w = $('welcome'); w.hidden = false; w.removeAttribute('data-v');
-  const chips = [['v','Case vaults'],['b','Link graph'],['a','Timeline'],['c','PCAP & SQLite'],['t','Sigma & YARA'],['r','Threat intel'],['g','Map & geo'],['p','Encrypted']];
-  const pic = n => `<img class="d" src="${WL_IMG[n + '-dark']}" alt="" decoding="async"><img class="l" src="${WL_IMG[n + '-light']}" alt="" decoding="async">`;
-  const win = (cls, title, n) => `<div class="lw-win ${cls}"><div class="lw-bar"><i></i><i></i><i></i><span>osintrix · ${title}</span></div><div class="lw-pic">${pic(n)}</div></div>`;
-  const chipRow = chips.map(([c, t]) => `<li class="lk-${c}"><i></i>${t}</li>`).join('');
-  w.innerHTML = `<div class="lw" data-wt="night">
-    <svg class="lw-thread" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true"><path d="M-40 860 C 420 840, 720 760, 940 560 S 1300 120, 1520 60" fill="none"/></svg>
-    <header class="lw-top"><span class="lw-ver">${esc(BRAND.version)}</span>
-      <div class="lw-th" role="group" aria-label="Preview theme">${WL_THEMES.map(([k, l]) => `<button data-act="wlTheme" data-v="${k}" aria-pressed="${k === 'night'}"><i></i><span>${l}</span></button>`).join('')}</div>
-      <button class="lw-skip" data-act="welcomeClose">Skip ${ico('arrow-right','sm')}</button></header>
-    <section class="lw-hero">
-      <div class="lw-copy">
-        <div class="lw-lock">${logoMark(84)}<span class="lw-word">OSINT<b>rix</b></span></div>
-        <p class="lw-tag" id="wTitle">${esc(BRAND.tagline)}</p>
-        <p class="lw-sub">A private OSINT investigation workspace that runs entirely in your browser — no server, no account, no tracking.</p>
-        <ul class="lw-chips">${chipRow}</ul>
-        <div class="lw-marq" aria-hidden="true"><ul>${chipRow}${chipRow}</ul><ul class="rev">${chipRow}${chipRow}</ul></div>
-        <div class="lw-acts"><button class="btn primary" data-act="welcomeDemo">Explore the demo case${ico('arrow-right','sm')}</button><button class="btn lw-ghost" data-act="welcomeClose">Open the dashboard</button></div>
-        <p class="lw-mono"><i></i>No server · no account · works offline</p>
+  const w = $('welcome'); w.hidden = false; w.removeAttribute('data-v'); w.classList.remove('lockscr'); w.classList.add('wl3host');
+  const pic = (n, alt) => `<img class="d" src="${WL_IMG[n + '-dark']}" alt="${alt}" decoding="async"><img class="l" src="${WL_IMG[n + '-light']}" alt="${alt}" decoding="async">`;
+  const feats = [
+    ['git-branch','Case board','Link people, accounts, domains and wallets, then find the path between any two.'],
+    ['clock','Evidence timeline','Paste logs, posts or headers. Indicators and times are pulled out and marked.'],
+    ['file-search','Forensics kit','Read PCAPs, SQLite databases, EXIF and file internals without uploading them.'],
+    ['file-code','Detections','Sigma and YARA rules, tested against your own evidence.'],
+    ['rss','Threat intel','Feeds and a watchlist that flag new sightings of your entities.'],
+    ['cloud','Cloud & CTF','Field guides, a misconfiguration scanner, write-ups and cheatsheets.'],
+    ['list-checks','Playbooks','Step-by-step checklists that become open questions on a case.'],
+    ['shield-check','Custody & audit','Encryption, a sealed audit log and signed custody reports.']];
+  const steps = [['Explore the demo','Op Lantern is a finished case: board, timeline, analysis and report.'],
+    ['Open a case','Give it a name and a code. Everything you add stays inside it.'],
+    ['Capture evidence','Press N and paste anything. OSINTrix sorts out the rest.']];
+  w.innerHTML = `<div class="wl3">
+    <header class="wl3-top"><div class="wl3-brand">${logoMark(28)}<span class="wl3-word">OSINT<b>rix</b></span><span class="wl3-ver">${esc(BRAND.version)}</span></div>
+      <button class="btn ghost" data-act="welcomeClose">Skip to the dashboard${ico('arrow-right','sm')}</button></header>
+    <section class="wl3-hero">
+      <div class="wl3-copy">
+        <span class="wl3-eye">${ico('lock','sm')}OSINT and DFIR workspace · runs in your browser</span>
+        <h1 id="wTitle">Follow every thread.</h1>
+        <p class="wl3-sub">Collect evidence, map the people and infrastructure behind it, and hand over a report you can defend. No server, no account, nothing leaves this browser unless you export it.</p>
+        <div class="wl3-acts"><button class="btn primary lg" data-act="welcomeDemo">Explore the demo case${ico('arrow-right','sm')}</button><button class="btn lg" data-act="welcomeClose">Open the dashboard</button></div>
+        <ul class="wl3-trust"><li>${ico('wifi-off','sm')}Works offline</li><li>${ico('eye-off','sm')}No account, no tracking</li><li>${ico('key-round','sm')}Optional encryption</li></ul>
       </div>
-      <figure class="lw-shots" aria-hidden="true">${win('back', 'dashboard', 'dashboard')}${win('front', 'case graph', 'graph')}
-        <div class="lw-phone"><div class="lw-scr"><div class="lw-notch"></div><div class="lw-sb"><span>9:41</span><span><i></i></span></div><div class="lw-pic">${pic('phone')}</div></div></div></figure>
-    </section></div>`;
-  wlCycle(true);
-  w.scrollTop = 0; const b = w.querySelector('[data-act=welcomeDemo]'); if(b) b.focus({preventScroll:true});
+      <figure class="wl3-shot" aria-hidden="true"><div class="wl3-back">${pic('timeline', '')}</div><div class="wl3-front">${pic('graph', '')}</div></figure>
+    </section>
+    <section class="wl3-sec"><h2>Everything an investigation needs</h2>
+      <div class="wl3-grid">${feats.map(([i, t, d]) => `<div class="wl3-f"><span class="wl3-ic">${ico(i)}</span><h3>${t}</h3><p>${d}</p></div>`).join('')}</div></section>
+    <section class="wl3-sec"><h2>Start in three steps</h2>
+      <ol class="wl3-steps">${steps.map(([t, d], i) => `<li><span>${i + 1}</span><div><h3>${t}</h3><p>${d}</p></div></li>`).join('')}</ol></section>
+    <footer class="wl3-foot"><span>${ico('shield-check','sm')}Your data stays in this browser. Back it up from Settings whenever you like.</span><button class="btn primary" data-act="welcomeDemo">Explore the demo case${ico('arrow-right','sm')}</button></footer>
+  </div>`;
+  w.scrollTop = 0; const b = w.querySelector('[data-act=welcomeDemo]'); if(b) b.focus({preventScroll:true, focusVisible:false});
 }
-function wlSet(k){ const l = document.querySelector('.lw'); if(!l) return; l.dataset.wt = k; l.querySelectorAll('[data-act=wlTheme]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === k))); }
-function wlCycle(on){
-  clearInterval(WL_T); WL_T = null;
-  if(!on || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const l = document.querySelector('.lw'); if(l) l.classList.add('auto');
-  WL_T = setInterval(() => { const l2 = document.querySelector('.lw'); if(!l2 || $('welcome').hidden){ clearInterval(WL_T); return; }
-    const i = WL_THEMES.findIndex(t => t[0] === l2.dataset.wt); wlSet(WL_THEMES[(i + 1) % WL_THEMES.length][0]); }, 3000);
-}
-function closeWelcome(){ wlCycle(false); $('welcome').hidden = true; try{ localStorage.setItem('osintrix:welcomed', '1'); }catch(e){} }
+function closeWelcome(){ const w = $('welcome'); w.hidden = true; w.classList.remove('wl3host'); try{ localStorage.setItem('osintrix:welcomed', '1'); }catch(e){} }
 (async function boot(){
   $('splash').innerHTML = logoMark(64); $('brand').innerHTML = logoMark(32) + `<div class="txt">${wordmark()}<small>${esc(BRAND.tagline)}</small></div>`; $('fav').href = FAVICON;
   try{ const th = localStorage.getItem('osintrix:theme'); if(th) document.documentElement.dataset.theme = th; document.documentElement.dataset.layout = 'pinboard'; document.documentElement.classList.add('ds'); document.documentElement.classList.toggle('nav-rail', localStorage.getItem('osintrix:navRail') !== '0'); }catch(e){}

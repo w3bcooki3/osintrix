@@ -197,13 +197,13 @@ test('auto-decode finds layered and uncommon encodings', async ({ page }) => {
 test('clicks every control on the main screens without an error', async ({ page }) => {
   test.setTimeout(240_000);
   const errors = await open(page);
-  const SKIP = new Set(['exportAll', 'resetDemo', 'freshStart', 'removeSample', 'importAll', 'importCase', 'secOn', 'secLock', 'secOff', 'secChange', 'capFiles', 'capLog', 'capWeb', 'attAdd', 'attOpen', 'attDl', 'rsAll', 'printReport', 'helpWelcome', 'refFind', 'pbGo']);
-  for (const r of ['#/home', '#/case/c-lantern/overview', '#/case/c-lantern/entities', '#/case/c-lantern/timeline', '#/case/c-lantern/graph', '#/case/c-lab/map', '#/case/c-lantern/questions', '#/toolbox', '#/lab', '#/security', '#/reference', '#/playbooks', '#/help', '#/cloud', '#/whatsnew', '#/pad']) {
+  const SKIP = new Set(['exportAll', 'resetDemo', 'freshStart', 'removeSample', 'importAll', 'importCase', 'secOn', 'secLock', 'secOff', 'secChange', 'capFiles', 'capLog', 'capWeb', 'attAdd', 'attOpen', 'attDl', 'rsAll', 'printReport', 'helpWelcome', 'refFind', 'pbGo', 'wuImport', 'placesKml', 'placesCsv', 'wuExportAll', 'wuExport']);
+  for (const r of ['#/home', '#/case/c-lantern/overview', '#/case/c-lantern/entities', '#/case/c-lantern/timeline', '#/case/c-lantern/graph', '#/case/c-lab/map', '#/case/c-lantern/questions', '#/toolbox', '#/lab', '#/security', '#/reference', '#/playbooks', '#/help', '#/cloud', '#/whatsnew', '#/pad', '#/ctf', '#/detections']) {
     await page.evaluate(h => { location.hash = h; renderMain(); }, r); await page.waitForTimeout(200);
     const acts = await page.evaluate(() => [...document.querySelectorAll('#main [data-act]')].map((e, i) => [i, e.dataset.act]));
     for (const [i, a] of acts.slice(0, 60)) {
       if (SKIP.has(a)) continue;
-      await page.evaluate(([h, i, a]) => { if (location.hash !== h) location.hash = h; renderMain(); const e = document.querySelectorAll('#main [data-act]')[i]; if (e && e.dataset.act === a) e.click(); }, [r, i, a]);
+      await page.evaluate(([h, i, a]) => { if (location.hash !== h) location.hash = h; renderMain(); const e = document.querySelectorAll('#main [data-act]')[i]; if (e && e.dataset.act === a) e.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })); }, [r, i, a]);
       await page.waitForTimeout(40); await page.keyboard.press('Escape');
     }
   }
@@ -225,7 +225,9 @@ test('cloud scanner flags IaC and logs, and sends to a case', async ({ page }) =
   await expect(page.locator('.cld-ev', { hasText: 'StopLogging' })).toHaveCount(1);
   // guide copy action is wired (no throw)
   await page.evaluate(() => { UI.cloudTab = 'guide'; renderMain(); });
-  await expect(page.locator('.cg-c')).not.toHaveCount(0);
+  await expect(page.locator('.cg-it')).not.toHaveCount(0);
+  await page.locator('.cg-it').nth(2).click();
+  await expect(page.locator('#cgDetail .cg-cmd')).not.toHaveCount(0);
 });
 
 test('scratchpad detects indicators and groups them into lanes', async ({ page }) => {
@@ -370,5 +372,32 @@ test('large cases save in pieces and open on the board without freezing', async 
   });
   expect(r.chunks).toBeGreaterThan(1); expect(r.ms).toBeLessThan(250); expect(r.n).toBeGreaterThan(2400); expect(r.changed).toBe('changed');
   expect(r.nodes).toBeGreaterThan(1000); expect(r.graphMs).toBeLessThan(15000);
+  noErrors(errors);
+});
+
+test('CTF: work log, flag check, write-up and cheatsheets', async ({ page }) => {
+  const errors = await open(page, '#/ctf');
+  await page.evaluate(() => { const c = DB.ctf.chals.find(x => x.name === 'Hidden layers'); UI.ctfSel = c.id; renderMain(); });
+  await page.click('[data-act=ctfKind][data-v=ok]'); await page.fill('#ctfLogIn', 'Data after IEND\n$ binwalk -e layers.png'); await page.click('[data-act=ctfLogAdd]');
+  await expect(page.locator('.att')).toHaveCount(1); await expect(page.locator('.att .code')).toContainText('binwalk -e layers.png');
+  await page.fill('#ctfFlagIn', 'nope'); await expect(page.locator('.flagin')).toHaveClass(/bad/);
+  await page.fill('#ctfFlagIn', 'FLAG{ok}'); await expect(page.locator('.flagin')).toHaveClass(/ok/);
+  await page.click('[data-act=ctfSolve]');
+  expect(await page.evaluate(() => DB.ctf.chals.find(x => x.name === 'Hidden layers').status)).toBe('solved');
+  await page.click('[data-act=wuFromChal]'); await page.click('form[data-form=wu] button[type=submit]');
+  await expect(page.locator('.reader .md-code')).toContainText('binwalk');
+  await page.evaluate(() => { UI.ctfTab = 'cheats'; UI.csq = 'steghide'; renderMain(); });
+  await expect(page.locator('.cs-sec')).not.toHaveCount(0);
+  noErrors(errors);
+});
+
+test('places, reference and packs load', async ({ page }) => {
+  const errors = await open(page, '#/case/c-lab/map');
+  await expect(page.locator('.pcard')).toHaveCount(1);
+  await expect(page.locator('.pcard .plink', { hasText: 'Google Maps' })).toHaveAttribute('href', /google\.com\/maps\/search\/\?api=1&query=59\.9/);
+  const n = await page.evaluate(() => ({ ref: Object.values(refAll().secs).reduce((a, S) => a + S.rows.length, 0), pb: (ensurePlaybooks(), DB.playbooks.length), cg: cgAll().reduce((a, g) => a + g.cards.length, 0), rules: (ensureRules(), DB.rules.length) }));
+  expect(n.ref).toBeGreaterThan(1000); expect(n.pb).toBeGreaterThan(50); expect(n.cg).toBeGreaterThan(90);
+  await page.evaluate(() => { location.hash = '#/reference'; UI.refQ = 'AADSTS50126'; renderMain(); });
+  await expect(page.locator('.rf2-r').first()).toContainText('50126');
   noErrors(errors);
 });

@@ -26,11 +26,19 @@ level: medium`,
     condition:
         any of them
 }`};
+const ruleFromSeed = r => ({id:r.id, type:r.type, title:r.title, desc:r.description || '', code:r.code || '', severity:(r.severity || 'medium').toLowerCase(), category:r.category || '', technique:r.technique || '',
+  author:r.author || '', platform:r.platform || '', tags:r.tags || [], refs:r.references || [], level:r.level || '', builtin:true, created:Date.parse(r.created) || Date.now(), modified:Date.parse(r.modified) || Date.now(), starred:!!r.starred, caseId:null});
+const RULE_BUILTIN = () => RULE_SEED.concat(typeof RULE_PACK !== 'undefined' ? RULE_PACK : []);
+let RULES_MERGED = false;
+/* Built-in rules are added once; later versions add the new ones without touching rules you changed or deleted. */
 function ensureRules(){
-  if(DB.rules) return;
-  DB.rules = RULE_SEED.map(r => ({id:r.id, type:r.type, title:r.title, desc:r.description || '', code:r.code || '', severity:(r.severity || 'medium').toLowerCase(), category:r.category || '', technique:r.technique || '',
-    author:r.author || '', platform:r.platform || '', tags:r.tags || [], refs:r.references || [], created:Date.parse(r.created) || Date.now(), modified:Date.parse(r.modified) || Date.now(), starred:!!r.starred, caseId:null}));
+  if(!DB.rules) DB.rules = [];
+  if(RULES_MERGED) return; RULES_MERGED = true;
+  const have = new Set(DB.rules.map(r => r.id)), gone = new Set(DB.deletedRules || []), add = RULE_BUILTIN().filter(r => !have.has(r.id) && !gone.has(r.id)).map(ruleFromSeed);
+  if(add.length){ DB.rules.push(...add); if(have.size) save(); }
 }
+const RULE_HAY = new WeakMap();
+const ruleHay = r => { let h = RULE_HAY.get(r); if(!h || h.m !== r.modified){ h = {m:r.modified, t:(r.title + ' ' + r.desc + ' ' + (r.tags || []).join(' ') + ' ' + r.technique + ' ' + r.platform + ' ' + r.category + ' ' + r.author + ' ' + r.code).toLowerCase()}; RULE_HAY.set(r, h); } return h.t; };
 function validateRule(type, code, title){
   const c = String(code || ''), issues = [];
   if(type === 'sigma'){
@@ -75,9 +83,11 @@ const rLay = () => ['table','gallery','ide'].includes(DB.prefs.rlay) ? DB.prefs.
 const SEV_ORDER = {critical:4, high:3, medium:2, low:1, informational:0};
 function viewDetections(){
   ensureRules();
-  const lay = rLay(), q = (UI.dq || '').toLowerCase(), t = UI.dtype || 'all', sv = UI.dsev || '', dc = UI.dcat || '';
+  const lay = rLay(), q = (UI.dq || '').toLowerCase(), t = UI.dtype || 'all', sv = UI.dsev || '', dc = UI.dcat || '', pf = UI.dplat || '', lv = UI.dlvl || '';
+  const words = q.split(/\s+/).filter(Boolean);
   let list = DB.rules.filter(r => (t === 'all' || r.type === t || (t === 'fav' && r.starred) || (t === 'case' && r.caseId === DB.active)) && (!sv || r.severity === sv) && (!dc || (r.category || 'other') === dc)
-    && (!q || (r.title + ' ' + r.desc + ' ' + r.tags.join(' ') + ' ' + r.technique + ' ' + r.code).toLowerCase().includes(q)));
+    && (!pf || r.platform === pf) && (!lv || (lv === 'mine' ? !r.builtin : (r.level || 'common') === lv)) && (!words.length || ((h) => words.every(w => h.includes(w)))(ruleHay(r))));
+  const LIM = UI.dlim || 120, total = list.length;
   const sk = UI.rsk || 'modified', sd = UI.rsd || -1;
   const cmp = {title:(a, b) => a.title.localeCompare(b.title), type:(a, b) => a.type.localeCompare(b.type), severity:(a, b) => (SEV_ORDER[a.severity] || 0) - (SEV_ORDER[b.severity] || 0), technique:(a, b) => (a.technique || '~').localeCompare(b.technique || '~'), modified:(a, b) => a.modified - b.modified}[sk];
   list.sort((a, b) => lay === 'table' ? (cmp(a, b) * sd || a.title.localeCompare(b.title)) : (b.starred - a.starred) || b.modified - a.modified);
@@ -90,6 +100,10 @@ function viewDetections(){
     `<button class="btn" data-act="rImport">${ico('upload','sm')}Import</button><button class="btn" data-act="rExportAll">${ico('download','sm')}Export</button><button class="btn" data-act="rFromCase">${ico('folder-open','sm')}From case</button><button class="btn primary" data-act="rNew">${ico('plus','sm')}New rule</button>`, seg);
   const search = `<div class="search-in">${ico('search')}<label class="sr" for="dq">Search rules</label><input id="dq" class="inp" placeholder="Search title, technique, content…" value="${esc(UI.dq || '')}"></div>`;
   const typeSeg = `<div class="seg">${[['all','All'],['sigma','Sigma'],['yara','YARA'],['fav','Starred'],['case','This case']].map(([v, l]) => `<button data-act="dtype" data-v="${v}" aria-pressed="${t === v}">${l}</button>`).join('')}</div>`;
+  const plats = countBy(DB.rules, r => r.platform || '').filter(([k]) => k);
+  const platSel = `<label class="sr" for="dplat">Platform</label><select id="dplat" class="gsel bord"><option value="">Any platform</option>${plats.map(([k, c]) => `<option value="${esc(k)}"${pf === k ? ' selected' : ''}>${esc(k)} (${c})</option>`).join('')}</select>`;
+  const lvlSel = `<label class="sr" for="dlvl">Level</label><select id="dlvl" class="gsel bord"><option value="">Any level</option>${[['common','Common'],['advanced','Advanced'],['mine','Written by you']].map(([k, l]) => `<option value="${k}"${lv === k ? ' selected' : ''}>${l}</option>`).join('')}</select>`;
+  const more = total > LIM ? `<div class="dmore"><span class="t3">Showing ${LIM} of ${total}</span><button class="btn" data-act="dMore">Show ${Math.min(200, total - LIM)} more</button></div>` : '';
   const sevSel = `<label class="sr" for="dsev">Severity</label><select id="dsev" class="gsel bord"><option value="">Any severity</option>${Object.entries(SEV).map(([k, [l]]) => `<option value="${k}"${sv === k ? ' selected' : ''}>${l}</option>`).join('')}</select>`;
   const typeTag = r => { const [tl, ti, tc] = RTYPE[r.type]; return `<span class="pill" style="--c:${tc}">${ico(ti,'sm')}${tl}</span>`; };
   const sevTag = r => { const [sl, sc] = sevOf(r.severity); return `<span class="sevt" style="--c:${sc}">${sl}</span>`; };
@@ -109,25 +123,25 @@ function viewDetections(){
         <div class="ide-h">Sigma</div>${node('sigma','','All Sigma',n('sigma'),'scroll-text')}${cats('sigma').map(([c, k]) => node('sigma', c, cap(c), k, '', true)).join('')}
         <div class="ide-h">YARA</div>${node('yara','','All YARA',n('yara'),'binary')}${cats('yara').map(([c, k]) => node('yara', c, cap(c), k, '', true)).join('')}</nav>
       <div class="ide-list"><div class="ide-lh">${search}<button class="iconbtn" data-act="rNew" aria-label="New rule" title="New rule">${ico('plus','sm')}</button></div>
-        <div class="ide-items">${list.map(r => `<button class="ide-i" data-act="rSel" data-id="${esc(r.id)}" aria-selected="${!!(cur && cur.id === r.id)}"><b>${esc(r.title)}${r.starred ? ` <span class="tstar">${ico('star','sm')}</span>` : ''}</b><small>${sevTag(r)}${esc([RTYPE[r.type][0], r.technique].filter(Boolean).join(' · '))}</small></button>`).join('') || '<p class="t3" style="padding:16px">No rules match.</p>'}</div></div>
+        <div class="ide-items">${list.slice(0, LIM).map(r => `<button class="ide-i" data-act="rSel" data-id="${esc(r.id)}" aria-selected="${!!(cur && cur.id === r.id)}"><b>${esc(r.title)}${r.starred ? ` <span class="tstar">${ico('star','sm')}</span>` : ''}</b><small>${sevTag(r)}${esc([RTYPE[r.type][0], r.technique].filter(Boolean).join(' · '))}</small></button>`).join('') || '<p class="t3" style="padding:16px">No rules match.</p>'}${more}</div></div>
       <section class="ide-ed">${cur ? ruleEditor(cur) : none}</section></div></div>`;
   }
 
   const body = !list.length ? none : lay === 'gallery'
-    ? `<div class="gal">${list.map(r => `<article class="gcard"><button class="gcard-hit" data-act="rSel" data-id="${esc(r.id)}" aria-label="Open ${esc(r.title)}"></button>
+    ? `<div class="gal">${list.slice(0, LIM).map(r => `<article class="gcard"><button class="gcard-hit" data-act="rSel" data-id="${esc(r.id)}" aria-label="Open ${esc(r.title)}"></button>
         <div class="gcard-h">${typeTag(r)}${sevTag(r)}<span style="flex:1"></span><button class="tb-ic${r.starred ? ' on star' : ''}" data-act="rStar" data-id="${esc(r.id)}" aria-label="Star">${ico('star','sm')}</button></div>
         <h3>${esc(r.title)}</h3>${r.desc ? `<p>${esc(r.desc)}</p>` : ''}
         <pre class="gcode hl">${hlCode(r.type, r.code.split('\n').slice(0, 7).join('\n'))}</pre>
-        <div class="gcard-f"><span class="mono t3">${esc(r.technique || '—')}</span>${r.platform ? `<span class="t3">· ${esc(r.platform)}</span>` : ''}<span style="flex:1"></span><span class="t3">${ago(r)}</span></div></article>`).join('')}</div>`
+        <div class="gcard-f"><span class="mono t3">${esc(r.technique || '—')}</span>${r.platform ? `<span class="t3">· ${esc(r.platform)}</span>` : ''}<span style="flex:1"></span><span class="t3">${ago(r)}</span></div></article>`).join('')}</div>${more}`
     : `<div class="card dtw"><table class="dt"><thead><tr><th class="c-star"></th>${sortTh('rSort','title',sk,sd,'Rule')}${sortTh('rSort','type',sk,sd,'Type','c-cat')}${sortTh('rSort','severity',sk,sd,'Severity','c-sev')}${sortTh('rSort','technique',sk,sd,'Technique','c-tech')}<th class="c-plat">Platform</th>${sortTh('rSort','modified',sk,sd,'Updated','c-upd')}<th class="c-act"></th></tr></thead><tbody>
-      ${list.map(r => { const c = r.caseId ? theCase(r.caseId) : null;
+      ${list.slice(0, LIM).map(r => { const c = r.caseId ? theCase(r.caseId) : null;
         return `<tr data-act="rSel" data-id="${esc(r.id)}" aria-selected="${!!(open && cur.id === r.id)}" tabindex="0">
           <td class="c-star"><button class="tb-ic${r.starred ? ' on star' : ''}" data-act="rStar" data-id="${esc(r.id)}" aria-label="Star">${ico('star','sm')}</button></td>
           <td class="c-name"><b>${esc(r.title)}</b><span>${esc(r.desc || '')}</span>${c ? `<em class="c-case" style="--c:${esc(c.color)}">${esc(c.code)}</em>` : ''}</td>
           <td class="c-cat">${typeTag(r)}</td><td class="c-sev">${sevTag(r)}</td><td class="c-tech mono">${esc(r.technique || '—')}</td><td class="c-plat">${esc(r.platform || '—')}</td><td class="c-upd">${ago(r)}</td>
-          <td class="c-act">${ico('chevron-right','sm')}</td></tr>`; }).join('')}</tbody></table></div>`;
+          <td class="c-act">${ico('chevron-right','sm')}</td></tr>`; }).join('')}</tbody></table></div>${more}`;
   return `<div class="scroll"><div class="page wide">${head}
-    <div class="toolbar ltb">${search}${typeSeg}${sevSel}<span style="flex:1"></span><span class="t3 lcount">${list.length} rule${list.length === 1 ? '' : 's'}</span></div>
+    <div class="toolbar ltb">${search}${typeSeg}${sevSel}${platSel}${lvlSel}<span style="flex:1"></span><span class="t3 lcount">${total} rule${total === 1 ? '' : 's'}</span></div>
     ${body}</div></div>${lay === 'table' && open ? drawer(ruleEditor(cur), 'rClose', cur.title, ico(RTYPE[cur.type][1],'sm') + RTYPE[cur.type][0] + ' rule') : ''}`;
 }
 function ruleEditor(r){
