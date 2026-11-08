@@ -7,16 +7,16 @@
    to filter the current case's timeline.
    ========================================================================== */
 const SCOPES = [['all','All','search'], ['case','Cases','folder-open'], ['entry','Vault','layers'], ['record','Evidence','clock'], ['ent','Indicators','fingerprint'], ['note','Notes','sticky-note'],
-  ['tool','Tools','wrench'], ['query','Queries','scan-search'], ['rule','Detections','file-code'], ['playbook','Playbooks','list-checks'], ['chal','CTF','flag'], ['feed','News','rss'], ['action','Actions','command']];
+  ['tool','Tools','wrench'], ['query','Queries','scan-search'], ['rule','Detections','file-code'], ['playbook','Playbooks','list-checks'], ['chal','CTF','flag'], ['page','Notebook','graduation-cap'], ['feed','News','rss'], ['action','Actions','command']];
 const SCOPE_ALIAS = {cases:'case', case:'case', vault:'entry', entry:'entry', entries:'entry', evidence:'record', record:'record', records:'record', timeline:'record', indicator:'ent', indicators:'ent', ioc:'ent', iocs:'ent', entity:'ent', entities:'ent',
   note:'note', notes:'note', tool:'tool', tools:'tool', query:'query', queries:'query', dork:'query', dorks:'query', rule:'rule', rules:'rule', detection:'rule', detections:'rule', sigma:'rule', yara:'rule',
-  playbook:'playbook', playbooks:'playbook', ctf:'chal', chal:'chal', challenge:'chal', challenges:'chal', flag:'chal', news:'feed', feed:'feed', intel:'feed', action:'action', actions:'action', command:'action'};
+  playbook:'playbook', playbooks:'playbook', ctf:'chal', chal:'chal', challenge:'chal', challenges:'chal', flag:'chal', notebook:'page', notebooks:'page', page:'page', pages:'page', learn:'page', news:'feed', feed:'feed', intel:'feed', action:'action', actions:'action', command:'action'};
 const TL_FIELD = /^(host|source|from|tag|type|kind|ent|verdict|after|before|is|has):/i;
 const S = {open:false, q:'', scope:'all', at:0, flat:[], index:null};
 function srchIndex(){
   const I = [], add = (kind, o) => I.push({kind, ...o});
   const nav = [['#/home','Dashboard','layout-dashboard'],['#/cases','Cases','folder-open'],['#/notes','Notes','sticky-note'],['#/toolbox','Toolbox','wrench'],['#/queries','Query library','scan-search'],
-    ['#/ctf','CTF','flag'],['#/lab','Forensics kit','file-search'],['#/decoder','Decoder','binary'],['#/feeds','Threat Intel','rss'],['#/detections','Detections','file-code'],['#/entities','Entities','fingerprint'],
+    ['#/ctf','CTF','flag'],['#/notebook','Notebook','graduation-cap'],['#/lab','Forensics kit','file-search'],['#/decoder','Decoder','binary'],['#/feeds','Threat Intel','rss'],['#/detections','Detections','file-code'],['#/entities','Entities','fingerprint'],
     ['#/reference','Reference','book-open'],['#/playbooks','Playbooks','list-checks'],['#/help','Help','circle-help'],['#/settings','Settings','settings']];
   for(const [h, l, i] of nav) add('action', {id:'go' + h, title:'Go to ' + l, sub:'Page', icon:i, text:l + ' page open go', run:() => go(h), w:2});
   const c0 = theCase();
@@ -43,6 +43,7 @@ function srchIndex(){
   for(const r of DB.rules || []) add('rule', {id:r.id, title:r.title, sub:RTYPE[r.type][0] + ' · ' + sevOf(r.severity)[0] + (r.technique ? ' · ' + r.technique : ''), icon:RTYPE[r.type][1], text:r.title + ' ' + r.desc + ' ' + r.technique + ' ' + r.tags.join(' ') + ' ' + r.code, body:r.desc, w:2});
   for(const p of DB.playbooks || []) add('playbook', {id:p.id, title:p.name, sub:'Playbook · ' + p.steps.length + ' steps', icon:p.icon || 'list-checks', text:p.name + ' ' + p.desc + ' ' + p.steps.map(s => s.t + ' ' + s.h).join(' '), body:p.desc, w:2});
   for(const c of (DB.ctf || {}).chals || []) add('chal', {id:c.id, title:c.name, sub:ctfCat(c.cat)[0] + ' · ' + (c.points || 0) + ' pts · ' + ({todo:'To do', working:'Working', solved:'Solved'}[c.status]), icon:ctfCat(c.cat)[2], text:c.name + ' ' + c.notes + ' ' + c.flag + ' ' + ctfCat(c.cat)[0], body:c.flag || c.notes, w:3});
+  if(DB.nb) for(const p of DB.nb.pages){ const s = nbSec(p.sectionId), b = s && nbBook(s.bookId), t = nbInfo(p).text; add('page', {id:p.id, title:p.title || 'Untitled', sub:'Notebook' + (b ? ' · ' + b.name : '') + (s ? ' · ' + s.name : ''), icon:'graduation-cap', text:p.title + ' ' + p.tags.join(' ') + ' ' + t + ' ' + (p.src || ''), body:t, w:3}); }
   for(const f of DB.feed) add('feed', {id:f.id, title:f.title, sub:f.source + ' · ' + E.fmtAgo(Math.max(0, Date.now() - f.ts)), icon:'rss', text:f.title + ' ' + f.body + ' ' + f.source, body:f.body, w:1});
   return I;
 }
@@ -134,6 +135,7 @@ function srchPreview(){
   else if(it.kind === 'playbook'){ const p = DB.playbooks.find(z => z.id === it.id); b = `<p>${hl(p.desc, terms)}</p><ol class="sp-steps">${p.steps.map(s => `<li>${hl(s.t, terms)}</li>`).join('')}</ol>`; }
   else if(it.kind === 'chal'){ const c = DB.ctf.chals.find(z => z.id === it.id); b = `${row('Flag', c.flag, true)}${row('Points', c.points)}${c.notes ? `<pre class="sp-pre">${hl(c.notes, terms)}</pre>` : ''}`; }
   else if(it.kind === 'note'){ b = `<pre class="sp-pre">${hl(it.body, terms)}</pre>`; }
+  else if(it.kind === 'page'){ b = `<pre class="sp-pre">${hl(it.body.slice(0, 1600), terms)}</pre>`; }
   else if(it.kind === 'feed'){ b = `<p>${hl(it.body, terms)}</p>`; }
   else if(it.kind === 'tl'){ b = `<p>Shows only the records in <b>${esc(theCase().name)}</b> that match. Filters you can combine:</p><div class="sp-list">${['host:DC01','verdict:malicious','type:finding','tag:c2','after:2026-09-14','before:2026-09-15','ent:203.0.113.47','source:sysmon'].map(x => `<span class="mono">${x}</span>`).join('')}</div>`; }
   else b = `<p>${esc(it.sub)}</p>`;
@@ -182,6 +184,7 @@ function srchGo(it, alt){
     case 'rule': UI.rule = it.id; UI.ropen = true; return go('#/detections');
     case 'playbook': UI.pb = it.id; return go('#/playbooks');
     case 'chal': UI.ctfSel = it.id; return go('#/ctf');
+    case 'page': UI.nbPage = it.id; UI.nbView = 'page'; return go('#/notebook');
     case 'feed': go('#/feeds'); return setTimeout(() => select('feed', it.id), 60);
   }
 }

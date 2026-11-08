@@ -4,6 +4,39 @@
    Each change has a type: "added" | "changed" | "fixed" | "removed". */
 const CHANGELOG_DATA = [
   {
+    "version": "1.21",
+    "name": "Safe keeping",
+    "date": "2026-11-08",
+    "summary": "Nothing lost on refresh, automatic backup to a folder, notebook pictures out of the main save, and a Storage panel that warns early and frees space.",
+    "changes": [
+      {"type": "changed", "text": "Notebook pictures and files are stored as separate blobs in the browser, encrypted with the workspace when encryption is on. Autosaves and restore points no longer copy them, so saving stays fast with hundreds of screenshots."},
+      {"type": "fixed", "text": "Export everything now includes notebook pictures and files, and importing the backup brings them back."},
+      {"type": "added", "text": "Settings → Storage: space used against what this browser allows, a breakdown (workspace, case attachments, notebook pictures, restore points, trash) and one-click clean-up: empty the trash, keep only the newest restore points, free deleted notebook pictures, remove leftover files."},
+      {"type": "added", "text": "Early warnings: the top bar shows when storage passes 85% or under 200 MB is free, a failed save is shown in red with a prompt to free space or export, and pictures, attachments and imports that would not fit are refused before anything is written."},
+      {"type": "added", "text": "Ask the browser to keep the data (persistent storage), so it is not cleared when the disk is short."},
+      {"type": "fixed", "text": "Notebook data in an imported backup is checked field by field and every page is cleaned again; Word files that would unpack to an unsafe size are refused."},
+      {"type": "added", "text": "Automatic backup to a folder (Chrome and Edge): pick a folder once, such as Documents or a OneDrive or Google Drive folder, and a full backup is written there a few minutes after changes, as osintrix-latest.json plus one dated copy per day (the last 7 are kept). Encrypted workspaces write encrypted backups. If the browser needs permission again after a restart, backup pauses and one click resumes it."},
+      {"type": "added", "text": "The top bar shows Saving… while a change is still being written. Closing or refreshing the tab at that moment makes the browser ask before leaving, and the save finishes while it asks, so large and encrypted workspaces no longer lose the last change. A workspace with everything saved never asks."},
+      {"type": "fixed", "text": "Typing right before a refresh or closing the tab is kept. Pending page text, titles and sources are saved first, and when a workspace is too big for the instant localStorage copy, the last page edits go to a small journal that is merged back on the next start."},
+      {"type": "fixed", "text": "Pictures from deleted pages are kept for 30 days, so undo and restore points bring them back. A notebook page opened in a second tab is read-only, so edits there cannot be lost."}
+    ]
+  },
+  {
+    "version": "1.20",
+    "name": "Notebook",
+    "date": "2026-11-08",
+    "summary": "A notebook for what you learn from courses, labs and reading, with screenshots, code, links and flashcards, that exports to Word, Google Docs, OneNote and Markdown.",
+    "changes": [
+      {"type": "added", "text": "Notebook: notebooks hold sections and pages. Pages take text, headings, lists, checklists, code blocks, tables, key takeaways, link cards and pictures. Paste a screenshot or drop a file anywhere on a page; pasted web pages and Google Docs keep their formatting, and anything unsafe is removed."},
+      {"type": "added", "text": "Markdown shortcuts while typing: # and ## for headings, - or 1. for lists, [] for a checklist, > for a quote and three backticks for code. Ctrl K adds a link, Ctrl Shift H highlights."},
+      {"type": "added", "text": "Flashcards from any line starting with Q: followed by a line starting with A:, or from selected text. A review panel spaces them out over days, like Anki."},
+      {"type": "added", "text": "Export a page, section, notebook or everything as a Word document, a single HTML file, Markdown with images in a .zip, or a PDF, with a live preview. Copy as rich text pastes into OneNote, Docs or Word. Everything is built in the browser."},
+      {"type": "added", "text": "Import Markdown, HTML, text and Word files as pages, with their pictures. A flashcard table in an exported file becomes flashcards again."},
+      {"type": "added", "text": "Pages link themselves to the Reference, detection rules and CTF write-ups through their tags, ATT&CK IDs and Windows event IDs. Notebook pages show up in global search."},
+      {"type": "fixed", "text": "Single-key shortcuts (n, e, /) no longer fire while typing in rich-text areas."}
+    ]
+  },
+  {
     "version": "1.19",
     "name": "Field kit",
     "date": "2026-11-03",

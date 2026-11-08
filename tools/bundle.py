@@ -29,7 +29,8 @@ for n in ('dashboard-dark', 'dashboard-light', 'graph-dark', 'graph-light', 'pho
     if f.exists(): html = html.replace('assets/welcome/' + n + '.jpg', 'data:image/jpeg;base64,' + base64.b64encode(f.read_bytes()).decode())
 # engines loaded on demand (the SQLite viewer) ride along as inert text and are started from it when needed
 LAZY = ['js/vendor/sql-wasm.js', 'js/vendor/sql-wasm-b64.js']
-html = html.replace('</body>', ''.join('<script type="text/plain" id="lazy:' + p + '">' + (root / p).read_text(encoding='utf-8') + '</script>' for p in LAZY) + '</body>')
+i = html.rfind('</body>')   # the page's own closing tag, not one inside a script's text
+html = html[:i] + ''.join('<script type="text/plain" id="lazy:' + p + '">' + (root / p).read_text(encoding='utf-8') + '</script>' for p in LAZY) + html[i:]
 # The policy allows exactly the scripts in this file, by hash: no 'unsafe-inline', so markup that
 # ends up in the page (an imported name, a saved web page) can never run as script.
 import hashlib

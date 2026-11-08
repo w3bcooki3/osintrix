@@ -87,6 +87,7 @@ function viewTrash(){
 function backupBanner(){
   const p = DB.prefs; if(!p.firstUse){ p.firstUse = Date.now(); save(); }
   const own = DB.records.filter(r => !(theCase(r.caseId) || {}).sample).length + (DB.notes || []).filter(n => !n.sample).length;
+  if(typeof fbOn === 'function' && fbOn() && FB.state === 'on' && Date.now() - fbGet().last < 3 * 864e5) return '';   // folder backup is doing the job
   const since = p.lastExport || p.firstUse, days = Math.floor((Date.now() - since) / 864e5);
   if(own < 5 || days < 14 || (p.remindAt && p.remindAt > Date.now())) return '';
   return `<div class="note amber bkp"><span class="ic">${ico('hard-drive-download','sm')}</span><div><b>${p.lastExport ? `Last backup was ${days} days ago.` : 'You have not exported a backup yet.'}</b> Your ${own} records and notes live only in this browser — clearing site data or a new device loses them.</div>
@@ -99,6 +100,7 @@ async function sha256Hex(buf){ const h = await crypto.subtle.digest('SHA-256', b
 async function storeFile(f){
   if(!STORE.idb) throw new Error('idb');
   if(f.size > 50 * 1048576) throw new Error('big');
+  if(typeof nbRoomFor === 'function' && !await nbRoomFor(f.size)) throw new Error('full');
   const buf = await f.arrayBuffer(), sha = await sha256Hex(buf), id = uid('f');
   if(!await IDB.set('file:' + id, await sealBlob(new Blob([buf], {type:f.type || 'application/octet-stream'})))) throw new Error('idb');
   let gps = null, cam = ''; if(/jpe?g|tiff|heic/i.test(f.type || f.name || '')){ try{ const x = exif(new Uint8Array(buf)); if(x){ if(x.GPS) gps = x.GPS; cam = [x.Make, x.Model].filter(Boolean).join(' '); } }catch(e){} }
@@ -115,8 +117,8 @@ async function attachFiles(files, recId){
   if(!recId){ const pages = files.filter(isWebPage); if(pages.length){ files = files.filter(f => !isWebPage(f)); await importWebPages(pages); if(!files.length) return; } }
   if(!STORE.idb) return toast('Attachments need IndexedDB, which this browser blocked');
   const made = [], metas = []; let skipped = 0;
-  for(const f of files){ let m; try{ m = await storeFile(f); }catch(e){ skipped++; continue; } metas.push(m); }
-  if(!metas.length) return toast(skipped ? 'Files over 50 MB are not stored' : 'Nothing attached');
+  let full = false; for(const f of files){ let m; try{ m = await storeFile(f); }catch(e){ skipped++; if(e.message === 'full') full = true; continue; } metas.push(m); }
+  if(!metas.length) return toast(full ? 'Browser storage is full — free space in Settings → Storage' : skipped ? 'Files over 50 MB are not stored' : 'Nothing attached');
   if(recId){ const r = recById(recId); r.att = (r.att || []).concat(metas); mutate('attached ' + metas.length + ' file(s)'); renderAll(); return toast(metas.length + ' file' + (metas.length > 1 ? 's' : '') + ' attached'); }
   const cid = capCase();
   for(const m of metas){ const img = /^image\//.test(m.type), body = `${img ? (m.cam || m.gps ? 'Photo' : /png/i.test(m.type) ? 'Screenshot' : 'Image') : 'File'}: ${m.name}\nType: ${m.type || 'unknown'}\nSize: ${m.size} bytes\nSHA-256: ${m.sha256}${m.cam ? '\nCamera: ' + m.cam : ''}${m.gps ? '\nEXIF GPS: ' + m.gps.lat.toFixed(6) + ', ' + m.gps.lon.toFixed(6) : ''}`;
@@ -159,12 +161,17 @@ async function filesForExport(recs){
   return out;
 }
 async function filesFromImport(files){ let n = 0; for(const [fid, url] of Object.entries(files || {})){ if(typeof url !== 'string' || !url.startsWith('data:')) continue; try{ const m = url.match(/^data:([^;,]*)(;base64)?,(.*)$/); const bytes = m[2] ? b64d8(m[3]) : new TextEncoder().encode(decodeURIComponent(m[3])); if(await IDB.set('file:' + fid, await sealBlob(new Blob([bytes], {type:m[1] || 'application/octet-stream'})))) n++; }catch(e){} } return n; }
+/* everything in one object: the workspace plus attached files and notebook media as data URLs */
+async function backupObject(){
+  const all = DB.records.concat((DB.trash || []).flatMap(x => x.kind === 'record' ? [x.data.r] : x.kind === 'case' ? x.data.records : []));
+  const files = await filesForExport(all), nbfiles = typeof nbBackupFiles === 'function' ? await nbBackupFiles() : {}, n = Object.keys(files).length;
+  return Object.assign({}, DB, n ? {files} : {}, Object.keys(nbfiles).length ? {nbfiles} : {}, DB.security && DB.security.sign ? {security:Object.assign({}, DB.security, {sign:{pub:DB.security.sign.pub, made:DB.security.sign.made}})} : {});   // the signing key's private half never goes into a backup
+}
 async function exportEverything(enc){
   if(enc == null) enc = !!SEC.key;
-  const all = DB.records.concat((DB.trash || []).flatMap(x => x.kind === 'record' ? [x.data.r] : x.kind === 'case' ? x.data.records : []));
-  const files = await filesForExport(all), n = Object.keys(files).length;
+  const obj = await backupObject();
   DB.prefs.lastExport = Date.now(); DB.prefs.remindAt = 0; save();
-  const name = 'osintrix-' + new Date().toISOString().slice(0, 10) + '.json', obj = Object.assign({}, DB, n ? {files} : {}, DB.security && DB.security.sign ? {security:Object.assign({}, DB.security, {sign:{pub:DB.security.sign.pub, made:DB.security.sign.made}})} : {});   // the signing key's private half never goes into a backup
+  const name = 'osintrix-' + new Date().toISOString().slice(0, 10) + '.json';
   if(enc) return downloadEncrypted(name, obj);
   download(name, JSON.stringify(obj, null, 2), 'application/json');
   if(UI.route.area === 'home') renderMain();

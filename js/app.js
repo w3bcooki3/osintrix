@@ -7,7 +7,7 @@ const isNarrow = () => window.innerWidth < 1440;
 function renderMain(){
   const r = UI.route, el = $('main');
   const V = {security:viewSecurity, watch:viewWatch, trash:viewTrash, ctf:viewCTF, lab:viewLab, help:viewHelp, home:viewHome, cases:viewCases, toolbox:viewToolbox, entities:viewEntities, feeds:viewIntel, decoder:viewDecoder, reference:viewReference, settings:viewSettings,
-    detections:viewDetections, queries:viewQueries, notes:viewNotes, playbooks:viewPlaybooks, cloud:viewCloud, whatsnew:viewWhatsNew, pad:viewPad};
+    detections:viewDetections, queries:viewQueries, notes:viewNotes, playbooks:viewPlaybooks, cloud:viewCloud, whatsnew:viewWhatsNew, pad:viewPad, notebook:viewNotebook};
   if(cy && !(r.area === 'case' && r.tab === 'graph')){ cy.destroy(); cy = null; }
   const key = r.area + '/' + (r.tab || ''), sc = el.querySelector('.scroll'), keepY = renderMain.key === key && sc ? sc.scrollTop : 0; renderMain.key = key;
   try{ el.innerHTML = r.area === 'case' ? viewCase(r.tab) : (V[r.area] || viewHome)(); }
@@ -24,6 +24,8 @@ function renderMain(){
   if(r.area === 'cloud') bindCloud();
   if(r.area === 'whatsnew') bindWhatsNew();
   if(r.area === 'pad') bindPad();
+  if(r.area === 'notebook') bindNotebook();
+  if(r.area === 'settings') storageRefresh();
   if(r.area === 'detections') bindRuleEditor();
   if(r.area === 'case' && r.tab === 'entities') bindCaseEnts();
   if(r.area === 'security') paintFp();
@@ -31,7 +33,7 @@ function renderMain(){
   radialHide(); layoutFocus();
 }
 function renderAll(){ document.documentElement.dataset.area = UI.route.area; renderNav(); renderMain(); renderInsp(); paintLock(); $('inspBtn').classList.toggle('on', UI.inspOpen); }
-const TITLES = {security:'Security', watch:'Watchlist', trash:'Trash', ctf:'CTF', lab:'Forensics kit', help:'Help', home:'Dashboard', cases:'Cases', toolbox:'Toolbox', entities:'Entities', feeds:'Threat Intel', decoder:'Decoder', reference:'Reference', settings:'Settings', detections:'Detections', queries:'Query library', notes:'Notes', playbooks:'Playbooks', library:'Library', cloud:'Cloud', whatsnew:"What's new", pad:"Scratchpad"};
+const TITLES = {security:'Security', watch:'Watchlist', trash:'Trash', ctf:'CTF', lab:'Forensics kit', help:'Help', home:'Dashboard', cases:'Cases', toolbox:'Toolbox', entities:'Entities', feeds:'Threat Intel', decoder:'Decoder', reference:'Reference', settings:'Settings', detections:'Detections', queries:'Query library', notes:'Notes', playbooks:'Playbooks', library:'Library', cloud:'Cloud', whatsnew:"What's new", pad:"Scratchpad", notebook:'Notebook'};
 function onRoute(){
   UI.route = parseHash(); $('side').classList.remove('open');
   document.title = (UI.route.area === 'case' ? theCase().name.split(' — ')[0] + ' · ' + CASE_TABS.find(t => t[0] === UI.route.tab)[1] : TITLES[UI.route.area] || 'OSINTrix') + ' — OSINTrix';
@@ -86,6 +88,10 @@ document.addEventListener('click', ev => {
   if(CLOUD_ACTS[a]) return CLOUD_ACTS[a](id, v, t, ev);
   if(WN_ACTS[a]) return WN_ACTS[a](id, v, t, ev);
   if(PAD_ACTS[a]) return PAD_ACTS[a](id, v, t, ev);
+  if(NB_ACTS[a]) return NB_ACTS[a](id, v, t, ev);
+  if(STO_ACTS[a]) return STO_ACTS[a](id, v, t, ev);
+  if(FB_ACTS[a]) return FB_ACTS[a](id, v, t, ev);
+  if(NBX_ACTS[a]) return NBX_ACTS[a](id, v, t, ev);
   if(a === 'toolRun') return toolRunDlg(id);
   if(a === 'trPick'){ $('trV').value = v; return $('trV').focus(); }
   switch(a){
@@ -228,9 +234,9 @@ document.addEventListener('click', ev => {
       if(!d || !Array.isArray(d.cases) || !Array.isArray(d.entries) || !Array.isArray(d.records)) return toast('Not an OSINTrix backup — use a file from “Export everything”');
       { const errs = checkImport(d, 'backup'); if(errs.length) return importRefused('The backup', errs); }
       confirmDlg('Replace everything with this backup?', 'Your current cases, notes, tools and rules in this browser are replaced by the ' + d.cases.length + ' case' + (d.cases.length === 1 ? '' : 's') + ' in the file. You can undo right after.', 'Import backup', async () => {
-        await snapshot('Before importing a backup'); if(d.files){ await rekeyFiles(d.files, d.records, d.trash); delete d.files; }
+        await snapshot('Before importing a backup'); if(d.files){ await rekeyFiles(d.files, d.records, d.trash); delete d.files; } const nbfiles = d.nbfiles; delete d.nbfiles;
         d.records.forEach(normRecord); d.entries.forEach(normEntry);
-        const prev = DB; DB = d; DB.prefs = Object.assign({}, prev.prefs, d.prefs || {}); ensureTools(); ensurePlaybooks(); ensureIntel(); ensureQueries(); ensureRules(); ensureNotes(); if(!DB.cases.some(c => c.id === DB.active)) DB.active = DB.cases[0] && DB.cases[0].id;
+        const prev = DB; DB = d; DB.prefs = Object.assign({}, prev.prefs, d.prefs || {}); ensureTools(); ensurePlaybooks(); ensureIntel(); ensureQueries(); ensureRules(); ensureNotes(); if(DB.nb){ nbSanitize(); await nbRestoreFiles(nbfiles); } else ensureNB(); UI.nbView = 'lib'; UI.nbRev = null; if(!DB.cases.some(c => c.id === DB.active)) DB.active = DB.cases[0] && DB.cases[0].id;
         await hashRecords(); ensurePositions(); mutate('imported backup'); UI.sel = null; applyPrefs(); renderAll(); toast('Backup imported', 'Undo', () => { DB = prev; mutate('undo import'); applyPrefs(); renderAll(); }); }); }));
     case 'freshStart': return confirmDlg('Start fresh?', 'Deletes every case, vault entry, evidence record and note in this browser. Tools, queries, rules and settings stay. Export first if you might need them. You can undo right after.', 'Delete my cases', async () => {
       await snapshot('Before starting fresh'); const prev = JSON.parse(JSON.stringify(DB)); const c = {id:uid('c'), name:'My first case', code:'TN-2026-001', status:'active', owner:'You', created:Date.now(), updated:Date.now(), scope:'', color:CASE_COLORS[0], icon:'briefcase'};
@@ -429,6 +435,7 @@ document.addEventListener('keydown', ev => { if((ev.key === 'Enter' || ev.key ==
 document.addEventListener('submit', ev => {
   const f = ev.target.closest('form[data-form]'); if(!f) return; ev.preventDefault();
   const k = f.dataset.form;
+  if(/^nb[A-Z]/.test(k)) return nbSubmit(f);
   if(k === 'evTag') return evTagSubmit();
   if(k === 'parser') return parserSubmit(f);
   if(k === 'pass') return PASS_CB && PASS_CB();
@@ -550,7 +557,7 @@ new MutationObserver(() => document.documentElement.classList.toggle('modal', !$
 $('scrim').addEventListener('mousedown', ev => { if(ev.target.id === 'scrim') closeDlg(); });
 
 document.addEventListener('keydown', ev => {
-  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName), dlg = !$('scrim').hidden;
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName) || ev.target.isContentEditable, dlg = !$('scrim').hidden;
   if(ev.key === 'Escape'){ if(!$('welcome').hidden) return closeWelcome(); if(dlg) return closeDlg(); if($('side').classList.contains('open')) return $('side').classList.remove('open'); if(typing) return ev.target.blur();
     if(UI.route.area === 'queries' && UI.qopen && qLay() !== 'ide') return clickAct('qClose');
     if(UI.route.area === 'ctf' && UI.ctfSel) return clickAct('ctfClose');
@@ -635,7 +642,7 @@ async function bootRest(unlocked){
   UI.inspOpen = false; UI.graph.legendMin = window.innerWidth < 1100;
   if(window.innerWidth <= 760) $('gq').placeholder = 'Search everything';
   $('gq').addEventListener('focus', () => { $('gq').blur(); srchOpen(); }); $('gq').addEventListener('mousedown', ev => { ev.preventDefault(); srchOpen(); });
-  ensureTools(); ensureToolTpl(); ensurePlaybooks(); ensureIntel(); ensureQueries(); ensureRules(); ensureNotes(); ensureSample(); ensureCTF(); ensureAchDemo(); applyPrefs(); storageEstimate(); await hashRecords(); migrateFieldEnts(); ensurePositions(); flush(); onRoute();
+  ensureTools(); ensureToolTpl(); ensurePlaybooks(); ensureIntel(); ensureQueries(); ensureRules(); ensureNotes(); ensureSample(); ensureCTF(); ensureNB(); ensureAchDemo(); applyPrefs(); storageCheck(); await hashRecords(); migrateFieldEnts(); ensurePositions(); flush(); onRoute(); nbFlushMedia(); fbInit();
   let seen = false; try{ seen = !!localStorage.getItem('osintrix:welcomed'); }catch(e){}
   if(!unlocked) setTimeout(() => { $('splash').classList.add('out'); setTimeout(() => $('splash').remove(), 320); if(!seen) showWelcome(); }, 350);
   armAutolock();

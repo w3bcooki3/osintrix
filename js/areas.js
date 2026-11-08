@@ -281,6 +281,7 @@ function viewSettings(){
         <p class="t3" style="font-size:13px;margin:12px 0 0">${DB.prefs.lastExport ? 'Last exported ' + esc(ago(DB.prefs.lastExport)) + '.' : 'Never exported.'} <a href="#/trash">Trash &amp; restore points</a> · <a href="#/security">Security &amp; audit</a>${(DB.trash || []).length ? ' · ' + DB.trash.length + ' in trash' : ''}</p>
         <div class="isec"><h4>Recent changes</h4>${DB.log.slice(0, 6).map(l => `<div class="li" style="padding:6px 0"><div class="main2"><b style="font-weight:500;font-size:13.5px">${esc(l.what)}</b></div><span class="end mono">${esc(E.fmtClock(l.at, tz()))}</span></div>`).join('') || '<span class="t3" style="font-size:13.5px">Nothing yet.</span>'}</div></div></section>
       
+      ${storageCard()}
     </div></div></div>`;
 }
 

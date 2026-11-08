@@ -36,7 +36,7 @@ function layoutNav(nv, cur){
     return `<div class="navg navd${open ? '' : ' closed'}"><button class="caps navd-t" data-act="navGroup" data-v="${id}" aria-expanded="${open}">${ico('chevron-right','sm')}<span>${label}</span></button>
       <div class="navd-b">${items.map(([a, i, l, n]) => nv(a, i, l, n)).join('')}</div></div>`; };
   return `
-    <div class="navg">${nv('home','layout-dashboard','Dashboard')}${nv('notes','sticky-note','Notes', (DB.notes || []).reduce((s, n) => s + noteTasks(n).filter(t => !t.done).length, 0) || null)}${nv('pad','notebook-pen','Scratchpad')}</div>
+    <div class="navg">${nv('home','layout-dashboard','Dashboard')}${nv('notes','sticky-note','Notes', (DB.notes || []).reduce((s, n) => s + noteTasks(n).filter(t => !t.done).length, 0) || null)}${nv('pad','notebook-pen','Scratchpad')}${nv('notebook','graduation-cap','Notebook', DB.nb ? nbDueCards().length || null : null)}</div>
     <div class="navg"><div class="caps"><span>Cases</span><button data-act="newCase" title="New case" aria-label="New case">${ico('plus','sm')}</button></div>
       ${cases.slice(0, 8).map(caseLink).join('')}${nv('cases','folder-open', cases.length > 8 ? 'All ' + cases.length + ' cases' : 'All cases')}</div>
     ${group('kit', 'Kit', [['toolbox','wrench','Toolbox', DB.tools.length],['queries','scan-search','Query library'],['lab','file-search','Forensics kit'],['decoder','binary','Decoder'],['cloud','cloud','Cloud'],['ctf','flag','CTF'],['reference','book-open','Reference'],['playbooks','list-checks','Playbooks']])}

@@ -81,17 +81,28 @@ function flushChunked(){
 }
 async function storageEstimate(){ try{ if(navigator.storage && navigator.storage.estimate){ const e = await navigator.storage.estimate(); STORE.quota = e.quota || 0; STORE.usage = e.usage || 0; } }catch(e){} return STORE; }
 let saveT = null, storageOK = true;
-function save(){ clearTimeout(saveT); saveT = setTimeout(flush, 250); }
-function flush(){ clearTimeout(saveT); if(!DB || SEC.locked) return; if(!TABS.writer){ paintSaved(); return; } DB.savedAt = Date.now();
-  if(!SEC.key && STORE.idb && DB.records.length >= CHUNKED_FROM){ storageOK = true; flushChunked(); STORE.lastSaved = Date.now(); paintSaved(); tabSaved(); return; }
+/* Is every change safely written? changedAt moves on each edit; safeAt moves when a write is confirmed.
+   Until they meet, the top bar says "Saving…" and closing or refreshing the tab asks first. */
+STORE.gen = 0; STORE.safeGen = 0; STORE.changedAt = 0;
+const PENDING = [];   // editors add a check for typing they have not committed yet
+const isDirty = () => STORE.gen > STORE.safeGen || PENDING.some(f => { try{ return f(); }catch(e){ return false; } });
+let paintT = null;
+function markChanged(){ STORE.gen++; STORE.changedAt = Date.now(); clearTimeout(paintT); paintT = setTimeout(paintSaved, 900); }
+function markSafe(g){ if(g > STORE.safeGen) STORE.safeGen = g; paintSaved(); }
+function save(){ markChanged(); clearTimeout(saveT); saveT = setTimeout(flush, 250); }
+/* editors with typing still waiting to be committed (the notebook) register here, so every save — including the one on closing the tab — includes it */
+const BEFORE_SAVE = [];
+function flush(){ clearTimeout(saveT); if(!DB || SEC.locked) return; for(const f of BEFORE_SAVE) try{ f(); }catch(e){ console.error(e); } clearTimeout(saveT); if(!TABS.writer){ paintSaved(); return; } DB.savedAt = Math.max(Date.now(), (DB.savedAt || 0) + 1);   // never a tie between two copies
+  const at = DB.savedAt, g = STORE.gen, done = r => { if(r){ STORE.idbAt = Math.max(STORE.idbAt || 0, at); markSafe(g); try{ localStorage.removeItem(STORE_KEY + ':nbj'); }catch(e){} } };   // IndexedDB has everything up to 'at'
+  if(!SEC.key && STORE.idb && DB.records.length >= CHUNKED_FROM){ storageOK = true; flushChunked().then(done); STORE.lastSaved = Date.now(); paintSaved(); tabSaved(); return; }
   if(LAST.n){ IDB.setMany([], Array.from({length:LAST.n}, (_, i) => STORE_KEY + ':r:' + i)); LAST.n = 0; LAST.chunks = []; }   // back to one piece
   const json = JSON.stringify(DB);
-  if(SEC.key) return flushSealed(json);
+  if(SEC.key) return flushSealed(json).then(() => { if(storageOK) markSafe(g); });
   STORE.bytes = json.length * 2;
-  let ok = false; try{ if(json.length < 2400000){ localStorage.setItem(STORE_KEY, json); STORE.ls = true; ok = true; } else { localStorage.removeItem(STORE_KEY); STORE.ls = false; } }catch(e){ STORE.ls = false; }
-  if(STORE.idb){ ok = true; IDB.set(STORE_KEY, json).then(r => { if(!r && !STORE.ls){ storageOK = false; paintSaved(); } }); }
+  let ok = false; try{ if(json.length < 2400000){ localStorage.setItem(STORE_KEY, json); STORE.ls = true; ok = true; markSafe(g); } else { localStorage.removeItem(STORE_KEY); STORE.ls = false; } }catch(e){ STORE.ls = false; }
+  if(STORE.idb){ ok = true; IDB.set(STORE_KEY, json).then(r => { done(r); if(!r && !STORE.ls){ storageOK = false; paintSaved(); } }); }
   storageOK = ok; STORE.lastSaved = Date.now(); paintSaved(); tabSaved(); }
-function paintSaved(){ const s = $('saved'); if(s && !TABS.writer){ s.innerHTML = '<i style="background:var(--amber)"></i><span>Read-only in this tab</span>'; s.title = 'This workspace is open in another tab'; return; } if(s) s.innerHTML = storageOK ? '<i></i><span>Saved in this browser</span>' : '<i style="background:var(--red)"></i><span>Not saved</span>'; s.title = storageOK ? 'Saved in this browser' : 'Not saved — this browser blocks storage'; }
+function paintSaved(){ const s = $('saved'); if(s && TABS.writer && storageOK && isDirty() && Date.now() - STORE.changedAt > 800){ s.innerHTML = '<i class="pulse" style="background:var(--text-3)"></i><span>Saving…</span>'; s.title = 'Writing your latest change to this browser'; return; } if(s && !TABS.writer){ s.innerHTML = '<i style="background:var(--amber)"></i><span>Read-only in this tab</span>'; s.title = 'This workspace is open in another tab'; return; } if(s) s.innerHTML = storageOK ? '<i></i><span>Saved in this browser</span>' : '<i style="background:var(--red)"></i><span>Not saved</span>'; s.title = storageOK ? 'Saved in this browser' : 'Not saved — this browser blocks storage'; }
 window.addEventListener('pagehide', flush); document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'hidden') flush(); });
 let rev = 0, cache = {};
 function mutate(what){ rev++; cache = {}; auditAdd(what); DB.log.unshift({at:Date.now(), what}); DB.log.length = Math.min(DB.log.length, 200); save(); }
@@ -177,7 +188,7 @@ function passes(r){
 }
 
 /* ---------- routing ---------- */
-const AREAS = ['security','watch','trash','help','ctf','lab','home','cases','case','toolbox','entities','feeds','decoder','reference','settings','detections','playbooks','queries','notes','cloud','whatsnew','pad'];
+const AREAS = ['security','watch','trash','help','ctf','lab','home','cases','case','toolbox','entities','feeds','decoder','reference','settings','detections','playbooks','queries','notes','cloud','whatsnew','pad','notebook'];
 const CASE_TABS = [['overview','Overview','layout-dashboard'],['vault','Vault','layers'],['entities','Entities','fingerprint'],['timeline','Timeline','clock'],['graph','Graph','waypoints'],['map','Places','map-pin'],['questions','Analysis','scale'],['report','Report','file-chart-column']];
 function parseHash(){
   const p = (location.hash || '#/home').replace(/^#\/?/, '').split('/').map(decodeURIComponent);
@@ -240,3 +251,11 @@ function ensureTools(){
   for(const t of TOOLS_SEED) if(!have.has(t.url) && !gone.has(t.url)){ DB.tools.push({id:'t' + t.id + '-' + uid('u').slice(-4), name:t.name, url:t.url, cat:t.parentCategory, sub:t.childCategory, desc:t.description, tags:t.tags || [], pinned:false, starred:false, added:Date.now(), uses:0, seed:true}); n++; }
   return n;
 }
+
+/* Leaving with a change that is not on disk yet (big or encrypted workspaces write in the background): try once more,
+   and if it still is not confirmed, let the browser ask "Leave site?" — the write finishes while the question is open. */
+window.addEventListener('beforeunload', ev => {
+  if(!DB || SEC.locked || !TABS.writer) return;
+  if(isDirty()) flush();
+  if(isDirty()){ ev.preventDefault(); ev.returnValue = ''; return ''; }
+});

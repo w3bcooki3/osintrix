@@ -125,6 +125,22 @@ Press `Ctrl K` or `/`, or click the search bar, to search the whole app at once:
   - **Write-ups:** turn a solved challenge's work log into a write-up in one click, or import Markdown. Search, filter, read with the flag hidden until you show it, and export as Markdown.
   - **Cheatsheets:** web, crypto, forensics, stego, OSINT, reversing, pwn, network and misc. Each has a recognise-it table (what you see, what it probably is, what to try), one-line commands that copy on click, and gotchas. Fill in your target, file, wordlist, IP and port once and every command uses them. One search covers every cheatsheet.
   - **First moves:** the first ten minutes for each category, as checklists.
+- **Notebook:** for what you learn from courses, labs and reading. Notebooks hold sections and pages.
+  - **Pages:** text, headings, lists, checklists, code blocks, tables, key takeaways, link cards and pictures. Paste a screenshot or drop a file anywhere; pasted web pages and Google Docs keep their formatting, and anything unsafe is removed. Markdown shortcuts (`#`, `-`, `[]`, three backticks) work while you type.
+  - **Flashcards:** any line starting with `Q:` followed by one starting with `A:` becomes a card. A review panel spaces them out over days, like Anki.
+  - **Export:** a page, section, notebook or everything as a Word document (opens in Word and Google Docs, inserts into OneNote), one HTML file, Markdown with images in a .zip (Obsidian, Notion) or PDF. *Copy as rich text* pastes straight into OneNote. Markdown, HTML and Word files import back as pages.
+  - **Linked:** tags, ATT&CK IDs and Windows event IDs on a page link it to the Reference, detection rules and CTF write-ups.
+
+![Notebook](docs/notebook.png)
+
+### 💾 Storage and limits
+- **Where it lives:** everything stays in this browser's IndexedDB; pictures and files are stored as separate blobs (encrypted when the workspace is encrypted). There are no accounts: one private workspace per browser profile.
+- **How much fits:** the browser decides, per site. Chrome and Edge allow up to about 60% of free disk, Firefox about 10% (more once marked persistent), recent Safari about 60%. **Settings → Storage** shows the real figure and what uses it.
+- **Limits per item:** case attachments up to 50 MB, notebook pictures and files up to 15 MB (large pictures are shrunk on paste), imports up to 30 MB.
+- **Never closing on unsaved work:** the top bar shows *Saving…* while a change is being written; closing or refreshing at that moment makes the browser ask first, and the save finishes meanwhile.
+- **Automatic backup to a folder** (Chrome and Edge): Settings → Storage → choose a folder (a OneDrive or Google Drive folder also gives you a cloud copy). The app writes `osintrix-latest.json` there a few minutes after changes, plus one dated copy per day, keeping the last 7. Encrypted workspaces write encrypted backups. If browser data is ever cleared, import `osintrix-latest.json`.
+- **Warnings:** the top bar turns amber past 85% or under 200 MB free and red if a save fails; files that would not fit are refused before anything is written. Clean up from Settings → Storage, and export a backup regularly.
+
 - **Flag finder:** flag-shaped strings (`FLAG{…}`, `picoCTF{…}`, `HTB{…}`, or your event's own format) are picked out automatically in the Decoder and File inspector, and saved to a challenge with one click.
 - **File inspector:** drop in any file; it is read locally and never uploaded. It shows:
   - the true file type from its magic bytes, with a warning when the extension lies;

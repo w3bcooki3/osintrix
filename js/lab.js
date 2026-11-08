@@ -23,12 +23,13 @@ function ensureSample(){
 }
 function removeSample(){
   const ids = new Set(DB.cases.filter(c => c.sample).map(c => c.id));
-  const n = {cases:ids.size, notes:(DB.notes || []).filter(x => x.sample || ids.has(x.caseId)).length, feed:DB.feed.filter(f => f.sample).length, ctf:((DB.ctf || {}).chals || []).filter(c => c.sample).length};
-  confirmDlg('Remove all sample data?', `Deletes the ${n.cases} sample cases (with their entries, evidence and graph), ${n.notes} sample notes, ${n.feed} sample news items and ${n.ctf} sample CTF challenges. Your own work, tools, queries, rules and playbooks stay. You can undo right after.`, 'Remove sample data', () => {
+  const n = {cases:ids.size, notes:(DB.notes || []).filter(x => x.sample || ids.has(x.caseId)).length, feed:DB.feed.filter(f => f.sample).length, ctf:((DB.ctf || {}).chals || []).filter(c => c.sample).length, nb:((DB.nb || {}).books || []).filter(b => b.sample).length};
+  confirmDlg('Remove all sample data?', `Deletes the ${n.cases} sample cases (with their entries, evidence and graph), ${n.notes} sample notes, ${n.feed} sample news items, ${n.ctf} sample CTF challenges and ${n.nb} sample notebooks. Your own work, tools, queries, rules and playbooks stay. You can undo right after.`, 'Remove sample data', () => {
     snapshot('Before removing sample data'); const prev = JSON.parse(JSON.stringify(DB)), seedV = seedDB().verdicts;
     DB.cases = DB.cases.filter(c => !ids.has(c.id)); DB.entries = DB.entries.filter(e => !ids.has(e.caseId)); DB.links = DB.links.filter(l => !ids.has(l.caseId)); DB.records = DB.records.filter(r => !ids.has(r.caseId));
     DB.notes = (DB.notes || []).filter(x => !x.sample && !ids.has(x.caseId)); DB.feed = DB.feed.filter(f => !f.sample);
     if(DB.ctf){ DB.ctf.chals = DB.ctf.chals.filter(c => !c.sample); DB.ctf.events = DB.ctf.events.filter(e => !e.sample || DB.ctf.chals.some(c => c.eventId === e.id)); }
+    if(DB.nb){ const bk = new Set(DB.nb.books.filter(b => b.sample).map(b => b.id)), sc = new Set(DB.nb.sections.filter(s => bk.has(s.bookId)).map(s => s.id)); DB.nb.books = DB.nb.books.filter(b => !bk.has(b.id)); DB.nb.sections = DB.nb.sections.filter(s => !sc.has(s.id)); DB.nb.pages = DB.nb.pages.filter(p => !sc.has(p.sectionId)); nbGC(); if(!nbPage(UI.nbPage)){ UI.nbView = 'lib'; UI.nbPage = null; } UI.nbRev = null; }
     for(const [k, v] of Object.entries(seedV)) if(DB.verdicts[k] === v) delete DB.verdicts[k];
     DB.queryLog = (DB.queryLog || []).filter(l => !ids.has(l.caseId));
     if(!DB.cases.length) DB.cases.push({id:uid('c'), name:'My first case', code:'TN-' + new Date().getFullYear() + '-001', status:'active', owner:'You', created:Date.now(), updated:Date.now(), scope:'', color:CASE_COLORS[0], icon:'briefcase'});

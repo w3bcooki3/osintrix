@@ -48,6 +48,7 @@ async function resealAll(fromKey){
   for(const s of list){ const v = await IDB.get('osintrix-snap:' + s.at); if(v) await IDB.set('osintrix-snap:' + s.at, await conv(v)); }
   const fids = new Set(DB.records.concat((DB.trash || []).flatMap(x => x.kind === 'record' ? [x.data.r] : x.kind === 'case' ? x.data.records : [])).flatMap(r => (r.att || []).map(a => a.id)));
   for(const fid of fids){ let v = await IDB.get('file:' + fid); if(!v) continue; if(v.enc){ if(!fromKey) continue; const pt = await crypto.subtle.decrypt({name:'AES-GCM', iv:b64d8(v.iv)}, fromKey, v.ct); v = new Blob([pt], {type:v.type}); } await IDB.set('file:' + fid, await sealBlob(v)); }
+  if(typeof nbReseal === 'function') await nbReseal(fromKey);
   FILE_URLS.clear(); SNAPS = null;
 }
 async function encEnable(pass){
