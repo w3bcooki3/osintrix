@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Notebook — proposal</title>
+<link rel="stylesheet" href="../css/fonts.css">
+<script src="../js/icons.js"></script>
+<style>
+:root{--font:'Geist',system-ui,sans-serif;--mono:'Geist Mono',ui-monospace,monospace;
+  --bg:#f4f6fa;--side:#fff;--surface:#fff;--surface-2:#f8f9fc;--hover:#f1f4f9;--active:#e9edf6;--border:#dde3ec;--soft:#e9edf3;
+  --text:#0f172a;--text-2:#475569;--text-3:#56657a;--accent:#4f46e5;--accent-bg:#5b54f0;--accent-soft:#5b54f014;--accent-line:#5b54f040;
+  --green:#04704f;--green-bg:#16a34a14;--red:#c81e1e;--red-bg:#dc262612;--amber:#a64b08;--amber-bg:#f59e0b18;--blue:#1d4ed8;--blue-bg:#2563eb12;
+  --sh:0 1px 2px #0f172a0d,0 1px 1px #0f172a08;--sh-lg:0 24px 60px -20px #0f172a40,0 2px 8px #0f172a14}
+[data-theme=dark]{--bg:#0a0e17;--side:#0c111c;--surface:#111827;--surface-2:#141c2c;--hover:#192235;--active:#1f2a41;--border:#2a3550;--soft:#1e273b;
+  --text:#e6eaf2;--text-2:#a3aec2;--text-3:#8d98ad;--accent:#a5a1ff;--accent-bg:#655cf7;--accent-soft:#6d64ff24;--accent-line:#6d64ff66;
+  --green:#4ade80;--green-bg:#22c55e1a;--red:#f87171;--red-bg:#ef44441a;--amber:#fbbf24;--amber-bg:#f59e0b1f;--blue:#93c5fd;--blue-bg:#3b82f61f;--sh:0 1px 2px #0005;--sh-lg:0 24px 60px -16px #000c}
+*{box-sizing:border-box}
+body{margin:0;background:#e5e8ee;font:14px/1.5 var(--font);color:var(--text)}
+.i{width:16px;height:16px;stroke-width:1.8;flex:none}.i.sm{width:14px;height:14px}
+.frame{width:1440px;height:900px;margin:0 auto 40px;display:grid;grid-template-columns:64px 1fr;background:var(--bg);overflow:hidden;position:relative}
+.rail{background:var(--side);border-right:1px solid var(--soft);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:6px}
+.rail .logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#6d64ff,#a855f7);margin-bottom:12px}
+.rail b{width:40px;height:36px;border-radius:9px;display:grid;place-items:center;color:var(--text-3)}.rail b.on{background:var(--accent-soft);color:var(--accent)}
+.rail hr{width:32px;border:0;border-top:1px solid var(--soft);margin:6px 0}
+.main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.top{height:56px;flex:none;display:flex;align-items:center;gap:12px;padding:0 20px;border-bottom:1px solid var(--soft)}
+.search{width:520px;height:34px;border:1px solid var(--border);border-radius:8px;background:var(--surface);display:flex;align-items:center;gap:8px;padding:0 12px;color:var(--text-3);font-size:13.5px;box-shadow:var(--sh)}
+.sp{flex:1}
+.btn{height:32px;padding:0 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);display:inline-flex;align-items:center;gap:7px;font:500 13.5px var(--font);color:var(--text);box-shadow:var(--sh);white-space:nowrap}
+.btn.pri{background:var(--accent-bg);border-color:var(--accent-bg);color:#fff}.btn.sm{height:28px;font-size:12.5px;padding:0 10px}.btn.ghost{border-color:transparent;box-shadow:none;background:none;color:var(--text-2)}
+.mono{font-family:var(--mono)}.caps{font-size:12px;color:var(--text-3);font-weight:500}
+.card{background:var(--surface);border:1px solid var(--soft);border-radius:12px;box-shadow:var(--sh)}
+.pill{height:22px;padding:0 8px;border-radius:6px;border:1px solid var(--soft);background:var(--surface-2);display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--text-2);font-weight:500}
+.pill.g{color:var(--green);background:var(--green-bg);border-color:transparent}.pill.a{color:var(--amber);background:var(--amber-bg);border-color:transparent}.pill.b{color:var(--accent);background:var(--accent-soft);border-color:transparent}
+.lbl{position:absolute;right:20px;bottom:14px;font:500 12px var(--mono);color:var(--text-3)}
+.dot{width:9px;height:9px;border-radius:3px;background:var(--cc);flex:none}
+
+/* ---------- 1 · editor ---------- */
+.nb{display:grid;grid-template-columns:268px minmax(0,1fr) 300px;flex:1;min-height:0}
+.tree{border-right:1px solid var(--soft);background:var(--side);padding:14px 10px;display:flex;flex-direction:column;gap:2px;overflow:hidden}
+.tree .th{display:flex;align-items:center;gap:8px;padding:2px 6px 10px}.tree .th h2{margin:0;font-size:15px;font-weight:600}
+.tree .tsearch{height:30px;border:1px solid var(--soft);border-radius:8px;display:flex;align-items:center;gap:7px;padding:0 9px;color:var(--text-3);font-size:12.5px;margin:0 2px 10px;background:var(--surface-2)}
+.nbk{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:8px;font-weight:600;font-size:13.5px}
+.nbk .cv{width:22px;height:26px;border-radius:4px 6px 6px 4px;background:var(--cc);box-shadow:inset 3px 0 0 #0002;flex:none}
+.nbk small{margin-left:auto;font:500 11.5px var(--mono);color:var(--text-3)}
+.sec{display:flex;align-items:center;gap:8px;padding:6px 8px 6px 20px;border-radius:7px;font-size:13px;color:var(--text-2);font-weight:500}
+.sec .i{color:var(--text-3)}
+.pg{display:flex;align-items:center;gap:8px;padding:6px 8px 6px 44px;border-radius:7px;font-size:13px;color:var(--text-2)}
+.pg.on{background:var(--active);color:var(--text);font-weight:600}
+.pg small{margin-left:auto;color:var(--text-3);font-size:11px}
+.tree .more{margin-top:auto;border-top:1px solid var(--soft);padding-top:8px}
+.doc{overflow:hidden;display:flex;flex-direction:column;min-width:0}
+.dtb{display:flex;align-items:center;gap:2px;padding:8px 24px;border-bottom:1px solid var(--soft);background:var(--surface)}
+.dtb .g{display:flex;gap:2px;padding:0 6px;border-right:1px solid var(--soft)}.dtb .g:last-of-type{border-right:0}
+.tb{min-width:30px;height:30px;border-radius:7px;display:grid;place-items:center;color:var(--text-2);font:600 13px var(--font);padding:0 6px}
+.tb.on{background:var(--active);color:var(--text)}
+.tb.t{display:flex;gap:6px;font-weight:500;font-size:12.5px;padding:0 9px}
+.dtb .saved{margin-left:auto;white-space:nowrap;font-size:12px;color:var(--text-3);display:flex;align-items:center;gap:6px}
+.page{padding:28px 56px 0;overflow:hidden;flex:1;background:var(--surface)}
+.page .bc{font-size:12.5px;color:var(--text-3);display:flex;gap:6px;align-items:center}
+.page h1{font-size:30px;letter-spacing:-.025em;margin:8px 0 10px;font-weight:650}
+.meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:22px}
+.meta .src{display:inline-flex;gap:6px;align-items:center;font-size:12.5px;color:var(--accent);font-weight:500}
+.page p{margin:0 0 12px;font-size:14.5px;line-height:1.7;color:var(--text);max-width:72ch}
+.page h3{font-size:17px;margin:22px 0 8px;font-weight:600;letter-spacing:-.01em}
+.page mark{background:#fde68a99;color:inherit;border-radius:3px;padding:0 2px}
+[data-theme=dark] .page mark{background:#ca8a0455}
+.page ul{margin:0 0 12px;padding-left:22px;font-size:14.5px;line-height:1.7}.page li{margin:2px 0}
+.code{font:12.5px/1.65 var(--mono);background:var(--surface-2);border:1px solid var(--soft);border-radius:9px;padding:10px 64px 10px 14px;margin:6px 0 14px;max-width:760px;position:relative;white-space:pre}
+.code .p{color:var(--text-3)}.code .lang{position:absolute;right:10px;top:8px;font:500 11px var(--font);color:var(--text-3)}
+.call{display:flex;gap:12px;padding:12px 14px;border-radius:10px;background:var(--blue-bg);margin:8px 0 14px;max-width:760px}
+.call .i{color:var(--blue);margin-top:2px}.call b{display:block;font-size:13px;margin-bottom:2px}.call span{font-size:13.5px;line-height:1.6;color:var(--text-2)}
+.shot{margin:6px 0 16px;max-width:660px}
+.shot .img{border-radius:10px;border:1px solid var(--border);background:#0d1117;padding:12px 14px;font:11.5px/1.55 var(--mono);color:#c9d1d9;white-space:pre;overflow:hidden;box-shadow:var(--sh);position:relative}
+.shot .img .wb{display:flex;gap:5px;margin:-4px 0 8px}.shot .img .wb i{width:9px;height:9px;border-radius:50%;background:#30363d}
+.shot .img .y{color:#e3b341}.shot .img .gr{color:#7ee787}.shot .img .r{color:#ff7b72}
+.shot .img .hl{position:absolute;left:8px;right:8px;top:94px;height:21px;border:2px solid #f59e0b;border-radius:5px}
+.shot figcaption{font-size:12.5px;color:var(--text-3);margin-top:6px;display:flex;gap:6px;align-items:center}
+.linkcard{display:flex;gap:12px;align-items:center;border:1px solid var(--soft);border-radius:10px;padding:10px 12px;max-width:520px;margin:4px 0 14px;background:var(--surface)}
+.linkcard .fav{width:34px;height:34px;border-radius:8px;background:var(--surface-2);display:grid;place-items:center;color:var(--text-2);flex:none}
+.linkcard b{font-size:13.5px;display:block}.linkcard small{font-size:12px;color:var(--text-3)}
+.side{border-left:1px solid var(--soft);background:var(--side);padding:16px;display:flex;flex-direction:column;gap:16px;overflow:hidden}
+.side h4{margin:0 0 8px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px}
+.outline a{display:block;font-size:13px;color:var(--text-2);padding:4px 0 4px 10px;border-left:2px solid var(--soft)}.outline a.on{color:var(--accent);border-color:var(--accent-bg);font-weight:500}.outline a.s{padding-left:22px}
+.qa{border:1px solid var(--soft);border-radius:10px;padding:10px 12px;font-size:13px;background:var(--surface-2)}
+.qa b{display:block;margin-bottom:3px}.qa span{color:var(--text-3)}
+.lk{display:flex;align-items:center;gap:9px;padding:6px 0;font-size:13px;border-bottom:1px solid var(--soft)}.lk:last-child{border-bottom:0}
+.lk .ic{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);flex:none}
+.lk small{display:block;color:var(--text-3);font-size:11.5px}
+.att{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-2);padding:4px 0}
+
+/* ---------- 2 · export ---------- */
+.dim{position:absolute;inset:0;background:#0f172a66;backdrop-filter:blur(1px)}
+.dlg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:860px;background:var(--surface);border-radius:16px;box-shadow:var(--sh-lg);border:1px solid var(--border);overflow:hidden}
+.dlg header{display:flex;align-items:center;gap:10px;padding:18px 22px;border-bottom:1px solid var(--soft)}
+.dlg header h2{margin:0;font-size:17px;font-weight:600}
+.dlg .body{display:grid;grid-template-columns:1fr 300px}
+.dlg .opts{padding:18px 22px;display:flex;flex-direction:column;gap:16px;border-right:1px solid var(--soft)}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface-2)}
+.seg span{padding:6px 12px;font-size:13px;font-weight:500;color:var(--text-2);border-right:1px solid var(--border)}.seg span:last-child{border-right:0}.seg span.on{background:var(--surface);color:var(--text);box-shadow:inset 0 -2px 0 var(--accent-bg)}
+.fmts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fmt{border:1px solid var(--soft);border-radius:12px;padding:12px 14px;display:flex;gap:12px;align-items:flex-start}
+.fmt.on{border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-soft)}
+.fmt .ic{width:36px;height:36px;border-radius:9px;display:grid;place-items:center;flex:none;font:700 11px var(--mono);color:#fff}
+.fmt b{font-size:13.5px;display:block}.fmt small{font-size:12px;color:var(--text-3);line-height:1.45;display:block;margin-top:2px}
+.fmt .to{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}.fmt .to span{font-size:11px;color:var(--text-2);background:var(--surface-2);border:1px solid var(--soft);border-radius:5px;padding:0 6px}
+.chk{display:flex;gap:9px;align-items:center;font-size:13.5px}
+.chk i{width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border);display:grid;place-items:center;flex:none}
+.chk i.on{background:var(--accent-bg);border-color:var(--accent-bg);color:#fff}
+.prev{padding:18px;background:var(--surface-2)}
+.paper{background:#fff;color:#111;border-radius:6px;box-shadow:var(--sh);padding:18px 20px;font:10.5px/1.55 'Geist',serif;height:330px;overflow:hidden;position:relative}
+.paper h1{font-size:17px;margin:0 0 4px}.paper .m{color:#666;font-size:9.5px;margin-bottom:10px}.paper h3{font-size:12px;margin:10px 0 4px}
+.paper .c{background:#f4f4f5;border-radius:4px;padding:5px 7px;font:9px var(--mono);margin:4px 0}
+.paper .im{height:58px;border-radius:4px;background:#0d1117;margin:6px 0}
+.paper:after{content:'';position:absolute;left:0;right:0;bottom:0;height:60px;background:linear-gradient(transparent,#fff)}
+.dlg footer{display:flex;align-items:center;gap:10px;padding:14px 22px;border-top:1px solid var(--soft)}
+.tip{display:flex;gap:8px;font-size:12.5px;color:var(--text-2);background:var(--surface-2);border-radius:10px;padding:10px 12px;line-height:1.5}
+.tip .i{color:var(--accent);margin-top:1px}
+
+/* ---------- 3 · library + review ---------- */
+.lib{padding:24px 32px;display:flex;flex-direction:column;gap:18px;flex:1;min-height:0}
+.lib .h{display:flex;align-items:flex-end;gap:12px}.lib h1{margin:0;font-size:26px;letter-spacing:-.02em;font-weight:600}.lib .h p{margin:4px 0 0;color:var(--text-2)}
+.lgrid{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:20px;flex:1;min-height:0}
+.books{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-content:start}
+.book{border-radius:14px;background:var(--surface);border:1px solid var(--soft);box-shadow:var(--sh);overflow:hidden}
+.book .cov{height:84px;background:linear-gradient(135deg,var(--cc),color-mix(in srgb,var(--cc) 55%,#000));position:relative;padding:12px 14px;color:#fff}
+.book .cov .t{font-size:11px;opacity:.85;font-weight:500}.book .cov h3{margin:4px 0 0;font-size:16px;font-weight:600;letter-spacing:-.01em}
+.book .bd{padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.book .st{display:flex;gap:12px;font-size:12px;color:var(--text-2)}.book .st b{color:var(--text)}
+.bar{height:6px;border-radius:6px;background:var(--surface-2);overflow:hidden}.bar i{display:block;height:100%;background:var(--cc)}
+.book .rec{font-size:12.5px;color:var(--text-3);display:flex;gap:6px;align-items:center}
+.book.new{border:1.5px dashed var(--border);background:none;box-shadow:none;display:grid;place-items:center;color:var(--text-3);font-weight:500;min-height:190px}
+.review{display:flex;flex-direction:column;gap:12px}
+.fc{border-radius:16px;background:var(--surface);border:1px solid var(--soft);box-shadow:var(--sh-lg);padding:22px;display:flex;flex-direction:column;gap:12px;min-height:280px}
+.fc .q{font-size:19px;font-weight:600;line-height:1.35;letter-spacing:-.01em}
+.fc .a{border-top:1px dashed var(--border);padding-top:12px;font-size:14px;line-height:1.6;color:var(--text-2)}
+.fc .from{font-size:12px;color:var(--text-3);display:flex;gap:6px;align-items:center}
+.rate{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:auto}
+.rate span{height:38px;border-radius:9px;border:1px solid var(--border);display:grid;place-items:center;font-size:12.5px;font-weight:500;line-height:1.15;text-align:center;background:var(--surface)}
+.rate span small{display:block;font-size:10.5px;color:var(--text-3);font-weight:400}
+.recent .r{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--soft);font-size:13px}.recent .r:last-child{border:0}
+.recent .r small{color:var(--text-3);font-size:12px;display:block}
+.clip{display:flex;gap:10px;align-items:center;border:1.5px dashed var(--border);border-radius:12px;padding:12px 14px;color:var(--text-2);font-size:13px}
+.clip .i{color:var(--accent)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const I = (n, c='') => `<svg class="i ${c}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">${LUCIDE[n]||''}</svg>`;
+const shell = (inner, lbl, nopage) => `<section class="frame"><nav class="rail"><div class="logo"></div>${['layout-dashboard','sticky-note','notebook-pen'].map(i=>`<b>${I(i)}</b>`).join('')}<b class="on">${I('book-open')}</b><hr>${['folder-open'].map(i=>`<b>${I(i)}</b>`).join('')}<hr>${['wrench','file-search','binary','cloud','flag','list-checks'].map(i=>`<b>${I(i)}</b>`).join('')}</nav>
+  <div class="main"><div class="top"><div class="search">${I('search')}Search everything — cases, evidence, notes, notebooks…</div><span class="sp"></span><button class="btn pri">${I('plus')}Capture</button></div>${inner}</div><div class="lbl">${lbl}</div></section>`;
+
+/* 1 — editor */
+const tree = `<aside class="tree">
+  <div class="th">${I('book-open')}<h2>Notebook</h2><span class="sp"></span><button class="btn sm ghost">${I('plus','sm')}</button></div>
+  <div class="tsearch">${I('search','sm')}Search notes, code, captions…</div>
+  <div class="nbk" style="--cc:#6366f1"><span class="cv"></span>Active Directory course<small>24</small></div>
+  <div class="sec">${I('chevron-right','sm')}Enumeration</div>
+  <div class="sec">${I('chevron-down','sm')}Kerberos attacks</div>
+  <div class="pg">AS-REP roasting<small>2d</small></div>
+  <div class="pg on">Kerberoasting<small>now</small></div>
+  <div class="pg">Golden &amp; silver tickets</div>
+  <div class="pg">Delegation abuse</div>
+  <div class="sec">${I('chevron-right','sm')}Lateral movement</div>
+  <div class="nbk" style="--cc:#0d9488;margin-top:6px"><span class="cv"></span>Web app labs<small>41</small></div>
+  <div class="nbk" style="--cc:#ea580c"><span class="cv"></span>DFIR study<small>17</small></div>
+  <div class="nbk" style="--cc:#0284c7"><span class="cv"></span>Cloud security<small>12</small></div>
+  <div class="more"><div class="sec" style="padding-left:8px">${I('upload','sm')}Import Markdown, HTML or Word</div></div>
+</aside>`;
+const doc = `<div class="doc">
+  <div class="dtb">
+    <div class="g"><span class="tb t on">Text ${I('chevron-down','sm')}</span></div>
+    <div class="g"><span class="tb">B</span><span class="tb" style="font-style:italic">I</span><span class="tb" style="text-decoration:underline">U</span><span class="tb" style="background:#fde68a;color:#78350f">A</span></div>
+    <div class="g"><span class="tb">${I('list','sm')}</span><span class="tb">${I('list-checks','sm')}</span><span class="tb">${I('code','sm')}</span><span class="tb">${I('table','sm')}</span></div>
+    <div class="g"><span class="tb">${I('image','sm')}</span><span class="tb">${I('link','sm')}</span><span class="tb">${I('lightbulb','sm')}</span><span class="tb t">${I('sparkles','sm')}Flashcard</span></div>
+    <span class="saved">${I('check','sm')}Saved</span>
+    <button class="btn sm" style="margin-left:10px">${I('download','sm')}Export</button>
+  </div>
+  <div class="page">
+    <div class="bc">Active Directory course ${I('chevron-right','sm')} Kerberos attacks</div>
+    <h1>Kerberoasting</h1>
+    <div class="meta"><span class="pill b">${I('sparkles','sm')}Learning</span><span class="pill">kerberos</span><span class="pill">credential-access</span><span class="pill mono">T1558.003</span><span class="src">${I('link','sm')}Course module 7 · Lab 3</span><span class="pill">${I('clock','sm')}8 Nov 2026</span></div>
+    <p>Any domain user can ask a domain controller for a service ticket to an account that has an SPN. Part of that ticket is encrypted with the <mark>service account's password hash</mark>, so it can be cracked offline — no traffic to the target, no lockouts.</p>
+    <h3>Request the tickets</h3>
+    <div class="code"><span class="lang">bash</span><span class="p">$</span> GetUserSPNs.py corp.example/j.okafor -request -outputfile hashes.txt
+<span class="p">$</span> hashcat -m 13100 hashes.txt rockyou.txt</div>
+    <figure class="shot"><div class="img"><div class="wb"><i></i><i></i><i></i></div>ServicePrincipalName              Name        MemberOf
+--------------------------------  ----------  -------------------------------
+MSSQLSvc/sql01.corp.example:1433  <span class="y">svc_sql</span>     CN=Domain Admins,CN=Users,DC=corp…
+HTTP/intranet.corp.example        svc_web     CN=Web,CN=Users,DC=corp,DC=example
+<span class="gr">$krb5tgs$23$*svc_sql$CORP.EXAMPLE$MSSQLSvc/sql01…</span>
+<div class="hl"></div></div><figcaption>${I('image','sm')}Lab 3 — svc_sql is a Domain Admin with an SPN: the jackpot. <span class="mono" style="margin-left:auto">pasted · 1240×620</span></figcaption></figure>
+    <div class="call">${I('lightbulb')}<div><b>Key takeaway</b><span>RC4 tickets (etype 23) crack far faster than AES. Defenders: alert on event 4769 with ticket encryption 0x17, and give service accounts long random passwords or gMSAs.</span></div></div>
+    <div class="linkcard"><span class="fav">${I('globe','sm')}</span><div><b>Kerberoasting — MITRE ATT&amp;CK T1558.003</b><small>attack.mitre.org</small></div><span class="sp"></span>${I('arrow-up-right','sm')}</div>
+  </div>
+</div>`;
+const side = `<aside class="side">
+  <div><h4>${I('list','sm')}On this page</h4><div class="outline"><a>Kerberoasting</a><a class="on s">Request the tickets</a><a class="s">Crack offline</a><a class="s">Detect &amp; defend</a></div></div>
+  <div><h4>${I('sparkles','sm')}Flashcards <span class="pill" style="margin-left:auto">3</span></h4>
+    <div class="qa"><b>Which hashcat mode cracks TGS-REP (RC4)?</b><span>13100</span></div>
+    <div class="qa" style="margin-top:8px"><b>Event that shows a service ticket request?</b><span>4769 — look for encryption type 0x17</span></div></div>
+  <div><h4>${I('link','sm')}Linked in OSINTrix</h4>
+    <div class="lk"><span class="ic">${I('book-open','sm')}</span><div>4769 · Kerberos service ticket<small>Reference</small></div></div>
+    <div class="lk"><span class="ic">${I('file-code','sm')}</span><div>Kerberoasting: RC4 TGS requests<small>Detection rule</small></div></div>
+    <div class="lk"><span class="ic">${I('flag','sm')}</span><div>“Roasted” — write-up<small>CTF · Sample CTF 2026</small></div></div></div>
+  <div><h4>${I('paperclip','sm')}Attachments</h4><div class="att">${I('image','sm')}lab3-spns.png <span class="sp"></span>412 KB</div><div class="att">${I('file-text','sm')}hashes.txt <span class="sp"></span>2 KB</div></div>
+</aside>`;
+const f1 = `<div class="nb">${tree}${doc}${side}</div>`;
+
+/* 2 — export */
+const fmt = (on, c, tag, n, d, to) => `<div class="fmt${on ? ' on' : ''}"><span class="ic" style="background:${c}">${tag}</span><div><b>${n}</b><small>${d}</small><div class="to">${to.map(t => `<span>${t}</span>`).join('')}</div></div></div>`;
+const chk = (on, t) => `<div class="chk"><i class="${on ? 'on' : ''}">${on ? I('check','sm') : ''}</i>${t}</div>`;
+const f2 = `<div class="nb" style="filter:saturate(.9)">${tree}${doc}${side}</div><div class="dim"></div>
+<div class="dlg"><header>${I('download')}<h2>Export “Kerberos attacks”</h2><span class="sp"></span>${I('x')}</header>
+  <div class="body"><div class="opts">
+    <div><div class="caps" style="margin-bottom:6px">What</div><div class="seg"><span>This page</span><span class="on">Section · 4 pages</span><span>Whole notebook · 24</span></div></div>
+    <div><div class="caps" style="margin-bottom:8px">Format</div><div class="fmts">
+      ${fmt(true, '#2563eb', 'DOCX', 'Word document', 'Headings, images, code and tables kept. One file.', ['Word', 'Google Docs', 'OneNote'])}
+      ${fmt(false, '#475569', 'HTML', 'Web page', 'A single file with images inside. Opens anywhere, pastes cleanly.', ['OneNote', 'Docs', 'Confluence'])}
+      ${fmt(false, '#0f172a', 'MD', 'Markdown + images', 'A .zip with one .md per page and an images folder.', ['Obsidian', 'Notion', 'GitHub'])}
+      ${fmt(false, '#c81e1e', 'PDF', 'PDF', 'Print-ready, with a table of contents.', ['Share', 'Archive'])}
+    </div></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px">${chk(true, 'Images and screenshots')}${chk(true, 'Source links and dates')}${chk(true, 'Flashcards as a Q&amp;A table')}${chk(false, 'Attachments (in a .zip)')}${chk(true, 'Table of contents')}${chk(false, 'Tags and ATT&amp;CK IDs')}</div>
+    <div class="tip">${I('info','sm')}<span><b>OneNote:</b> use <i>Copy as rich text</i> and paste into a page, or <i>Insert → File printout</i> with the Word file. <b>Google Docs:</b> upload the Word file and open it with Docs.</span></div>
+  </div>
+  <div class="prev"><div class="caps" style="margin-bottom:8px">Preview</div><div class="paper"><h1>Kerberos attacks</h1><div class="m">Active Directory course · 4 pages · exported 8 Nov 2026</div>
+    <h3>Kerberoasting</h3><div>Any domain user can ask a domain controller for a service ticket to an account that has an SPN…</div><div class="c">$ GetUserSPNs.py corp.example/j.okafor -request</div><div class="im"></div><div style="color:#666;font-size:9px">Lab 3 — svc_sql is a Domain Admin with an SPN</div>
+    <h3>Flashcards</h3><div>Which hashcat mode cracks TGS-REP (RC4)? — 13100</div></div></div></div>
+  <footer><button class="btn ghost">${I('copy','sm')}Copy as rich text</button><span class="sp"></span><button class="btn">Cancel</button><button class="btn pri">${I('download','sm')}Download kerberos-attacks.docx</button></footer></div>`;
+
+/* 3 — library + review */
+const book = (c, t, n, p, d, s, r) => `<div class="book" style="--cc:${c}"><div class="cov"><div class="t">${t}</div><h3>${n}</h3></div><div class="bd"><div class="st"><span><b>${p}</b> pages</span><span><b>${d}</b> flashcards due</span><span><b>${s}</b> screenshots</span></div><div class="bar"><i style="width:${r}%"></i></div><div class="rec">${I('clock','sm')}Edited ${['now','2 days ago','last week','3 weeks ago','yesterday'][n.length % 5]}</div></div></div>`;
+const f3 = `<div class="lib"><div class="h"><div><h1>Notebook</h1><p>What you learn from courses, labs and reading — with screenshots, links and code — and ready to export.</p></div><span class="sp"></span><button class="btn">${I('upload','sm')}Import</button><button class="btn pri">${I('plus','sm')}New notebook</button></div>
+  <div class="lgrid"><div style="display:flex;flex-direction:column;gap:14px;min-height:0">
+    <div class="clip">${I('image')}<span><b>Paste a screenshot or a link anywhere</b> — Ctrl V adds it to the open page, with the source and time. Drop a file to attach it.</span></div>
+    <div class="books">
+      ${book('#6366f1', 'Course · 62% reviewed', 'Active Directory course', 24, 12, 31, 62)}
+      ${book('#0d9488', 'Labs · 80% reviewed', 'Web app labs', 41, 5, 58, 80)}
+      ${book('#ea580c', 'Study · 35% reviewed', 'DFIR study', 17, 9, 22, 35)}
+      ${book('#0284c7', 'Course · 20% reviewed', 'Cloud security', 12, 7, 9, 20)}
+      ${book('#be185d', 'Reading', 'Malware analysis notes', 8, 0, 6, 100)}
+      <div class="book new"><span style="display:flex;gap:8px;align-items:center">${I('plus')}New notebook</span></div>
+    </div>
+    <div class="card recent" style="padding:6px 16px"><div class="r">${I('file-text','sm')}<div>Kerberoasting<small>Active Directory course · Kerberos attacks · edited now</small></div></div><div class="r">${I('file-text','sm')}<div>SSRF to cloud metadata<small>Web app labs · Server-side · edited 2 days ago</small></div></div></div>
+  </div>
+  <div class="review"><div class="caps" style="display:flex;align-items:center;gap:8px">${I('sparkles','sm')}Review · 33 flashcards due today <span class="sp"></span><span class="pill">7 / 33</span></div>
+    <div class="fc"><div class="from">${I('book-open','sm')}Active Directory course · Kerberoasting</div><div class="q">Which Windows event shows a service ticket request, and what makes it suspicious for Kerberoasting?</div>
+      <div class="a"><b style="color:var(--text)">4769</b> — a burst of requests from one account, especially with ticket encryption type <span class="mono">0x17</span> (RC4).</div>
+      <div class="rate"><span>Again<small>1 min</small></span><span>Hard<small>1 day</small></span><span style="border-color:var(--accent-line);background:var(--accent-soft)">Good<small>4 days</small></span><span>Easy<small>9 days</small></span></div></div>
+    <div class="tip">${I('lightbulb','sm')}<span>Turn any line into a flashcard with <b>Q:</b> and <b>A:</b>, or select text and press the Flashcard button. Reviews space themselves out like Anki.</span></div>
+  </div></div></div>`;
+
+document.getElementById('root').innerHTML = shell(f1, '1 · Page editor') + shell(f2, '2 · Export') + shell(f3, '3 · Library and review');
+</script>
+</body></html>

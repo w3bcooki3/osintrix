@@ -1,10 +1,10 @@
 // End-to-end checks for OSINTrix. Every test opens the real app from disk, like a user would.
 const { test, expect } = require('@playwright/test');
-const { open, capture, fixture, noErrors } = require('./helpers');
+const { open, capture, fixture, noErrors, APP } = require('./helpers');
 
 const ROUTES = ['#/home', '#/cases', '#/cloud', '#/pad', '#/whatsnew', '#/case/c-lantern/overview', '#/case/c-lantern/vault', '#/case/c-lantern/entities', '#/case/c-lantern/timeline',
   '#/case/c-lantern/graph', '#/case/c-lab/map', '#/case/c-lantern/questions', '#/case/c-lantern/report', '#/toolbox', '#/queries', '#/detections',
-  '#/notes', '#/playbooks', '#/ctf', '#/lab', '#/decoder', '#/feeds', '#/watch', '#/entities', '#/reference', '#/trash', '#/security', '#/help', '#/settings'];
+  '#/notes', '#/notebook', '#/playbooks', '#/ctf', '#/lab', '#/decoder', '#/feeds', '#/watch', '#/entities', '#/reference', '#/trash', '#/security', '#/help', '#/settings'];
 
 test('every screen draws without errors @phone', async ({ page }) => {
   const errors = await open(page);
@@ -197,13 +197,14 @@ test('auto-decode finds layered and uncommon encodings', async ({ page }) => {
 test('clicks every control on the main screens without an error', async ({ page }) => {
   test.setTimeout(240_000);
   const errors = await open(page);
-  const SKIP = new Set(['exportAll', 'resetDemo', 'freshStart', 'removeSample', 'importAll', 'importCase', 'secOn', 'secLock', 'secOff', 'secChange', 'capFiles', 'capLog', 'capWeb', 'attAdd', 'attOpen', 'attDl', 'rsAll', 'printReport', 'helpWelcome', 'refFind', 'pbGo', 'wuImport', 'placesKml', 'placesCsv', 'wuExportAll', 'wuExport']);
-  for (const r of ['#/home', '#/case/c-lantern/overview', '#/case/c-lantern/entities', '#/case/c-lantern/timeline', '#/case/c-lantern/graph', '#/case/c-lab/map', '#/case/c-lantern/questions', '#/toolbox', '#/lab', '#/security', '#/reference', '#/playbooks', '#/help', '#/cloud', '#/whatsnew', '#/pad', '#/ctf', '#/detections']) {
-    await page.evaluate(h => { location.hash = h; renderMain(); }, r); await page.waitForTimeout(200);
+  const SKIP = new Set(['exportAll', 'resetDemo', 'freshStart', 'removeSample', 'importAll', 'importCase', 'secOn', 'secLock', 'secOff', 'secChange', 'capFiles', 'capLog', 'capWeb', 'attAdd', 'attOpen', 'attDl', 'rsAll', 'printReport', 'helpWelcome', 'refFind', 'pbGo', 'wuImport', 'placesKml', 'placesCsv', 'wuExportAll', 'wuExport', 'nbImport', 'nbAttach', 'nbMediaDl', 'nbLinkGo']);
+  for (let r of ['#/home', '#/case/c-lantern/overview', '#/case/c-lantern/entities', '#/case/c-lantern/timeline', '#/case/c-lantern/graph', '#/case/c-lab/map', '#/case/c-lantern/questions', '#/toolbox', '#/lab', '#/security', '#/reference', '#/playbooks', '#/help', '#/cloud', '#/whatsnew', '#/pad', '#/ctf', '#/detections', '#/notebook', 'nb-page']) {
+    const nbp = r === 'nb-page'; if (nbp) r = '#/notebook';
+    await page.evaluate(([h, nbp]) => { if (h === '#/notebook'){ UI.nbView = nbp ? 'page' : 'lib'; UI.nbPage = DB.nb.pages[2].id; } location.hash = h; renderMain(); }, [r, nbp]); await page.waitForTimeout(200);
     const acts = await page.evaluate(() => [...document.querySelectorAll('#main [data-act]')].map((e, i) => [i, e.dataset.act]));
     for (const [i, a] of acts.slice(0, 60)) {
       if (SKIP.has(a)) continue;
-      await page.evaluate(([h, i, a]) => { if (location.hash !== h) location.hash = h; renderMain(); const e = document.querySelectorAll('#main [data-act]')[i]; if (e && e.dataset.act === a) e.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })); }, [r, i, a]);
+      await page.evaluate(([h, i, a, nbp]) => { closeDlg(); if (h === '#/notebook'){ UI.nbView = nbp ? 'page' : 'lib'; if (!nbPage(UI.nbPage)) UI.nbPage = DB.nb.pages[0].id; } if (location.hash !== h) location.hash = h; renderMain(); const e = document.querySelectorAll('#main [data-act]')[i]; if (e && e.dataset.act === a) e.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })); }, [r, i, a, nbp]);
       await page.waitForTimeout(40); await page.keyboard.press('Escape');
     }
   }
@@ -422,13 +423,15 @@ test('no serious accessibility problems on the main screens, light and dark', as
   const AxeBuilder = require('@axe-core/playwright').default;
   const errors = await open(page, '#/home');
   const routes = ['#/home', '#/case/c-lantern/graph', '#/case/c-lantern/timeline', '#/case/c-lantern/entities', '#/case/c-lab/map', '#/case/c-lantern/questions', '#/case/c-lantern/overview', '#/case/c-lantern/vault',
-    '#/toolbox', '#/queries', '#/lab', '#/cloud', '#/ctf', '#/reference', '#/playbooks', '#/feeds', '#/detections', '#/notes', '#/security', '#/whatsnew', '#/help', '#/settings', 'ctf-ws', 'ctf-cheats', 'ctf-wu', 'welcome'];
+    '#/toolbox', '#/queries', '#/lab', '#/cloud', '#/ctf', '#/reference', '#/playbooks', '#/feeds', '#/detections', '#/notes', '#/security', '#/whatsnew', '#/help', '#/settings', 'ctf-ws', 'ctf-cheats', 'ctf-wu', 'nb-page', 'nb-export', '#/notebook', 'welcome'];
   const found = [];
   for (const theme of ['light', 'dark']) {
     await page.evaluate(t => { DB.prefs.theme = t; applyPrefs(); renderAll(); }, theme);
     for (const r of routes) {
       await page.evaluate(r => { closeWelcome();
         if (r === 'welcome') return showWelcome();
+        if (r === 'nb-page' || r === 'nb-export'){ closeDlg(); UI.nbPage = DB.nb.pages.find(p => p.title === 'Kerberoasting').id; UI.nbView = 'page'; location.hash = '#/notebook'; setTimeout(() => { renderMain(); if (r === 'nb-export') nbExportDlg('page', UI.nbPage); }, 30); return; }
+        if (r === '#/notebook'){ closeDlg(); UI.nbView = 'lib'; }
         if (r.startsWith('ctf-')) { location.hash = '#/ctf'; UI.ctfTab = r === 'ctf-ws' ? 'board' : r === 'ctf-cheats' ? 'cheats' : 'writeups'; UI.ctfSel = r === 'ctf-ws' ? DB.ctf.chals[0].id : null; setTimeout(renderMain, 30); return; }
         location.hash = r; }, r);
       await page.waitForTimeout(450);
@@ -481,5 +484,182 @@ test('an improved built-in rule replaces an unedited old copy, but never one you
     return { upgraded: DB.rules.find(x => x.id === 'sig-2026-cred-010').code.includes('filter_system'), kept: DB.rules.find(x => x.id === 'pk-sig-001').code };
   });
   expect(r.upgraded).toBe(true); expect(r.kept).toBe('my own edit');
+  noErrors(errors);
+});
+
+test('notebook: write, paste a picture, flashcards, review, export to Word and Markdown, import back', async ({ page }) => {
+  const fs = require('fs');
+  const errors = await open(page, '#/notebook');
+  await expect(page.locator('.nbk')).toHaveCount(3);
+  await page.evaluate(() => NB_ACTS.nbPageNew(DB.nb.sections.find(s => s.name === 'Kerberos attacks').id));
+  await page.keyboard.type('Delegation abuse'); await page.keyboard.press('Enter');
+  await page.keyboard.type('## Unconstrained'); await page.keyboard.press('Enter');
+  await page.keyboard.type('- first'); await page.keyboard.press('Enter'); await page.keyboard.type('second'); await page.keyboard.press('Enter'); await page.keyboard.press('Enter');
+  await page.keyboard.type('``` '); await page.keyboard.type('Get-ADComputer -Filter *'); await page.keyboard.press('Enter'); await page.keyboard.type('next line'); await page.keyboard.press('Enter'); await page.keyboard.press('Enter');
+  await page.keyboard.type('Q: What does unconstrained delegation store?'); await page.keyboard.press('Enter'); await page.keyboard.type('A: The TGTs of users who connect.');
+  await page.evaluate(() => { const bin = Uint8Array.from(atob(NB_DEMO_SHOT.data.split(',')[1]), c => c.charCodeAt(0)), dt = new DataTransfer(); dt.items.add(new File([bin], 'shot.png', { type: 'image/png' }));
+    $('nbEd').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); });
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { const dt = new DataTransfer(); dt.setData('text/html', '<p><span style="font-weight:700">Bold</span> <a href="javascript:alert(1)">bad</a><img src=x onerror=alert(1)><script>alert(1)</script></p>'); dt.setData('text/plain', 'x');
+    $('nbEd').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); });
+  await page.waitForTimeout(900);
+  const pg = await page.evaluate(() => { const p = nbPage(UI.nbPage); return { title: p.title, html: p.html, cards: nbInfo(p).cards.length, imgs: nbInfo(p).imgs.length }; });
+  expect(pg.title).toBe('Delegation abuse');
+  expect(pg.html).toContain('<h3>Unconstrained</h3>'); expect(pg.html).toContain('<li>first</li><li>second</li>'); expect(pg.html).toContain('<pre>Get-ADComputer -Filter *\nnext line</pre>');
+  expect(pg.html).toContain('<b>Bold</b>'); expect(pg.html).not.toMatch(/javascript:|onerror|<script/);
+  expect(pg.cards).toBe(1); expect(pg.imgs).toBe(1);
+  await expect(page.locator('#nbSide')).toContainText('What does unconstrained delegation store?');
+  // review from the library: reveal, rate Good
+  await page.click('[data-act=nbLib]');
+  await page.keyboard.press('Space'); await page.keyboard.press('3');
+  expect(await page.evaluate(() => Object.values(DB.nb.cards).filter(c => c.reps > 0).length)).toBeGreaterThan(0);
+  // Word export: a real .docx with the picture inside
+  await page.evaluate(() => nbOpen(DB.nb.pages.find(p => p.title === 'Kerberoasting').id));
+  await page.click('.nbbar [data-act=nbExport]');
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('[data-act=nbxGo]')]);
+  expect(dl.suggestedFilename()).toBe('kerberoasting.docx');
+  const file = await dl.path(), bytes = fs.readFileSync(file), txt = bytes.toString('latin1');
+  expect(bytes.slice(0, 2).toString()).toBe('PK');
+  for (const part of ['[Content_Types].xml', 'word/document.xml', 'word/styles.xml', 'word/numbering.xml', 'word/media/image1.png']) expect(txt).toContain(part);
+  expect(txt).toContain('Request the tickets'); expect(txt).toContain('w:pStyle w:val="Heading1"');
+  // Markdown export of the section: a zip with one .md per page and the picture
+  await page.click('.nbbar [data-act=nbExport]'); await page.click('[data-act=nbxScope][data-v=sec]'); await page.click('[data-act=nbxFmt][data-v=md]');
+  const [md] = await Promise.all([page.waitForEvent('download'), page.click('[data-act=nbxGo]')]);
+  const mtxt = fs.readFileSync(await md.path()).toString('utf8');
+  expect(md.suggestedFilename()).toBe('kerberos-attacks-markdown.zip'); expect(mtxt).toContain('kerberos-attacks/kerberoasting.md'); expect(mtxt).toContain('## Request the tickets'); expect(mtxt).toContain('| 13100 |');
+  // the Word file imports back as a page with its picture and flashcards
+  const back = await page.evaluate(async b64 => { const r = await nbFromDocx(Uint8Array.from(atob(b64), c => c.charCodeAt(0))); return { title: r.title, img: /<img data-m=/.test(r.html), q: (r.html.match(/<p>Q: /g) || []).length }; }, bytes.toString('base64'));
+  expect(back).toEqual({ title: 'Kerberoasting', img: true, q: 3 });
+  // reload keeps everything
+  await page.reload(); await expect.poll(() => page.evaluate(() => !!DB && !!DB.nb && DB.nb.pages.some(p => p.title === 'Delegation abuse'))).toBe(true);
+  noErrors(errors);
+});
+
+test('notebook cleaning: hostile HTML never survives, and nothing runs', async ({ page }) => {
+  const errors = await open(page, '#/notebook');
+  const V = ['<img src=x onerror=window.__x=1>', '<svg onload=window.__x=1>', '<script>window.__x=1</script>', '<a href=" JaVaScRiPt:window.__x=1">a</a>', '<a href="java&#x09;script:x">a</a>',
+    '<a href="data:text/html,<script>1</script>">a</a>', '<iframe src="javascript:x"></iframe>', '<math><mtext><table><mglyph><style><img src=x onerror=window.__x=1>', '<noscript><p title="</noscript><img src=x onerror=window.__x=1>">',
+    '<p style="background:url(http://evil)">x</p>', '<form action="http://evil"><input></form>', '<div class="nb-link"><a href="javascript:alert(1)">x</a></div>', '<img data-m="__proto__">',
+    '<img data-m="constructor" src="data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+">', '<ul class="nb-check evil"><li class="done x" onclick=x>t</li></ul>', '<base href="http://evil/">', '<details open ontoggle=window.__x=1>', '<p>' + '<b>'.repeat(3000) + 'deep</p>'];
+  const bad = await page.evaluate(V => { const out = [];
+    for (const v of V) { const d = document.createElement('div'); d.innerHTML = nbClean(v, { src: true, media: true });
+      for (const el of d.querySelectorAll('*')) { if (!/^(P|H2|H3|H4|B|I|U|S|MARK|CODE|SUB|SUP|PRE|UL|OL|LI|A|BR|HR|BLOCKQUOTE|TABLE|TR|TH|TD|FIGURE|FIGCAPTION|IMG|DIV|SMALL|TBODY)$/.test(el.tagName)) out.push(v + ' tag ' + el.tagName);
+        for (const a of el.attributes) { if (/^on|^style$/i.test(a.name)) out.push(v + ' ' + a.name); if (a.name === 'href' && !/^(https?:|mailto:)/i.test(a.value)) out.push(v + ' href'); if (a.name === 'src' && !/^(data:image\/(png|jpeg|gif|webp);base64,|blob:)/.test(a.value)) out.push(v + ' src');
+          if (a.name === 'class' && !['nb-link', 'nb-call', 'nb-check', 'done'].includes(a.value)) out.push(v + ' class'); } } }
+    const pg = nbNewPage(DB.nb.sections[0].id, { html: nbClean(V.join('')) }); nbOpen(pg.id, { full: true }); return out; }, V);
+  await page.waitForTimeout(500);
+  expect(bad).toEqual([]); expect(await page.evaluate(() => window.__x)).toBeUndefined();
+  // a backup with hostile notebook data is cleaned on import
+  const clean = await page.evaluate(() => { const prev = DB.nb; DB.nb = { books: [{ id: 'nb-x', name: '<b>x</b>'.repeat(50), color: 'red;background:url(http://evil)', kind: 'Hack' }], sections: [{ id: 'ns-x', bookId: 'nb-x', name: 'S' }, { id: 'ns-y', bookId: 'nope' }],
+      pages: [{ id: 'pg-x', sectionId: 'ns-x', title: 7, html: '<img src=x onerror=alert(1)><p>ok</p>', tags: ['a', 5, {}], att: ['m-none'] }], media: { '__proto__': {}, 'm-ok': { type: 'image/png', name: 'a', data: 'javascript:1' } }, cards: { 'bad key': {} } };
+    nbSanitize(); const r = JSON.parse(JSON.stringify(DB.nb)); DB.nb = prev; return r; });
+  expect(clean.books[0].color).toMatch(/^#/); expect(clean.books[0].name.length).toBeLessThanOrEqual(120); expect(clean.books[0].kind).toBe('Other');
+  expect(clean.sections.length).toBe(1); expect(clean.pages[0].html).toBe('<p>ok</p>'); expect(clean.pages[0].title).toBe('Untitled'); expect(clean.pages[0].tags).toEqual(['a']); expect(clean.pages[0].att).toEqual([]);
+  expect(Object.keys(clean.media)).toEqual(['m-ok']); expect(clean.media['m-ok'].data).toBeUndefined(); expect(clean.cards).toEqual({});
+  noErrors(errors);
+});
+
+test('notebook pictures live outside the save, survive closing the tab, and travel in backups', async ({ page: first, context }) => {
+  const fs = require('fs');
+  const errors = await open(first, '#/notebook'); let page = first;
+  await page.evaluate(() => NB_ACTS.nbPageNew(DB.nb.sections[0].id)); await page.keyboard.press('Enter');
+  await page.evaluate(() => { const bin = Uint8Array.from(atob(NB_DEMO_SHOT.data.split(',')[1]), c => c.charCodeAt(0)), dt = new DataTransfer(); dt.items.add(new File([bin], 'lab.png', { type: 'image/png' }));
+    $('nbEd').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); });
+  await expect(page.locator('#nbEd img[src^="blob:"]')).toHaveCount(1);
+  // close the tab straight after typing, then open the app again (the test helper's start-up script would race a plain reload)
+  await page.keyboard.type('typed just before closing'); await page.close({ runBeforeUnload: true });
+  page = await context.newPage(); page.on('pageerror', e => errors.push('pageerror: ' + e.message)); await page.goto(APP + '#/notebook');
+  await expect.poll(() => page.evaluate(() => typeof DB !== 'undefined' && !!DB && !!DB.nb && DB.nb.pages.some(p => p.html.includes('typed just before closing')))).toBe(true);
+  await page.evaluate(() => { if (typeof closeWelcome === 'function') closeWelcome(); });
+  const st = await page.evaluate(async () => { const m = Object.values(DB.nb.media).find(x => x.name === 'lab.png'); return { inline: !!m.data, stored: !!(await IDB.get('nbm:' + m.id)), inSave: JSON.stringify(DB).includes('iVBOR') }; });
+  expect(st).toEqual({ inline: false, stored: true, inSave: false });
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.evaluate(() => exportEverything(false))]);
+  const bk = JSON.parse(fs.readFileSync(await dl.path(), 'utf8')); expect(Object.keys(bk.nbfiles).length).toBe(1);
+  await page.evaluate(async () => { for (const k of Object.keys(DB.nb.media)) await IDB.del('nbm:' + k); });
+  const [fc] = await Promise.all([page.waitForEvent('filechooser'), page.evaluate(() => clickAct('importAll'))]); await fc.setFiles(await dl.path());
+  await page.click('[data-act=confirmOk]');
+  await expect.poll(() => page.evaluate(async () => { const m = Object.values(DB.nb.media).find(x => x.name === 'lab.png'); return !!(m && await IDB.get('nbm:' + m.id)); })).toBe(true);
+  noErrors(errors);
+});
+
+test('storage: real usage, early warnings, refusing files that do not fit, and clean-up', async ({ page }) => {
+  const errors = await open(page, '#/settings');
+  await expect(page.locator('#storage .sto-t')).toBeVisible();
+  await page.evaluate(async () => { await IDB.set('file:f-orphan', new Blob(['x'])); await IDB.set('nbm:m-orphan', new Blob(['y'])); await storageRefresh(); });
+  await expect(page.locator('#storage')).toContainText('Leftover files nothing uses (2)');
+  await page.click('[data-act=stoOrphans]'); await page.click('[data-act=confirmOk]');
+  await expect.poll(() => page.evaluate(async () => (await IDB.keys()).filter(k => /orphan/.test(k)).length)).toBe(0);
+  await page.evaluate(async () => { storageEstimate = async () => { STORE.quota = 500e6; STORE.usage = 450e6; return STORE; }; await storageCheck(); });
+  await expect(page.locator('#saved')).toContainText('Storage 90% full');
+  expect(await page.evaluate(() => nbRoomFor(80e6))).toBe(false);
+  await page.evaluate(() => { storageOK = false; paintSaved(); }); await expect(page.locator('#saved')).toContainText('Not saved');
+  noErrors(errors);
+});
+
+test('a large workspace keeps the last typing when the tab closes (journal)', async ({ page: first, context }) => {
+  const errors = await open(first, '#/notebook'); let page = first;
+  await page.evaluate(() => { const h = DB.nb.pages[2].html; for (let i = 0; i < 900; i++) nbNewPage(DB.nb.sections[0].id, { title: 'P' + i, html: h }); flush(); });
+  await expect.poll(() => page.evaluate(() => STORE.ls)).toBe(false);          // too big for the instant localStorage copy
+  await page.evaluate(() => NB_ACTS.nbPageNew(DB.nb.sections[0].id)); await page.keyboard.press('Enter');
+  await page.keyboard.type('last words before closing'); await page.close({ runBeforeUnload: true });
+  page = await context.newPage(); page.on('pageerror', e => errors.push('pageerror: ' + e.message)); await page.goto(APP + '#/notebook');
+  await expect.poll(() => page.evaluate(() => typeof DB !== 'undefined' && !!DB && !!DB.nb && DB.nb.pages.some(p => p.html.includes('last words before closing'))), { timeout: 15000 }).toBe(true);
+  noErrors(errors);
+});
+
+test('leaving with a change not yet on disk asks first; a saved workspace never asks', async ({ page: first, context }) => {
+  const errors = await open(first, '#/notebook'); let page = first;
+  await page.evaluate(() => encEnable('correct horse battery staple 9')); await page.waitForTimeout(1200);   // encrypted saves finish in the background
+  await page.evaluate(() => NB_ACTS.nbPageNew(DB.nb.sections[0].id)); await page.keyboard.press('Enter'); await page.keyboard.type('encrypted words');
+  let asked = false; page.on('dialog', async d => { asked = d.type() === 'beforeunload'; await d.dismiss(); });
+  await page.close({ runBeforeUnload: true });
+  await expect.poll(() => asked).toBe(true);
+  await expect.poll(() => page.evaluate(() => isDirty())).toBe(false);                       // the save finished while the browser asked
+  await expect(page.locator('#saved')).toContainText('Saved');
+  expect(await page.evaluate(() => DB.nb.pages.some(p => p.html.includes('encrypted words')))).toBe(true);
+  // nothing pending: closing does not ask
+  page.removeAllListeners('dialog'); let again = false; page.on('dialog', d => { again = true; d.accept(); });
+  await page.close({ runBeforeUnload: true }); await new Promise(r => setTimeout(r, 400)); expect(again).toBe(false);
+  noErrors(errors);
+});
+
+test('automatic backup to a folder: writes, keeps 7 days, pauses without permission, encrypts, restores', async ({ page }) => {
+  const errors = await open(page, '#/settings');
+  // a stand-in folder (headless browsers cannot show the real picker)
+  await page.evaluate(() => {
+    const files = new Map(); let perm = 'granted';
+    const dir = { kind: 'directory', name: 'OSINTrix backups', files, setPerm: p => perm = p,
+      queryPermission: async () => perm, requestPermission: async () => perm,
+      getFileHandle: async (n, o) => { if (!files.has(n) && !(o && o.create)) throw new DOMException('no', 'NotFoundError'); if (perm !== 'granted') throw new DOMException('no', 'NotAllowedError');
+        return { kind: 'file', createWritable: async () => { let buf = ''; return { write: async t => { buf += t; }, close: async () => { files.set(n, buf); } }; } }; },
+      entries: async function* () { for (const k of files.keys()) yield [k, { kind: 'file' }]; },
+      removeEntry: async n => { files.delete(n); } };
+    window.__dir = dir; window.showDirectoryPicker = async () => dir;
+    for (let i = 1; i <= 9; i++) files.set('osintrix-2020-01-0' + i + '.json', '{}');   // old daily copies
+    files.set('my-notes.txt', 'not ours');
+  });
+  await expect(page.locator('#storage')).toContainText('Automatic backup to a folder');
+  await page.click('[data-act=fbChoose]');
+  await expect(page.locator('#storage .fb-st')).toContainText('On');
+  const names = await page.evaluate(() => [...__dir.files.keys()].sort());
+  expect(names).toContain('osintrix-latest.json'); expect(names).toContain('my-notes.txt');
+  expect(names.filter(n => /^osintrix-\d{4}-\d{2}-\d{2}\.json$/.test(n)).length).toBe(7);           // today + the 6 newest old ones
+  const latest = await page.evaluate(() => JSON.parse(__dir.files.get('osintrix-latest.json')));
+  expect(latest.cases.length).toBeGreaterThan(0); expect(latest.nb.pages.length).toBeGreaterThan(0);
+  // a change is backed up automatically
+  await page.evaluate(() => { const p = fbGet(); p.every = 0; fbSet(p); DB.notes.push({ id: uid('n'), text: 'after the first backup', created: Date.now() }); mutate('note'); });
+  await expect.poll(() => page.evaluate(() => (__dir.files.get('osintrix-latest.json') || '').includes('after the first backup')), { timeout: 20000 }).toBe(true);
+  // permission withdrawn: paused, and Resume brings it back
+  await page.evaluate(async () => { __dir.setPerm('prompt'); DB.notes.push({ id: uid('n'), text: 'while paused', created: Date.now() }); mutate('note'); await fbRun(true); });
+  await expect(page.locator('#storage .fb-st')).toContainText('Paused');
+  await page.evaluate(() => __dir.setPerm('granted')); await page.click('[data-act=fbResume]');
+  await expect.poll(() => page.evaluate(() => (__dir.files.get('osintrix-latest.json') || '').includes('while paused'))).toBe(true);
+  // encrypted workspace: the backup is encrypted and opens with the passphrase
+  await page.evaluate(async () => { await encEnable('correct horse battery staple 9'); await fbRun(true); });
+  const env = await page.evaluate(() => JSON.parse(__dir.files.get('osintrix-latest.json')));
+  expect(env.enc).toBeTruthy(); expect(JSON.stringify(env)).not.toContain('while paused');
+  const back = await page.evaluate(async () => { const d = JSON.parse(__dir.files.get('osintrix-latest.json')); const key = await deriveKey('correct horse battery staple 9', b64d8(d.kdf.salt), d.kdf.iter); return JSON.parse(await openWith(key, d)).notes.some(n => n.text === 'while paused'); });
+  expect(back).toBe(true);
+  await page.click('[data-act=fbOff]'); await expect(page.locator('#storage [data-act=fbChoose]')).toBeVisible();
   noErrors(errors);
 });
