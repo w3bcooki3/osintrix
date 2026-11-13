@@ -7,7 +7,7 @@ const isNarrow = () => window.innerWidth < 1440;
 function renderMain(){
   const r = UI.route, el = $('main');
   const V = {security:viewSecurity, watch:viewWatch, trash:viewTrash, ctf:viewCTF, lab:viewLab, help:viewHelp, home:viewHome, cases:viewCases, toolbox:viewToolbox, entities:viewEntities, feeds:viewIntel, decoder:viewDecoder, reference:viewReference, settings:viewSettings,
-    detections:viewDetections, queries:viewQueries, notes:viewNotes, playbooks:viewPlaybooks, cloud:viewCloud, whatsnew:viewWhatsNew, pad:viewPad, notebook:viewNotebook};
+    detections:viewDetections, queries:viewQueries, notes:viewNotes, playbooks:viewPlaybooks, cloud:viewCloud, whatsnew:viewWhatsNew, pad:viewPad, notebook:viewNotebook, certs:viewCerts};
   if(cy && !(r.area === 'case' && r.tab === 'graph')){ cy.destroy(); cy = null; }
   const key = r.area + '/' + (r.tab || ''), sc = el.querySelector('.scroll'), keepY = renderMain.key === key && sc ? sc.scrollTop : 0; renderMain.key = key;
   try{ el.innerHTML = r.area === 'case' ? viewCase(r.tab) : (V[r.area] || viewHome)(); }
@@ -25,6 +25,7 @@ function renderMain(){
   if(r.area === 'whatsnew') bindWhatsNew();
   if(r.area === 'pad') bindPad();
   if(r.area === 'notebook') bindNotebook();
+  if(r.area === 'certs') bindCerts();
   if(r.area === 'settings') storageRefresh();
   if(r.area === 'detections') bindRuleEditor();
   if(r.area === 'case' && r.tab === 'entities') bindCaseEnts();
@@ -33,7 +34,7 @@ function renderMain(){
   radialHide(); layoutFocus();
 }
 function renderAll(){ document.documentElement.dataset.area = UI.route.area; renderNav(); renderMain(); renderInsp(); paintLock(); $('inspBtn').classList.toggle('on', UI.inspOpen); }
-const TITLES = {security:'Security', watch:'Watchlist', trash:'Trash', ctf:'CTF', lab:'Forensics kit', help:'Help', home:'Dashboard', cases:'Cases', toolbox:'Toolbox', entities:'Entities', feeds:'Threat Intel', decoder:'Decoder', reference:'Reference', settings:'Settings', detections:'Detections', queries:'Query library', notes:'Notes', playbooks:'Playbooks', library:'Library', cloud:'Cloud', whatsnew:"What's new", pad:"Scratchpad", notebook:'Notebook'};
+const TITLES = {security:'Security', watch:'Watchlist', trash:'Trash', ctf:'CTF', lab:'Forensics kit', help:'Help', home:'Dashboard', cases:'Cases', toolbox:'Toolbox', entities:'Entities', feeds:'Threat Intel', decoder:'Decoder', reference:'Reference', settings:'Settings', detections:'Detections', queries:'Query library', notes:'Notes', playbooks:'Playbooks', library:'Library', cloud:'Cloud', whatsnew:"What's new", pad:"Scratchpad", notebook:'Notebook', certs:'Certificates'};
 function onRoute(){
   UI.route = parseHash(); $('side').classList.remove('open');
   document.title = (UI.route.area === 'case' ? theCase().name.split(' — ')[0] + ' · ' + CASE_TABS.find(t => t[0] === UI.route.tab)[1] : TITLES[UI.route.area] || 'OSINTrix') + ' — OSINTrix';
@@ -91,6 +92,7 @@ document.addEventListener('click', ev => {
   if(NB_ACTS[a]) return NB_ACTS[a](id, v, t, ev);
   if(STO_ACTS[a]) return STO_ACTS[a](id, v, t, ev);
   if(FB_ACTS[a]) return FB_ACTS[a](id, v, t, ev);
+  if(CX_ACTS[a]) return CX_ACTS[a](id, v, t, ev);
   if(NBX_ACTS[a]) return NBX_ACTS[a](id, v, t, ev);
   if(a === 'toolRun') return toolRunDlg(id);
   if(a === 'trPick'){ $('trV').value = v; return $('trV').focus(); }

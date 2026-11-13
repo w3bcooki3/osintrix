@@ -141,6 +141,14 @@ Press `Ctrl K` or `/`, or click the search bar, to search the whole app at once:
 - **Automatic backup to a folder** (Chrome and Edge): Settings → Storage → choose a folder (a OneDrive or Google Drive folder also gives you a cloud copy). The app writes `osintrix-latest.json` there a few minutes after changes, plus one dated copy per day, keeping the last 7. Encrypted workspaces write encrypted backups. If browser data is ever cleared, import `osintrix-latest.json`.
 - **Warnings:** the top bar turns amber past 85% or under 200 MB free and red if a save fails; files that would not fit are refused before anything is written. Clean up from Settings → Storage, and export a backup regularly.
 
+- **Certificates:** decode certificates, chains and signing requests (PEM, DER, base64, hex, .p7b) entirely in the browser.
+  - **Decoder:** subject, issuer, lifetime, every name, extensions in plain English, fingerprints, raw ASN.1; findings such as lookalike names, tool defaults (Cobalt Strike, openssl), weak keys, over-long lifetimes and AD CS logon certificates.
+  - **Chain and CSR:** chains are ordered and every signature verified (RSA, RSA-PSS, ECDSA, Ed25519); requests are checked for signature, key strength and names.
+  - **Pivots and cases:** links to crt.sh, Censys, Shodan and VirusTotal; save to a case so names and fingerprints become entities. Certificates from TLS 1.2 captures open straight from the PCAP view.
+  - **Guide:** ten chapters on how certificates work, with flashcards for the Notebook. Private keys are refused and never stored.
+
+![Certificates](docs/certificates.png)
+
 - **Flag finder:** flag-shaped strings (`FLAG{…}`, `picoCTF{…}`, `HTB{…}`, or your event's own format) are picked out automatically in the Decoder and File inspector, and saved to a challenge with one click.
 - **File inspector:** drop in any file; it is read locally and never uploaded. It shows:
   - the true file type from its magic bytes, with a warning when the extension lies;

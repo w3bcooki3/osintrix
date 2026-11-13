@@ -4,6 +4,22 @@
    Each change has a type: "added" | "changed" | "fixed" | "removed". */
 const CHANGELOG_DATA = [
   {
+    "version": "1.22",
+    "name": "Certificates",
+    "date": "2026-11-13",
+    "summary": "A Certificates section: decode certificates, chains and signing requests in the browser, see what they reveal, and learn how certificates work.",
+    "changes": [
+      {"type": "added", "text": "Decoder: paste PEM, base64 or hex, or open .crt, .cer, .der, .pem, .csr or .p7b files (openssl s_client output works too). Shows who a certificate is for and who issued it, its lifetime, every name it covers, each extension in plain English, SHA-256, SHA-1 and key-pin fingerprints, and the raw ASN.1 structure."},
+      {"type": "added", "text": "Findings for investigators: lookalike brand names, unrelated domains on one certificate, Cobalt Strike and openssl defaults, self-signed certificates claiming a brand, weak keys and hashes, lifetimes longer than public CAs may issue (including the 200-day limit from March 2026), tiny serials, AD CS logon certificates (UPN plus client authentication) and enrollment agents."},
+      {"type": "added", "text": "Chain: certificates in any order are sorted leaf to root and every signature is verified with the browser's own cryptography (RSA, RSA-PSS, ECDSA and Ed25519). A missing root is named; a broken signature is shown in red."},
+      {"type": "added", "text": "CSR: what a signing request asks for, its signature, key strength, missing or mismatched names, a stored challenge password, and whether it shares a key with a certificate."},
+      {"type": "added", "text": "Save a certificate to the case as evidence: its names and fingerprints become entities, and the issue date lands on the timeline. Pivot links to crt.sh, Censys, Shodan and VirusTotal."},
+      {"type": "added", "text": "How certificates work: ten short chapters with diagrams, an annotated certificate, commands and flashcards that go to your Notebook in one click."},
+      {"type": "added", "text": "PCAP: certificates in TLS 1.2 and older handshakes open in the decoder. Certificate files dropped on the capture dialog open there too."},
+      {"type": "added", "text": "Private keys are never read: if one is pasted, it is removed from the box with a warning."}
+    ]
+  },
+  {
     "version": "1.21",
     "name": "Safe keeping",
     "date": "2026-11-08",

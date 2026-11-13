@@ -183,6 +183,7 @@ function bindCaptureFiles(){
   d.ondragover = e => { if([...(e.dataTransfer.types || [])].includes('Files')){ e.preventDefault(); d.classList.add('dropping'); } };
   d.ondragleave = e => { if(e.target === d) d.classList.remove('dropping'); };
   d.ondrop = e => { if(!e.dataTransfer.files.length) return; e.preventDefault(); d.classList.remove('dropping'); const fs = [...e.dataTransfer.files];
+    if(fs.length === 1 && /\.(pem|crt|cer|der|csr|req|p7b|p7c)$/i.test(fs[0].name)){ closeDlg(); return cxReadFile(fs[0]); }
     if(fs.length === 1 && /\.(csv|tsv|json|ndjson|jsonl|log|txt|evtx)$/i.test(fs[0].name) && !/^image\//.test(fs[0].type)) return logImportFile(fs[0]); attachFiles(fs); };
   d.onpaste = e => { const fs = [...(e.clipboardData && e.clipboardData.files || [])]; if(fs.length){ e.preventDefault(); attachFiles(fs.map((f, i) => f.name && f.name !== 'image.png' ? f : new File([f], 'screenshot-' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-') + (i ? '-' + i : '') + '.png', {type:f.type}))); } };
 }

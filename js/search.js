@@ -16,7 +16,7 @@ const S = {open:false, q:'', scope:'all', at:0, flat:[], index:null};
 function srchIndex(){
   const I = [], add = (kind, o) => I.push({kind, ...o});
   const nav = [['#/home','Dashboard','layout-dashboard'],['#/cases','Cases','folder-open'],['#/notes','Notes','sticky-note'],['#/toolbox','Toolbox','wrench'],['#/queries','Query library','scan-search'],
-    ['#/ctf','CTF','flag'],['#/notebook','Notebook','graduation-cap'],['#/lab','Forensics kit','file-search'],['#/decoder','Decoder','binary'],['#/feeds','Threat Intel','rss'],['#/detections','Detections','file-code'],['#/entities','Entities','fingerprint'],
+    ['#/ctf','CTF','flag'],['#/notebook','Notebook','graduation-cap'],['#/certs','Certificates','shield-check'],['#/lab','Forensics kit','file-search'],['#/decoder','Decoder','binary'],['#/feeds','Threat Intel','rss'],['#/detections','Detections','file-code'],['#/entities','Entities','fingerprint'],
     ['#/reference','Reference','book-open'],['#/playbooks','Playbooks','list-checks'],['#/help','Help','circle-help'],['#/settings','Settings','settings']];
   for(const [h, l, i] of nav) add('action', {id:'go' + h, title:'Go to ' + l, sub:'Page', icon:i, text:l + ' page open go', run:() => go(h), w:2});
   const c0 = theCase();
