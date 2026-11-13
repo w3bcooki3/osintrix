@@ -4,7 +4,7 @@ const { open, capture, fixture, noErrors, APP } = require('./helpers');
 
 const ROUTES = ['#/home', '#/cases', '#/cloud', '#/pad', '#/whatsnew', '#/case/c-lantern/overview', '#/case/c-lantern/vault', '#/case/c-lantern/entities', '#/case/c-lantern/timeline',
   '#/case/c-lantern/graph', '#/case/c-lab/map', '#/case/c-lantern/questions', '#/case/c-lantern/report', '#/toolbox', '#/queries', '#/detections',
-  '#/notes', '#/notebook', '#/playbooks', '#/ctf', '#/lab', '#/decoder', '#/feeds', '#/watch', '#/entities', '#/reference', '#/trash', '#/security', '#/help', '#/settings'];
+  '#/notes', '#/notebook', '#/certs', '#/playbooks', '#/ctf', '#/lab', '#/decoder', '#/feeds', '#/watch', '#/entities', '#/reference', '#/trash', '#/security', '#/help', '#/settings'];
 
 test('every screen draws without errors @phone', async ({ page }) => {
   const errors = await open(page);
@@ -423,7 +423,7 @@ test('no serious accessibility problems on the main screens, light and dark', as
   const AxeBuilder = require('@axe-core/playwright').default;
   const errors = await open(page, '#/home');
   const routes = ['#/home', '#/case/c-lantern/graph', '#/case/c-lantern/timeline', '#/case/c-lantern/entities', '#/case/c-lab/map', '#/case/c-lantern/questions', '#/case/c-lantern/overview', '#/case/c-lantern/vault',
-    '#/toolbox', '#/queries', '#/lab', '#/cloud', '#/ctf', '#/reference', '#/playbooks', '#/feeds', '#/detections', '#/notes', '#/security', '#/whatsnew', '#/help', '#/settings', 'ctf-ws', 'ctf-cheats', 'ctf-wu', 'nb-page', 'nb-export', '#/notebook', 'welcome'];
+    '#/toolbox', '#/queries', '#/lab', '#/cloud', '#/ctf', '#/reference', '#/playbooks', '#/feeds', '#/detections', '#/notes', '#/security', '#/whatsnew', '#/help', '#/settings', 'ctf-ws', 'ctf-cheats', 'ctf-wu', 'nb-page', 'nb-export', '#/notebook', 'cx-dec', 'cx-chain', 'cx-csr', 'cx-guide', 'welcome'];
   const found = [];
   for (const theme of ['light', 'dark']) {
     await page.evaluate(t => { DB.prefs.theme = t; applyPrefs(); renderAll(); }, theme);
@@ -432,6 +432,7 @@ test('no serious accessibility problems on the main screens, light and dark', as
         if (r === 'welcome') return showWelcome();
         if (r === 'nb-page' || r === 'nb-export'){ closeDlg(); UI.nbPage = DB.nb.pages.find(p => p.title === 'Kerberoasting').id; UI.nbView = 'page'; location.hash = '#/notebook'; setTimeout(() => { renderMain(); if (r === 'nb-export') nbExportDlg('page', UI.nbPage); }, 30); return; }
         if (r === '#/notebook'){ closeDlg(); UI.nbView = 'lib'; }
+        if (r.startsWith('cx-')){ closeDlg(); location.hash = '#/certs'; setTimeout(() => { renderMain(); const t = r.slice(3); if (t === 'guide') CX_ACTS.cxCh(null, 'inside'); else CX_ACTS.cxSample(null, t === 'dec' ? 'phish' : t); }, 30); return; }
         if (r.startsWith('ctf-')) { location.hash = '#/ctf'; UI.ctfTab = r === 'ctf-ws' ? 'board' : r === 'ctf-cheats' ? 'cheats' : 'writeups'; UI.ctfSel = r === 'ctf-ws' ? DB.ctf.chals[0].id : null; setTimeout(renderMain, 30); return; }
         location.hash = r; }, r);
       await page.waitForTimeout(450);
@@ -661,5 +662,60 @@ test('automatic backup to a folder: writes, keeps 7 days, pauses without permiss
   const back = await page.evaluate(async () => { const d = JSON.parse(__dir.files.get('osintrix-latest.json')); const key = await deriveKey('correct horse battery staple 9', b64d8(d.kdf.salt), d.kdf.iter); return JSON.parse(await openWith(key, d)).notes.some(n => n.text === 'while paused'); });
   expect(back).toBe(true);
   await page.click('[data-act=fbOff]'); await expect(page.locator('#storage [data-act=fbChoose]')).toBeVisible();
+  noErrors(errors);
+});
+
+test('certificates: decode, findings, chain, CSR, private keys refused, save to case, notebook cards', async ({ page }) => {
+  const fs = require('fs'), path = require('path'), D = path.join(__dirname, 'fixtures', 'certs');
+  const errors = await open(page, '#/certs');
+  // a phishing-style leaf with its issuer, pasted as PEM
+  await page.fill('#cxIn', fs.readFileSync(path.join(D, 'chain-phish.pem'), 'utf8')); await page.click('[data-act=cxDecode]');
+  await expect(page.locator('.crt-hero h1')).toHaveText('secure-acme-login.com');
+  await expect(page.locator('.crt-r')).toContainText('Lookalike name');
+  await expect(page.locator('.crt-chips .chip.hl')).toHaveText(/acme-sso\.microsoftonline-auth\.com/);
+  await expect(page.locator('.crt-fp code').first()).toContainText(':');
+  const fp = await page.evaluate(() => cxS().R.certs.find(c => c.title === 'secure-acme-login.com').fp.sha256);
+  const want = require('crypto').createHash('sha256').update(fs.readFileSync(path.join(D, 'leaf-phish.der'))).digest('hex');
+  expect(fp).toBe(want);
+  // the chain is ordered and each signature checked; the missing root is named
+  await page.click('[data-act=cxTab][data-v=chain]');
+  await expect(page.locator('.crt-lnk.ok')).toHaveCount(1); await expect(page.locator('.crt-lnk.warn')).toContainText('Example Root CA X1');
+  // a .p7b bundle opened as a file: full chain, all signatures good
+  const [fc] = await Promise.all([page.waitForEvent('filechooser'), page.click('[data-act=cxFile]')]); await fc.setFiles(path.join(D, 'bundle.p7b'));
+  await expect(page.locator('.crt-lnk.ok')).toHaveCount(3);
+  // tampering is caught
+  await page.evaluate(() => { const leaf = cxS().R.chain.order[0], b = new Uint8Array(leaf.der); b[b.length - 300] ^= 1; cxLoad(b); });
+  await page.evaluate(() => { const R = cxS().R; R.certs.push(...X5.read(CERT_SAMPLES.ov.pem).certs.slice(1)); return cxEnrich(R); });
+  await page.click('[data-act=cxTab][data-v=chain]'); await expect(page.locator('.crt-lnk.bad')).toHaveCount(1);
+  // CSR: signature, challenge password, matching a certificate key
+  await page.evaluate(() => CX_ACTS.cxSample(null, 'csr'));
+  await expect(page.locator('.crt-csr')).toContainText('Signature is valid'); await expect(page.locator('.crt-csr')).toContainText('Contains a challenge password');
+  // private keys are refused and removed from the box
+  await page.fill('#cxIn', fs.readFileSync(path.join(D, 'private-key.pem'), 'utf8')); await page.click('[data-act=cxDecode]');
+  await expect(page.locator('.crt-key')).toContainText('private key'); expect(await page.inputValue('#cxIn')).not.toContain('PRIVATE KEY');
+  // Cobalt Strike default, AD CS logon certificate
+  await page.evaluate(() => CX_ACTS.cxSample(null, 'cs')); await expect(page.locator('.crt-r')).toContainText('Cobalt Strike default certificate');
+  await page.evaluate(() => CX_ACTS.cxSample(null, 'adcs')); await expect(page.locator('.crt-r')).toContainText('Can log on to Windows as j.okafor@corp.example');
+  // save to the case: an evidence record whose names and fingerprints are entities, reopened from the list
+  await page.evaluate(() => CX_ACTS.cxSample(null, 'phish')); await expect(page.locator('.crt-fp code').first()).toContainText(':');
+  await page.click('.crt-hero [data-act=cxSave]');
+  const rec = await page.evaluate(() => { const r = DB.records.find(x => x.source === 'certificate'); return r && { title: r.title, ents: JSON.stringify(r.ents), ts: r.ts }; });
+  expect(rec.title).toBe('Certificate: secure-acme-login.com'); expect(rec.ents).toContain('files-acme.net'); expect(rec.ents).toContain(fp); expect(rec.ts).toBeGreaterThan(0);
+  await page.evaluate(() => { cxS().R = null; cxPaint(); }); await page.click('.crt-it'); await expect(page.locator('.crt-hero h1')).toHaveText('secure-acme-login.com');
+  // guide flashcards into the Notebook
+  await page.evaluate(() => CX_ACTS.cxCh(null, 'chain')); await page.click('[data-act=cxToNb]');
+  expect(await page.evaluate(() => { const b = DB.nb.books.find(x => x.name === 'Certificates'), p = DB.nb.pages.find(x => x.title === 'Chain of trust'); return !!b && nbInfo(p).cards.length; })).toBe(4);
+  noErrors(errors);
+});
+
+test('certificates from a TLS 1.2 capture open in the decoder', async ({ page }) => {
+  const fs = require('fs'), path = require('path');
+  const errors = await open(page, '#/lab');
+  const b64 = fs.readFileSync(path.join(__dirname, 'fixtures', 'tls12-cert.pcap')).toString('base64');
+  const tls = await page.evaluate(async b64 => { const A = await pcapAnalyse(new File([Uint8Array.from(atob(b64), c => c.charCodeAt(0))], 'tls12-cert.pcap')); UI.pcap = A; UI.labTab = 'pcap'; UI.pcTab = 'tls'; renderMain(); return A.tls.map(t => [t.sni, t.ver, t.certs.length]); }, b64);
+  expect(tls).toEqual([['shop.acme.example', 'TLS 1.2', 1]]);
+  await page.click('[data-act=pcCerts]');
+  await expect(page.locator('.crt-hero h1')).toHaveText('shop.acme.example');
+  await expect(page.locator('.crt-chips')).toContainText('pay.acme.example');
   noErrors(errors);
 });
