@@ -25,6 +25,7 @@ function cxLoad(input, opts = {}){
   else S.keyWarn = false;
   if(!R.certs.length && !R.csrs.length && !R.pe){ if(!R.keys.length) toast(R.errors[0] || 'No certificate found'); S.R = R.keys.length ? null : S.R; return cxPaint(); }
   R.at = Date.now(); R.rec = opts.rec || null; S.sel = 0; S.rec = opts.rec || null;
+  if(!opts.rec && !/^Example/.test(opts.src || '')) cxKeep(opts.name || (typeof input === 'string' ? cxNameOf(R) : 'certificate'), input, opts.cmp ? 'cmp' : '');
   R.src = opts.src || (opts.rec ? 'Saved in ' + ((theCase(DB.active) || {}).code || 'this case') : opts.name || 'Pasted');
   if(R.pe){ R.pe.name = opts.name || 'program'; R.u = input; }
   if(opts.cmp){ R.certs.forEach(c => { if(!S.cmpX.some(x => cxId(x) === cxId(c))) S.cmpX.push(c); }); if(R.certs[0]) S.cmpB = 'x:' + cxId(R.certs[0]); S.tab = 'compare'; cxPaint(); return Promise.all(R.certs.map(c => X5.prints(c))).then(() => cxPaint()); }
@@ -42,12 +43,47 @@ async function cxEnrich(R){
   }catch(e){ console.error(e); }
   R.ready = true; if(cxS().R === R) cxPaint();
 }
+/* ---------- history: everything opened here is kept in this browser (never a private key) ---------- */
+let CX_NOKEEP = false;
+const cxNameOf = R => { const c = R.certs[0] || R.csrs[0]; return c ? (c.kind === 'csr' ? 'CSR · ' : '') + (c.title || 'certificate') : R.pe ? 'program' : 'certificate'; };
+const cxStripKeys = t => t.replace(/-----BEGIN ([A-Z0-9 ]*PRIVATE KEY[A-Z0-9 ]*)-----[\s\S]*?-----END \1-----\s*/g, '');
+function cxKeep(name, data, mode){
+  if(CX_NOKEEP || typeof recentAdd !== 'function') return;
+  if(typeof data === 'string'){ data = cxStripKeys(data); if(/PRIVATE KEY-----|PuTTY-User-Key-File/.test(data)) return; }
+  recentAdd('certs', name, data, {mode}).then(() => { const b = document.querySelector('[data-act=cxSaved] .crt-cnt'); if(b) b.textContent = cxHistN(); });
+}
+const cxHistN = () => (typeof recentOf === 'function' ? recentOf('certs').length : 0) + cxRecs().length;
+if(typeof RECENT_OPEN !== 'undefined'){
+  RECENT_OPEN.certs = async (it, data, restoring) => {
+    if(UI.route.area !== 'certs' && !restoring){ go('#/certs'); await new Promise(r => setTimeout(r, 30)); }
+    CX_NOKEEP = true;
+    try{
+      const S = cxS();
+      if(it.mode === 'ct'){ const A = ctParse(data); if(A){ S.ct = A; S.ctF = ''; S.ctRec = null; S.ctDom = S.ctDom || A.dom; if(!restoring || !S.R) S.tab = 'ct'; cxPaint(); } return; }
+      if(data instanceof File) return await cxReadFile(data, it.mode);
+      if(it.mode === 'cmp') return cxLoad(data, {cmp:true, src:it.name});
+      S.input = data; S.rec = null; return cxLoad(data, {name:it.name, src:restoring ? 'Reopened · ' + it.name : it.name});
+    }finally{ CX_NOKEEP = false; }
+  };
+  RECENT_AFTER_DEL.certs = x => { const S = cxS();
+    if(!x || x.wasOpen){ if(!x || x.mode === 'ct') S.ct = null; if((!x || x.mode !== 'ct') && S.R && !S.rec){ S.R = null; S.input = ''; } if(UI.route.area === 'certs') cxPaint(); }
+    const b = document.querySelector('[data-act=cxSaved] .crt-cnt'); if(b) b.textContent = cxHistN(); };
+}
+/* the History window: recent inputs in this browser, and what is saved in the case — each one deletable */
+function cxHistory(){
+  const extra = () => { const recs = cxRecs();
+    return `<section><h3>Saved in ${esc(theCase(DB.active) ? theCase(DB.active).code : 'this case')}<small>${recs.length}</small></h3>
+      ${recs.length ? `<ul class="rc-l">${recs.slice(0, 60).map(rec => `<li class="rc-r"><span class="rc-ic">${ico('archive','sm')}</span><button class="rc-o" data-act="cxHistRec" data-id="${rec.id}"><b>${esc(rec.title.replace(/^(Certificate|Signing request|Signed program): /, ''))}</b><small>${esc(rec.title.split(':')[0])} · ${esc(E.fmtAgo(Math.max(0, Date.now() - (rec.addedAt || rec.ts || 0))))}${cxS().rec === rec.id ? ' · open now' : ''}</small></button>
+        <button class="iconbtn rc-d" data-act="cxHistDel" data-id="${rec.id}" aria-label="Move ${esc(rec.title)} to the trash" title="Move to trash">${ico('trash-2','sm')}</button></li>`).join('')}</ul>` : '<p class="rc-none">Nothing saved in this case yet. Use Save to case on a certificate to keep it as evidence.</p>'}
+      <p class="rc-note">${ico('info','sm')}Saved items are evidence records. Deleting one moves it to the trash, where it can be restored for 30 days.</p></section>`; };
+  UI.rcExtraFn = extra; recentDlg('certs', extra());
+}
 const cxFindings = c => (c._F = c._F || X5.findings(c));
 function cxRecParse(r){ const k = r.id + ':' + (r.hash || r.body.length); if(CX_REC.has(k)) return CX_REC.get(k); const R = X5.read(r.body); CX_REC.set(k, R); return R; }
 /* crt.sh JSON (or anything shaped like it) pasted instead of a certificate */
 const cxLooksCt = t => /^\s*[[{]/.test(t) && /"(name_value|common_name|issuer_name)"/.test(t.slice(0, 4000));
 function cxIngest(text, opts = {}){
-  if(cxLooksCt(text)){ const A = ctParse(text); if(A){ const S = cxS(); S.ct = A; S.ctF = ''; S.ctDom = S.ctDom || A.dom; S.tab = 'ct'; return cxPaint(); } return toast('That JSON is not a crt.sh result list'); }
+  if(cxLooksCt(text)){ const A = ctParse(text); if(A){ const S = cxS(); S.ct = A; S.ctF = ''; S.ctDom = S.ctDom || A.dom; S.tab = 'ct'; cxKeep('crt.sh · ' + (A.dom || 'names'), text, 'ct'); return cxPaint(); } return toast('That JSON is not a crt.sh result list'); }
   const S = cxS(); if(!opts.cmp){ S.input = text; S.rec = null; } return cxLoad(text, Object.assign({src:'Pasted'}, opts));
 }
 
@@ -89,14 +125,14 @@ function cxBar(){
     <button class="btn primary" data-act="cxPaste" data-v="${cmp ? 'cmp' : 'decode'}">${ico('clipboard-paste','sm')}Paste${R && !cmp ? ' another' : ''}…</button>
     <button class="btn" data-act="cxFile">${ico('upload','sm')}Open file</button>
     <button class="btn ghost" data-act="cxExamples" aria-haspopup="menu">${ico('sparkles','sm')}Examples${ico('chevron-down','sm')}</button>
-    <button class="btn ghost" data-act="cxSaved" aria-haspopup="menu">${ico('archive','sm')}Saved<span class="crt-cnt">${n}</span>${ico('chevron-down','sm')}</button>
+    <button class="btn ghost" data-act="cxSaved" aria-haspopup="dialog">${ico('history','sm')}History<span class="crt-cnt">${cxHistN()}</span></button>
     ${R && !cmp ? `<button class="iconbtn" data-act="cxClear" aria-label="Close this certificate" title="Close">${ico('x','sm')}</button>` : ''}</div>
   ${S.keyWarn ? `<p class="crt-key" role="alert">${ico('triangle-alert','sm')}<span>That included a <b>private key</b>. It was not read, kept or saved. If it came from anywhere public, treat it as exposed.</span></p>` : ''}`;
 }
 function cxPasteDlg(mode){
   const T = {decode:['Paste certificates', 'Certificates, a chain, a signing request, openssl s_client output — or crt.sh JSON. Private keys are refused.', 'Decode'], cmp:['Add a certificate to compare', 'Paste the certificate to compare against. It is kept for this comparison only.', 'Compare'], ct:['Paste crt.sh results', 'Open crt.sh with “output=json” (the button on the page builds the link), select all, copy, and paste here.', 'Analyse']}[mode] || [];
   openDlg(`${dhead(T[0])}<div class="in crt-pd" id="cxPd"><p class="t3">${T[1]}</p><label class="sr" for="cxPdIn">${T[0]}</label>
-      <textarea id="cxPdIn" spellcheck="false" placeholder="${mode === 'ct' ? '[{&quot;issuer_ca_id&quot;: …, &quot;name_value&quot;: …}]' : '-----BEGIN CERTIFICATE-----'}"></textarea>
+      <textarea id="cxPdIn" class="inp" spellcheck="false" placeholder="${mode === 'ct' ? '[{&quot;issuer_ca_id&quot;: …, &quot;name_value&quot;: …}]' : '-----BEGIN CERTIFICATE-----'}"></textarea>
       <p class="t3 crt-pdh">${ico('upload','sm')}You can also drop a file onto this box.</p></div>
     <footer><span class="t3">Ctrl+Enter</span><button class="btn" data-act="dclose">Cancel</button><button class="btn" data-act="cxPdFile" data-v="${mode}">${ico('upload','sm')}Open file</button><button class="btn primary" data-act="cxPdGo" data-v="${mode}">${T[2]}</button></footer>`, true, () => {
     const pd = $('cxPd'), ta = $('cxPdIn');
@@ -109,13 +145,6 @@ function cxPasteDlg(mode){
 }
 const leafGuess = certs => certs.find(c => !c.isCA) || certs[0];
 const cxDropZone = (t, d, mode = 'decode') => `<button class="crt-dz" data-act="cxPaste" data-v="${mode}"><span>${ico('upload')}</span><b>${t}</b><small>${d}</small><em>Click to paste · Ctrl+V anywhere · or drop a file on this page</em></button>`;
-function cxSavedMenu(t){
-  const recs = cxRecs(), r = t.getBoundingClientRect();
-  showMenu(r.left, r.bottom + 6, recs.length ? recs.slice(0, 40).map(rec => { const R = cxRecParse(rec), c = R.certs[0] || R.csrs[0]; if(!c) return null;
-      const lc = R.certs.length ? leafGuess(R.certs) : c, w = c.kind === 'csr' ? 'file-text' : Date.now() > lc.notAfter ? 'clock' : cxWorst(cxFindings(lc)) === 'ok' ? 'shield-check' : 'shield-alert';
-      return {label:(cxS().rec === rec.id ? '✓ ' : '') + rec.title.replace(/^(Certificate|Signing request|Signed program): /, ''), icon:w, fn:() => CX_ACTS.cxRec(rec.id)}; }).filter(Boolean)
-    : [{label:'Nothing saved in this case yet', icon:'info', disabled:true, fn:() => {}}], 'Saved in ' + (theCase(DB.active) ? theCase(DB.active).code : 'this case'));
-}
 
 /* ---------- decoder ---------- */
 function cxDecoder(){
@@ -136,6 +165,7 @@ function cxDecoder(){
       <div class="crt-hm"><h1>${esc(c.title)}</h1><p>Issued by <b>${esc(iss)}</b>${c.selfIssued ? ' (itself)' : ''} · ${org ? 'to <b>' + esc(org) + '</b>' : c.isCA ? 'a certificate authority' : 'to no organisation (domain validated)'}</p>
         <div class="crt-pills">${exp ? `<span class="crt-pill amber">${ico('clock','sm')}Expired ${cxDays(-left)} days ago</span>` : pre ? `<span class="crt-pill amber">Not valid until ${cxDay(c.notBefore)}</span>` : `<span class="crt-pill green">${ico('check','sm')}Valid · ${cxDays(left)} days left</span>`}
           ${c.isCA ? `<span class="crt-pill">${c.selfIssued ? 'Root' : 'Intermediate'} CA${c.bc && c.bc.pathLen != null ? ' · path length ' + c.bc.pathLen : ''}</span>` : c.level ? `<span class="crt-pill">${esc(c.level)} · ${cxDays(c.notAfter - c.notBefore)}-day</span>` : ''}
+          ${cxKind(c) ? `<button class="crt-pill crt-kind" data-act="cxType" data-v="${cxKind(c)}" title="What this type of certificate is for">${ico('book-open','sm')}${esc(CX_KIND[cxKind(c)])}</button>` : ''}
           <span class="crt-pill">${esc(c.key.label)}</span><span class="crt-pill">${esc(c.sigAlg.name)}</span>${c.selfIssued ? `<span class="crt-pill">Self-signed${c.selfOk === true ? ' ✓' : ''}</span>` : ''}
           ${bad ? `<span class="crt-pill red">${ico('triangle-alert','sm')}${bad} red flag${bad > 1 ? 's' : ''}</span>` : ''}${reuse.length ? `<span class="crt-pill blue">${ico('key-round','sm')}Key shared with ${reuse.length}</span>` : ''}</div></div>
       <div class="crt-ha">${S.rec ? `<span class="crt-pill green">${ico('check','sm')}Saved</span>` : `<button class="btn sm primary" data-act="cxSave">${ico('plus','sm')}Save to case</button>`}<button class="btn sm" data-act="cxCopyPem">${ico('copy','sm')}Copy PEM</button><button class="btn sm ghost" data-act="cxExport" aria-haspopup="menu">${ico('download','sm')}Export${ico('chevron-down','sm')}</button></div></section>
@@ -204,7 +234,9 @@ function cxAssess(c, R, F, reuse, inds, seen){
   const org = (c.subject.map.O || [])[0], code = (c.eku || []).some(e => e.oid === '1.3.6.1.5.5.7.3.3'), age = cxDays(now - c.notBefore);
   const tone = bad.length ? 'bad' : warn.length ? 'warn' : 'ok';
   const head = bad.some(f => /Cobalt|Lookalike|brand/.test(f.t)) ? 'Looks like attacker infrastructure' : bad.length ? 'Red flags — treat as suspicious' : warn.length ? 'Unusual — needs context' : 'Nothing suspicious in the certificate itself';
-  const P = [];
+  const P = [], kind = cxKind(c), priv = !c.scts.length && !c.selfIssued;
+  const KP = {server:'proves a server’s name to clients', client:'logs a person or program in to a server (VPN, Wi‑Fi, mutual TLS)', device:'proves a machine is a managed company device', ca:'issues other certificates', code:'signs software', smime:'signs and encrypts email', smartcard:'logs on to Windows and Active Directory', docsign:'signs documents', tsa:'signs trusted timestamps'};
+  if(kind) P.push('A ' + CX_KIND[kind].toLowerCase().replace('tls', 'TLS').replace('(s/mime)', '(S/MIME)') + ' certificate: it ' + KP[kind] + '.');
   P.push(c.selfIssued ? 'Self-signed: nobody vouches for who made it.' : org ? `Issued to “${org}”${c.level === 'EV' || c.level === 'OV' ? ', and the CA checked that organisation' : ''}.` : code ? 'A code signing certificate.' : 'Domain-validated: the CA only checked that the requester controlled ' + (dns.length > 1 ? 'the names' : 'the name') + ', not who they are.');
   if(dns.length || ips.length) P.push(`Names ${dns.length ? dns.length + ' host' + (dns.length > 1 ? 's' : '') + (regs.length > 1 ? ' across ' + regs.length + ' registered domains (' + regs.slice(0, 3).map(x => x.v).join(', ') + ')' : '') : ''}${ips.length ? (dns.length ? ' and ' : '') + ips.length + ' IP address' + (ips.length > 1 ? 'es' : '') + ' (' + ips.map(x => x.v).join(', ') + ')' : ''}.`);
   if(!c.isCA) P.push(`Issued ${cxYmd(c.notBefore)}${age >= 0 && age < 400 ? ' — ' + age + ' day' + (age === 1 ? '' : 's') + ' ago' : ''}, ${now > c.notAfter ? 'expired ' + cxYmd(c.notAfter) : 'valid until ' + cxYmd(c.notAfter)}${c.scts.length ? '; publicly logged, so its history is searchable' : ''}.`);
@@ -212,9 +244,11 @@ function cxAssess(c, R, F, reuse, inds, seen){
   if(reuse.length) P.push(`Its private key is also in ${reuse.length} other certificate${reuse.length > 1 ? 's' : ''} (${reuse.slice(0, 2).map(x => x.c.title).join(', ')}) — the same operator.`);
   if(seen.length) P.push(`${seen.length} record${seen.length > 1 ? 's' : ''} in your cases already mention${seen.length > 1 ? '' : 's'} these indicators.`);
   const N = [];
-  if(regs.length) N.push(['radar', 'List every certificate ever issued for ' + regs[0].v, 'cxCtFor', regs[0].v]);
+  if(regs.length && !(priv && /client|device|smartcard|smime|docsign/.test(kind))) N.push(['radar', 'List every certificate ever issued for ' + regs[0].v, 'cxCtFor', regs[0].v]);
+  if(priv && /client|device|smartcard/.test(kind)) P.push('Issued by a private company CA, so it is not in public Certificate Transparency logs — the trail is in that CA’s issued-certificates database and on the endpoints that hold the key.');
+  if(kind) N.push(['book-open', 'What ' + CX_KIND[kind].toLowerCase().replace('tls', 'TLS').replace('(s/mime)', '(S/MIME)') + ' certificates are for, and how they are abused', 'cxType', kind]);
   if(dns.length || ips.length) N.push(['crosshair', 'Look up the hosts: hosting, WHOIS, reputation', 'cxGoInd', '']);
-  if(c.fp && !c.isCA) N.push(['server', 'Find other servers presenting it (Shodan, Censys)', 'cxGoHunt', '']);
+  if(c.fp && !c.isCA && (!kind || kind === 'server')) N.push(['server', 'Find other servers presenting it (Shodan, Censys)', 'cxGoHunt', '']);
   if(code) N.push(['app-window', 'Find files signed with it on your devices', 'cxGoHunt', '']);
   if(bad.some(f => f.t === 'Lookalike name')) N.push(['flag', 'Report the lookalike domain to its registrar and to the brand', '', '']);
   if(!cxS().rec) N.push(['plus', 'Save it to the case so the names become entities on the timeline and graph', 'cxSave', '']);
@@ -226,6 +260,21 @@ function cxAssessCard(c, R, F, reuse, inds, seen){
       <button class="btn sm ghost" data-act="cxReport">${ico('copy','sm')}Copy for a report</button></div>
     <div class="crt-asb"><ul class="crt-asp">${A.P.map(p => `<li>${esc(p)}</li>`).join('')}</ul>
       <div class="crt-nx"><h4>Next steps</h4>${A.N.map(([i, t, act, v]) => act ? `<button class="crt-nxi" data-act="${act}" data-v="${esc(v)}">${ico(i,'sm')}<span>${esc(t)}</span>${ico('arrow-right','sm')}</button>` : `<div class="crt-nxi">${ico(i,'sm')}<span>${esc(t)}</span></div>`).join('')}</div></div></section>`;
+}
+
+/* what job a certificate is for, as a section of the "Types of certificates" chapter */
+const CX_KIND = {server:'Website (TLS server)', client:'Client authentication', device:'Device / machine', ca:'Certificate authority', code:'Code signing', smime:'Email (S/MIME)', smartcard:'Windows logon', docsign:'Document signing', tsa:'Timestamping authority'};
+function cxKind(c){
+  if(c.isCA) return 'ca';
+  const ek = (c.eku || []).map(e => e.oid), has = o => ek.includes(o);
+  if(has('1.3.6.1.4.1.311.20.2.2')) return 'smartcard';
+  if(has('1.3.6.1.5.5.7.3.3')) return 'code';
+  if(has('1.3.6.1.5.5.7.3.8')) return 'tsa';
+  if(has('1.3.6.1.5.5.7.3.36') || has('1.3.6.1.4.1.311.10.3.12')) return 'docsign';
+  if(has('1.3.6.1.5.5.7.3.1') || (!ek.length && c.san.some(s => s.t === 'DNS' || s.t === 'IP'))) return 'server';
+  if(has('1.3.6.1.5.5.7.3.4') && !has('1.3.6.1.5.5.7.3.2')) return 'smime';
+  if(has('1.3.6.1.5.5.7.3.2')) return c.san.some(s => s.t === 'DNS') || /\.[a-z]{2,}$/i.test(c.cn || '') ? 'device' : 'client';
+  return '';
 }
 
 /* signed Windows programs: what the Authenticode signature says, and whether the file still matches it */
@@ -256,8 +305,8 @@ const S_rec = () => !!cxS().rec;
 function cxTestCard(c){
   const S = cxS();
   return `<section class="card crt-s"><h3>${ico('target','sm')}Test it</h3>
-    <div class="crt-tst"><label for="cxHost">Does it cover this host?</label><input id="cxHost" value="${esc(S.host || '')}" placeholder="login.example.com, an IP or a URL" spellcheck="false" autocomplete="off"><p class="crt-res" id="cxHostR" aria-live="polite">${cxHostRes(c)}</p></div>
-    <div class="crt-tst"><label for="cxWhen">Was it valid at this moment? <small>(your local time)</small></label><input id="cxWhen" type="datetime-local" value="${esc(S.when || '')}"><p class="crt-res" id="cxWhenR" aria-live="polite">${cxWhenRes(c)}</p></div></section>`;
+    <div class="crt-tst"><label for="cxHost">Does it cover this host?</label><input id="cxHost" class="inp" value="${esc(S.host || '')}" placeholder="login.example.com, an IP or a URL" spellcheck="false" autocomplete="off"><p class="crt-res" id="cxHostR" aria-live="polite">${cxHostRes(c)}</p></div>
+    <div class="crt-tst"><label for="cxWhen">Was it valid at this moment? <small>(your local time)</small></label><input id="cxWhen" class="inp" type="datetime-local" value="${esc(S.when || '')}"><p class="crt-res" id="cxWhenR" aria-live="polite">${cxWhenRes(c)}</p></div></section>`;
 }
 function cxHostRes(c){ const h = cxS().host; if(!h || !h.trim()) return '<span class="t3">Type a host name — wildcards are matched the way browsers do.</span>';
   const r = X5.covers(c, h); if(!r) return '';
@@ -343,7 +392,7 @@ function cxRight(c, F, reuse = []){
   if(reuse.length) F = [{s:reuse.some(x => x.c.cn !== c.cn) ? 'warn' : 'info', t:'Key shared with ' + reuse.length + ' other certificate' + (reuse.length > 1 ? 's' : ''), d:reuse.slice(0, 3).map(x => x.c.title).join(', ') + (reuse.some(x => x.c.cn !== c.cn) ? ' — different names on one key tie them to the same owner' : ' — likely renewals')}].concat(F);
   const dns = c.san.filter(s => s.t === 'DNS').map(s => s.v.replace(/^\*\./, '')), host = dns[0] || (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(c.cn) ? c.cn : (c.san.find(s => s.t === 'IP') || {}).v || 'HOST'), regs = [...new Set(dns.map(X5.regDom))].slice(0, 3), fp = c.fp;
   const link = (u, icon, t, d) => `<a class="crt-pv" href="${esc(u)}" target="_blank" rel="noopener noreferrer">${ico(icon,'sm')}<span>${t}<small>${d}</small></span>${ico('external-link','sm')}</a>`;
-  return `<aside class="crt-r" aria-label="Findings and pivots">
+  return `<aside class="crt-r" aria-label="Findings and pivots" tabindex="0">
     <section><h4>${ico('triangle-alert','sm')}Findings</h4>${F.length ? F.map(f => `<div class="crt-fd"><span class="crt-sv ${f.s === 'info' ? 'inf' : f.s}">${ico(f.s === 'bad' || f.s === 'warn' ? 'triangle-alert' : 'info','sm')}</span><div><b>${esc(f.t)}</b><small>${esc(f.d)}</small></div></div>`).join('')
       : `<div class="crt-fd"><span class="crt-sv ok">${ico('check','sm')}</span><div><b>Nothing unusual</b><small>Structure, key, dates and names look normal for this kind of certificate</small></div></div>`}</section>
     <section><h4>${ico('search','sm')}Pivot</h4>
@@ -354,7 +403,7 @@ function cxRight(c, F, reuse = []){
       ${fp ? link('https://www.shodan.io/search?query=' + encodeURIComponent('ssl.cert.fingerprint:' + fp.sha256), 'server', 'Shodan', 'Search by fingerprint') : ''}
       ${regs[0] ? link('https://www.virustotal.com/gui/domain/' + encodeURIComponent(regs[0]), 'shield', 'VirusTotal · ' + esc(regs[0]), 'Reputation and passive DNS') : ''}
       <p class="crt-e">These open the site in a new tab; the app itself sends nothing.</p></section>
-${dns.length || c.san.some(x => x.t === 'IP') ? `    <section><h4>${ico('binary','sm')}Grab it from the server</h4><div class="crt-cmd">openssl s_client -connect ${esc(host)}:443 -servername ${esc(host)} -showcerts &lt;/dev/null</div>
+${(dns.length || c.san.some(x => x.t === 'IP')) && (!cxKind(c) || cxKind(c) === 'server') ? `    <section><h4>${ico('binary','sm')}Grab it from the server</h4><div class="crt-cmd">openssl s_client -connect ${esc(host)}:443 -servername ${esc(host)} -showcerts &lt;/dev/null</div>
       <button class="btn xs ghost" data-act="cxCopy" data-v="${esc('openssl s_client -connect ' + host + ':443 -servername ' + host + ' -showcerts </dev/null')}">${ico('copy','sm')}Copy</button> <span class="crt-e">then paste the output here.</span></section>` : ''}
     <section><h4>${ico('book-open','sm')}Learn</h4><button class="crt-learn" data-act="cxCh" data-v="inside">What every field means</button><button class="crt-learn" data-act="cxCh" data-v="bad">Malicious certificate patterns</button><button class="crt-learn" data-act="cxCh" data-v="osint">Pivoting from a certificate</button></section>
   </aside>`;
@@ -512,11 +561,11 @@ function cxCt(){
       <div class="crt-lg"><span>${esc(A.bins[0].label)}</span><span>${esc(A.bins[A.bins.length - 1].label)}</span></div>
       <p class="crt-e">Bursts usually mean new services or a CA switch. Short-lived certificates (90 days) renew on a steady rhythm; a gap is a server that stopped renewing.</p></section>
     <section class="card crt-s"><h3>${ico('globe','sm')}Names<span class="crt-n">${A.names.length}</span></h3>
-      <div class="crt-ctf"><label class="sr" for="cxCtF">Filter names</label><input id="cxCtF" type="search" placeholder="Filter, e.g. vpn or dev" value="${esc(S.ctF || '')}" autocomplete="off" spellcheck="false">
+      <div class="crt-ctf"><label class="sr" for="cxCtF">Filter names</label><input id="cxCtF" class="inp" type="search" placeholder="Filter, e.g. vpn or dev" value="${esc(S.ctF || '')}" autocomplete="off" spellcheck="false">
         ${['all', 'live', 'hot', 'fresh'].map(k => `<button class="chip${(S.ctK || 'all') === k ? ' on' : ''}" data-act="cxCtK" data-v="${k}" aria-pressed="${(S.ctK || 'all') === k}">${{all:'All', live:'Valid now', hot:'Interesting', fresh:'New in the last month'}[k]}</button>`).join('')}</div>
       <div id="cxCtT">${cxCtTable()}</div></section>
   </div>
-  <aside class="crt-r" aria-label="Highlights">
+  <aside class="crt-r" aria-label="Highlights" tabindex="0">
     <section><h4>${ico('triangle-alert','sm')}Worth a look</h4>
       ${look.length ? cxChk('bad', look.length + ' lookalike name' + (look.length > 1 ? 's' : ''), look.slice(0, 6).map(r => '<span class="mono">' + esc(r.name) + '</span>').join('<br>')) : ''}
       ${hot.length ? cxChk('warn', hot.length + ' interesting host name' + (hot.length > 1 ? 's' : ''), 'VPN, login, admin, development and build systems are the first things attackers probe:<br>' + hot.slice(0, 8).map(r => '<span class="mono">' + esc(r.name) + '</span>').join('<br>') + (hot.length > 8 ? '<br>+' + (hot.length - 8) + ' more — use the Interesting filter' : '')) : ''}
@@ -557,7 +606,7 @@ function cxGuide(){
   return `<div class="crt-gd"><nav class="crt-toc" aria-label="Chapters">${CERT_GUIDE.map((c, j) => `<button data-act="cxCh" data-v="${c.id}"${c === ch ? ' aria-current="true" class="on"' : ''}><span class="n">${j + 1}</span>${esc(c.title)}</button>`).join('')}</nav>
     <article class="crt-art" id="cxArt"><p class="crt-k">Chapter ${i + 1} of ${CERT_GUIDE.length}</p><h1>${esc(ch.title)}</h1><p class="crt-lead">${esc(ch.lead)}</p>${ch.body}
       <div class="crt-nav">${i > 0 ? `<button class="btn sm" data-act="cxCh" data-v="${CERT_GUIDE[i - 1].id}">${ico('arrow-left','sm')}${esc(CERT_GUIDE[i - 1].title)}</button>` : '<span></span>'}${i < CERT_GUIDE.length - 1 ? `<button class="btn sm" data-act="cxCh" data-v="${CERT_GUIDE[i + 1].id}">${esc(CERT_GUIDE[i + 1].title)}${ico('arrow-right','sm')}</button>` : ''}</div></article>
-    <aside class="crt-r" aria-label="Try it">
+    <aside class="crt-r" aria-label="Try it" tabindex="0">
       <section><h4>${ico('sparkles','sm')}Try it</h4><button class="btn sm crt-wide" data-act="cxSample" data-v="${ch.sample}">${ico('scroll-text','sm')}Open the example in the decoder</button><p class="crt-e">${esc(CERT_SAMPLES[ch.sample].label)} — fictional.</p></section>
       <section><h4>${ico('book-open','sm')}Flashcards from this chapter</h4>${ch.cards.map(([q, a]) => `<div class="crt-qa"><b>${esc(q)}</b>${esc(a)}</div>`).join('')}
         <button class="btn sm crt-wide" data-act="cxToNb">${ico('plus','sm')}Add ${ch.cards.length} cards to my Notebook</button></section>
@@ -647,12 +696,13 @@ async function cxReadFile(f, mode){
   const u = new Uint8Array(await f.arrayBuffer()); if(!u.length) return toast('That file is empty');
   if(UI.route.area !== 'certs'){ go('#/certs'); await new Promise(r => setTimeout(r, 30)); }
   const S = cxS(), isPe = u[0] === 0x4d && u[1] === 0x5a, bin = isPe || (u[0] === 0x30 && /\.(der|cer|crt|p7b|p7c|p7s|cat|spc)$/i.test(f.name));
-  if(!bin){ const t = new TextDecoder().decode(u.subarray(0, 50 * 1048576)); if(mode === 'ct' || cxLooksCt(t)){ const A = ctParse(t); if(!A) return toast('That file is not a crt.sh JSON result list'); S.ct = A; S.ctF = ''; S.ctRec = null; S.ctDom = S.ctDom || A.dom; S.tab = 'ct'; return cxPaint(); } }
-  if(mode === 'cmp') return cxLoad(bin ? u : new TextDecoder().decode(u), {cmp:true});
+  if(!bin){ const t = new TextDecoder().decode(u.subarray(0, 50 * 1048576)); if(mode === 'ct' || cxLooksCt(t)){ const A = ctParse(t); if(!A) return toast('That file is not a crt.sh JSON result list'); S.ct = A; S.ctF = ''; S.ctRec = null; S.ctDom = S.ctDom || A.dom; S.tab = 'ct'; cxKeep(f.name, t, 'ct'); return cxPaint(); } }
+  if(mode === 'cmp') return cxLoad(bin ? u : new TextDecoder().decode(u), {cmp:true, name:f.name});
   S.input = bin ? '' : new TextDecoder().decode(u.subarray(0, 400000)); S.rec = null;
   return cxLoad(u, {name:f.name});
 }
 function bindCerts(){
+  { const S = cxS(); if(!S.R && !S.ct && typeof recentRestore === 'function') recentRestore('certs'); }
   const dom = $('cxCtDom'); if(dom) dom.addEventListener('input', () => { const S = cxS(), l = $('cxCtLink'); S.ctDom = dom.value; if(!l) return; const d = dom.value.trim(); if(d){ l.href = cxCtUrl(d); l.removeAttribute('aria-disabled'); } else { l.removeAttribute('href'); l.setAttribute('aria-disabled', 'true'); } });
   const R = cxS().R, cur = () => R && (R.certs[cxS().sel] || R.certs[0]);
   const h = $('cxHost'); if(h) h.addEventListener('input', () => { cxS().host = h.value; const c = cur(); if(c) $('cxHostR').innerHTML = cxHostRes(c); });
@@ -677,16 +727,19 @@ const CX_FILES = '.pem,.crt,.cer,.der,.csr,.req,.p7b,.p7c,.p7s,.cat,.txt,.html,.
 const cxCur = () => { const R = cxS().R; return R && (R.certs[cxS().sel] || R.certs[0]); };
 const CX_ACTS = {
   cxTab:(id, v) => { cxS().tab = v; cxPaint(); },
-  cxClear:() => { const S = cxS(); S.R = null; S.rec = null; S.keyWarn = false; S.input = ''; cxPaint(); },
+  cxClear:() => { const S = cxS(); S.R = null; S.rec = null; S.keyWarn = false; S.input = ''; if(typeof recentSetLast === 'function'){ recentSetLast('certs', null); save(); } cxPaint(); },
   cxPaste:(id, v) => cxPasteDlg(v || 'decode'),
   cxPdGo:(id, v) => { const t = ($('cxPdIn') || {}).value || ''; if(!t.trim()) return toast('Paste something first'); closeDlg();
-    if(v === 'ct'){ const A = ctParse(t); if(!A) return toast('That is not crt.sh JSON — open the link with output=json and copy everything'); const S = cxS(); S.ct = A; S.ctF = ''; S.ctRec = null; S.ctDom = S.ctDom || A.dom; S.tab = 'ct'; return cxPaint(); }
+    if(v === 'ct'){ const A = ctParse(t); if(!A) return toast('That is not crt.sh JSON — open the link with output=json and copy everything'); const S = cxS(); S.ct = A; S.ctF = ''; S.ctRec = null; S.ctDom = S.ctDom || A.dom; S.tab = 'ct'; cxKeep('crt.sh · ' + (A.dom || 'names'), t, 'ct'); return cxPaint(); }
     if(v === 'cmp') return cxLoad(t, {cmp:true});
     cxIngest(t); },
   cxPdFile:(id, v) => { closeDlg(); pickFiles(v === 'ct' ? '.json,.txt' : CX_FILES, fs => fs[0] && cxReadFile(fs[0], v)); },
   cxFile:(id, v) => pickFiles(v === 'ct' ? '.json,.txt' : CX_FILES, fs => fs[0] && cxReadFile(fs[0], v || (cxS().tab === 'compare' ? 'cmp' : ''))),
   cxExamples:(id, v, t) => { const r = t.getBoundingClientRect(); showMenu(r.left, r.bottom + 6, Object.entries(CERT_SAMPLES).map(([k, s]) => ({label:s.label, icon:k === 'csr' ? 'file-text' : k === 'ct' ? 'radar' : k === 'pe' ? 'app-window' : k === 'reuse' ? 'git-compare' : 'scroll-text', fn:() => CX_ACTS.cxSample(null, k === 'reuse' ? 'cmp' : k)})), 'Fictional examples'); },
-  cxSaved:(id, v, t) => cxSavedMenu(t),
+  cxSaved:() => cxHistory(),
+  cxHistRec:id => { closeDlg(); CX_ACTS.cxRec(id); },
+  cxHistDel:id => { const r = DB.records.find(x => x.id === id); if(!r) return; const S = cxS(); if(S.rec === id){ S.rec = null; if(S.R) S.R.rec = null; }
+    delRecord([id]); cxHistory(); if(UI.route.area === 'certs') cxPaint(); },
   cxSample:(id, v) => { const S = cxS();
     if(v === 'ct'){ S.ct = ctParse(JSON.stringify(CERT_SAMPLES.ct.data)); S.ctF = ''; S.ctK = 'all'; S.ctRec = null; S.ctDom = S.ct.dom; S.tab = 'ct'; return cxPaint(); }
     if(v === 'pe'){ const b = atob(CERT_SAMPLES.pe.b64), u = new Uint8Array(b.length); for(let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); S.input = ''; S.rec = null; return cxLoad(u, {name:CERT_SAMPLES.pe.name, src:'Example · ' + CERT_SAMPLES.pe.label, tab:'decoder'}); }
@@ -733,6 +786,8 @@ const CX_ACTS = {
   cxCtCsv:() => { const A = cxS().ct; if(!A) return; const q = v => csvCell(v);
     download('ct-' + (nbSlug(A.dom) || 'names') + '.csv', 'name,certificates,first_seen,last_issued,covered_until,valid_now,interesting\n' + A.names.map(r => [q(r.name), r.n, cxYmd(r.first), cxYmd(r.last), cxYmd(r.until), r.live, r.look ? 'lookalike' : r.hot ? 'yes' : ''].join(',')).join('\n') + '\n', 'text/csv'); },
   cxCtSave:() => cxCtSave(),
+  cxType:(id, v) => { const S = cxS(); S.ch = 'types'; S.tab = 'guide'; cxPaint(); CX_ACTS.cxJump(null, v); },
+  cxJump:(id, v) => { const el = $('crtg-ty-' + v), a = $('cxArt'); if(!el) return; if(a && a.scrollHeight > a.clientHeight + 4) a.scrollTop += el.getBoundingClientRect().top - a.getBoundingClientRect().top - 12; else el.scrollIntoView({block:'start'}); const h = el.querySelector('h3') || el; h.setAttribute('tabindex', '-1'); h.focus({preventScroll:true}); },
   cxCh:(id, v) => { const S = cxS(); S.ch = v; S.tab = 'guide'; cxPaint(); const a = $('cxArt'); if(a) a.scrollTop = 0; },
   cxToNb:() => cxToNb(),
   pcCerts:(id, v) => { const x = UI.pcap && UI.pcap.tls[+v]; if(!x || !x.certs.length) return; const pem = x.certs.map(d => X5.toPem(d)).join(''); const S = cxS(); S.input = pem; S.rec = null; S.tab = 'decoder'; go('#/certs'); setTimeout(() => cxLoad(pem, {src:'From the packet capture · ' + (x.sni || x.srv)}), 30); }

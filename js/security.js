@@ -48,6 +48,7 @@ async function resealAll(fromKey){
   for(const s of list){ const v = await IDB.get('osintrix-snap:' + s.at); if(v) await IDB.set('osintrix-snap:' + s.at, await conv(v)); }
   const fids = new Set(DB.records.concat((DB.trash || []).flatMap(x => x.kind === 'record' ? [x.data.r] : x.kind === 'case' ? x.data.records : [])).flatMap(r => (r.att || []).map(a => a.id)));
   for(const fid of fids){ let v = await IDB.get('file:' + fid); if(!v) continue; if(v.enc){ if(!fromKey) continue; const pt = await crypto.subtle.decrypt({name:'AES-GCM', iv:b64d8(v.iv)}, fromKey, v.ct); v = new Blob([pt], {type:v.type}); } await IDB.set('file:' + fid, await sealBlob(v)); }
+  for(const x of (DB.recent || []).filter(x => x.kind === 'file')){ let v = await IDB.get('wk:' + x.id); if(!v) continue; if(v.enc){ if(!fromKey) continue; const pt = await crypto.subtle.decrypt({name:'AES-GCM', iv:b64d8(v.iv)}, fromKey, v.ct); v = new Blob([pt], {type:v.type}); } await IDB.set('wk:' + x.id, await sealBlob(v)); }
   if(typeof nbReseal === 'function') await nbReseal(fromKey);
   FILE_URLS.clear(); SNAPS = null;
 }
@@ -71,7 +72,7 @@ async function encDisable(pass){
 /* ---------- lock screen ---------- */
 function lockScreen(env, done){
   const w = $('welcome'); w.hidden = false; w.classList.add('lockscr');
-  w.innerHTML = `<div class="wcard lockcard">${logoMark(64)}<h1 id="wTitle" style="font-size:30px">This workspace is locked</h1><p>Your cases are encrypted in this browser. Enter your passphrase to open them.</p>
+  w.innerHTML = `<div class="wcard lockcard">${logoMark(64)}<h1 id="wTitle" style="font-size:calc(30px * var(--ts,1))">This workspace is locked</h1><p>Your cases are encrypted in this browser. Enter your passphrase to open them.</p>
     <form id="unlockF" class="unlock"><label class="sr" for="unlockP">Passphrase</label><input id="unlockP" type="password" class="inp" autocomplete="current-password" placeholder="Passphrase" autofocus><button class="btn primary" type="submit">${ico('lock-open','sm')}Unlock</button></form>
     <p class="lockerr" id="unlockE" role="alert"></p>
     <p class="t3 lockfoot">Forgot it? There is no reset — that is what keeps the data private. <button class="linkbtn" type="button" id="eraseB">Erase this workspace and start over…</button></p></div>`;
@@ -90,7 +91,7 @@ function armAutolock(){ const m = +((DB.security || {}).autolock || 0); clearTim
 
 /* ---------- encrypted backup files ---------- */
 async function passDlg(title, body, label, cb, confirm2){
-  openDlg(dhead(title) + `<form data-form="pass"><div class="in"><p class="t2" style="margin:0 0 14px;font-size:14px">${body}</p>
+  openDlg(dhead(title) + `<form data-form="pass"><div class="in"><p class="t2" style="margin:0 0 14px;font-size:calc(14px * var(--ts,1))">${body}</p>
     <div class="field"><label for="pw1">Passphrase</label><input id="pw1" type="password" class="inp" autocomplete="new-password" required minlength="${confirm2 ? 8 : 1}" autofocus>${confirm2 ? '<div class="pwmeter" id="pwM"><i></i></div><span class="hint" id="pwH">At least 8 characters. A few random words is strong and easy to remember.</span>' : ''}</div>
     ${confirm2 ? `<div class="field" style="margin:0"><label for="pw2">Repeat it</label><input id="pw2" type="password" class="inp" autocomplete="new-password" required></div>` : ''}<p class="lockerr" id="pwE" role="alert"></p></div>
     <footer><button class="btn" type="button" data-act="dclose">Cancel</button><button class="btn primary" type="submit">${label}</button></footer></form>`, false, () => {

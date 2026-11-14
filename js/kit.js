@@ -25,7 +25,7 @@ const wordy = s => /[A-Za-z]{4,}/.test(s) && (s.replace(/[A-Za-z0-9 ._\-:/\\@=,(
 const u16le = (b, o) => b[o] | (b[o + 1] << 8), u32le = (b, o) => (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0;
 const u16be = (b, o) => (b[o] << 8) | b[o + 1], u32be = (b, o) => ((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]) >>> 0;
 const latin1 = (b, s = 0, e = b.length) => { let out = ''; for(let i = s; i < e; i += 8192) out += String.fromCharCode.apply(null, b.subarray(i, Math.min(e, i + 8192))); return out; };
-async function inflateRaw(bytes){ return new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer()); }
+async function inflateRaw(bytes, max){ return decompressCapped(bytes, 'deflate-raw', max); }
 function entropyOf(b){ if(!b.length) return 0; const f = new Array(256).fill(0); for(const x of b) f[x]++; let e = 0; for(const c of f) if(c){ const p = c / b.length; e -= p * Math.log2(p); } return e; }
 
 /* regions of compressed image data — strings found there are noise */

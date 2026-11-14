@@ -36,14 +36,14 @@ function imgxCard(){
   if(!I.dhash) I.dhash = dhashOf(I.data);
   if(!I.sim){ I.sim = 'loading'; similarTo(I.dhash).then(s => { I.sim = s; if(UI.route.area === 'lab') { const el = $('imgSim'); if(el) el.innerHTML = simHTML(s); } }); }
   return `<section class="card"><header><h3>${ico('fingerprint','sm')} Fingerprint &amp; look-alikes</h3></header><div class="body">
-    <p class="t3" style="margin:0 0 8px;font-size:13px">Perceptual hash (dHash) — stays the same when the picture is resized or re-compressed.</p>
-    <code class="mono" style="font-size:14px">${I.dhash}</code>
+    <p class="t3" style="margin:0 0 8px;font-size:calc(13px * var(--ts,1))">Perceptual hash (dHash) — stays the same when the picture is resized or re-compressed.</p>
+    <code class="mono" style="font-size:calc(14px * var(--ts,1))">${I.dhash}</code>
     <div id="imgSim" style="margin-top:12px">${simHTML(I.sim)}</div></div></section>`;
 }
 function simHTML(s){
-  if(s === 'loading' || !s) return '<span class="t3" style="font-size:13px">Comparing with images in your evidence…</span>';
-  if(!s.length) return '<span class="t3" style="font-size:13px">No similar image among your evidence.</span>';
-  return `<div class="t3" style="font-size:12.5px;margin-bottom:6px">Similar images in your evidence</div>` + s.map(x => `<button class="li simi" data-act="selRec" data-id="${x.r.id}"><img data-fid="${x.a.id}" alt=""><div class="main2"><b style="font-weight:540;font-size:13.5px">${esc(x.a.name)}</b><small>${esc((theCase(x.r.caseId) || {}).code || '')} · ${x.d === 0 ? 'identical picture' : x.d <= 5 ? 'almost certainly the same picture' : 'looks alike'} (${x.d}/64 bits differ)</small></div></button>`).join('');
+  if(s === 'loading' || !s) return '<span class="t3" style="font-size:calc(13px * var(--ts,1))">Comparing with images in your evidence…</span>';
+  if(!s.length) return '<span class="t3" style="font-size:calc(13px * var(--ts,1))">No similar image among your evidence.</span>';
+  return `<div class="t3" style="font-size:calc(12.5px * var(--ts,1));margin-bottom:6px">Similar images in your evidence</div>` + s.map(x => `<button class="li simi" data-act="selRec" data-id="${x.r.id}"><img data-fid="${x.a.id}" alt=""><div class="main2"><b style="font-weight:540;font-size:calc(13.5px * var(--ts,1))">${esc(x.a.name)}</b><small>${esc((theCase(x.r.caseId) || {}).code || '')} · ${x.d === 0 ? 'identical picture' : x.d <= 5 ? 'almost certainly the same picture' : 'looks alike'} (${x.d}/64 bits differ)</small></div></button>`).join('');
 }
 async function showEla(canvas){
   const I = UI.img; if(!I) return; if(!I.ela){ I.ela = 'busy'; I.ela = await elaOf(I.data); }

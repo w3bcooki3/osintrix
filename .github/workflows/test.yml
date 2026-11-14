@@ -1,0 +1,58 @@
+# Runs the end-to-end tests on every push and pull request, and checks that the
+# one-file offline copy still builds and that CHANGELOG.md matches js/data/changelog.js.
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Changelog is up to date
+        run: |
+          python3 tools/changelog.py
+          git diff --exit-code CHANGELOG.md || (echo "::error::CHANGELOG.md is out of date. Run python3 tools/changelog.py and commit it." && exit 1)
+
+      - name: Offline copy builds
+        run: python3 tools/bundle.py
+
+      - name: Run tests
+        run: npx playwright test
+
+      - name: Upload test report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14

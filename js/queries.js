@@ -121,7 +121,7 @@ function queryPanel(x){
     <div class="qp-go"><a class="btn primary big" id="qRunLink" target="_blank" rel="noopener noreferrer" data-act="qGo" data-id="${x.id}">${ico('external-link','sm')}<span id="qRunLabel">Search</span></a>
       <button class="btn" data-act="qCopy">${ico('copy','sm')}Copy</button><label class="chk"><input type="checkbox" id="qLog" checked> Log to ${esc(theCase().code)}</label></div>
     <p class="hint" id="qRunHint"></p>
-    ${runs.length ? `<div class="qp-s"><h4>Recent searches</h4>${runs.map(l => `<div class="qrun"><span class="mono">${esc(l.q)}</span><small>${esc(ENGINES[l.engine][0])} · ${esc((theCase(l.caseId) || {code:'deleted case'}).code)} · ${esc(E.fmtAgo(Date.now() - l.at))}</small></div>`).join('')}</div>` : ''}
+    ${runs.length ? `<div class="qp-s"><h4>Recent searches</h4>${runs.map(l => `<div class="qrun"><span class="mono">${esc(l.q)}</span><small>${esc((ENGINES[l.engine] || [l.engine])[0])} · ${esc((theCase(l.caseId) || {code:'deleted case'}).code)} · ${esc(E.fmtAgo(Date.now() - l.at))}</small><button class="iconbtn qrun-x" data-act="qRunDel" data-v="${l.at}" aria-label="Forget this search" title="Forget">${ico('x','sm')}</button></div>`).join('')}</div>` : ''}
   </div>`;
 }
 function syncRun(){

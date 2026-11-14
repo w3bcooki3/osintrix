@@ -1,0 +1,6 @@
+dist/
+__pycache__/
+_old-single-file/
+node_modules/
+playwright-report/
+test-results/

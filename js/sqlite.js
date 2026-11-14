@@ -84,7 +84,7 @@ function sqlFree(b){
 }
 
 /* ---------- open ---------- */
-async function sqlLoad(f){
+async function sqlLoad(f, keep = true){
   if(f.size > 300 * 1048576) return toast('That database is over 300 MB — too big for a browser tab');
   UI.sql = {busy:true, name:f.name}; UI.sqlView = null; renderMain();
   try{
@@ -99,7 +99,7 @@ async function sqlLoad(f){
     const arts = sqlArts(db, tables);
     UI.sql = {name:f.name, size:f.size, file:f, db, tables, arts, apple, wal, sha256:await sha256Hex(buf.buffer), free:sqlFree(buf), user:{version:(buf[60] << 24 | buf[61] << 16 | buf[62] << 8 | buf[63]) >>> 0, enc:['', 'UTF-8', 'UTF-16le', 'UTF-16be'][(buf[56] << 24 | buf[57] << 16 | buf[58] << 8 | buf[59]) >>> 0] || ''}};
     UI.sqlView = arts.length ? {kind:'art', id:arts[0].id} : tables.length ? {kind:'table', name:tables[0].name} : {kind:'sql'};
-    UI.sqlPage = 0; UI.sqlQ = ''; UI.sqlSort = null;
+    UI.sqlPage = 0; UI.sqlQ = ''; UI.sqlSort = null; if(keep) recentKeepFile('sqlite', f);
   }catch(e){ UI.sql = null; toast(e.message || 'Could not open that database'); }
   renderMain();
 }
@@ -135,7 +135,7 @@ function labSql(){
   const S = UI.sql;
   if(!S) return `<label class="drop" id="sqDrop" tabindex="0"><input type="file" id="sqIn" class="sr">${ico('database')}<b>Drop a SQLite database, or click to choose</b>
     <span>Browser history, cookies, phone messages, app databases — up to 300 MB. Opened as a copy in your browser; the original is never changed.</span>
-    <span class="drop-feat"><i>Chrome · Edge · Brave</i><i>Firefox</i><i>Safari</i><i>Android SMS &amp; calls</i><i>iPhone messages</i><i>WhatsApp</i><i>Any table</i><i>Timestamps decoded</i><i>Deleted-data scan</i><i>SQL console</i></span></label>
+    <span class="drop-feat"><i>Chrome · Edge · Brave</i><i>Firefox</i><i>Safari</i><i>Android SMS &amp; calls</i><i>iPhone messages</i><i>WhatsApp</i><i>Any table</i><i>Timestamps decoded</i><i>Deleted-data scan</i><i>SQL console</i></span></label><div class="drop-hist"><button class="btn sm ghost" data-act="rcShow" data-v="sqlite">${ico('history','sm')}History<span class="crt-cnt">${recentN('sqlite')}</span></button><span class="t3 small">Files you open are kept in this browser (up to 50 MB each) so a refresh does not lose them.</span></div>
     <details class="caphelp" style="margin-top:12px"><summary>${ico('circle-help','sm')}Where do I find these files?</summary><div class="caphelp-b"><ul>
       <li><b>Chrome</b> (Windows): <span class="mono">%LOCALAPPDATA%\\Google\\Chrome\\User Data\\Default\\History</span> — also <span class="mono">Cookies</span>, <span class="mono">Login Data</span>, <span class="mono">Web Data</span>. Edge and Brave use the same names in their own folders.</li>
       <li><b>Firefox</b>: <span class="mono">places.sqlite</span>, <span class="mono">cookies.sqlite</span>, <span class="mono">formhistory.sqlite</span> in the profile folder (about:profiles shows it).</li>
@@ -153,13 +153,13 @@ function labSql(){
     <button data-act="sqView" data-v="info" aria-current="${V.kind === 'info'}">${ico('info','sm')}<span>File details</span></button></nav>`;
   return `<section class="card pc-head"><header><span class="fi-ic">${ico('database')}</span><div style="min-width:0;flex:1"><h3>${esc(S.name)}</h3>
       <p class="t3">${apps.length ? esc(apps.join(' · ')) : 'SQLite database'} · ${S.tables.filter(t => t.type === 'table').length} tables · ${fmtBytes(S.size)}${S.wal ? ' · WAL mode' : ''}</p></div>
-      <div class="wrap"><button class="btn sm" data-act="sqSave">${ico('plus','sm')}Save to ${esc(theCase().code)}</button><button class="btn sm" data-act="sqClear">${ico('x','sm')}Another file</button></div></header></section>
+      <div class="wrap"><button class="btn sm" data-act="sqSave">${ico('plus','sm')}Save to ${esc(theCase().code)}</button><button class="btn sm ghost" data-act="rcShow" data-v="sqlite">${ico('history','sm')}History<span class="crt-cnt">${recentN('sqlite')}</span></button><button class="btn sm" data-act="sqClear">${ico('x','sm')}Another file</button></div></header></section>
     <div class="sq-grid">${side}<div class="sq-main" id="sqMain">${sqlMain()}</div></div>`;
 }
 function sqlMain(){
   const S = UI.sql, V = UI.sqlView || {};
   if(V.kind === 'info') return `<section class="card"><div class="body">
-    <div class="kv"><span>SHA-256</span><code style="font-size:11.5px;word-break:break-all">${S.sha256}</code></div><div class="kv"><span>Size</span><b>${fmtBytes(S.size)}</b></div>
+    <div class="kv"><span>SHA-256</span><code style="font-size:calc(11.5px * var(--ts,1));word-break:break-all">${S.sha256}</code></div><div class="kv"><span>Size</span><b>${fmtBytes(S.size)}</b></div>
     <div class="kv"><span>Page size</span><b>${S.free.ps.toLocaleString()} bytes</b></div><div class="kv"><span>Free pages</span><b>${S.free.total.toLocaleString()}</b></div><div class="kv"><span>Text encoding</span><b>${esc(S.user.enc)}</b></div><div class="kv"><span>Journal</span><b>${S.wal ? 'WAL — recent changes may be in the separate -wal file' : 'rollback journal'}</b></div>
     <h4 class="caps" style="margin:16px 0 8px">Schema</h4><pre class="sq-schema">${esc(sqlExec(S.db, `SELECT sql FROM sqlite_master WHERE sql IS NOT NULL`).rows.map(r => r[0]).join(';\n\n'))}</pre></div></section>`;
   if(V.kind === 'free'){ const F = S.free, q = (UI.sqlQ || '').toLowerCase(), f = q ? F.found.filter(x => x.text.toLowerCase().includes(q)) : F.found;
@@ -229,5 +229,5 @@ const SQL_ACTS = {
   sqPage:(id, v) => { UI.sqlPage = Math.max(0, +v); sqMainPaint(); },
   sqSort:(id, v) => { UI.sqlSort = UI.sqlSort && UI.sqlSort.col === v ? {col:v, desc:!UI.sqlSort.desc} : {col:v, desc:false}; UI.sqlPage = 0; sqMainPaint(); },
   sqRun:() => sqlRun(), sqCsv:() => sqlCsv(), sqSend:() => sqlSend(), sqSave:() => sqlSave(),
-  sqClear:() => { if(UI.sql && UI.sql.db) try{ UI.sql.db.close(); }catch(e){} UI.sql = null; UI.sqlRes = null; renderMain(); }
+  sqClear:() => { if(UI.sql && UI.sql.db) try{ UI.sql.db.close(); }catch(e){} UI.sql = null; UI.sqlRes = null; recentSetLast('sqlite', null); save(); renderMain(); }
 };

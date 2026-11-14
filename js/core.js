@@ -5,7 +5,7 @@ const E = Engine, esc = E.esc;
 const $ = id => document.getElementById(id);
 const STORE_KEY = 'osintrix-poc:v4';
 const uid = p => (p || 'x') + '-' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-3);
-const ico = (n, cls = '') => `<svg class="i ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${LUCIDE[n] || ''}</svg>`;
+const ico = (n, cls = '') => !LUCIDE[n] ? '' : `<svg class="i ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${LUCIDE[n] || ''}</svg>`;
 
 let DB = null;
 const UI = {route:{area:'home'}, q:'', ast:null, sel:null, inspOpen:false, navOpen:false, vcat:'all', vq:'', vview:'grid',
@@ -221,7 +221,7 @@ function entPill(id, opts = {}){
   return `<button class="ent${UI.sel && UI.sel.id === id ? ' on' : ''}" data-v="${verdictOf(id)}" data-act="selEnt" data-id="${esc(id)}" title="${esc(E.LABEL[k] || k)}">${kindBadge(k)}<span class="v">${esc(v)}</span>${opts.n ? `<span class="n">×${opts.n}</span>` : ''}</button>`;
 }
 function entryPill(e){
-  return `<button class="ent" data-v="${entryVerdict(e)}" data-act="selEntry" data-id="${e.id}">${tbadge(e.type)}<span class="v"${MONO_TYPES.has(e.type) ? '' : ' style="font-family:var(--font);font-size:13px"'}>${esc(primary(e))}</span></button>`;
+  return `<button class="ent" data-v="${entryVerdict(e)}" data-act="selEntry" data-id="${e.id}">${tbadge(e.type)}<span class="v"${MONO_TYPES.has(e.type) ? '' : ' style="font-family:var(--font);font-size:calc(13px * var(--ts,1))"'}>${esc(primary(e))}</span></button>`;
 }
 const vdLabel = v => v ? `<span class="vd" data-v="${v}">${v[0].toUpperCase() + v.slice(1)}</span>` : '';
 const prioLabel = p => `<span class="prio" data-p="${p}">${p[0].toUpperCase() + p.slice(1)}</span>`;
@@ -231,7 +231,17 @@ const impl = i => `<span class="impl" data-i="${i}">${{real:'Working', mock:'Sam
 const typeLabel = t => ({evidence:'Evidence', note:'Note', finding:'Finding', lead:'Question'}[t] || t);
 const ILL_FOR = {waypoints:'graph', layers:'vault', 'folder-open':'vault', clock:'time', 'book-open':'time', filter:'search', search:'search', wrench:'tools', 'list-checks':'time'};
 function empty(icon, title, body, acts){ const il = ILLUS[ILL_FOR[icon]]; return `<div class="empty" role="status">${il ? `<div class="illus">${il}</div>` : `<div class="art">${ico(icon)}</div>`}<h3>${title}</h3><div>${body}</div>${acts ? `<div class="acts">${acts}</div>` : ''}</div>`; }
+/* spreadsheet formula injection: a text cell starting with = + - @ (or a tab/CR) is run as a formula by Excel and Sheets — prefix it with ' */
+const csvFormula = v => typeof v === 'string' && /^[=+\-@\t\r]/.test(v) ? "'" + v : v;
+/* a file name that is safe on every system: no path parts, control or reserved characters, not too long */
+function safeName(n, fb = 'download'){
+  let s = String(n || '').normalize('NFC').replace(/[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]/g, '').replace(/[\\/:*?"<>|]+/g, '_').replace(/^[\s.]+|[\s.]+$/g, '');
+  if(/^(con|prn|aux|nul|com\d|lpt\d)(\.|$)/i.test(s)) s = '_' + s;
+  if(s.length > 150){ const m = s.match(/(\.[a-z0-9]{1,8})$/i), ext = m ? m[1] : ''; s = s.slice(0, 150 - ext.length) + ext; }
+  return s || fb;
+}
 function download(name, text, mime){
+  name = safeName(name);
   try{ const u = URL.createObjectURL(new Blob([text], {type:mime || 'text/plain;charset=utf-8'})); const a = document.createElement('a'); a.href = u; a.download = name;
     document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(u); a.remove(); }, 150); toast('Saved ' + name); }catch(e){ toast('The browser blocked the download'); }
 }
@@ -259,3 +269,13 @@ window.addEventListener('beforeunload', ev => {
   if(isDirty()) flush();
   if(isDirty()){ ev.preventDefault(); ev.returnValue = ''; return ''; }
 });
+/* Decompress with a ceiling: a tiny "zip bomb" must not be able to fill memory. Throws when the output passes max bytes. */
+const INFLATE_MAX = 256 * 1048576;
+async function decompressCapped(bytes, kind, max = INFLATE_MAX){
+  if(typeof DecompressionStream === 'undefined') throw new Error('This browser cannot decompress');
+  const rd = new Blob([bytes]).stream().pipeThrough(new DecompressionStream(kind)).getReader(), parts = []; let n = 0;
+  for(;;){ const {done, value} = await rd.read(); if(done) break; n += value.length;
+    if(n > max){ try{ await rd.cancel(); }catch(e){} throw new Error('Decompressed data is larger than ' + Math.round(max / 1048576) + ' MB — stopped (possible decompression bomb)'); }
+    parts.push(value); }
+  const out = new Uint8Array(n); let o = 0; for(const p of parts){ out.set(p, o); o += p.length; } return out;
+}

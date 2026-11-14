@@ -27,9 +27,9 @@ function inspEntry(e){
   const tools = DB.tools.filter(x => (TOOL_FOR[e.type] || []).includes(x.sub)).slice(0, 6);
   const m = k ? E.meaning(entSplit(k).k, entSplit(k).v) : null;
   return ihead('Vault entry', `<button class="iconbtn${e.starred ? ' on' : ''}" data-act="star" data-id="${e.id}" aria-label="Star">${ico('star')}</button>`) + `<div class="ibody">
-    <div style="display:flex;gap:14px;align-items:flex-start">${tbadge(e.type,'lg')}<div style="min-width:0"><div class="t3" style="font-size:13px;font-weight:560">${esc(t.label)}</div>
-      <h2 class="${MONO_TYPES.has(e.type) ? 'mono' : ''}" style="overflow-wrap:anywhere;${MONO_TYPES.has(e.type) ? 'font-size:16px;font-weight:600' : ''}">${esc(primary(e))}</h2>
-      ${m ? `<div style="font-size:13px;margin-top:3px;color:${m.hot ? 'var(--amber)' : 'var(--text-3)'}">${esc(m.t)}</div>` : ''}${k ? `<div class="cxts">${ctxChips(entSplit(k).k, entSplit(k).v)}</div>` : ''}</div></div>
+    <div style="display:flex;gap:14px;align-items:flex-start">${tbadge(e.type,'lg')}<div style="min-width:0"><div class="t3" style="font-size:calc(13px * var(--ts,1));font-weight:560">${esc(t.label)}</div>
+      <h2 class="${MONO_TYPES.has(e.type) ? 'mono' : ''}" style="overflow-wrap:anywhere;${MONO_TYPES.has(e.type) ? 'font-size:calc(16px * var(--ts,1));font-weight:600' : ''}">${esc(primary(e))}</h2>
+      ${m ? `<div style="font-size:calc(13px * var(--ts,1));margin-top:3px;color:${m.hot ? 'var(--amber)' : 'var(--text-3)'}">${esc(m.t)}</div>` : ''}${k ? `<div class="cxts">${ctxChips(entSplit(k).k, entSplit(k).v)}</div>` : ''}</div></div>
     <div class="wrap" style="margin-top:14px"><button class="btn sm" data-act="editEntry" data-id="${e.id}">${ico('pencil','sm')}Edit</button>${k ? `<button class="btn sm${isWatched(k) ? ' on' : ''}" data-act="watch" data-id="${esc(k)}">${ico(isWatched(k) ? 'eye-off' : 'eye','sm')}${isWatched(k) ? 'Unwatch' : 'Watch'}</button>` : ''}<button class="btn sm" data-act="linkFrom" data-id="${e.id}">${ico('git-branch','sm')}Connect</button>
       <a class="btn sm" href="${caseHash(e.caseId,'graph')}" data-act="showInGraph" data-id="${e.id}">${ico('waypoints','sm')}Graph</a><button class="btn sm danger" data-act="delEntry" data-id="${e.id}" aria-label="Delete">${ico('trash-2','sm')}</button></div>
     ${pivotSection(k ? entSplit(k).k : e.type, k ? entSplit(k).v : primary(e))}
@@ -38,12 +38,12 @@ function inspEntry(e){
     <div class="isec"><h4>Details</h4><dl class="kv">${t.fields.filter(([n]) => e.fields[n]).map(([n, l]) => `<dt>${esc(l)}</dt><dd class="${MONO_TYPES.has(e.type) && n === t.fields[0][0] ? 'mono' : ''}">${esc(e.fields[n])}</dd>`).join('')}
       <dt>Added</dt><dd>${esc(E.fmtFull(e.created, tz()).slice(0, 16))}</dd>${src ? `<dt>Source</dt><dd><button class="linkbtn" data-act="selRec" data-id="${src.id}">${esc(src.title)}</button></dd>` : ''}</dl>
       ${e.tags.length ? `<div class="wrap" style="margin-top:12px">${e.tags.map(x => `<span class="chip sq">#${esc(x)}</span>`).join('')}</div>` : ''}
-      ${e.notes ? `<p style="margin:12px 0 0;color:var(--text-2);font-size:14px;line-height:1.6">${esc(e.notes)}</p>` : ''}</div>
+      ${e.notes ? `<p style="margin:12px 0 0;color:var(--text-2);font-size:calc(14px * var(--ts,1));line-height:1.6">${esc(e.notes)}</p>` : ''}</div>
     ${other.length ? `<div class="isec"><div class="note amber"><span class="ic">${ico('link-2','sm')}</span><div><b>Also in ${other.length} other case${other.length > 1 ? 's' : ''}:</b> ${other.map(x => `<a href="${caseHash(x)}">${esc(theCase(x).name)}</a>`).join(', ')}</div></div></div>` : ''}
     <div class="isec"><h4>Relationships <span class="t3">${links.length}</span></h4>
-      ${links.map(l => { const out = l.a === e.id, o = entryById(out ? l.b : l.a); return o ? `<div class="rel"><div class="rt"><span class="dir" title="${out ? 'Outgoing' : 'Incoming'}">${ico(out ? 'arrow-up-right' : 'undo-2','sm')}</span><button class="lab" data-act="selLink" data-id="${l.id}">${out ? '' : '← '}${esc(l.label)}</button>${conf(l.conf)}</div>${entryPill(o)}</div>` : ''; }).join('') || '<span class="t3" style="font-size:13.5px">None yet — use Connect.</span>'}</div>
+      ${links.map(l => { const out = l.a === e.id, o = entryById(out ? l.b : l.a); return o ? `<div class="rel"><div class="rt"><span class="dir" title="${out ? 'Outgoing' : 'Incoming'}">${ico(out ? 'arrow-up-right' : 'undo-2','sm')}</span><button class="lab" data-act="selLink" data-id="${l.id}">${out ? '' : '← '}${esc(l.label)}</button>${conf(l.conf)}</div>${entryPill(o)}</div>` : ''; }).join('') || '<span class="t3" style="font-size:calc(13.5px * var(--ts,1))">None yet — use Connect.</span>'}</div>
     <div class="isec"><h4>Evidence that mentions it <span class="t3">${mentions.length}</span></h4>
-      ${mentions.slice(0, 8).map(r => `<button class="li" data-act="selRec" data-id="${r.id}" style="padding:8px 0"><div class="main2"><b style="font-weight:520;font-size:14px">${esc(r.title)}</b><small>${r.ts ? esc(E.fmtFull(r.ts, tz()).slice(5, 16)) : 'no time'}${r.host ? ' · ' + esc(r.host) : ''}</small></div></button>`).join('') || '<span class="t3" style="font-size:13.5px">No captured record mentions this yet.</span>'}</div>
+      ${mentions.slice(0, 8).map(r => `<button class="li" data-act="selRec" data-id="${r.id}" style="padding:8px 0"><div class="main2"><b style="font-weight:520;font-size:calc(14px * var(--ts,1))">${esc(r.title)}</b><small>${r.ts ? esc(E.fmtFull(r.ts, tz()).slice(5, 16)) : 'no time'}${r.host ? ' · ' + esc(r.host) : ''}</small></div></button>`).join('') || '<span class="t3" style="font-size:calc(13.5px * var(--ts,1))">No captured record mentions this yet.</span>'}</div>
     ${tools.length ? `<div class="isec"><h4>From your toolbox</h4><div class="wrap">${tools.map(x => { const u = E.safeUrl(x.url); return u ? `<a class="btn sm" href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(x.name)} ${ico('external-link','sm')}</a>` : ''; }).join('')}</div>
       <p class="heur">Opens the tool's site. The value is not sent anywhere.</p></div>` : ''}
   </div>`;
@@ -74,19 +74,19 @@ function inspRecord(r){
 }
 function inspEnt(id){
   const {k, v} = entSplit(id), g = globalEnts().get(id), recs = g ? g.recs : [], m = E.meaning(k, v), vd = verdictOf(id), canVault = !!KIND_TO_TYPE[k];
-  return ihead('Indicator') + `<div class="ibody"><div style="display:flex;gap:14px;align-items:flex-start">${kindBadge(k,'lg')}<div style="min-width:0"><div class="t3" style="font-size:13px">${esc(E.LABEL[k] || k)} · extracted</div><h2 class="mono" style="font-size:16px;font-weight:600;overflow-wrap:anywhere">${esc(v)}</h2>
-    ${m ? `<div style="font-size:13px;margin-top:3px;color:${m.hot ? 'var(--amber)' : 'var(--text-3)'}">${esc(m.t)}</div>` : ''}<div class="cxts">${ctxChips(k, v)}</div></div></div>
+  return ihead('Indicator') + `<div class="ibody"><div style="display:flex;gap:14px;align-items:flex-start">${kindBadge(k,'lg')}<div style="min-width:0"><div class="t3" style="font-size:calc(13px * var(--ts,1))">${esc(E.LABEL[k] || k)} · extracted</div><h2 class="mono" style="font-size:calc(16px * var(--ts,1));font-weight:600;overflow-wrap:anywhere">${esc(v)}</h2>
+    ${m ? `<div style="font-size:calc(13px * var(--ts,1));margin-top:3px;color:${m.hot ? 'var(--amber)' : 'var(--text-3)'}">${esc(m.t)}</div>` : ''}<div class="cxts">${ctxChips(k, v)}</div></div></div>
     <div class="wrap" style="margin-top:14px"><button class="btn sm${isWatched(id) ? ' on' : ''}" data-act="watch" data-id="${esc(id)}">${ico(isWatched(id) ? 'eye-off' : 'eye','sm')}${isWatched(id) ? 'Unwatch' : 'Watch'}</button></div>
     ${canVault && !derive().byKey.has(id) ? `<button class="btn primary sm" data-act="promote" data-id="${esc(id)}" style="margin-top:14px">${ico('plus','sm')}Add to ${esc(theCase().code)} vault</button>` : ''}
     ${pivotSection(k, v)}
     <div class="isec"><h4>Verdict <span class="t3">applies in every case</span></h4><div class="seg v">${[['malicious','Malicious'],['suspicious','Suspicious'],['benign','Benign'],['','Unknown']].map(([x, l]) => `<button data-act="entVerdict" data-id="${esc(id)}" data-v="${x}" aria-pressed="${vd === x}">${l}</button>`).join('')}</div></div>
-    <div class="isec"><h4>Appears in <span class="t3">${recs.length} records · ${g ? g.cases.size : 0} cases</span></h4>${recs.slice(0, 10).map(r => `<button class="li" data-act="selRec" data-id="${r.id}" style="padding:8px 0"><div class="main2"><b style="font-weight:520;font-size:14px">${esc(r.title)}</b><small>${esc(theCase(r.caseId).code)}${r.ts ? ' · ' + esc(E.fmtFull(r.ts, tz()).slice(5, 16)) : ''}</small></div></button>`).join('')}</div>
+    <div class="isec"><h4>Appears in <span class="t3">${recs.length} records · ${g ? g.cases.size : 0} cases</span></h4>${recs.slice(0, 10).map(r => `<button class="li" data-act="selRec" data-id="${r.id}" style="padding:8px 0"><div class="main2"><b style="font-weight:520;font-size:calc(14px * var(--ts,1))">${esc(r.title)}</b><small>${esc(theCase(r.caseId).code)}${r.ts ? ' · ' + esc(E.fmtFull(r.ts, tz()).slice(5, 16)) : ''}</small></div></button>`).join('')}</div>
     <div class="wrap" style="margin-top:16px"><button class="btn sm" data-act="pivot" data-id="${esc(id)}">${ico('filter','sm')}Filter timeline to this</button></div></div>`;
 }
 function inspFeed(f){
   if(!f) return '';
   const g = globalEnts(), hits = E.extract(f.title + ' ' + f.body);
-  return ihead('Feed item') + `<div class="ibody"><h2>${esc(f.title)}</h2><p class="t3" style="font-size:13px;margin:6px 0 14px">${esc(f.source)} · ${esc(E.fmtDate(f.ts, tz()))}</p><pre class="rawbox" style="font-family:var(--font);font-size:14px">${esc(f.body)}</pre>
+  return ihead('Feed item') + `<div class="ibody"><h2>${esc(f.title)}</h2><p class="t3" style="font-size:calc(13px * var(--ts,1));margin:6px 0 14px">${esc(f.source)} · ${esc(E.fmtDate(f.ts, tz()))}</p><pre class="rawbox" style="font-family:var(--font);font-size:calc(14px * var(--ts,1))">${esc(f.body)}</pre>
     <div class="isec"><h4>Entities</h4><div class="wrap">${hits.map(e => entPill(entKey(e))).join('')}</div>${hits.some(e => g.has(entKey(e))) ? '<p class="heur">Highlighted entities already exist in your cases.</p>' : ''}</div>
     <div class="wrap" style="margin-top:18px"><button class="btn primary" data-act="feedToCase" data-id="${f.id}">${ico('plus','sm')}Add to ${esc(theCase().code)}</button>${E.safeUrl(f.link) ? `<a class="btn" href="${esc(E.safeUrl(f.link))}" target="_blank" rel="noopener noreferrer">Read original ${ico('arrow-up-right','sm')}</a>` : ''}</div></div>`;
 }
@@ -120,7 +120,7 @@ function paintEntryDlg(){
     ? `<select id="ef-${n}" data-f="${n}"><option value=""></option>${opts.map(o => `<option${d.fields[n] === o ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select>`
     : `<input id="ef-${n}" data-f="${n}" type="${inp === 'number' ? 'text' : inp}" value="${esc(d.fields[n] || '')}" ${i === 0 ? 'required autofocus' : ''} ${inp === 'number' ? 'inputmode="numeric"' : ''} autocomplete="off">`}</div>`;
   openDlg(dhead((d.id ? 'Edit ' : 'New ') + t.label.toLowerCase()) + `<form data-form="entry"><div class="in">
-    <div style="display:flex;gap:12px;align-items:center;margin-bottom:18px">${tbadge(d.type)}<div><b>${esc(t.label)}</b><div class="t3" style="font-size:13px">${esc(GROUPS.find(g => g[0] === t.group)[1])}</div></div>${d.id ? '' : `<button type="button" class="btn sm ghost" data-act="pickType" data-v="" style="margin-left:auto">Change type</button>`}</div>
+    <div style="display:flex;gap:12px;align-items:center;margin-bottom:18px">${tbadge(d.type)}<div><b>${esc(t.label)}</b><div class="t3" style="font-size:calc(13px * var(--ts,1))">${esc(GROUPS.find(g => g[0] === t.group)[1])}</div></div>${d.id ? '' : `<button type="button" class="btn sm ghost" data-act="pickType" data-v="" style="margin-left:auto">Change type</button>`}</div>
     <div class="frow">${t.fields.map(f).join('')}</div>
     <div class="frow"><div class="field"><label for="ef-prio">Priority</label><select id="ef-prio">${['low','medium','high','critical'].map(p => `<option value="${p}"${d.priority === p ? ' selected' : ''}>${p[0].toUpperCase() + p.slice(1)}</option>`).join('')}</select></div>
       <div class="field"><label for="ef-tags">Tags</label><input id="ef-tags" value="${esc(d.tags)}" placeholder="actor, c2"></div></div>
@@ -174,7 +174,7 @@ function linkDlg(o = {}){
   const a = L ? L.a : o.a, b = L ? L.b : o.b;
   const opts = sel => D.entries.map(e => `<option value="${e.id}"${e.id === sel ? ' selected' : ''}>${esc(TYPES[e.type].label + ' · ' + primary(e))}</option>`).join('');
   openDlg(dhead(L ? 'Edit relationship' : 'New relationship') + `<form data-form="link" data-id="${L ? L.id : ''}"><div class="in">
-    <p class="t2" style="margin:0 0 16px;font-size:14px">A relationship is your claim. It carries a confidence and points at the evidence behind it.</p>
+    <p class="t2" style="margin:0 0 16px;font-size:calc(14px * var(--ts,1))">A relationship is your claim. It carries a confidence and points at the evidence behind it.</p>
     <div class="field"><label for="lA">From</label><select id="lA">${opts(a)}</select></div>
     <div class="field"><label for="lL">Relationship</label><input id="lL" list="lSug" value="${esc(L ? L.label : '')}" required autofocus placeholder="e.g. uses email, resolves to, operates">
       <datalist id="lSug">${['uses email','resolves to','hosted on','registered via','registrant','operates','alias of','advertises wallet','paid','beacons to','drops','sent','posts on','sells','same person as','located at'].map(x => `<option value="${x}">`).join('')}</datalist></div>
@@ -193,7 +193,7 @@ function openCapture(prefill){
   const cur = theCase(draft.caseId), open = DB.cases.filter(c => c.status !== 'closed' || c.id === cur.id);
   openDlg(dhead('Capture evidence') + `<div class="in"><div class="capto"><label for="capCase">Save to</label><span class="capdot" style="background:${esc(cur.color)}"></span><select id="capCase" class="gsel bord">${open.map(c => `<option value="${c.id}"${c.id === cur.id ? ' selected' : ''}>${esc(c.code + ' · ' + c.name)}</option>`).join('')}<option value="__new">+ New case…</option></select>
       <label class="chk capg" title="Add what this evidence mentions to the case graph, and link relations it states"><span class="sw"><input type="checkbox" id="capGraph"${cur.autoGraph ? ' checked' : ''}><span></span></span>Add to graph</label></div>
-    <p class="t2" style="margin:0 0 12px;font-size:14px">Paste a log line, a WHOIS record, a forum post, a whole report — anything. Indicators are picked out and checked against every case, your watchlist and the offline context lists.</p>
+    <p class="t2" style="margin:0 0 12px;font-size:calc(14px * var(--ts,1))">Paste a log line, a WHOIS record, a forum post, a whole report — anything. Indicators are picked out and checked against every case, your watchlist and the offline context lists.</p>
     <label class="sr" for="capBody">Evidence text</label><textarea id="capBody" class="inp code" rows="6" autofocus placeholder="2026-09-14T09:03:15Z EventID 3 … -> 203.0.113.47:4444">${esc(draft.body)}</textarea>
     <div class="found" id="capFound"></div>
     <div class="frow" style="margin-top:14px"><div class="field"><label for="capSrc">Source</label><input id="capSrc" value="${esc(draft.source)}" placeholder="sysmon, whois, forum…"></div><div class="field"><label for="capHost">Host</label><input id="capHost" value="${esc(draft.host)}" placeholder="WS-FIN-07"></div></div>
@@ -222,7 +222,7 @@ function capPreview(){
     const ctx = cx.find(x => x[1] === 'red') || cx.find(x => x[1] === 'amber') || cx.find(x => x[1] === 'blue');
     return `<span class="ent" data-v="${vd}" title="${esc((E.LABEL[e.k] || e.k) + (cx.length ? ' · ' + cx.map(x => x[0]).join(' · ') : ''))}">${kindBadge(e.k)}<span class="v">${esc(e.v)}</span>${ctx ? `<span class="n ctxn ${ctx[1]}">${esc(ctx[0])}</span>` : ''}${note}</span>`; }).join('');
   const sum = [`<b>${ents.length}</b> indicator${ents.length > 1 ? 's' : ''}`, inCase ? `${inCase} already in this case` : '', other ? `<span style="color:var(--accent)">${other} seen in other cases</span>` : '', bad ? `<span style="color:var(--red)">${bad} marked malicious or suspicious</span>` : '', watched ? `<span style="color:var(--amber)">${watched} on your watchlist</span>` : ''].filter(Boolean).join(' · ');
-  el.innerHTML = `${ph}<div class="capsum">${sum}</div>${chips}${ents.length > 40 ? `<span class="t3" style="font-size:12.5px">+${ents.length - 40} more</span>` : ''}`;
+  el.innerHTML = `${ph}<div class="capsum">${sum}</div>${chips}${ents.length > 40 ? `<span class="t3" style="font-size:calc(12.5px * var(--ts,1))">+${ents.length - 40} more</span>` : ''}`;
 }
 async function capSave(split){
   const body = ($('capBody').value || '').trim(); draft.source = $('capSrc').value.trim(); draft.host = $('capHost').value.trim();

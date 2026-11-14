@@ -141,7 +141,11 @@ function ctfWriteupsView(){
     .sort((a, b) => b.updated - a.updated);
   const cur = C.writeups.find(w => w.id === UI.wuSel) || list[0];
   const n = s => C.writeups.filter(w => w.source === s).length;
-  const item = w => { const [cn, col] = ctfCat(w.cat); return `<button class="wcard${cur && cur.id === w.id ? ' on' : ''}" data-act="wuOpen" data-id="${w.id}" style="--cc:${col}"><span class="ws-cat"><i></i>${esc(cn)}</span><b>${esc(w.title)}</b>${w.tldr ? `<small>${esc(w.tldr.slice(0, 140))}</small>` : ''}<span class="m">${esc([w.event, w.source === 'imported' ? 'Imported' : 'Mine'].filter(Boolean).join(' · '))}</span></button>`; };
+  const solved = w => { const ch = w.chalId && C.chals.find(c => c.id === w.chalId); return !!(ch && ch.status === 'solved'); };
+  const item = w => { const [cn, col] = ctfCat(w.cat);
+    return `<button class="wl2-i${cur && cur.id === w.id ? ' on' : ''}" data-act="wuOpen" data-id="${w.id}" style="--cc:${col}"${cur && cur.id === w.id ? ' aria-current="true"' : ''}><b>${esc(w.title)}</b><span class="r">${esc(E.fmtAgo(Math.max(0, Date.now() - w.updated)))}</span>
+      <span class="m"><i></i>${esc(cn)}${w.points ? ' · ' + esc(w.points) + ' pts' : ''}${solved(w) ? `<span class="s">${ico('check','sm')}Solved</span>` : ''}${w.source === 'imported' ? ' · Imported' : ''}</span>${w.tldr ? `<span class="t">${esc(w.tldr)}</span>` : ''}</button>`; };
+  const events = [...new Set(list.map(w => w.event || ''))];
   let reader = '';
   if(cur && UI.wuEdit === cur.id) reader = `<form class="card reader wued" data-form="wu" data-id="${cur.id}">
       <div class="frow"><div class="field" style="flex:2"><label for="wuT">Title</label><input id="wuT" value="${esc(cur.title)}" required></div>
@@ -162,10 +166,13 @@ function ctfWriteupsView(){
       ${cur.flag || cur.tools || cur.lesson ? `<div class="rfoot">${cur.flag ? `<div><span class="caps">Flag</span><span class="mono ${UI.wuShow === cur.id ? '' : 'blur'}">${esc(cur.flag)}</span> ${UI.wuShow === cur.id ? '' : `<button class="linkbtn" data-act="wuShow" data-id="${cur.id}">Show</button>`}</div>` : ''}${cur.tools ? `<div><span class="caps">Tools</span>${esc(cur.tools)}</div>` : ''}${cur.lesson ? `<div><span class="caps">Lesson</span>${esc(cur.lesson)}</div>` : ''}</div>` : ''}
     </article>`; }
   return `<div class="wl">
-    <div class="wl-list"><div class="search-in">${ico('search')}<label class="sr" for="wuq">Search write-ups</label><input id="wuq" class="inp" placeholder="Search write-ups, tools, techniques…" value="${esc(UI.wuq || '')}"></div>
-      <div class="filters">${[['all', 'All', C.writeups.length], ['mine', 'Mine', n('mine')], ['imported', 'Imported', n('imported')]].map(([k, l, c]) => `<button class="pbcat${src === k ? ' on' : ''}" data-act="wuSrc" data-v="${k}">${l}<small>${c}</small></button>`).join('')}
-        <label class="sr" for="wuCatSel">Category</label><select id="wuCatSel" class="gsel bord"><option value="">Any category</option>${Object.entries(CTF_CATS).map(([k, [nm]]) => `<option value="${k}"${cf === k ? ' selected' : ''}>${nm}</option>`).join('')}</select></div>
-      ${list.length ? list.map(item).join('') : `<p class="t3" style="padding:12px 4px">${C.writeups.length ? 'No write-ups match.' : 'No write-ups yet. Solve a challenge and turn its work log into one, or import Markdown.'}</p>`}</div>
+    <div class="card wl2"><div class="wl2-h"><div class="search-in">${ico('search')}<label class="sr" for="wuq">Search write-ups</label><input id="wuq" class="inp" placeholder="Search write-ups…" value="${esc(UI.wuq || '')}" autocomplete="off"></div>
+        <button class="iconbtn wl2-fb${cf ? ' on' : ''}" data-act="wuFilt" aria-label="Filter by category${cf ? ' (' + esc(ctfCat(cf)[0]) + ')' : ''}" title="Filter by category">${ico('filter','sm')}${cf ? '<em></em>' : ''}</button></div>
+      <div class="seg wl2-src" role="group" aria-label="Show">${[['all', 'All', C.writeups.length], ['mine', 'Mine', n('mine')], ['imported', 'Imported', n('imported')]].map(([k, l, c]) => `<button data-act="wuSrc" data-v="${k}" aria-pressed="${src === k}">${l}<small>${c}</small></button>`).join('')}</div>
+      ${cf ? `<div class="wl2-cf"><span>${esc(ctfCat(cf)[0])} only</span><button class="linkbtn" data-act="wuCat" data-v="">Show all</button></div>` : ''}
+      <div class="wl2-l">${list.length ? events.map(ev => { const L = list.filter(w => (w.event || '') === ev); return `<div class="wl2-g">${ico('flag','sm')}${esc(ev || 'No event')}<small>${L.length}</small></div>${L.map(item).join('')}`; }).join('')
+        : `<p class="wl2-none">${C.writeups.length ? 'No write-ups match.' : 'No write-ups yet. Solve a challenge and turn its work log into one, or import Markdown.'}</p>`}</div>
+      <button class="wl2-new" data-act="wuNew">${ico('plus','sm')}New write-up</button></div>
     ${reader || `<div class="card reader">${empty('scroll-text', 'No write-up open', 'Pick one from the list, write a new one, or import a Markdown file.', `<button class="btn primary" data-act="wuNew">${ico('plus','sm')}New write-up</button>`)}</div>`}
   </div>`;
 }
@@ -193,7 +200,7 @@ function wuImport(){
    One search across every category, one-line commands that copy on click, your own target and file
    names filled into every command, and the first-moves checklist always beside it. */
 const CS_VARS = [['target', 'Target', 'target or 10.10.10.5'], ['file', 'File', 'chal.bin'], ['wordlist', 'Wordlist', 'rockyou.txt'], ['ip', 'Your IP', '$IP'], ['port', 'Port', '$PORT']];
-const CS_RE = {target:/\btarget\b/g, file:/\b(?:file\.(?:png|jpg|jpeg|pdf|doc|docx|txt|b64|b32|bin|zip|wav|gif|bmp)|chal\.bin|mem\.raw|disk\.img|img\.(?:png|jpg))\b/g, wordlist:/\b(?:rockyou\.txt|wordlist\.txt)\b/g, ip:/\$IP\b/g, port:/\$PORT\b/g};
+const CS_RE = {target:/\btarget\b(?!@)/g, file:/\b(?:file\.(?:png|jpg|jpeg|pdf|doc|docx|txt|b64|b32|bin|zip|wav|gif|bmp)|chal\.bin|mem\.raw|disk\.img|img\.(?:png|jpg))\b/g, wordlist:/\b(?:rockyou\.txt|wordlist\.txt)\b/g, ip:/\$IP\b/g, port:/\$PORT\b/g};
 const csVars = () => (DB.ctf.vars || (DB.ctf.vars = {}));
 /* Escape, then fill in (or highlight) the placeholders the user can change. */
 function csCmd(cmd){
@@ -216,33 +223,58 @@ function csBody(){
       ${recs.length ? `<section class="cs-blk"><h3>${ico('eye','sm')}Recognise it<small>${recs.length}</small></h3><div class="csl">${recs.slice(0, 60).map(([k, r]) => recRow(k, r, true)).join('')}</div></section>` : ''}
       ${gots.length ? `<section class="cs-blk"><h3>${ico('lightbulb','sm')}Gotchas<small>${gots.length}</small></h3><ul class="cs-got">${gots.map(([k, g]) => `<li><span class="cs-tag" style="--cc:${csCatOf(k)[1]}"><i></i>${esc(csCatOf(k)[0])}</span>${esc(g)}</li>`).join('')}</ul></section>` : ''}`;
   }
-  const view = ['cmds', 'recog', 'gotchas'].includes(UI.csView) ? UI.csView : 'cmds', groups = [...new Set((C.cmds || []).map(c => c[0]))], grp = groups.includes(UI.csGrp) ? UI.csGrp : '';
-  const seg = `<div class="seg cs-view" role="group" aria-label="Show">${[['cmds', 'Commands', 'terminal', (C.cmds || []).length], ['recog', 'Recognise it', 'eye', (C.recog || []).length], ['gotchas', 'Gotchas', 'lightbulb', (C.gotchas || []).length]].map(([k, l, i, n]) => `<button data-act="csView" data-v="${k}" aria-pressed="${view === k}">${ico(i,'sm')}${l}<small>${n}</small></button>`).join('')}</div>`;
-  let body = '';
-  if(view === 'cmds') body = `<div class="cs-groups">${['', ...groups].map(g => `<button class="rf3-s${grp === g ? ' on' : ''}" data-act="csGrp" data-v="${esc(g)}">${g ? esc(g) : 'All'}<small>${g ? C.cmds.filter(c => c[0] === g).length : C.cmds.length}</small></button>`).join('')}</div>
-      <div class="csl">${(grp ? [grp] : groups).map(g => `${grp ? '' : `<div class="csl-h">${esc(g)}</div>`}${C.cmds.filter(c => c[0] === g).map(c => cmdRow(cat, c)).join('')}`).join('')}</div>`;
-  else if(view === 'recog') body = `<div class="csl"><div class="csrec hd"><span>You see</span><span>It is probably</span><span>Try</span></div>${(C.recog || []).map(r => recRow(cat, r)).join('')}</div>`;
-  else body = `<ul class="cs-got big">${(C.gotchas || []).map(g => `<li>${esc(g)}</li>`).join('')}</ul>`;
-  return `<div class="cs-bar">${seg}<p class="cs-blurb">${esc(C.blurb || '')}</p></div>${body}`;
+  const view = csViewOf(), groups = [...new Set((C.cmds || []).map(c => c[0]))], grp = groups.includes(UI.csGrp) ? UI.csGrp : '';
+  if(view === 'cmds') return `<div class="csl">${(grp ? [grp] : groups).map(g => `<div class="csl-h">${esc(g)}<small>${C.cmds.filter(c => c[0] === g).length}</small></div>${C.cmds.filter(c => c[0] === g).map(c => cmdRow(cat, c)).join('')}`).join('')}</div>`;
+  if(view === 'recog') return `<div class="csl"><div class="csrec hd"><span>You see</span><span>It is probably</span><span>Try</span></div>${(C.recog || []).map(r => recRow(cat, r)).join('')}</div>`;
+  if(view === 'first') return csFirst(cat);
+  return `<ul class="cs-got big">${(C.gotchas || []).map(g => `<li>${esc(g)}</li>`).join('')}</ul>`;
 }
-function csSide(){
-  const S = CHEATS(), keys = Object.keys(CTF_CATS).filter(k => S[k]), cat = S[UI.csCat] ? UI.csCat : keys[0], C = S[cat], done = (DB.ctf.fm || {})[cat] || [];
-  return `<section class="card fmc"><div class="ws-h">${ico('list-checks','sm')}First moves<span class="sp"></span>${done.length ? `<button class="linkbtn" data-act="csFmReset">Reset</button>` : ''}<span class="t3 small">${done.length}/${(C.first || []).length}</span></div>
+const csViewOf = () => ['cmds', 'recog', 'gotchas', 'first'].includes(UI.csView) ? UI.csView : 'cmds';
+const csCurCat = () => { const S = CHEATS(); return S[UI.csCat] ? UI.csCat : Object.keys(CTF_CATS).find(k => S[k]); };
+const csDone = cat => (DB.ctf.fm || {})[cat] || [];
+function csFirst(cat){
+  const C = CHEATS()[cat], done = csDone(cat);
+  return `<section class="card fmc cs4-fm"><div class="ws-h">${ico('list-checks','sm')}First moves in ${esc(C.name || ctfCat(cat)[0])}<span class="sp"></span>${done.length ? `<button class="linkbtn" data-act="csFmReset">Reset</button>` : ''}<span class="t3 small">${done.length}/${(C.first || []).length}</span></div>
       <ol class="fm">${(C.first || []).map((f, i) => `<li class="${done.includes(i) ? 'done' : ''}"><button class="cb" data-act="csFm" data-v="${i}" aria-pressed="${done.includes(i)}" aria-label="Done">${done.includes(i) ? ico('check','sm') : ''}</button><span>${esc(f)}</span></li>`).join('')}</ol></section>`;
 }
+/* the values button: what is set, as tokens */
+function csValsSum(){
+  const V = csVars(), set = CS_VARS.filter(([k]) => V[k]);
+  return set.length ? `${set.slice(0, 2).map(([k, l]) => `<span class="cs4-tok"><em>${esc(l)}</em>${esc(V[k])}</span>`).join('')}${set.length > 2 ? `<small>+${set.length - 2}</small>` : ''}` : '<small>none set</small>';
+}
+function csViewSeg(cat){
+  const C = CHEATS()[cat], v = csViewOf(), searching = !!(UI.csq || '').trim();
+  return [['cmds', 'Commands', 'terminal', (C.cmds || []).length], ['recog', 'Recognise it', 'eye', (C.recog || []).length], ['gotchas', 'Gotchas', 'lightbulb', (C.gotchas || []).length], ['first', 'First moves', 'list-checks', csDone(cat).length + '/' + (C.first || []).length]]
+    .map(([k, l, i, n]) => `<button data-act="csView" data-v="${k}" aria-pressed="${!searching && v === k}">${ico(i,'sm')}<span class="bl">${l}</span><small${k === 'first' ? ' id="csFmN"' : ''}>${n}</small></button>`).join('');
+}
+function csTree(cat){
+  const S = CHEATS(), keys = Object.keys(CTF_CATS).filter(k => S[k]), searching = !!(UI.csq || '').trim(), v = csViewOf();
+  return keys.map(k => { const C = S[k], open = k === cat, groups = [...new Set((C.cmds || []).map(c => c[0]))], grp = groups.includes(UI.csGrp) ? UI.csGrp : '';
+    const n = (C.cmds || []).length + (C.recog || []).length;
+    return `<div class="rf4-g${open ? ' open' : ''}${open && !searching ? ' cur' : ''}"><button class="rf4-gh" data-act="ctfCheat" data-v="${k}" aria-expanded="${open}">${ico('chevron-right','sm')}<span>${esc(C.name || ctfCat(k)[0])}</span><small>${n}</small></button>
+      ${open ? `<div class="rf4-gb"><button class="rf4-s${!searching && v === 'cmds' && !grp ? ' on' : ''}" data-act="csGrp" data-v=""><span>All commands</span><small>${(C.cmds || []).length}</small></button>${groups.map(g => `<button class="rf4-s${!searching && v === 'cmds' && grp === g ? ' on' : ''}" data-act="csGrp" data-v="${esc(g)}"><span>${esc(g)}</span><small>${C.cmds.filter(c => c[0] === g).length}</small></button>`).join('')}</div>` : ''}</div>`; }).join('');
+}
+function csRepaint(){ const cat = csCurCat(), b = $('csBody'), t = $('csTree'), g = $('csSeg'), bl = $('csBlurb');
+  if(b) b.innerHTML = csBody(); if(t) t.innerHTML = csTree(cat); if(g) g.innerHTML = csViewSeg(cat);
+  if(bl) bl.hidden = !!(UI.csq || '').trim(); }
 function ctfCheatsView(){
   const S = CHEATS(), keys = Object.keys(CTF_CATS).filter(k => S[k]);
   if(!keys.length) return empty('book-open', 'Cheatsheets are not loaded', 'The cheatsheet data file is missing from this copy of OSINTrix.');
-  const cat = S[UI.csCat] ? UI.csCat : keys[0], V = csVars(), searching = !!(UI.csq || '').trim();
-  const n = k => (S[k].cmds || []).length + (S[k].recog || []).length;
-  return `<div class="cs3">
-    <aside class="cs3-rail" aria-label="Categories"><div class="cs3-rh">Categories</div>${keys.map(k => `<button data-act="ctfCheat" data-v="${k}" class="${!searching && k === cat ? 'on' : ''}" style="--cc:${ctfCat(k)[1]}"><span class="cs3-ic">${ico(ctfCat(k)[2],'sm')}</span><span class="cs3-l">${esc(S[k].name || ctfCat(k)[0])}</span><small>${n(k)}</small></button>`).join('')}</aside>
-    <div class="cs3-main">
-      <div class="cs-tools">
-        <div class="search-in cs-q">${ico('search')}<label class="sr" for="csq">Search every cheatsheet</label><input id="csq" class="inp" placeholder="Search all cheatsheets — steghide, ==, jwt, 89 50 4E 47, rop…" value="${esc(UI.csq || '')}" autocomplete="off">${UI.csq ? `<button class="iconbtn" data-act="csClear" aria-label="Clear">${ico('x','sm')}</button>` : '<kbd>/</kbd>'}</div>
-        <div class="cs-vars" role="group" aria-label="Your values"><span class="t3 small">Fill in</span>${CS_VARS.map(([k, l, ph]) => `<label class="csvar${V[k] ? ' set' : ''}"><span>${l}</span><input data-csvar="${k}" value="${esc(V[k] || '')}" placeholder="${esc(ph)}" autocomplete="off" spellcheck="false"></label>`).join('')}</div>
+  const cat = csCurCat(), V = csVars(), C = S[cat], searching = !!(UI.csq || '').trim(), nSet = CS_VARS.filter(([k]) => V[k]).length;
+  return `<div class="cs4">
+    <aside class="rf4-rail cs4-rail" aria-label="Cheatsheets" id="csTree">${csTree(cat)}</aside>
+    <div class="cs4-main">
+      <div class="cs4-bar">
+        <div class="search-in cs-q">${ico('search')}<label class="sr" for="csq">Search every cheatsheet</label><input id="csq" class="inp" placeholder="Search all cheatsheets — steghide, ==, jwt, 89 50 4E 47, rop…" value="${esc(UI.csq || '')}" autocomplete="off">${UI.csq ? `<button class="iconbtn" data-act="csClear" aria-label="Clear search">${ico('x','sm')}</button>` : '<kbd>/</kbd>'}</div>
+        <div class="cs4-vals${UI.csValsOpen ? ' open' : ''}" id="csVals">
+          <button class="btn cs4-vb${nSet ? ' set' : ''}" data-act="csVals" aria-expanded="${!!UI.csValsOpen}" aria-controls="csPop">${ico('braces','sm')}<span>Values</span><span class="cs4-sum" id="csValsSum">${csValsSum()}</span>${ico('chevron-down','sm')}</button>
+          <div class="cs4-pop" id="csPop" role="dialog" aria-label="Your values"><b>Your values</b><p>Filled into every command as you type, and kept in this workspace.</p>
+            <div class="cs4-f">${CS_VARS.map(([k, l, ph]) => `<label class="${V[k] ? 'set' : ''}"><span>${l}</span><input class="inp mono" data-csvar="${k}" value="${esc(V[k] || '')}" placeholder="${esc(ph)}" autocomplete="off" spellcheck="false"></label>`).join('')}</div>
+            <div class="cs4-pf"><span id="csValsN">${nSet} of ${CS_VARS.length} set</span><button class="btn sm" data-act="csValsClear">Clear all</button></div></div>
+        </div>
       </div>
-      <div class="cs-grid"><div class="cs-main" id="csBody">${csBody()}</div><aside class="cs-side" id="csSide">${csSide()}</aside></div>
+      <div class="cs4-sub"><div class="seg cs4-seg" role="group" aria-label="Show" id="csSeg">${csViewSeg(cat)}</div><p class="cs4-blurb" id="csBlurb"${searching ? ' hidden' : ''} title="${esc(C.blurb || '')}">${esc(C.blurb || '')}</p></div>
+      <div id="csBody">${csBody()}</div>
     </div>
   </div>`;
 }
@@ -273,12 +305,15 @@ const CTF2_ACTS = {
   ctfLogCopy:() => { const c = DB.ctf.chals.find(x => x.id === UI.ctfSel); if(c) copyText(c.log.map(x => `- ${(LOG_KIND[x.kind] || LOG_KIND.note)[0]}: ${x.text}${x.cmd ? '\n  `' + x.cmd + '`' : ''}`).join('\n')); },
   ctfFirst:(id, v) => { const c = DB.ctf.chals.find(x => x.id === UI.ctfSel); if(!c) return; const i = +v; c.firstDone = c.firstDone.includes(i) ? c.firstDone.filter(x => x !== i) : [...c.firstDone, i]; mutate('checklist'); renderMain(); },
   csCopy:(id, v) => copyText(csFill(v)),
-  csView:(id, v) => { UI.csView = v; const b = $('csBody'); if(b) b.innerHTML = csBody(); },
-  csGrp:(id, v) => { UI.csGrp = v; const b = $('csBody'); if(b) b.innerHTML = csBody(); },
+  csView:(id, v) => { UI.csView = v; if((UI.csq || '').trim()){ UI.csq = ''; const q = $('csq'); if(q) q.value = ''; } csRepaint(); },
+  csGrp:(id, v) => { UI.csGrp = v; UI.csView = 'cmds'; if((UI.csq || '').trim()){ UI.csq = ''; const q = $('csq'); if(q) q.value = ''; } csRepaint(); const s = document.querySelector('#main .scroll'), b = $('csBody'); if(s && b && b.getBoundingClientRect().top < s.getBoundingClientRect().top) b.scrollIntoView({block:'start'}); },
+  csVals:() => { UI.csValsOpen = !UI.csValsOpen; const w = $('csVals'); if(!w) return; w.classList.toggle('open', UI.csValsOpen); w.querySelector('.cs4-vb').setAttribute('aria-expanded', UI.csValsOpen);
+    if(UI.csValsOpen){ const i = w.querySelector('input'); if(i) i.focus(); } },
+  csValsClear:() => { DB.ctf.vars = {}; save(); document.querySelectorAll('[data-csvar]').forEach(i => { i.value = ''; i.parentElement.classList.remove('set'); }); csValsPaint(); csRepaint(); },
   csClear:() => { UI.csq = ''; renderMain(); refocus('csq'); },
   csFm:(id, v) => { const cat = CHEATS()[UI.csCat] ? UI.csCat : Object.keys(CTF_CATS).find(k => CHEATS()[k]); DB.ctf.fm = DB.ctf.fm || {}; const d = DB.ctf.fm[cat] || [], i = +v;
-    DB.ctf.fm[cat] = d.includes(i) ? d.filter(x => x !== i) : [...d, i]; save(); const s2 = $('csSide'); if(s2) s2.innerHTML = csSide(); },
-  csFmReset:() => { const cat = CHEATS()[UI.csCat] ? UI.csCat : Object.keys(CTF_CATS).find(k => CHEATS()[k]); if(DB.ctf.fm) delete DB.ctf.fm[cat]; save(); const s2 = $('csSide'); if(s2) s2.innerHTML = csSide(); },
+    DB.ctf.fm[cat] = d.includes(i) ? d.filter(x => x !== i) : [...d, i]; save(); csRepaint(); },
+  csFmReset:() => { const cat = csCurCat(); if(DB.ctf.fm) delete DB.ctf.fm[cat]; save(); csRepaint(); },
   ctfCheat:(id, v) => { UI.csCat = v; UI.csq = ''; UI.csGrp = ''; UI.ctfTab = 'cheats'; UI.ctfSel = null; renderMain(); const s = document.querySelector('#main .scroll'); if(s) s.scrollTop = 0; },
   ctfSolve:() => { const c = DB.ctf.chals.find(x => x.id === UI.ctfSel), f = $('ctfFlagIn'); if(!c || !f || !f.value.trim()) return;
     c.flag = f.value.trim().slice(0, 400); c.status = 'solved'; c.solvedAt = Date.now(); UI.ctfFlag = null; mutate('solved ' + c.name); renderMain(); toast('Solved — nice work', 'Write it up', () => CTF2_ACTS.wuFromChal(c.id)); },
@@ -290,6 +325,10 @@ const CTF2_ACTS = {
   wuEditX:() => { UI.wuEdit = null; renderMain(); },
   wuShow:id => { UI.wuShow = id; renderMain(); },
   wuSrc:(id, v) => { UI.wuSrc = v; renderMain(); },
+  wuCat:(id, v) => { UI.wuCat = v || ''; renderMain(); },
+  wuFilt:(id, v, t) => { const r0 = t.getBoundingClientRect(), cf = UI.wuCat || '', N = k => DB.ctf.writeups.filter(w => !k || w.cat === k).length;
+    showMenu(Math.max(8, r0.right - 240), r0.bottom + 6, [{label:'Any category', icon:cf ? 'circle' : 'check', fn:() => CTF2_ACTS.wuCat(null, '')}, {sep:true},
+      ...Object.keys(CTF_CATS).filter(k => N(k)).map(k => ({label:ctfCat(k)[0] + ' (' + N(k) + ')', icon:cf === k ? 'check' : 'circle', fn:() => CTF2_ACTS.wuCat(null, k)}))], 'Category'); },
   wuDel:id => { const C = DB.ctf, i = C.writeups.findIndex(x => x.id === id); if(i < 0) return; const [w] = C.writeups.splice(i, 1); UI.wuEdit = null; UI.wuSel = null; mutate('deleted write-up'); renderMain();
     toast('Write-up deleted', 'Undo', () => { C.writeups.splice(i, 0, w); mutate('restored write-up'); renderMain(); }); },
   wuExport:id => { const w = DB.ctf.writeups.find(x => x.id === id); if(w) download(slug(w.title) + '.md', wuMarkdown(w), 'text/markdown'); },
@@ -301,12 +340,15 @@ document.addEventListener('input', ev => { const t = ev.target;
   else if(t.id === 'ctfFlagIn'){ const c = DB.ctf.chals.find(x => x.id === UI.ctfSel); if(!c) return; UI.ctfFlag = t.value; UI.ctfFlagFor = c.id; const ok = flagOk(c, t.value.trim()), box = t.parentElement;
     box.classList.toggle('ok', !!ok); box.classList.toggle('bad', ok === false); const p = box.nextElementSibling; if(p) p.textContent = ok ? 'Matches the event’s flag format.' : ok === false ? 'Does not match the event’s flag format yet.' : 'Paste the flag to check its format.';
     const b = document.querySelector('.ws-solve'); if(b) b.disabled = !t.value.trim(); }
-  else if(t.id === 'csq'){ UI.csq = t.value; clearTimeout(ctfQT); ctfQT = setTimeout(() => { const b = $('csBody'); if(b) b.innerHTML = csBody();
-      document.querySelectorAll('.cs3-rail button').forEach(x => x.classList.toggle('on', !t.value.trim() && x.dataset.v === (CHEATS()[UI.csCat] ? UI.csCat : Object.keys(CTF_CATS).find(k => CHEATS()[k])))); }, 120); }
-  else if(t.dataset && t.dataset.csvar){ const V = csVars(); V[t.dataset.csvar] = t.value.trim().slice(0, 200); t.parentElement.classList.toggle('set', !!V[t.dataset.csvar]); clearTimeout(ctfQT);
+  else if(t.id === 'csq'){ UI.csq = t.value; clearTimeout(ctfQT); ctfQT = setTimeout(csRepaint, 120); }
+  else if(t.dataset && t.dataset.csvar){ const V = csVars(); V[t.dataset.csvar] = t.value.trim().slice(0, 200); if(!V[t.dataset.csvar]) delete V[t.dataset.csvar]; t.parentElement.classList.toggle('set', !!V[t.dataset.csvar]); csValsPaint(); clearTimeout(ctfQT);
     ctfQT = setTimeout(() => { save(); const b = $('csBody'); if(b) b.innerHTML = csBody(); }, 120); }
   else if(t.id === 'wuq'){ UI[t.id] = t.value; clearTimeout(ctfQT); ctfQT = setTimeout(() => { renderMain(); refocus(t.id); }, 160); }
 });
 let ctfQT = null;
-document.addEventListener('change', ev => { if(ev.target.id === 'wuCatSel'){ UI.wuCat = ev.target.value; renderMain(); } });
+function csValsPaint(){ const n = CS_VARS.filter(([k]) => csVars()[k]).length, s = $('csValsSum'), c = $('csValsN'), b = document.querySelector('.cs4-vb');
+  if(s) s.innerHTML = csValsSum(); if(c) c.textContent = n + ' of ' + CS_VARS.length + ' set'; if(b) b.classList.toggle('set', !!n); }
+/* the values popover closes on a click outside it or Escape */
+document.addEventListener('mousedown', ev => { if(UI.csValsOpen && !ev.target.closest('#csVals')) CTF2_ACTS.csVals(); }, true);
+document.addEventListener('keydown', ev => { if(ev.key === 'Escape' && UI.csValsOpen && ev.target.closest && ev.target.closest('#csVals')){ ev.stopPropagation(); CTF2_ACTS.csVals(); const b = document.querySelector('.cs4-vb'); if(b) b.focus(); } }, true);
 document.addEventListener('keydown', ev => { if(ev.target.id === 'ctfLogIn' && ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)){ ev.preventDefault(); ctfAddLog(); } });

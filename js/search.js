@@ -112,7 +112,7 @@ function srchPaint(){
   }
   if(!S.flat.length) h = `<div class="sr-empty">${ico('search')}<b>Nothing found for “${esc(S.q)}”</b><span>Try fewer words, another scope, or check the spelling. Tip: <code>in:tools</code>, <code>case:TN-2026-014</code>, <code>"exact phrase"</code>, <code>-exclude</code>.</span></div>`;
   if(!S.q.trim() && S.scope === 'all'){ const rec = (DB.prefs.recentQ || []).slice(0, 8);
-    h = (rec.length ? `<div class="sr-g"><span>Recent searches</span><button data-act="srClearRecent">Clear</button></div><div class="sr-recent">${rec.map(r => `<button data-act="srRecent" data-v="${esc(r)}">${ico('clock','sm')}${esc(r)}</button>`).join('')}</div>` : '')
+    h = (rec.length ? `<div class="sr-g"><span>Recent searches</span><button data-act="srClearRecent">Clear</button></div><div class="sr-recent">${rec.map(r => `<span class="sr-rq"><button data-act="srRecent" data-v="${esc(r)}">${ico('clock','sm')}${esc(r)}</button><button class="sr-rqx" data-act="srForget" data-v="${esc(r)}" aria-label="Forget the search ${esc(r)}" title="Forget">${ico('x','sm')}</button></span>`).join('')}</div>` : '')
       + `<div class="sr-tips"><div><b>Search everything</b><span>Cases, vault, evidence, indicators, notes, tools, queries, rules, playbooks, CTF and news.</span></div>
         <div><code>in:tools shodan</code><code>case:TN-2026-014 dns</code><code>"lamp loader"</code><code>beacon -firewall</code><code>host:DC01 verdict:malicious</code><code>203.0.113.47</code></div></div>` + h; }
   $('srList').innerHTML = h; srchPreview();

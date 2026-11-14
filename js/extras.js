@@ -48,7 +48,7 @@ function toolRunDlg(id){
   const t = DB.tools.find(x => x.id === id); if(!t || !t.tpl) return;
   const g = new Set(t.kinds || []), sug = [...derive().ents.values()].filter(x => g.has('any') || g.has(kindGroup(x.k))).slice(0, 12);
   openDlg(dhead('Run ' + t.name) + `<form data-form="toolRun" data-id="${t.id}"><div class="in"><div class="field"><label for="trV">Value</label><input id="trV" required autofocus placeholder="${esc((TPL_KINDS.find(k => k[0] === (t.kinds || [])[0]) || ['','value'])[1].toLowerCase())}"><span class="hint mono">${esc(t.tpl)}</span></div>
-    ${sug.length ? `<div class="t3" style="font-size:13px;margin:4px 0 8px">From ${esc(theCase().code)}:</div><div class="wrap">${sug.map(x => `<button type="button" class="chip" data-act="trPick" data-v="${esc(x.v)}">${esc(x.v.length > 40 ? x.v.slice(0, 39) + '…' : x.v)}</button>`).join('')}</div>` : ''}</div>
+    ${sug.length ? `<div class="t3" style="font-size:calc(13px * var(--ts,1));margin:4px 0 8px">From ${esc(theCase().code)}:</div><div class="wrap">${sug.map(x => `<button type="button" class="chip" data-act="trPick" data-v="${esc(x.v)}">${esc(x.v.length > 40 ? x.v.slice(0, 39) + '…' : x.v)}</button>`).join('')}</div>` : ''}</div>
     <footer><button class="btn" type="button" data-act="dclose">Cancel</button><button class="btn primary" type="submit">${ico('arrow-up-right','sm')}Open</button></footer></form>`);
 }
 /* research checklist: every lookup for an entity, ticked when you open it */
@@ -90,7 +90,7 @@ const uuid4 = () => crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xx
 function exportIOCs(fmt){
   const c = theCase(), list = caseIOCs(c.id), name = slug(c.name) + '-iocs';
   if(!list.length) return toast('No indicators in this case yet');
-  if(fmt === 'csv'){ const q = s => '"' + String(s).replace(/"/g, '""') + '"';
+  if(fmt === 'csv'){ const q = s => '"' + String(csvFormula(s)).replace(/"/g, '""') + '"';
     return download(name + '.csv', ['type,value,verdict,in_vault,records,case'].concat(list.map(x => [E.LABEL[x.k] || x.k, x.v, x.verdict || 'unknown', x.vault ? 'yes' : 'no', x.recs, c.code].map(q).join(','))).join('\n'), 'text/csv'); }
   if(fmt === 'txt') return download(name + '-defanged.txt', `# ${c.code} · ${c.name}\n# ${list.length} indicators · defanged · ${new Date().toISOString()}\n\n` + list.map(x => defang(x.v) + (x.verdict ? '    # ' + x.verdict : '')).join('\n'), 'text/plain');
   const now = new Date().toISOString(), ident = {type:'identity', spec_version:'2.1', id:'identity--' + uuid4(), created:now, modified:now, name:'OSINTrix · ' + c.code, identity_class:'individual'};
@@ -173,7 +173,7 @@ function bytesOf(t){ const h = t.replace(/^0x/i, '').replace(/\\x|0x|[\s:,-]/gi,
   return null; }
 function textOf(bytes){ if(bytes.length >= 4 && bytes[1] === 0 && bytes[3] === 0) return [new TextDecoder('utf-16le').decode(bytes), ' (UTF-16LE)']; try{ return [new TextDecoder('utf-8', {fatal:true}).decode(bytes), '']; }catch(e){ return [null, '']; } }
 async function inflateAny(bytes){ const kind = bytes[0] === 0x1f && bytes[1] === 0x8b ? 'gzip' : bytes[0] === 0x78 && [0x01, 0x5e, 0x9c, 0xda].includes(bytes[1]) ? 'deflate' : null; if(!kind || typeof DecompressionStream === 'undefined') return null;
-  try{ return [kind, new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream(kind))).arrayBuffer())]; }catch(e){ return null; } }
+  try{ return [kind, await decompressCapped(bytes, kind, 64 * 1048576)]; }catch(e){ return null; } }
 async function decodeOnce(t){
   const cands = [], add = (name, out) => { if(typeof out === 'string' && out && out !== t && out.trim() !== t.trim()) cands.push([name, out]); };
   const tt = t.trim();
@@ -209,7 +209,7 @@ async function runTx(op, input){
   if(op === 'gunzip'){ if(typeof DecompressionStream === 'undefined') throw new Error('This browser cannot decompress');
     const t = input.trim(); const bytes = /^([0-9a-f]{2}\s*)+$/i.test(t) ? new Uint8Array(t.replace(/\s/g, '').match(/../g).map(x => parseInt(x, 16))) : Uint8Array.from(atob(t.replace(/\s/g, '')), c => c.charCodeAt(0));
     const kind = bytes[0] === 0x1f && bytes[1] === 0x8b ? 'gzip' : bytes[0] === 0x78 ? 'deflate' : 'deflate-raw';
-    const out = await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream(kind))).arrayBuffer(); return {out:new TextDecoder().decode(out)}; }
+    const out = await decompressCapped(bytes, kind, 64 * 1048576); return {out:new TextDecoder().decode(out)}; }
   if(op === 'sha256' || op === 'sha1'){ if(!(crypto.subtle)) throw new Error('Hashing needs a secure context (https)');
     const h = await crypto.subtle.digest(op === 'sha1' ? 'SHA-1' : 'SHA-256', new TextEncoder().encode(input)); return {out:[...new Uint8Array(h)].map(b => b.toString(16).padStart(2, '0')).join('')}; }
   return {out:TX[op][2](input)};
@@ -250,6 +250,6 @@ function bindDecoder(){ const i = $('decIn'); if(!i) return; i.oninput = () => {
 
 /* ---------- entities: search + CSV ---------- */
 function exportEntities(list){
-  const q = s => '"' + String(s).replace(/"/g, '""') + '"';
+  const q = s => '"' + String(csvFormula(s)).replace(/"/g, '""') + '"';
   download('osintrix-entities.csv', ['type,value,verdict,records,cases'].concat(list.map(e => [E.LABEL[e.k] || e.k, e.v, verdictOf(e.id) || 'unknown', e.recs.length, [...e.cases].map(id => (theCase(id) || {}).code).join(' ')].map(q).join(','))).join('\n'), 'text/csv');
 }

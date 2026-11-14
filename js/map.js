@@ -137,7 +137,7 @@ function mapSelect(k){
 function placesExport(kind){
   const M = UI.mapData, c = DB.cases.find(x => x.id === DB.active); if(!M || !M.pts.length) return;
   const name = (c ? c.code || c.name : 'case').replace(/[^\w.-]+/g, '_');
-  if(kind === 'csv'){ const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  if(kind === 'csv'){ const q = v => '"' + String(v == null ? '' : csvFormula(v)).replace(/"/g, '""') + '"';
     return download(name + '-places.csv', ['name,latitude,longitude,time_utc,source'].concat(M.pts.map(p => [q(p.label), p.la, p.lo, q(p.ts ? new Date(p.ts).toISOString() : ''), q([...p.src].join('; '))].join(','))).join('\n'), 'text/csv'); }
   const x = s => String(s == null ? '' : s).replace(/[<>&'"]/g, ch => ({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&apos;','"':'&quot;'})[ch]);
   const T = M.pts.filter(p => p.ts).sort((a, b) => a.ts - b.ts);

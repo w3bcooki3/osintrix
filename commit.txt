@@ -1,0 +1,59 @@
+v1.24: certificate types guide, Cases board/list, CTF redesign, nothing lost on refresh, design pass and security fixes
+
+Certificates
+- New guide chapter "Types of certificates and what they are for": website, client
+  authentication, device, mutual TLS (trusted server CA vs trusted client CA), root and
+  intermediate CAs, code signing, S/MIME, smart card logon, document signing, timestamping.
+  Each with purpose, how to recognise it, how attackers abuse it, what to check, a
+  comparison table, flashcards, and a one-click example in the decoder.
+- The decoder labels each certificate's type; smart card needs the smartcardLogon EKU.
+  Document signing EKU added. Code signing and other non-website certificates are no
+  longer labelled DV/OV.
+- "Saved" becomes "History": recent certificates, CSRs, crt.sh results and signed
+  programs in this browser plus those saved in the case, each reopenable or deletable.
+
+Cases
+- Two switchable views, remembered: Board (default; each card shows a small picture of
+  the case's own graph with malicious entries ringed, counts, status, top entries,
+  questions answered, last update) and List (grouped Pinned/Active/In review/Archived,
+  with a 12-week activity chart).
+- Find a case by name, code, scope or owner; sort by activity, name, malicious, entries
+  or newest.
+
+CTF
+- Cheatsheets: categories and command groups in one tree like Reference; one search;
+  Commands / Recognise it / Gotchas / First moves as tabs; your values (Target, File,
+  Wordlist, IP, Port) in a Values popover. The coloured-tile rail is gone.
+- Write-ups: one list grouped by event with category, points, solved, age and TL;DR;
+  search, All/Mine/Imported, and a category filter.
+- Fixed: Target was filled into email addresses (target@example.com).
+
+Nothing lost on refresh
+- New js/recent.js. Inputs are kept in this browser (encrypted when encryption is on,
+  re-encrypted when it changes, not part of backups) and reopen after a refresh:
+  Certificates, Cloud scanner and logs, Lab file inspector, PCAP, SQLite and image,
+  Decoder input, Lab text tools, log parser, SQL console, CTF flag, current tabs.
+- History buttons on every tool to reopen or delete each item; Settings -> Storage shows
+  their size with a Manage window. Files over 50 MB and private keys are never kept.
+- Restore points, recent searches (Ctrl+K) and recent query runs can be deleted one by one.
+
+Design
+- Default text a little larger; every font follows one text scale (Settings -> Text size).
+- Larger buttons and inputs with proper padding, select arrows, accent-coloured filter
+  chips, wider Ctrl+K palette whose scopes wrap, bigger top search bar.
+- What's new redesigned: totals, type filter tiles, search with highlights, release list.
+- Toolbox, Graph, Decoder, Certificates, Cloud and CTF filters, search bars and tables
+  restyled.
+- Menus stay attached to their button while scrolling and close once it leaves the
+  screen (Toolbox menu used to float away).
+
+Security
+- Decompression is capped (Decoder, Lab ZIP/Office, notebook .docx import, compressed
+  HTTP in PCAP), so a decompression bomb cannot freeze the tab.
+- Every download gets a safe file name: no path parts, reserved names (CON...) or
+  control / right-to-left override characters.
+- Lab image tool refuses non-images and files over 100 MB.
+
+Tests: 47 Playwright tests pass, including new ones for certificate types, the Cases
+views, the CTF layout, refresh persistence with per-item delete, decompression bombs
+and download names.

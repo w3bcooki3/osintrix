@@ -57,6 +57,6 @@ function noteDlg(id){
     <div class="frow"><div class="field"><label for="nCase">Case</label><select id="nCase"><option value="">General (no case)</option>${DB.cases.map(c => `<option value="${c.id}"${n.caseId === c.id ? ' selected' : ''}>${esc(c.code + ' · ' + c.name.split(' — ')[0])}</option>`).join('')}</select></div>
       <div class="field"><label for="nDue">Due</label><input id="nDue" type="date" value="${esc(n.due || '')}"></div></div>
     <div class="field" style="margin:0"><span class="label">Colour</span><div class="ncolors big">${NOTE_COLORS.map(([k, col]) => `<button type="button" data-act="nColor" data-id="${n.id}" data-v="${k}" style="--nc:${col}" aria-pressed="${n.color === k}" aria-label="${k}"></button>`).join('')}</div></div>
-    <label style="display:flex;gap:10px;align-items:center;margin-top:14px;font-size:14px"><input type="checkbox" id="nPin" ${n.pinned ? 'checked' : ''}> Pin to the top and to the Dashboard</label></div>
+    <label style="display:flex;gap:10px;align-items:center;margin-top:14px;font-size:calc(14px * var(--ts,1))"><input type="checkbox" id="nPin" ${n.pinned ? 'checked' : ''}> Pin to the top and to the Dashboard</label></div>
     <footer><button class="btn danger" type="button" data-act="nDel" data-id="${n.id}" style="margin-right:auto">${ico('trash-2','sm')}Delete</button><button class="btn" type="button" data-act="dclose">Cancel</button><button class="btn primary" type="submit">Save</button></footer></form>`);
 }

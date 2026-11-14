@@ -43,7 +43,7 @@ function cloudScannerView(){
   const intro = `<div class="cld-kinds"><span class="ix">Reads</span> AWS IAM &amp; resource policies · Terraform (<code>.tf</code> and plan JSON) · CloudFormation · Azure ARM · Azure roles · GCP IAM · Kubernetes manifests</div>`;
   if(!R) return `<section class="cld-pane">${cloudDrop('csDrop', 'Drop a config or policy file', 'or click to choose · or paste below')}
     ${intro}
-    <div class="cld-paste"><label class="ix" for="csText">Paste config</label><textarea id="csText" class="inp mono" placeholder="Paste IAM JSON, Terraform, a Kubernetes manifest…" spellcheck="false"></textarea><div class="cld-paste-a"><button class="btn primary" data-act="cloudScanText">${ico('shield-alert','sm')}Scan</button><span class="t3">Samples:</span>${samples}</div></div></section>`;
+    <div class="cld-paste"><label class="ix" for="csText">Paste config</label><textarea id="csText" class="inp mono" placeholder="Paste IAM JSON, Terraform, a Kubernetes manifest…" spellcheck="false"></textarea><div class="cld-paste-a"><button class="btn primary" data-act="cloudScanText">${ico('shield-alert','sm')}Scan</button><button class="btn ghost" data-act="cloudHist" data-v="cloudScan">${ico('history','sm')}History<span class="crt-cnt">${typeof recentOf === 'function' ? recentOf('cloudScan').length : 0}</span></button><span class="t3">Samples:</span>${samples}</div></div></section>`;
   const c = R.counts, total = R.findings.length;
   const chips = Object.keys(SEV_META).filter(s => c[s]).map(s => `<span class="cld-sev ${s}">${c[s]} ${SEV_META[s][0].toLowerCase()}</span>`).join('');
   const rows = R.findings.map((f, i) => `<article class="cld-f ${f.sev}">
@@ -53,7 +53,7 @@ function cloudScannerView(){
       <div class="cld-f-w">${f.where ? `<code>${esc(f.where)}</code>` : ''}${f.line ? `<span class="t3">line ${f.line}</span>` : ''}</div></article>`).join('');
   return `<section class="cld-pane">
     <div class="cld-res-h"><div><h2>${esc(R.name || 'Pasted config')}</h2><p class="t3">${esc(R.kindLabel)}${R.resources ? ' · ' + R.resources + ' resource' + (R.resources === 1 ? '' : 's') : ''} · ${total} finding${total === 1 ? '' : 's'}</p></div>
-      <div class="cld-res-a"><button class="btn" data-act="cloudRescan">${ico('arrow-left','sm')}New scan</button>${total ? `<button class="btn" data-act="cloudExport">${ico('download','sm')}Export</button>${DB.cases.length ? `<button class="btn" data-act="cloudToCase">${ico('list-plus','sm')}Add to ${esc((theCase() || DB.cases[0]).code)}</button>` : ''}` : ''}</div></div>
+      <div class="cld-res-a"><button class="btn" data-act="cloudRescan">${ico('arrow-left','sm')}New scan</button><button class="btn ghost" data-act="cloudHist" data-v="cloudScan">${ico('history','sm')}History<span class="crt-cnt">${typeof recentOf === 'function' ? recentOf('cloudScan').length : 0}</span></button>${total ? `<button class="btn" data-act="cloudExport">${ico('download','sm')}Export</button>${DB.cases.length ? `<button class="btn" data-act="cloudToCase">${ico('list-plus','sm')}Add to ${esc((theCase() || DB.cases[0]).code)}</button>` : ''}` : ''}</div></div>
     ${R.kind === 'unknown' ? `<div class="note red"><span class="ic">${ico('triangle-alert','sm')}</span><div><b>Not recognised.</b> This doesn't look like a policy, IaC or Kubernetes file. Check it is valid JSON/YAML/HCL.</div></div>`
       : total ? `<div class="cld-sevbar">${chips}</div><div class="cld-flist">${rows}</div>`
       : `<div class="cld-clean">${ico('shield-check')}<b>No misconfigurations found</b><p>The ${R.resources} resource${R.resources === 1 ? '' : 's'} in this ${esc(R.kindLabel)} passed every check. This is a focused linter, not a full audit — keep using your cloud provider's own tools too.</p><button class="btn" data-act="cloudRescan">Scan another</button></div>`}
@@ -65,7 +65,7 @@ function cloudLogsView(){
   const R = UI.cloudLogs;
   if(!R) return `<section class="cld-pane">${cloudDrop('clDrop', 'Drop a cloud audit log', 'or click to choose · or paste below')}
     <div class="cld-kinds"><span class="ix">Reads</span> AWS CloudTrail (<code>Records</code> or JSON lines) · Azure Activity log · GCP Audit log</div>
-    <div class="cld-paste"><label class="ix" for="clText">Paste log</label><textarea id="clText" class="inp mono" placeholder="Paste CloudTrail / Azure / GCP audit JSON…" spellcheck="false"></textarea><div class="cld-paste-a"><button class="btn primary" data-act="cloudLogText">${ico('file-search','sm')}Hunt</button><span class="t3">Sample:</span><button class="cld-samp" data-act="cloudSample" data-v="CloudTrail (suspicious burst)">CloudTrail (suspicious burst)</button></div></div></section>`;
+    <div class="cld-paste"><label class="ix" for="clText">Paste log</label><textarea id="clText" class="inp mono" placeholder="Paste CloudTrail / Azure / GCP audit JSON…" spellcheck="false"></textarea><div class="cld-paste-a"><button class="btn primary" data-act="cloudLogText">${ico('file-search','sm')}Hunt</button><button class="btn ghost" data-act="cloudHist" data-v="cloudLogs">${ico('history','sm')}History<span class="crt-cnt">${typeof recentOf === 'function' ? recentOf('cloudLogs').length : 0}</span></button><span class="t3">Sample:</span><button class="cld-samp" data-act="cloudSample" data-v="CloudTrail (suspicious burst)">CloudTrail (suspicious burst)</button></div></div></section>`;
   if(R.fmt === 'unknown') return `<section class="cld-pane"><div class="cld-res-h"><div><h2>${esc(R.name || 'Pasted log')}</h2></div><div class="cld-res-a"><button class="btn" data-act="cloudLogReset">${ico('arrow-left','sm')}New</button></div></div><div class="note red"><span class="ic">${ico('triangle-alert','sm')}</span><div><b>Not recognised.</b> Expected CloudTrail, Azure Activity or GCP Audit JSON.</div></div></section>`;
   const c = R.counts;
   const chips = Object.keys(SEV_META).filter(s => c[s]).map(s => `<span class="cld-sev ${s}">${c[s]} ${SEV_META[s][0].toLowerCase()}</span>`).join('');
@@ -75,7 +75,7 @@ function cloudLogsView(){
   const actors = R.topActors.map(a => `<div><span>${esc(a.v)}</span><b>${a.n}</b></div>`).join('');
   const ips = R.topIps.map(a => `<div><span class="mono">${esc(a.v)}</span><b>${a.n}</b></div>`).join('');
   return `<section class="cld-pane"><div class="cld-res-h"><div><h2>${esc(R.name || 'Pasted log')}</h2><p class="t3">${esc(R.fmtLabel)} · ${R.total} event${R.total === 1 ? '' : 's'} · ${R.flagged.length} flagged · ${R.errors} error${R.errors === 1 ? '' : 's'}</p></div>
-    <div class="cld-res-a"><button class="btn" data-act="cloudLogReset">${ico('arrow-left','sm')}New</button>${R.total ? `<button class="btn" data-act="cloudLogCase">${ico('list-plus','sm')}Send to timeline</button>` : ''}</div></div>
+    <div class="cld-res-a"><button class="btn" data-act="cloudLogReset">${ico('arrow-left','sm')}New</button><button class="btn ghost" data-act="cloudHist" data-v="cloudLogs">${ico('history','sm')}History<span class="crt-cnt">${typeof recentOf === 'function' ? recentOf('cloudLogs').length : 0}</span></button>${R.total ? `<button class="btn" data-act="cloudLogCase">${ico('list-plus','sm')}Send to timeline</button>` : ''}</div></div>
     ${R.flagged.length ? `<div class="cld-sevbar">${chips}</div>` : ''}
     <div class="cld-loggrid">
       <div class="cld-logmain">${R.flagged.length ? flag : `<div class="cld-clean">${ico('shield-check')}<b>No notable events</b><p>None of the ${R.total} events matched a high-signal rule. You can still send them all to a case timeline.</p></div>`}</div>
@@ -136,14 +136,14 @@ function cloudGuideView(){
 }
 
 /* ---------------- actions ---------------- */
-function cloudRunScan(text, name){
+function cloudRunScan(text, name, keep = true){
   if(!text || !text.trim()) return toast('Nothing to scan');
-  try{ const R = cloudScan(text, name || ''); R.name = name || 'Pasted config'; UI.cloudScan = R; UI.cloudTab = 'scanner'; renderMain(); }
+  try{ const R = cloudScan(text, name || ''); R.name = name || 'Pasted config'; UI.cloudScan = R; UI.cloudTab = 'scanner'; renderMain(); if(keep && typeof recentAdd === 'function') recentAdd('cloudScan', R.name, text); }
   catch(e){ toast('Could not scan that file'); }
 }
-function cloudRunLogs(text, name){
+function cloudRunLogs(text, name, keep = true){
   if(!text || !text.trim()) return toast('Nothing to hunt');
-  try{ const R = CL.parse(text); R.name = name || 'Pasted log'; UI.cloudLogs = R; UI.cloudTab = 'logs'; renderMain(); }
+  try{ const R = CL.parse(text); R.name = name || 'Pasted log'; UI.cloudLogs = R; UI.cloudTab = 'logs'; renderMain(); if(keep && typeof recentAdd === 'function') recentAdd('cloudLogs', R.name, text); }
   catch(e){ toast('Could not read that log'); }
 }
 function cloudReadFile(file, cb){
@@ -167,7 +167,14 @@ function cloudLogsToTimeline(){
   logImportDlg();
 }
 
+if(typeof RECENT_OPEN !== 'undefined'){
+  RECENT_OPEN.cloudScan = async (it, text, restoring) => { if(!restoring) go('#/cloud'); const tab = UI.cloudTab; cloudRunScan(text, it.name, false); if(restoring){ UI.cloudTab = tab; renderMain(); } };
+  RECENT_OPEN.cloudLogs = async (it, text, restoring) => { if(!restoring) go('#/cloud'); const tab = UI.cloudTab; cloudRunLogs(text, it.name, false); if(restoring && tab){ UI.cloudTab = tab; renderMain(); } };
+  RECENT_AFTER_DEL.cloudScan = x => { if(!x || x.wasOpen) UI.cloudScan = null; if(UI.route.area === 'cloud') renderMain(); };
+  RECENT_AFTER_DEL.cloudLogs = x => { if(!x || x.wasOpen) UI.cloudLogs = null; if(UI.route.area === 'cloud') renderMain(); };
+}
 function bindCloud(){
+  if(typeof recentRestore === 'function'){ if(!UI.cloudScan) recentRestore('cloudScan'); if(!UI.cloudLogs) recentRestore('cloudLogs'); }
   const wire = (id, run) => { const el = $(id); if(!el) return; const inp = el.querySelector('input'); el.onkeydown = e => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); inp.click(); } };
     if(inp) inp.onchange = () => cloudReadFile(inp.files[0], run);
     el.ondragover = e => { e.preventDefault(); el.classList.add('over'); }; el.ondragleave = () => el.classList.remove('over');
@@ -188,9 +195,10 @@ const CLOUD_ACTS = {
   cgClear:() => { UI.cgQ = ''; renderMain(); },
   cloudScanText:() => { const t = $('csText'); cloudRunScan(t ? t.value : '', 'Pasted config'); },
   cloudLogText:() => { const t = $('clText'); cloudRunLogs(t ? t.value : '', 'Pasted log'); },
-  cloudSample:(id, v) => { const txt = CLOUD_SAMPLES[v]; if(!txt) return; if(/CloudTrail/.test(v)) cloudRunLogs(txt, v); else cloudRunScan(txt, v); },
-  cloudRescan:() => { UI.cloudScan = null; renderMain(); },
-  cloudLogReset:() => { UI.cloudLogs = null; renderMain(); },
+  cloudSample:(id, v) => { const txt = CLOUD_SAMPLES[v]; if(!txt) return; if(/CloudTrail/.test(v)) cloudRunLogs(txt, v, false); else cloudRunScan(txt, v, false); },
+  cloudRescan:() => { UI.cloudScan = null; if(typeof recentSetLast === 'function'){ recentSetLast('cloudScan', null); save(); } renderMain(); },
+  cloudLogReset:() => { UI.cloudLogs = null; if(typeof recentSetLast === 'function'){ recentSetLast('cloudLogs', null); save(); } renderMain(); },
+  cloudHist:(id, v) => recentDlg(v),
   cloudToCase:() => cloudFindingsToCase(),
   cloudLogCase:() => cloudLogsToTimeline(),
   cloudExport:() => { const R = UI.cloudScan; if(!R) return; download('cloud-scan-' + new Date().toISOString().slice(0, 10) + '.json', JSON.stringify({scanned:R.name, kind:R.kindLabel, resources:R.resources, counts:R.counts, findings:R.findings}, null, 2), 'application/json'); },

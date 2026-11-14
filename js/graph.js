@@ -200,12 +200,25 @@ function showMenu(x, y, items, title){
   m.onkeydown = ev => { const bs = [...m.querySelectorAll('button:not([disabled])')], i = bs.indexOf(document.activeElement);
     if(ev.key === 'ArrowDown'){ ev.preventDefault(); bs[(i + 1) % bs.length].focus(); } else if(ev.key === 'ArrowUp'){ ev.preventDefault(); bs[(i - 1 + bs.length) % bs.length].focus(); }
     else if(ev.key === 'Escape' || ev.key === 'Tab'){ ev.preventDefault(); hideMenu(); } };
-  CTX = {m, prev:document.activeElement};
+  const press = MENU_PRESS && Date.now() - MENU_PRESS.at < 1500 && MENU_PRESS.el && document.contains(MENU_PRESS.el) ? MENU_PRESS.el : null;
+  const anchor = press || (document.activeElement && document.activeElement !== document.body && document.activeElement.closest && document.activeElement.closest('button,[data-act]')) || null;
+  CTX = {m, prev:document.activeElement, anchor, ar:anchor ? anchor.getBoundingClientRect() : null};
   const f = m.querySelector('button:not([disabled])'); if(f) f.focus({preventScroll:true});
 }
 function hideMenu(){ if(CTX){ CTX.m.remove(); const p = CTX.prev; CTX = null; if(p && p.focus && document.contains(p)) p.focus({preventScroll:true}); } }
 document.addEventListener('mousedown', ev => { if(CTX && !ev.target.closest('#ctx')) hideMenu(); }, true);
 window.addEventListener('blur', hideMenu); window.addEventListener('resize', hideMenu);
+/* a menu belongs to the button that opened it: when the page scrolls it moves with the button,
+   and closes once the button leaves the screen. A menu opened at a point (right-click) closes on scroll. */
+let MENU_PRESS = null;
+document.addEventListener('pointerdown', ev => { MENU_PRESS = {el:ev.target.closest && ev.target.closest('button,[data-act],a'), at:Date.now()}; }, true);
+document.addEventListener('scroll', ev => {
+  if(!CTX || (ev.target instanceof Node && CTX.m.contains(ev.target))) return;
+  const a = CTX.anchor; if(!a || !document.contains(a)) return hideMenu();
+  const r = a.getBoundingClientRect(); if(r.bottom < 0 || r.top > window.innerHeight || !r.height) return hideMenu();
+  const dx = r.left - CTX.ar.left, dy = r.top - CTX.ar.top; if(!dx && !dy) return;
+  CTX.ar = r; CTX.m.style.left = (parseFloat(CTX.m.style.left) + dx) + 'px'; CTX.m.style.top = (parseFloat(CTX.m.style.top) + dy) + 'px';
+}, true);
 
 function verdictSeg(cur, set){ return [['malicious','Malicious','m'],['suspicious','Suspicious','s'],['benign','Benign','b'],['','Unknown','u']].map(([v, l, c]) => ({label:l, on:cur === v, cls:'v-' + c, fn:() => set(v)})); }
 function nodeMenu(id, x, y){
@@ -278,7 +291,7 @@ function applyAsof(){ if(!cy) return; const D = derive(), cut = asofCut(D); cy.e
   for(const l of D.links){ const r = recById(l.src); if(r && r.ts > cut) cy.getElementById(l.id).addClass('later'); } }
 function exportGraph(fmt){
   const c = theCase(), D = derive(), X = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'), name = slug(c.name) + '-graph';
-  if(fmt === 'csv'){ const q = s => '"' + String(s == null ? '' : s).replace(/"/g, '""') + '"';
+  if(fmt === 'csv'){ const q = s => '"' + String(s == null ? '' : csvFormula(s)).replace(/"/g, '""') + '"';
     const nodes = ['id,label,type,verdict,priority,tags'].concat(D.entries.map(e => [e.id, primary(e), TYPES[e.type].label, entryVerdict(e) || '', e.priority, e.tags.join(' ')].map(q).join(',')));
     const edges = ['source,target,source_label,target_label,relationship,confidence'].concat(D.links.map(l => [l.a, l.b, primary(entryById(l.a)), primary(entryById(l.b)), l.label, l.conf].map(q).join(',')));
     download(name + '-nodes.csv', nodes.join('\n'), 'text/csv'); return setTimeout(() => download(name + '-edges.csv', edges.join('\n'), 'text/csv'), 400); }

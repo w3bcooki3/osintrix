@@ -300,14 +300,14 @@ function labPcap(){
   const A = UI.pcap;
   if(!A) return `<label class="drop" id="pcDrop" tabindex="0"><input type="file" id="pcIn" accept=".pcap,.pcapng,.cap,.dmp" class="sr">${ico('network')}<b>Drop a packet capture, or click to choose</b>
     <span>.pcap or .pcapng from Wireshark, tcpdump or a firewall — up to 300 MB. Read locally; nothing is uploaded.</span>
-    <span class="drop-feat"><i>Conversations</i><i>Hosts &amp; MACs</i><i>DNS</i><i>HTTP &amp; files</i><i>TLS SNI · JA3</i><i>Cleartext logins</i><i>Beacons &amp; scans</i><i>Follow stream</i><i>Flag finder</i></span></label>
-    <p class="t3" style="font-size:13px;margin:12px 2px 0">Encrypted traffic (HTTPS, SSH, QUIC, VPN) cannot be decrypted without its keys — you still see who talked to whom, when, how much, and the server name from the TLS handshake.</p>`;
+    <span class="drop-feat"><i>Conversations</i><i>Hosts &amp; MACs</i><i>DNS</i><i>HTTP &amp; files</i><i>TLS SNI · JA3</i><i>Cleartext logins</i><i>Beacons &amp; scans</i><i>Follow stream</i><i>Flag finder</i></span></label><div class="drop-hist"><button class="btn sm ghost" data-act="rcShow" data-v="pcap">${ico('history','sm')}History<span class="crt-cnt">${recentN('pcap')}</span></button><span class="t3 small">Files you open are kept in this browser (up to 50 MB each) so a refresh does not lose them.</span></div>
+    <p class="t3" style="font-size:calc(13px * var(--ts,1));margin:12px 2px 0">Encrypted traffic (HTTPS, SSH, QUIC, VPN) cannot be decrypted without its keys — you still see who talked to whom, when, how much, and the server name from the TLS handshake.</p>`;
   if(A.busy) return `<div class="card" style="padding:40px;text-align:center">${ico('refresh-cw','sm spin')} Reading ${esc(A.name)}…</div>`;
   if(UI.pcSel) return pcStreamView(A);
   const t = PC_TABS.some(x => x[0] === UI.pcTab) ? UI.pcTab : 'sum', cnt = {flows:A.flows.size, hosts:A.hosts.size, dns:A.dns.length, http:A.http.length, tls:A.tls.length, creds:A.creds.length};
   return `${flagBox(A.flags || [])}<section class="card pc-head"><header><span class="fi-ic">${ico('network')}</span><div style="min-width:0;flex:1"><h3>${esc(A.name)}</h3>
       <p class="t3">${esc(A.fmt)} · ${esc(A.links.map(l => PC_LINKS[l] || 'link type ' + l).join(', '))} · ${A.n.toLocaleString()} packets · ${fmtBytes(A.bytes)} · ${A.first ? pcDur(A.last - A.first) : 'no timestamps'}</p></div>
-      <div class="wrap"><button class="btn sm" data-act="pcSave">${ico('plus','sm')}Save to ${esc(theCase().code)}</button><button class="btn sm" data-act="pcEvents">${ico('list-plus','sm')}Send events to timeline</button><button class="btn sm" data-act="pcClear">${ico('x','sm')}Another file</button></div></header></section>
+      <div class="wrap"><button class="btn sm" data-act="pcSave">${ico('plus','sm')}Save to ${esc(theCase().code)}</button><button class="btn sm" data-act="pcEvents">${ico('list-plus','sm')}Send events to timeline</button><button class="btn sm ghost" data-act="rcShow" data-v="pcap">${ico('history','sm')}History<span class="crt-cnt">${recentN('pcap')}</span></button><button class="btn sm" data-act="pcClear">${ico('x','sm')}Another file</button></div></header></section>
     <nav class="seg pc-tabs" aria-label="Capture views">${PC_TABS.map(([k, l]) => `<button data-act="pcTab" data-v="${k}" aria-pressed="${t === k}">${l}${cnt[k] != null ? ` <small>${cnt[k].toLocaleString()}</small>` : ''}</button>`).join('')}</nav>
     ${t === 'sum' ? '' : `<div class="pc-filter search-in">${ico('search')}<label class="sr" for="pcq">Filter</label><input id="pcq" class="inp" placeholder="Filter this table…" value="${esc(UI.pcq || '')}"></div>`}
     <div id="pcBody">${pcTable(A, t)}</div>`;
@@ -322,12 +322,12 @@ function pcTable(A, t){
     const talk = [...A.hosts.values()].sort((a, b) => (b.sent + b.recv) - (a.sent + a.recv)).slice(0, 8);
     const names = [...new Set([...A.tls.map(x => x.sni), ...A.http.map(x => x.host), ...A.dns.filter(d => !d.mdns).map(d => d.name)].filter(Boolean).map(s => s.toLowerCase().replace(/:\d+$/, '')))];
     return `<div class="pc-grid">
-      <section class="card pc-wide"><header><h3>Findings</h3><span class="t3 small">${A.findings.length ? A.findings.length + ' to review' : ''}</span></header><div class="body pc-fbody">${A.findings.length ? `<ul class="pc-finds">${A.findings.map(f => `<li><span class="sev ${f.tone === 'red' ? 'high' : 'med'}">${f.tone === 'red' ? 'High' : 'Medium'}</span><div class="pf-main"><b>${esc(f.title)}</b><p>${esc(f.detail)}</p></div>${f.view ? `<button class="btn xs ghost" data-act="pcTab" data-v="${f.view}">${esc({flows:'Conversations', hosts:'Hosts', dns:'DNS', http:'HTTP', tls:'TLS', creds:'Logins'}[f.view] || 'View')}${ico('chevron-right','sm')}</button>` : ''}</li>`).join('')}</ul>` : `<p class="t3" style="margin:0;font-size:13.5px">Nothing stands out — no cleartext logins, beacons, scans or ports typical of malware.</p>`}</div></section>
+      <section class="card pc-wide"><header><h3>Findings</h3><span class="t3 small">${A.findings.length ? A.findings.length + ' to review' : ''}</span></header><div class="body pc-fbody">${A.findings.length ? `<ul class="pc-finds">${A.findings.map(f => `<li><span class="sev ${f.tone === 'red' ? 'high' : 'med'}">${f.tone === 'red' ? 'High' : 'Medium'}</span><div class="pf-main"><b>${esc(f.title)}</b><p>${esc(f.detail)}</p></div>${f.view ? `<button class="btn xs ghost" data-act="pcTab" data-v="${f.view}">${esc({flows:'Conversations', hosts:'Hosts', dns:'DNS', http:'HTTP', tls:'TLS', creds:'Logins'}[f.view] || 'View')}${ico('chevron-right','sm')}</button>` : ''}</li>`).join('')}</ul>` : `<p class="t3" style="margin:0;font-size:calc(13.5px * var(--ts,1))">Nothing stands out — no cleartext logins, beacons, scans or ports typical of malware.</p>`}</div></section>
       <section class="card"><header><h3>Capture</h3></header><div class="body">
         <div class="kv"><span>First packet</span><b class="mono">${pcT(A.first)}</b></div><div class="kv"><span>Last packet</span><b class="mono">${pcT(A.last)}</b></div>
         <div class="kv"><span>Hosts</span><b>${A.hosts.size.toLocaleString()} (${[...A.hosts.keys()].filter(ip => !pcPriv(ip)).length} public)</b></div><div class="kv"><span>Conversations</span><b>${A.flows.size.toLocaleString()}</b></div>
         ${A.other ? `<div class="kv"><span>Not decoded</span><b>${A.other.toLocaleString()} frames</b></div>` : ''}${A.frag ? `<div class="kv"><span>IP fragments</span><b>${A.frag.toLocaleString()}</b></div>` : ''}
-        <div class="kv"><span>SHA-256</span><code style="font-size:11.5px;word-break:break-all">${A.sha256}</code></div></div></section>
+        <div class="kv"><span>SHA-256</span><code style="font-size:calc(11.5px * var(--ts,1));word-break:break-all">${A.sha256}</code></div></div></section>
       <section class="card"><header><h3>Protocols</h3></header><div class="body">${pr.slice(0, 12).map(([k, v]) => `<div class="pc-bar"><span>${esc(k)}</span><i><b style="width:${Math.max(1, v / tot * 100)}%"></b></i><small>${v.toLocaleString()}</small></div>`).join('')}</div></section>
       <section class="card"><header><h3>Top talkers</h3></header><div class="body">${talk.map(h => `<div class="pc-bar"><span class="mono">${esc(h.ip)}</span><i><b style="width:${Math.max(1, (h.sent + h.recv) / ((talk[0].sent + talk[0].recv) || 1) * 100)}%"></b></i><small>${fmtBytes(h.sent + h.recv)}</small></div>`).join('')}</div></section>
       ${names.length ? `<section class="card pc-wide"><header><h3>Names contacted <small class="t3">${names.length}</small></h3></header><div class="body"><div class="pc-names">${names.slice(0, 120).map(n => `<code>${esc(n)}</code>`).join('')}</div></div></section>` : ''}
@@ -359,7 +359,7 @@ function pcStreamView(A){
     const d = c.d.subarray(0, 400000 - n); n += d.length;
     parts.push(`<div class="pc-chunk d${c.dir}">${hexMode ? esc(hexdump(d)) : esc(latin1(d).replace(/[^\x09\x0a\x0d\x20-\x7e\xa0-\xff]/g, '·'))}</div>`); }
   const enc = /HTTPS|TLS|SSH/.test(F.svc);
-  return `<section class="card"><header><button class="btn sm" data-act="pcBack">${ico('arrow-left','sm')}Back</button><div style="min-width:0;flex:1;margin-left:6px"><h3 class="mono" style="font-size:14.5px">${esc(pcHP(F.cli.ip, F.cli.port))} → ${esc(pcHP(F.srv.ip, F.srv.port))}</h3><p class="t3">${esc(F.tr)} · ${esc(F.svc)} · ${F.pk.toLocaleString()} packets · client sent ${fmtBytes(F.pl[0])}, server sent ${fmtBytes(F.pl[1])} · ${pcT(F.first)}</p></div>
+  return `<section class="card"><header><button class="btn sm" data-act="pcBack">${ico('arrow-left','sm')}Back</button><div style="min-width:0;flex:1;margin-left:6px"><h3 class="mono" style="font-size:calc(14.5px * var(--ts,1))">${esc(pcHP(F.cli.ip, F.cli.port))} → ${esc(pcHP(F.srv.ip, F.srv.port))}</h3><p class="t3">${esc(F.tr)} · ${esc(F.svc)} · ${F.pk.toLocaleString()} packets · client sent ${fmtBytes(F.pl[0])}, server sent ${fmtBytes(F.pl[1])} · ${pcT(F.first)}</p></div>
     <div class="wrap"><div class="seg sm"><button data-act="pcHex" data-v="0" aria-pressed="${!hexMode}">Text</button><button data-act="pcHex" data-v="1" aria-pressed="${!!hexMode}">Hex</button></div><button class="btn sm" data-act="pcDlStream" data-v="${F.id}">${ico('download','sm')}Download</button></div></header>
     <div class="body">${enc ? `<p class="note" style="margin:0 0 10px"><span class="ic">${ico('lock','sm')}</span><span>This conversation is encrypted. Without the session keys the content below is ciphertext; the handshake at the start is readable.</span></p>` : ''}
     <div class="pc-legend"><span class="d0">Client</span><span class="d1">Server</span></div><pre class="pc-stream">${parts.join('') || '<span class="t3">No payload.</span>'}</pre></div></section>`;
@@ -370,10 +370,10 @@ function bindPcap(){
     d.ondrop = e => { e.preventDefault(); d.classList.remove('over'); const f = e.dataTransfer.files[0]; if(f) pcLoad(f); }; d.onkeydown = e => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); inp.click(); } }; }
   const q = $('pcq'); if(q) q.oninput = () => { clearTimeout(q.__t); q.__t = setTimeout(() => { UI.pcq = q.value; const b = $('pcBody'); if(b && UI.pcap) b.innerHTML = pcTable(UI.pcap, UI.pcTab || 'sum'); }, 150); };
 }
-async function pcLoad(f){
+async function pcLoad(f, keep = true){
   if(f.size > 300 * 1048576) return toast('That capture is over 300 MB — split it with editcap or tshark first');
   UI.pcap = {busy:true, name:f.name}; UI.pcSel = null; UI.pcq = ''; UI.pcTab = 'sum'; renderMain();
-  try{ UI.pcap = await pcapAnalyse(f); }catch(e){ UI.pcap = null; toast(e.message && /pcap/.test(e.message) ? e.message : 'Could not read that capture'); }
+  try{ UI.pcap = await pcapAnalyse(f); if(keep) recentKeepFile('pcap', f); }catch(e){ UI.pcap = null; toast(e.message && /pcap/.test(e.message) ? e.message : 'Could not read that capture'); }
   renderMain();
 }
 function pcSummary(A){
@@ -409,14 +409,14 @@ function pcEvents(){
 }
 async function pcObj(i){
   const h = UI.pcap && UI.pcap.http[+i]; if(!h || !h.body) return; let data = h.body;
-  if(/gzip|deflate/i.test(h.enc) && typeof DecompressionStream !== 'undefined'){ try{ data = new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream(/gzip/i.test(h.enc) ? 'gzip' : 'deflate'))).arrayBuffer()); }catch(e){} }
+  if(/gzip|deflate/i.test(h.enc) && typeof DecompressionStream !== 'undefined'){ try{ data = await decompressCapped(data, /gzip/i.test(h.enc) ? 'gzip' : 'deflate', 64 * 1048576); }catch(e){} }
   let name = (h.disp.match(/filename\*?=(?:UTF-8'')?"?([^";]+)/i) || [])[1] || decodeURIComponent((h.url.split('?')[0].split('/').pop() || '')) || 'object';
   name = name.replace(/[\\/:*?"<>|]+/g, '_').slice(0, 100) || 'object';
   confirmDlg('Save file from the capture?', `${name} · ${fmtBytes(data.length)} · ${h.ctype || 'unknown type'}. Files taken from network traffic can be malicious — open it only in a safe environment.`, 'Save file', () => download(name, new Blob([data], {type:'application/octet-stream'})), true);
 }
 function pcDlStream(id){ const A = UI.pcap, F = A && [...A.flows.values()].find(x => x.id === +id); if(!F) return; download(`stream-${F.cli.ip}-${F.cli.port}-${F.srv.ip}-${F.srv.port}.bin`.replace(/:/g, '_'), new Blob(pcChunks(F).map(c => c.d), {type:'application/octet-stream'})); }
 const PCAP_ACTS = {
-  pcTab:(id, v) => { UI.pcTab = v; UI.pcq = ''; renderMain(); }, pcClear:() => { UI.pcap = null; UI.pcSel = null; renderMain(); },
+  pcTab:(id, v) => { UI.pcTab = v; UI.pcq = ''; renderMain(); }, pcClear:() => { UI.pcap = null; UI.pcSel = null; recentSetLast('pcap', null); save(); renderMain(); },
   pcFollow:(id, v) => { UI.pcSel = +v; UI.pcHex = false; renderMain(); const s = $('main').querySelector('.scroll'); if(s) s.scrollTop = 0; }, pcBack:() => { UI.pcSel = null; renderMain(); }, pcHex:(id, v) => { UI.pcHex = v === '1'; renderMain(); },
   pcShow:() => { UI.pcShow = !UI.pcShow; const b = $('pcBody'); if(b) b.innerHTML = pcTable(UI.pcap, 'creds'); },
   pcFilter:(id, v, el) => { UI.pcTab = el.dataset.t || 'flows'; UI.pcq = v; renderMain(); },

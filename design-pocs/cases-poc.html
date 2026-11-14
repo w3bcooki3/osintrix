@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cases — three proposals</title>
+<link rel="stylesheet" href="../css/fonts.css">
+<script src="../js/icons.js"></script>
+<style>
+:root{--font:'Geist',system-ui,sans-serif;--mono:'Geist Mono',ui-monospace,monospace;
+  --bg:#f5f6f8;--side:#fff;--surface:#fff;--surface-2:#f8f9fb;--hover:#f2f4f7;--border:#dfe3ea;--soft:#eaedf2;
+  --text:#0f172a;--text-2:#475569;--text-3:#5b6678;--accent:#4f46e5;--accent-bg:#5b54f0;--accent-soft:#5b54f012;
+  --green:#047857;--red:#c81e1e;--amber:#a14b08;--blue:#2563eb;--sh:0 1px 2px #0f172a0a}
+[data-theme=dark]{--bg:#0b0f17;--side:#0d121c;--surface:#111723;--surface-2:#151c2a;--hover:#1a2232;--border:#2a3346;--soft:#1f2737;
+  --text:#e7ebf2;--text-2:#a9b3c4;--text-3:#8f9ab0;--accent:#a5a1ff;--accent-bg:#655cf7;--accent-soft:#6d64ff1f;--green:#4ade80;--red:#f87171;--amber:#fbbf24;--blue:#93c5fd;--sh:0 1px 2px #0006}
+*{box-sizing:border-box}
+body{margin:0;background:#dfe3ea;font:14.5px/1.5 var(--font);color:var(--text);padding:30px 0}
+.i{width:16px;height:16px;stroke-width:1.8;flex:none}.i.sm{width:14px;height:14px}
+.frame{width:1440px;height:900px;margin:0 auto 40px;display:grid;grid-template-columns:64px 1fr;background:var(--bg);overflow:hidden;position:relative;border-radius:10px;box-shadow:0 20px 60px -20px #0f172a55}
+.rail{background:var(--side);border-right:1px solid var(--soft);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:6px}
+.rail .logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#6d64ff,#a855f7);margin-bottom:12px}
+.rail b{width:40px;height:36px;border-radius:9px;display:grid;place-items:center;color:var(--text-3)}.rail b.on{background:var(--accent-soft);color:var(--accent)}
+.rail hr{width:32px;border:0;border-top:1px solid var(--soft);margin:6px 0}
+.main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.top{height:60px;flex:none;display:flex;align-items:center;gap:12px;padding:0 24px;border-bottom:1px solid var(--soft)}
+.search{width:600px;height:40px;border:1px solid var(--border);border-radius:11px;background:var(--surface);display:flex;align-items:center;gap:10px;padding:0 14px;color:var(--text-3);font-size:14.5px}
+.sp{flex:1}
+.btn{height:36px;padding:0 15px;border-radius:9px;border:1px solid var(--border);background:var(--surface);display:inline-flex;align-items:center;gap:8px;font:500 14px var(--font);color:var(--text);box-shadow:var(--sh);white-space:nowrap}
+.btn.pri{background:var(--accent-bg);border-color:var(--accent-bg);color:#fff}
+.page{padding:28px 32px;overflow:hidden;flex:1}
+.ph{display:flex;align-items:flex-end;gap:16px;margin-bottom:22px}
+.ph h1{margin:0;font-size:27px;letter-spacing:-.025em;font-weight:680}.ph p{margin:4px 0 0;color:var(--text-2);font-size:15px}
+.bar{display:flex;align-items:center;gap:10px;margin-bottom:18px}
+.seg{display:inline-flex;padding:3px;border-radius:10px;background:var(--surface-2);border:1px solid var(--soft);gap:2px}
+.seg span{height:32px;padding:0 13px;border-radius:8px;display:inline-flex;align-items:center;gap:7px;font-size:13.5px;font-weight:500;color:var(--text-2)}
+.seg span.on{background:var(--surface);color:var(--text);box-shadow:0 1px 2px #0000001a,0 0 0 1px var(--border)}
+.seg small{font:500 11.5px var(--mono);color:var(--text-3)}
+.fsearch{height:38px;width:280px;border:1px solid var(--border);border-radius:9px;background:var(--surface);display:flex;align-items:center;gap:8px;padding:0 12px;color:var(--text-3);font-size:14px}
+.sel{height:38px;border:1px solid var(--border);border-radius:9px;background:var(--surface);display:inline-flex;align-items:center;gap:8px;padding:0 12px;font-size:14px;color:var(--text)}
+.mono{font-family:var(--mono)}
+.lbl{position:absolute;right:20px;bottom:14px;font:500 12px var(--mono);color:var(--text-3);background:var(--surface);padding:4px 8px;border-radius:6px;border:1px solid var(--soft)}
+.sq{width:10px;height:10px;border-radius:3px;background:var(--cc);flex:none;display:inline-block}
+.st{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:var(--text-2);white-space:nowrap}
+.st::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--sc)}
+.st.active{--sc:var(--green)}.st.review{--sc:var(--amber)}.st.closed{--sc:var(--text-3)}
+.red{color:var(--red)!important}
+.spark{display:flex;align-items:flex-end;gap:2px;height:28px}
+.spark i{flex:1;min-width:3px;border-radius:2px 2px 0 0;background:color-mix(in srgb,var(--cc) 70%,var(--text-3))}
+.spark i.z{background:var(--soft);height:2px!important}
+h2.ttl{font:600 13px var(--mono);color:var(--text-3);margin:0 0 6px;text-align:center;letter-spacing:.02em}
+
+/* ---------- A: ledger (list) ---------- */
+.led{background:var(--surface);border:1px solid var(--soft);border-radius:14px;overflow:hidden;box-shadow:var(--sh)}
+.led-h,.led-r{display:grid;grid-template-columns:minmax(0,1fr) 110px 120px 78px 78px 84px 150px 92px 64px;align-items:center;gap:16px;padding:0 20px}
+.led-h{height:42px;font-size:12.5px;color:var(--text-3);font-weight:500;background:var(--surface-2);border-bottom:1px solid var(--soft)}
+.led-h .n{text-align:right}
+.led-g{padding:14px 20px 6px;font-size:12.5px;font-weight:600;color:var(--text-3);display:flex;gap:8px;align-items:center}
+.led-g small{font:500 11.5px var(--mono)}
+.led-r{min-height:74px;border-top:1px solid var(--soft)}
+.led-r:hover{background:var(--hover)}
+.led-n{display:flex;gap:12px;align-items:flex-start;min-width:0}
+.led-n .sq{margin-top:6px}
+.led-n b{display:flex;align-items:baseline;gap:10px;font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.led-n b .mono{font-size:12.5px;color:var(--text-3);font-weight:500}
+.led-n small{display:block;font-size:13.5px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.led-q{display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:var(--text-2)}
+.led-q span.b{height:4px;border-radius:4px;background:var(--soft);overflow:hidden}.led-q span.b i{display:block;height:100%;background:var(--cc)}
+.led-num{text-align:right;font-variant-numeric:tabular-nums;font-size:15px;font-weight:600}
+.led-up{font-size:13px;color:var(--text-3);text-align:right}
+.led-act{display:flex;gap:2px;justify-content:flex-end;color:var(--text-3)}
+.led-act b{width:30px;height:30px;display:grid;place-items:center;border-radius:7px}
+
+/* ---------- B: case file ---------- */
+.files{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.cf{background:var(--surface);border:1px solid var(--soft);border-radius:14px;box-shadow:var(--sh);display:flex;flex-direction:column;min-height:330px}
+.cf-h{display:flex;align-items:center;gap:10px;padding:18px 22px 0}
+.cf-h .mono{font-size:13px;color:var(--text-3);font-weight:500;letter-spacing:.01em}
+.cf-h .act{margin-left:auto;display:flex;gap:2px;color:var(--text-3)}.cf-h .act b{width:30px;height:30px;display:grid;place-items:center;border-radius:7px}
+.cf h3{margin:14px 22px 6px;font-size:19px;line-height:1.3;font-weight:650;letter-spacing:-.015em}
+.cf p{margin:0 22px;color:var(--text-2);font-size:14.5px;line-height:1.55;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.cf dl{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:20px 22px 0;padding:14px 0;border-top:1px solid var(--soft);border-bottom:1px solid var(--soft)}
+.cf dt{font-size:12px;color:var(--text-3)}.cf dd{margin:2px 0 0;font-size:19px;font-weight:650;font-variant-numeric:tabular-nums}.cf dd small{font-size:13px;color:var(--text-3);font-weight:500}
+.cf-act{padding:14px 22px 18px;margin-top:auto;display:grid;grid-template-columns:minmax(0,1fr) 120px;gap:18px;align-items:end}
+.cf-act .last{font-size:13px;color:var(--text-2);line-height:1.45;min-width:0}
+.cf-act .last span{display:block;color:var(--text-3);font-size:12px;margin-bottom:2px}
+.cf-act .last b{font-weight:500;color:var(--text)}
+.cf-act .spark{height:32px}
+.cf.new{border:1.5px dashed var(--border);background:transparent;box-shadow:none;align-items:center;justify-content:center;text-align:center;color:var(--text-2);gap:6px}
+.cf.new b{color:var(--text);font-size:16px}
+
+/* ---------- C: board preview ---------- */
+.boards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.bc{background:var(--surface);border:1px solid var(--soft);border-radius:14px;box-shadow:var(--sh);overflow:hidden;display:flex;flex-direction:column}
+.bc-map{height:150px;position:relative;background:var(--surface-2);border-bottom:1px solid var(--soft);
+  background-image:radial-gradient(circle,color-mix(in srgb,var(--text-3) 22%,transparent) 1px,transparent 1.2px);background-size:16px 16px}
+.bc-map>svg{position:absolute;inset:0;width:100%;height:100%}
+.bc-map .nd{position:absolute;width:13px;height:13px;margin:-6.5px 0 0 -6.5px;border-radius:50%;background:var(--surface);border:2px solid var(--nc)}.bc-map .nd.m{width:15px;height:15px;margin:-7.5px 0 0 -7.5px;border-width:3px;box-shadow:0 0 0 3px color-mix(in srgb,var(--nc) 18%,transparent)}
+.bc-map .ov{position:absolute;left:12px;bottom:10px;display:flex;gap:6px}
+.bc-map .ov span{height:24px;padding:0 9px;border-radius:7px;background:var(--surface);border:1px solid var(--soft);font-size:12px;font-weight:500;display:inline-flex;align-items:center;gap:6px;color:var(--text-2)}
+.bc-map .ov span.r{color:var(--red)}
+.bc-map .st{position:absolute;right:12px;top:10px;background:var(--surface);border:1px solid var(--soft);border-radius:7px;padding:2px 9px}
+.bc-b{padding:16px 20px 18px;display:flex;flex-direction:column;gap:8px;flex:1}
+.bc-b .code{display:flex;align-items:center;gap:8px;font:500 12.5px var(--mono);color:var(--text-3)}
+.bc-b h3{margin:0;font-size:18px;font-weight:650;letter-spacing:-.015em;line-height:1.3}
+.bc-b p{margin:0;color:var(--text-2);font-size:14px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.bc-ind{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.bc-ind span{font:500 12px var(--mono);height:24px;display:inline-flex;align-items:center;gap:6px;padding:0 8px;border-radius:6px;border:1px solid var(--soft);color:var(--text-2);background:var(--surface)}
+.bc-ind span i{width:6px;height:6px;border-radius:50%;background:var(--red)}
+.bc-f{display:flex;align-items:center;gap:14px;margin-top:auto;padding-top:12px;font-size:13px;color:var(--text-3)}
+.bc-f .q{flex:1;display:flex;align-items:center;gap:8px}
+.bc-f .q span.b{flex:1;max-width:120px;height:4px;border-radius:4px;background:var(--soft);overflow:hidden}.bc-f .q span.b i{display:block;height:100%;background:var(--cc)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const I = (n, c='') => `<svg class="i ${c}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">${LUCIDE[n]||''}</svg>`;
+const shell = (inner, lbl) => `<section class="frame"><nav class="rail"><div class="logo"></div>${['layout-dashboard','sticky-note','notebook-pen','graduation-cap'].map(i=>`<b>${I(i)}</b>`).join('')}<hr><b class="on">${I('folder-open')}</b><hr>${['wrench','scan-search','binary','shield-check','cloud','flag','book-open'].map(i=>`<b>${I(i)}</b>`).join('')}</nav>
+  <div class="main"><div class="top"><div class="search">${I('search')}Search everything — cases, evidence, IOCs, tools, notes…</div><span class="sp"></span><button class="btn pri">${I('plus')}Capture</button></div>
+  <div class="page"><div class="ph"><div><h1>Cases</h1><p>Every investigation is its own vault — entries, evidence, timeline, graph and report.</p></div><span class="sp"></span><button class="btn">${I('upload')}Import case</button><button class="btn pri">${I('plus')}New case</button></div>${inner}</div></div><div class="lbl">${lbl}</div></section>`;
+const CASES = [
+  {code:'TN-2026-014', name:'Op Lantern — invoice LNK intrusion', scope:'Phishing LNK on WS-FIN-07, beaconing implant, lateral movement to DC01. OSINT on the sender infrastructure.', s:'active', cc:'#4f46e5', e:18, r:27, m:6, q:[2,5], up:'2 d ago', last:'<b>203.0.113.47</b> marked malicious', spark:[0,1,0,3,5,2,0,4,6,3,1,0,2,7,4,2,0,1,3,2], pin:true,
+    ind:['203.0.113.47','update-lamp.test','Lamp loader'], g:'lantern'},
+  {code:'TN-2026-011', name:'Customer portal — credential stuffing', scope:'Burst of failed logins against portal.corp.example; check overlap with other cases.', s:'review', cc:'#ea580c', e:3, r:5, m:1, q:null, up:'5 d ago', last:'Report draft shared for review', spark:[0,0,2,1,0,0,0,3,1,0,0,0,0,0,1,0,0,0,0,0],
+    ind:['203.0.113.47','portal.corp.example'], g:'portal'},
+  {code:'LAB-2026-01', name:'Harbour photo — OSINT & forensics CTF lab', scope:'Practice challenge: work out where harbour.jpg was taken, who posted it, and recover the hidden flag.', s:'active', cc:'#0d9488', e:5, r:8, m:0, q:[1,3], up:'9 d ago', last:'GPS position added from the photo', spark:[0,0,0,0,1,2,0,0,0,3,1,0,0,0,0,0,1,0,0,0],
+    ind:['harbour.jpg','@harbourlens'], g:'harbour'},
+  {code:'TN-2026-016', name:'Test case', scope:'', s:'active', cc:'#2563eb', e:2, r:1, m:0, q:null, up:'48 d ago', last:'Case created', spark:new Array(20).fill(0), ind:[], g:'empty'}
+];
+const spark = (c) => `<div class="spark" style="--cc:${c.cc}">${c.spark.map(v => `<i class="${v ? '' : 'z'}" style="height:${v ? Math.max(14, v / 7 * 100) : 0}%"></i>`).join('')}</div>`;
+const st = c => `<span class="st ${c.s}">${{active:'Active', review:'In review', closed:'Archived'}[c.s]}</span>`;
+const bar = (tail = '') => `<div class="bar"><div class="seg"><span class="on">All <small>4</small></span><span>Active <small>3</small></span><span>In review <small>1</small></span><span>Archived <small>0</small></span></div>
+  <div class="fsearch">${I('search','sm')}Find a case…</div><span class="sp"></span><span class="sel">${I('arrow-down-up','sm')}Last activity ${I('chevron-down','sm')}</span>${tail}</div>`;
+
+/* A — ledger */
+const ledRow = c => `<div class="led-r"><div class="led-n"><span class="sq" style="--cc:${c.cc}"></span><div style="min-width:0"><b>${c.name}</b><small><span class="mono" style="color:var(--text-3);font-size:12.5px">${c.code}</span> · ${c.scope || '<i style="color:var(--text-3)">No scope written yet</i>'}</small></div></div>
+  <div>${st(c)}</div>
+  <div class="led-q" style="--cc:${c.cc}">${c.q ? `<span>${c.q[0]} of ${c.q[1]} answered</span><span class="b"><i style="width:${c.q[0] / c.q[1] * 100}%"></i></span>` : '<span style="color:var(--text-3)">No questions</span>'}</div>
+  <div class="led-num">${c.e}</div><div class="led-num">${c.r}</div><div class="led-num${c.m ? ' red' : ''}">${c.m}</div>
+  <div style="--cc:${c.cc}">${spark(c)}</div><div class="led-up">${c.up}</div>
+  <div class="led-act"><b style="${c.pin ? 'color:var(--accent)' : ''}">${I('pin','sm')}</b><b>${I('ellipsis','sm')}</b></div></div>`;
+const A = shell(`${bar(`<div class="seg"><span class="on">${I('list','sm')}</span><span>${I('layout-grid','sm')}</span></div>`)}
+  <div class="led"><div class="led-h"><span>Case</span><span>Status</span><span>Questions</span><span class="n">Entries</span><span class="n">Records</span><span class="n">Malicious</span><span>Activity · 20 days</span><span class="n">Updated</span><span></span></div>
+  <div class="led-g">${I('pin','sm')}Pinned <small>1</small></div>${ledRow(CASES[0])}
+  <div class="led-g">Active <small>2</small></div>${ledRow(CASES[2])}${ledRow(CASES[3])}
+  <div class="led-g">In review <small>1</small></div>${ledRow(CASES[1])}</div>`, 'A · Ledger — a list built for scanning');
+
+/* B — case file */
+const cf = c => `<article class="cf"><div class="cf-h"><span class="sq" style="--cc:${c.cc}"></span><span class="mono">${c.code}</span>${st(c)}<span class="act"><b style="${c.pin ? 'color:var(--accent)' : ''}">${I('pin','sm')}</b><b>${I('ellipsis','sm')}</b></span></div>
+  <h3>${c.name}</h3><p>${c.scope || '<i style="color:var(--text-3)">No scope written yet.</i>'}</p>
+  <dl><div><dt>Entries</dt><dd>${c.e}</dd></div><div><dt>Records</dt><dd>${c.r}</dd></div><div><dt>Malicious</dt><dd class="${c.m ? 'red' : ''}">${c.m}</dd></div><div><dt>Questions</dt><dd>${c.q ? c.q[0] + '<small> / ' + c.q[1] + '</small>' : '—'}</dd></div></dl>
+  <div class="cf-act"><div class="last"><span>Last activity · ${c.up}</span>${c.last}</div><div style="--cc:${c.cc}">${spark(c)}</div></div></article>`;
+const B = shell(`${bar()}<div class="files">${cf(CASES[0])}${cf(CASES[1])}${cf(CASES[2])}${cf(CASES[3])}
+  <article class="cf new">${I('plus')}<b>New case</b><span>Name it, write the scope, then capture evidence.</span></article></div>`, 'B · Case file — calm cards with the facts that matter');
+
+/* C — board preview: a thumbnail of each case's own relationship graph */
+const G = {
+  lantern:{n:[[50,48,'#7c3aed'],[30,30,'#0891b2'],[70,28,'#2563eb'],[30,68,'#64748b'],[52,80,'#dc2626',1],[74,62,'#dc2626',1],[88,40,'#d97706'],[14,50,'#7c3aed'],[64,46,'#2563eb'],[86,78,'#dc2626',1]], e:[[0,1],[0,2],[0,3],[3,4],[4,5],[2,6],[1,7],[0,8],[8,5],[5,9]]},
+  portal:{n:[[40,50,'#2563eb'],[64,36,'#dc2626',1],[64,66,'#7c3aed']], e:[[0,1],[0,2]]},
+  harbour:{n:[[36,50,'#64748b'],[56,30,'#16a34a'],[62,66,'#7c3aed'],[80,48,'#0891b2'],[20,32,'#64748b']], e:[[0,1],[0,2],[2,3],[0,4]]},
+  empty:{n:[[44,50,'#2563eb'],[60,50,'#7c3aed']], e:[[0,1]]}
+};
+const mini = g => `<svg viewBox="0 0 100 100" preserveAspectRatio="none">${g.e.map(([a, b]) => `<line x1="${g.n[a][0]}" y1="${g.n[a][1]}" x2="${g.n[b][0]}" y2="${g.n[b][1]}" stroke="currentColor" stroke-opacity=".3" stroke-width="1" vector-effect="non-scaling-stroke" style="color:var(--text-3)"/>`).join('')}</svg>
+  ${g.n.map(([x, y, c, m]) => `<i class="nd${m ? ' m' : ''}" style="left:${x}%;top:${y}%;--nc:${c}"></i>`).join('')}`;
+const bc = c => `<article class="bc"><div class="bc-map">${mini(G[c.g])}<div class="ov"><span>${I('git-branch','sm')}${c.e} entities</span>${c.m ? `<span class="r">${I('shield-alert','sm')}${c.m} malicious</span>` : ''}</div>${st(c)}</div>
+  <div class="bc-b"><div class="code"><span class="sq" style="--cc:${c.cc}"></span>${c.code}<span class="sp"></span><span style="display:flex;gap:2px">${I('pin','sm')}${I('ellipsis','sm')}</span></div>
+  <h3>${c.name}</h3><p>${c.scope || '<i style="color:var(--text-3)">No scope written yet.</i>'}</p>
+  ${c.ind.length ? `<div class="bc-ind">${c.ind.map((v, i) => `<span>${i === 0 && c.m ? '<i></i>' : ''}${v}</span>`).join('')}</div>` : ''}
+  <div class="bc-f"><span class="q" style="--cc:${c.cc}">${c.q ? `${c.q[0]}/${c.q[1]} questions <span class="b"><i style="width:${c.q[0] / c.q[1] * 100}%"></i></span>` : `${c.r} records`}</span><span>${I('clock','sm')} ${c.up}</span></div></div></article>`;
+const C = shell(`${bar()}<div class="boards">${bc(CASES[0])}${bc(CASES[1])}${bc(CASES[2])}</div>`, 'C · Board preview — each case shows its own graph');
+
+const theme = new URLSearchParams(location.search).get('theme'); if(theme) document.documentElement.dataset.theme = theme;
+root.innerHTML = `<h2 class="ttl">A · Ledger</h2>${A}<h2 class="ttl">B · Case file</h2>${B}<h2 class="ttl">C · Board preview</h2>${C}`;
+</script>
+</body>
+</html>

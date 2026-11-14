@@ -46,7 +46,8 @@ async function storageBreakdown(){
   const snaps = (SNAPS || []).reduce((s, x) => s + (x.size || 0) * 2, 0);
   // files in IndexedDB that nothing points at any more (left behind by crashes or older versions)
   const keys = await IDB.keys(), fids = new Set(recs.flatMap(r => (r && r.att || []).map(a => 'file:' + a.id))), nbk = new Set(media.map(m => 'nbm:' + m.id));
-  const orphans = keys.filter(k => typeof k === 'string' && ((k.startsWith('file:') && !fids.has(k)) || (k.startsWith('nbm:') && !nbk.has(k))));
+  const wk = new Set((DB.recent || []).filter(x => x.kind === 'file').map(x => 'wk:' + x.id));
+  const orphans = keys.filter(k => typeof k === 'string' && ((k.startsWith('file:') && !fids.has(k)) || (k.startsWith('nbm:') && !nbk.has(k)) || (k.startsWith('wk:') && !wk.has(k))));
   stoInfo = {quota:STO_QUOTA(), usage:STORE.usage || 0, json:STORE.bytes || 0, att, nbLive, nbGone, nbGoneN:media.filter(m => m.gone).length, snaps, snapN:(SNAPS || []).length, trashN:(DB.trash || []).length, orphans};
   return stoInfo;
 }
@@ -64,6 +65,7 @@ function storageCard(){
       ${row('Notebook pictures and files', stoBytes(I.nbLive))}
       ${I.nbGoneN ? row(`Deleted notebook pictures, kept ${NB_KEEP_DAYS} days for undo`, stoBytes(I.nbGone), 'stoNbFree', 'Free now') : ''}
       ${row(`Restore points (${I.snapN} of ${SNAP_MAX})`, stoBytes(I.snaps), I.snapN > 2 ? 'stoSnapTrim' : '', 'Keep newest 2')}
+      ${typeof recentAll === 'function' ? row(`Recent tool inputs (${recentAll().length}) — certificates, Lab files, cloud`, stoBytes(recentBytes()), recentAll().length ? 'rcShow' : '', 'Manage').replace('data-act="rcShow"', 'data-act="rcShow" data-v="*"') : ''}
       ${row(`Trash (${I.trashN} item${I.trashN === 1 ? '' : 's'})`, I.trashN ? 'auto-empties after 30 days' : '—', I.trashN ? 'trEmpty' : '', 'Empty')}
       ${I.orphans.length ? row(`Leftover files nothing uses (${I.orphans.length})`, '', 'stoOrphans', 'Remove') : ''}</div>` : '<p class="t3">Measuring…</p>'}
     <p class="t3 sto-n">${STORE.persisted ? 'Marked persistent: the browser will not clear this data to free disk space.' : 'Not marked persistent: under heavy disk pressure the browser may clear it.'}

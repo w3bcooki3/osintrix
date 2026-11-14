@@ -263,8 +263,8 @@ function fileStructure(r){
   if(r.zip){ const z = r.zip;
     if(z.office){ h += `<section class="card"><header><h3>${ico('file-text','sm')} Office document metadata</h3></header><div class="body">${Object.entries(z.office).map(([k, v]) => kvr(k, v)).join('') || '<p class="t3">No metadata.</p>'}
       ${z.macros.length ? `<div class="note red" style="margin:10px 0 0"><span class="ic">${ico('triangle-alert','sm')}</span><div><b>Contains macros:</b> ${esc(z.macros.join(', '))}. Extract with <span class="mono">olevba</span> before opening.</div></div>` : ''}
-      ${z.external.length ? `<div class="note amber" style="margin:10px 0 0"><span class="ic">${ico('link','sm')}</span><div><b>External links (possible remote template / tracking):</b>${z.external.slice(0, 10).map(([f, u]) => `<div class="mono" style="font-size:12px;overflow-wrap:anywhere">${esc(u)}</div>`).join('')}</div></div>` : ''}
-      ${z.ole.length ? `<p class="t3" style="font-size:12.5px;margin:10px 0 0">Embedded objects: ${esc(z.ole.slice(0, 8).join(', '))}</p>` : ''}</div></section>`; }
+      ${z.external.length ? `<div class="note amber" style="margin:10px 0 0"><span class="ic">${ico('link','sm')}</span><div><b>External links (possible remote template / tracking):</b>${z.external.slice(0, 10).map(([f, u]) => `<div class="mono" style="font-size:calc(12px * var(--ts,1));overflow-wrap:anywhere">${esc(u)}</div>`).join('')}</div></div>` : ''}
+      ${z.ole.length ? `<p class="t3" style="font-size:calc(12.5px * var(--ts,1));margin:10px 0 0">Embedded objects: ${esc(z.ole.slice(0, 8).join(', '))}</p>` : ''}</div></section>`; }
     h += `<section class="card"><header><h3>${ico('box','sm')} Archive contents</h3><span class="t3">${z.files.length} files${z.encrypted ? ' · password-protected' : ''}</span></header>
       ${z.comment ? `<div class="body" style="padding-bottom:0">${kvr('Comment', z.comment, true)}</div>` : ''}
       <div class="ziplist">${z.files.slice(0, 300).map(f => `<div><span class="mono">${esc(f.name)}</span>${f.enc ? `<span class="pill" style="--c:var(--amber)">${ico('lock','sm')}encrypted</span>` : ''}<span class="t3">${fmtBytes(f.size)}</span><span class="t3 hide-m">${isFinite(f.date) ? new Date(f.date).toISOString().slice(0, 16).replace('T', ' ') : ''}</span></div>`).join('')}</div></section>`; }
@@ -272,8 +272,8 @@ function fileStructure(r){
     h += `<section class="card"><header><h3>${ico('file-text','sm')} PDF structure</h3><span class="t3">PDF ${esc(p.version)}${p.updates ? ' · ' + p.updates + ' incremental update' + (p.updates > 1 ? 's' : '') : ''}</span></header><div class="body">
       ${Object.entries(p.info).map(([k, v]) => kvr(k, v)).join('')}
       <div class="pdfkeys">${Object.entries(p.keys).map(([k, n]) => `<span class="${n && ['/JS','/JavaScript','/OpenAction','/AA','/Launch','/EmbeddedFile','/XFA'].includes(k) ? 'hot' : ''}"><code>${esc(k)}</code><b>${n}</b></span>`).join('')}</div>
-      ${risky.length ? `<div class="note red" style="margin:10px 0 0"><span class="ic">${ico('triangle-alert','sm')}</span><div><b>Active content:</b> ${esc(risky.join(', '))}. Inspect with <span class="mono">pdf-parser</span> in a sandbox.</div></div>` : '<p class="t3" style="font-size:12.5px;margin:10px 0 0">No JavaScript, auto-actions or embedded files.</p>'}
-      ${p.uris.length ? `<div class="isec"><h4>Links in the document</h4>${p.uris.slice(0, 12).map(u => `<div class="mono" style="font-size:12px;overflow-wrap:anywhere">${esc(u)}</div>`).join('')}</div>` : ''}</div></section>`; }
+      ${risky.length ? `<div class="note red" style="margin:10px 0 0"><span class="ic">${ico('triangle-alert','sm')}</span><div><b>Active content:</b> ${esc(risky.join(', '))}. Inspect with <span class="mono">pdf-parser</span> in a sandbox.</div></div>` : '<p class="t3" style="font-size:calc(12.5px * var(--ts,1));margin:10px 0 0">No JavaScript, auto-actions or embedded files.</p>'}
+      ${p.uris.length ? `<div class="isec"><h4>Links in the document</h4>${p.uris.slice(0, 12).map(u => `<div class="mono" style="font-size:calc(12px * var(--ts,1));overflow-wrap:anywhere">${esc(u)}</div>`).join('')}</div>` : ''}</div></section>`; }
   if(r.pe){ const p = r.pe;
     h += `<section class="card"><header><h3>${ico('cpu','sm')} Windows executable</h3></header><div class="body">${kvr('Type', p.kind)}${kvr('Machine', p.machine)}${kvr('Compiled', p.compiled)}${kvr('Subsystem', p.subsystem)}${kvr('Entry point', p.entry, true)}
       ${p.packers.length ? `<div class="note amber" style="margin:8px 0"><span class="ic">${ico('box','sm')}</span><div><b>Packer section names:</b> ${esc(p.packers.join(', '))}</div></div>` : ''}
@@ -286,17 +286,17 @@ function fileStructure(r){
 function yaraPanel(r){
   const rules = (DB.rules || []).filter(x => x.type === 'yara'), res = r.yara;
   return `<section class="card"><header><h3>${ico('file-code','sm')} YARA scan</h3><span class="t3">${rules.length} rules in Detections</span><span style="flex:1"></span><button class="btn sm${res ? '' : ' primary'}" data-act="labYara">${ico('play','sm')}${res ? 'Scan again' : 'Scan this file'}</button></header>
-    <div class="body">${!res ? '<p class="t3" style="margin:0;font-size:13.5px">Runs every YARA rule from Detections against this file, in the browser. Supports text, hex (with wildcards and jumps) and regex strings, and conditions like <span class="mono">any of them</span>, <span class="mono">2 of ($a*)</span>, <span class="mono">uint16(0) == 0x5A4D</span>, <span class="mono">filesize</span>. Module functions (<span class="mono">pe.</span>, <span class="mono">math.</span>) are reported as unsupported.</p>'
+    <div class="body">${!res ? '<p class="t3" style="margin:0;font-size:calc(13.5px * var(--ts,1))">Runs every YARA rule from Detections against this file, in the browser. Supports text, hex (with wildcards and jumps) and regex strings, and conditions like <span class="mono">any of them</span>, <span class="mono">2 of ($a*)</span>, <span class="mono">uint16(0) == 0x5A4D</span>, <span class="mono">filesize</span>. Module functions (<span class="mono">pe.</span>, <span class="mono">math.</span>) are reported as unsupported.</p>'
       : (() => { const hit = res.filter(x => x.match), bad = res.filter(x => x.error);
-        return `<p style="margin:0 0 10px;font-size:14px"><b>${hit.length ? hit.length + ' rule' + (hit.length > 1 ? 's' : '') + ' matched' : 'No rule matched'}</b><span class="t3"> · ${res.length - bad.length} checked${bad.length ? ' · ' + bad.length + ' use features the browser engine does not support' : ''}</span></p>
+        return `<p style="margin:0 0 10px;font-size:calc(14px * var(--ts,1))"><b>${hit.length ? hit.length + ' rule' + (hit.length > 1 ? 's' : '') + ' matched' : 'No rule matched'}</b><span class="t3"> · ${res.length - bad.length} checked${bad.length ? ' · ' + bad.length + ' use features the browser engine does not support' : ''}</span></p>
           ${hit.map(x => `<div class="yhit">${ico('shield-alert','sm')}<b>${esc(x.rule)}</b><span class="mono t3">${Object.entries(x.strings).filter(([, v]) => v.hits.length).slice(0, 6).map(([n, v]) => esc(n) + '@0x' + v.hits[0].toString(16)).join('  ')}</span></div>`).join('')}
-          ${bad.length ? `<details class="more"><summary>Unsupported rules</summary>${bad.map(x => `<div class="t3" style="font-size:12.5px"><b>${esc(x.rule)}</b> — ${esc(x.error)}</div>`).join('')}</details>` : ''}`; })()}</div></section>`;
+          ${bad.length ? `<details class="more"><summary>Unsupported rules</summary>${bad.map(x => `<div class="t3" style="font-size:calc(12.5px * var(--ts,1))"><b>${esc(x.rule)}</b> — ${esc(x.error)}</div>`).join('')}</details>` : ''}`; })()}</div></section>`;
 }
 function labFile(){
   const r = UI.labFile;
   if(!r) return `<label class="drop" id="labDrop" tabindex="0"><input type="file" id="labIn" class="sr">${ico('file-search')}<b>Drop a file here, or click to choose</b>
     <span>Images, Office documents, PDFs, archives, executables — up to 200 MB. Read locally; nothing is uploaded.</span>
-    <span class="drop-feat"><i>Magic bytes</i><i>MD5 · SHA-1 · SHA-256</i><i>EXIF & GPS</i><i>Office & PDF metadata</i><i>Macros & active content</i><i>ZIP listing</i><i>PE / ELF headers</i><i>YARA scan</i><i>Appended data</i><i>Flag finder</i></span></label>`;
+    <span class="drop-feat"><i>Magic bytes</i><i>MD5 · SHA-1 · SHA-256</i><i>EXIF & GPS</i><i>Office & PDF metadata</i><i>Macros & active content</i><i>ZIP listing</i><i>PE / ELF headers</i><i>YARA scan</i><i>Appended data</i><i>Flag finder</i></span></label><div class="drop-hist"><button class="btn sm ghost" data-act="rcShow" data-v="labFile">${ico('history','sm')}History<span class="crt-cnt">${recentN('labFile')}</span></button><span class="t3 small">Files you open are kept in this browser (up to 50 MB each) so a refresh does not lose them.</span></div>`;
   if(r.busy) return `<div class="card" style="padding:40px;text-align:center">${ico('refresh-cw','sm spin')} Reading ${esc(r.name)}…</div>`;
   const eh = r.entropy, ehl = eh > 7.5 ? ['Very high — compressed or encrypted','var(--red)'] : eh > 6 ? ['High — packed or compressed data likely','var(--amber)'] : ['Normal','var(--green)'];
   const q = (UI.strq || '').toLowerCase(), showAll = !!UI.strAll, st = r.strings.filter(s => (showAll || s[3]) && (!q || s[1].toLowerCase().includes(q))).slice(0, 500);
@@ -306,14 +306,14 @@ function labFile(){
   <div class="fi-grid">
     <div class="fi-side">
     <section class="card fi-sum"><header><span class="fi-ic">${ico('file-digit')}</span><div style="min-width:0;flex:1"><h3>${esc(r.name)}</h3><p class="t3">${fmtBytes(r.size)} · modified ${esc(new Date(r.lastModified).toISOString().slice(0, 16).replace('T', ' '))} UTC</p></div>
-      <button class="btn sm" data-act="labClear">${ico('x','sm')}Another file</button></header>
+      <button class="btn sm ghost" data-act="rcShow" data-v="labFile">${ico('history','sm')}History<span class="crt-cnt">${recentN('labFile')}</span></button><button class="btn sm" data-act="labClear">${ico('x','sm')}Another file</button></header>
       <div class="body">
         <div class="kv"><span>Detected type</span><b>${esc(r.type.name)}</b></div>
         ${r.mismatch ? `<div class="note amber" style="margin:6px 0 10px"><span class="ic">${ico('triangle-alert','sm')}</span><div>Extension <b>.${esc(r.ext)}</b> does not match the content (${esc(r.type.name)}). Classic trick — rename it and look again.</div></div>` : ''}
         ${hashRow('MD5', r.md5)}${hashRow('SHA-1', r.sha1)}${hashRow('SHA-256', r.sha256)}
         <div class="kv"><span>Entropy</span><b style="color:${ehl[1]}">${eh.toFixed(2)} / 8</b><span class="t3">${ehl[0]}</span></div>
         <div class="entbar"><i style="width:${eh / 8 * 100}%;background:${ehl[1]}"></i></div>
-        ${/^(png|jpg|gif|zip|gz|7z|rar|mp3|mp4|mkv|pdf)$/.test(r.type.ext) && eh > 7.5 ? '<p class="t3" style="font-size:12.5px;margin:0 0 8px">High entropy is normal for this format — its content is compressed.</p>' : ''}
+        ${/^(png|jpg|gif|zip|gz|7z|rar|mp3|mp4|mkv|pdf)$/.test(r.type.ext) && eh > 7.5 ? '<p class="t3" style="font-size:calc(12.5px * var(--ts,1));margin:0 0 8px">High entropy is normal for this format — its content is compressed.</p>' : ''}
         ${pivotSection('sha256', r.sha256)}
         <div class="wrap" style="margin-top:14px"><button class="btn primary" data-act="labSave">${ico('plus','sm')}Save to ${esc(theCase().code)}</button><button class="btn" data-act="labReport">${ico('download','sm')}Download report</button>${isImg ? `<button class="btn" data-act="labToImage">${ico('image','sm')}Open in Image tools</button>` : ''}${/^pcap/.test(r.type.ext) ? `<button class="btn" data-act="labToPcap">${ico('network','sm')}Open in PCAP reader</button>` : ''}${r.type.ext === 'sqlite' ? `<button class="btn" data-act="labToSql">${ico('database','sm')}Open in SQLite viewer</button>` : ''}</div></div></section>
     ${yaraPanel(r)}
@@ -321,14 +321,14 @@ function labFile(){
     <div class="fi-side">
       ${fileStructure(r)}
       ${r.exif ? `<section class="card"><header><h3>${ico('image','sm')} EXIF metadata</h3></header><div class="body">${Object.entries(r.exif).filter(([k]) => k !== 'GPS').map(([k, v]) => `<div class="kv"><span>${esc(k)}</span><b>${esc(Array.isArray(v) ? v.join(', ') : v)}</b></div>`).join('')}
-        ${G ? `<div class="gpsbox"><div>${ico('map-pin','sm')}<b>${G.lat}, ${G.lon}</b>${G.alt != null ? `<span class="t3"> · ${G.alt} m</span>` : ''}</div><div class="pivots">${geoLinks(G.lat, G.lon).map(([n, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(n)}${ico('arrow-up-right','sm')}</a>`).join('')}</div></div>` : '<p class="t3" style="margin:8px 0 0;font-size:13px">No GPS tags.</p>'}</div></section>` : ''}
-      ${r.c2pa ? `<section class="card"><header><h3>${ico('shield-check','sm')} Content Credentials (C2PA)</h3></header><div class="body"><p style="margin:0 0 8px;font-size:13.5px">This file carries a signed provenance manifest — who or what created or edited it. Readable parts appear in the strings below (look for <span class="mono">claim_generator</span>, <span class="mono">softwareAgent</span>).</p><div class="pivots"><a href="https://contentcredentials.org/verify" target="_blank" rel="noopener noreferrer">Verify on contentcredentials.org${ico('arrow-up-right','sm')}</a></div></div></section>` : ''}
+        ${G ? `<div class="gpsbox"><div>${ico('map-pin','sm')}<b>${G.lat}, ${G.lon}</b>${G.alt != null ? `<span class="t3"> · ${G.alt} m</span>` : ''}</div><div class="pivots">${geoLinks(G.lat, G.lon).map(([n, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(n)}${ico('arrow-up-right','sm')}</a>`).join('')}</div></div>` : '<p class="t3" style="margin:8px 0 0;font-size:calc(13px * var(--ts,1))">No GPS tags.</p>'}</div></section>` : ''}
+      ${r.c2pa ? `<section class="card"><header><h3>${ico('shield-check','sm')} Content Credentials (C2PA)</h3></header><div class="body"><p style="margin:0 0 8px;font-size:calc(13.5px * var(--ts,1))">This file carries a signed provenance manifest — who or what created or edited it. Readable parts appear in the strings below (look for <span class="mono">claim_generator</span>, <span class="mono">softwareAgent</span>).</p><div class="pivots"><a href="https://contentcredentials.org/verify" target="_blank" rel="noopener noreferrer">Verify on contentcredentials.org${ico('arrow-up-right','sm')}</a></div></div></section>` : ''}
       ${r.png ? `<section class="card"><header><h3>${ico('image','sm')} PNG structure</h3></header><div class="body"><div class="kv"><span>Size</span><b>${r.png.w} × ${r.png.h}</b></div><div class="kv"><span>Chunks</span><code style="white-space:normal">${esc([...new Set(r.png.chunks)].join(' '))}</code></div>
-        ${r.png.text.map(t => `<div class="kv"><span>Text chunk</span><code style="white-space:normal">${esc(t.slice(0, 300))}</code></div>`).join('') || '<p class="t3" style="font-size:12.5px;margin:8px 0 0">No text chunks.</p>'}</div></section>` : ''}
+        ${r.png.text.map(t => `<div class="kv"><span>Text chunk</span><code style="white-space:normal">${esc(t.slice(0, 300))}</code></div>`).join('') || '<p class="t3" style="font-size:calc(12.5px * var(--ts,1));margin:8px 0 0">No text chunks.</p>'}</div></section>` : ''}
       ${r.trailing ? `<section class="card warnc"><header><h3>${ico('triangle-alert','sm')} Data after the end of the file</h3><span class="t3">offset 0x${r.trailing.toString(16)} · ${fmtBytes(r.size - r.trailing)}</span></header><div class="body"><pre class="rawbox">${esc(r.trailPreview.replace(/[^\x09\x0a\x0d\x20-\x7e]/g, '.'))}</pre><button class="btn sm" data-act="labTrailDecode">${ico('binary','sm')}Open in Decoder</button></div></section>` : ''}
-      ${r.carve.length ? `<section class="card"><header><h3>${ico('box','sm')} Embedded file signatures</h3><span class="t3">${r.carve.length}</span></header><div class="body">${r.carve.map(([o, n]) => `<div class="kv"><span class="mono">0x${o.toString(16).padStart(6, '0')}</span><b>${esc(n)}</b></div>`).join('')}<p class="t3" style="font-size:12.5px;margin:8px 0 0">Signatures can occur by chance inside compressed data. Carve with <span class="mono">binwalk -e</span> or <span class="mono">dd skip=${r.carve[0][0]}</span> to confirm.</p></div></section>` : ''}
+      ${r.carve.length ? `<section class="card"><header><h3>${ico('box','sm')} Embedded file signatures</h3><span class="t3">${r.carve.length}</span></header><div class="body">${r.carve.map(([o, n]) => `<div class="kv"><span class="mono">0x${o.toString(16).padStart(6, '0')}</span><b>${esc(n)}</b></div>`).join('')}<p class="t3" style="font-size:calc(12.5px * var(--ts,1));margin:8px 0 0">Signatures can occur by chance inside compressed data. Carve with <span class="mono">binwalk -e</span> or <span class="mono">dd skip=${r.carve[0][0]}</span> to confirm.</p></div></section>` : ''}
       <section class="card"><header><h3>${ico('fingerprint','sm')} Indicators in the file</h3><span class="t3">${r.iocs.length}</span></header><div class="body"><div class="wrap">${r.iocs.slice(0, 60).map(e => `<span class="ent">${kindBadge(e.k)}<span class="v">${esc(e.v)}</span></span>`).join('') || '<span class="t3">None found.</span>'}</div>
-        ${r.noise ? '<p class="t3" style="font-size:12.5px;margin:10px 0 0">Compressed image data is skipped — random bytes there only look like text by chance.</p>' : ''}</div></section>
+        ${r.noise ? '<p class="t3" style="font-size:calc(12.5px * var(--ts,1));margin:10px 0 0">Compressed image data is skipped — random bytes there only look like text by chance.</p>' : ''}</div></section>
     </div>
   </div>
   <div class="fi-grid2">
@@ -356,12 +356,13 @@ function bindLab(){
   if(UI.macIn) macOut(UI.macIn);
   const sq = $('strq'); if(sq) sq.oninput = () => { UI.strq = sq.value; clearTimeout(bindLab.s); bindLab.s = setTimeout(() => { renderMain(); const x = $('strq'); if(x){ x.focus(); x.setSelectionRange(x.value.length, x.value.length); } }, 200); };
   bindImage(); bindParse(); bindPcap(); bindSql();
+  if(typeof labRestore === 'function') labRestore();
   const tb = document.querySelector('.labtabs [aria-selected=true]'), nav = tb && tb.parentElement; if(nav && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = Math.max(0, tb.offsetLeft - nav.clientWidth / 2 + tb.offsetWidth / 2);
 }
-async function labLoad(f){
+async function labLoad(f, keep = true){
   if(f.size > 200 * 1048576) return toast('That file is over 200 MB — too big to inspect in a browser tab');
   UI.labFile = {busy:true, name:f.name}; UI.strq = ''; renderMain();
-  try{ UI.labFile = await analyseFile(f); }catch(e){ UI.labFile = null; toast('Could not read that file'); }
+  try{ UI.labFile = await analyseFile(f); if(keep) recentKeepFile('labFile', f); }catch(e){ UI.labFile = null; toast('Could not read that file'); }
   renderMain();
 }
 function labSummary(r){
@@ -398,7 +399,7 @@ function tsTable(input){
 function idTable(input){
   const rows = decodeIds(input); if(!rows.length) return '';
   return `<div class="idrows"><h4>${ico('fingerprint','sm')} Decoded from the ID</h4>${rows.map(([l, ms, note]) => `<div class="idrow"><span>${esc(l)}${note === 'from URL' ? ' <span class="pill" style="--c:var(--green)">from the link</span>' : ''}</span>${isFinite(ms) ? `<code>${esc(new Date(ms).toISOString().replace('T', ' ').replace('.000Z', 'Z'))}</code>` : `<span class="t3">${esc(note)}</span>`}</div>`).join('')}
-    <p class="t3" style="font-size:12px;margin:8px 0 0">Social-media IDs embed their creation time. Only the platform you know the ID came from is meaningful.</p></div>`;
+    <p class="t3" style="font-size:calc(12px * var(--ts,1));margin:8px 0 0">Social-media IDs embed their creation time. Only the platform you know the ID came from is meaningful.</p></div>`;
 }
 function labTime(){
   const now = Date.now(), ft = (BigInt(now) * 10000n + 116444736000000000n).toString();
@@ -406,11 +407,11 @@ function labTime(){
     <label class="sr" for="tsIn">Timestamp or ID</label><input id="tsIn" class="inp mono big" placeholder="1726303053 · 133708740530000000 · a post link · a Discord ID · a UUID…" value="${esc(UI.tsIn || '')}" autocomplete="off" spellcheck="false">
     <div id="idOut">${idTable(UI.tsIn || '')}</div>
     <div id="tsOut" class="tsout">${tsTable(UI.tsIn || '')}</div>
-    <div class="wrap" style="margin-top:12px"><span class="t3" style="font-size:12.5px">Try:</span>${[['1834567890123456789','X post ID'],['1234567890123456789','Discord ID'],['https://www.instagram.com/p/C8x9yZ2Nabc/','Instagram link'],['66f5a3c2e1b2c3d4e5f60718','MongoDB ObjectId'],['133708740530000000','FILETIME']].map(([v, l]) => `<button class="chip" data-act="tsTry" data-v="${esc(v)}">${esc(l)}</button>`).join('')}</div></div></section>
+    <div class="wrap" style="margin-top:12px"><span class="t3" style="font-size:calc(12.5px * var(--ts,1))">Try:</span>${[['1834567890123456789','X post ID'],['1234567890123456789','Discord ID'],['https://www.instagram.com/p/C8x9yZ2Nabc/','Instagram link'],['66f5a3c2e1b2c3d4e5f60718','MongoDB ObjectId'],['133708740530000000','FILETIME']].map(([v, l]) => `<button class="chip" data-act="tsTry" data-v="${esc(v)}">${esc(l)}</button>`).join('')}</div></div></section>
     <section class="card"><header><h3>Right now</h3></header><div class="body">
       ${[['Unix seconds', Math.floor(now / 1000)], ['Unix milliseconds', now], ['Windows FILETIME', ft], ['Chrome / WebKit', (BigInt(now) * 1000n + 11644473600000000n).toString()], ['Cocoa absolute', Math.floor(now / 1000 - 978307200)], ['ISO 8601', new Date(now).toISOString()]]
         .map(([l, v]) => `<div class="kv"><span>${l}</span><code>${esc(v)}</code><button class="iconbtn" data-act="flagCopy" data-v="${esc(v)}" aria-label="Copy">${ico('copy','sm')}</button></div>`).join('')}
-      <p class="t3" style="font-size:12.5px;margin:12px 0 0">Tip: forensic artefacts mix epochs — browser history (WebKit), NTFS & registry (FILETIME), iOS/macOS (Cocoa), ZIP (DOS).</p></div></section></div>`;
+      <p class="t3" style="font-size:calc(12.5px * var(--ts,1));margin:12px 0 0">Tip: forensic artefacts mix epochs — browser history (WebKit), NTFS & registry (FILETIME), iOS/macOS (Cocoa), ZIP (DOS).</p></div></section></div>`;
 }
 /* hash identifier */
 const HASHES = [
@@ -433,7 +434,7 @@ function labHash(){
   return `<div class="labgrid one"><section class="card"><header><h3>Identify hashes</h3></header><div class="body">
     <label class="sr" for="hashIn">Hashes</label><textarea id="hashIn" class="inp mono" rows="5" spellcheck="false" placeholder="5f4dcc3b5aa765d61d8327deb882cf99&#10;$2b$12$…&#10;admin::CORP:1122334455667788:…">${esc(UI.hashIn || '')}</textarea>
     <div id="hashOut" class="hashout">${hashTable(UI.hashIn || '')}</div>
-    <p class="t3" style="font-size:12.5px;margin:12px 0 0">Identification is by shape only — a 32-character hex string could be MD5, NTLM or something custom. Mode numbers are for hashcat.</p></div></section></div>`;
+    <p class="t3" style="font-size:calc(12.5px * var(--ts,1));margin:12px 0 0">Identification is by shape only — a 32-character hex string could be MD5, NTLM or something custom. Mode numbers are for hashcat.</p></div></section></div>`;
 }
 /* coordinates */
 function parseCoords(s){
@@ -469,22 +470,22 @@ function labImage(){
   const I = UI.img;
   if(!I) return `<label class="drop" id="imgDrop" tabindex="0"><input type="file" id="imgIn" accept="image/*" class="sr">${ico('image')}<b>Drop an image, or click to choose</b>
     <span>Colour channels, bit planes, least-significant-bit extraction, QR codes and reverse image search — the usual steganography and geolocation checks.</span>
-    <span class="drop-feat"><i>R · G · B · Alpha</i><i>Bit planes 0–7</i><i>LSB text</i><i>QR / barcode</i><i>Invert</i><i>Error level (ELA)</i><i>Look-alikes</i><i>Reverse search</i></span></label>`;
+    <span class="drop-feat"><i>R · G · B · Alpha</i><i>Bit planes 0–7</i><i>LSB text</i><i>QR / barcode</i><i>Invert</i><i>Error level (ELA)</i><i>Look-alikes</i><i>Reverse search</i></span></label><div class="drop-hist"><button class="btn sm ghost" data-act="rcShow" data-v="image">${ico('history','sm')}History<span class="crt-cnt">${recentN('image')}</span></button><span class="t3 small">Files you open are kept in this browser (up to 50 MB each) so a refresh does not lose them.</span></div>`;
   if(I.busy) return `<div class="card" style="padding:40px;text-align:center">${ico('refresh-cw','sm spin')} Loading image…</div>`;
   const ch = UI.imgCh || 'rgb', bit = UI.imgBit === undefined ? 'all' : UI.imgBit, L = I.lsb || {};
   return `<div class="imgwrap">
-    <section class="card imgview"><header><h3>${esc(I.name)}</h3><span class="t3">${I.w} × ${I.h}${I.scaled ? ' · previewed at 4096 px' : ''}</span><span style="flex:1"></span><button class="btn sm" data-act="imgClear">${ico('x','sm')}Another image</button></header>
+    <section class="card imgview"><header><h3>${esc(I.name)}</h3><span class="t3">${I.w} × ${I.h}${I.scaled ? ' · previewed at 4096 px' : ''}</span><span style="flex:1"></span><button class="btn sm ghost" data-act="rcShow" data-v="image">${ico('history','sm')}History<span class="crt-cnt">${recentN('image')}</span></button><button class="btn sm" data-act="imgClear">${ico('x','sm')}Another image</button></header>
       <div class="imgtools"><div class="seg">${[['rgb','Colour'],['r','Red'],['g','Green'],['b','Blue'],['a','Alpha'],['gray','Grey'],['inv','Invert'],['ela','Error level']].map(([k, l]) => `<button data-act="imgCh" data-v="${k}" aria-pressed="${ch === k}">${l}</button>`).join('')}</div>
         ${ch !== 'rgb' && ch !== 'inv' && ch !== 'ela' ? `<div class="seg bits"><button data-act="imgBit" data-v="all" aria-pressed="${bit === 'all'}">All bits</button>${[7,6,5,4,3,2,1,0].map(b => `<button data-act="imgBit" data-v="${b}" aria-pressed="${bit === b}" title="Bit plane ${b}">${b}</button>`).join('')}</div>` : ''}</div>
       <div class="imgcanvas"><canvas id="imgCv"></canvas></div>
-      <p class="t3" id="elaNote" style="font-size:12.5px;margin:0;padding:10px 16px">${ch === 'ela' ? 'Computing error levels…' : 'Hidden data often shows up as noise or text in bit plane 0 of one channel — compare it with plane 7.'}</p></section>
+      <p class="t3" id="elaNote" style="font-size:calc(12.5px * var(--ts,1));margin:0;padding:10px 16px">${ch === 'ela' ? 'Computing error levels…' : 'Hidden data often shows up as noise or text in bit plane 0 of one channel — compare it with plane 7.'}</p></section>
     <div class="fi-side">
       ${imgxCard()}
-      <section class="card"><header><h3>${ico('scan','sm')} QR / barcode</h3></header><div class="body">${I.qr ? `<pre class="rawbox">${esc(I.qr)}</pre><div class="wrap" style="margin-top:8px"><button class="btn sm" data-act="flagCopy" data-v="${esc(I.qr)}">${ico('copy','sm')}Copy</button><button class="btn sm" data-act="imgToDecoder" data-v="${esc(I.qr)}">${ico('binary','sm')}Open in Decoder</button></div>${flagBox(findFlags(I.qr))}` : '<p class="t3" style="margin:0;font-size:13.5px">No QR code found in this image. Try a bit plane or crop tighter.</p>'}</div></section>
+      <section class="card"><header><h3>${ico('scan','sm')} QR / barcode</h3></header><div class="body">${I.qr ? `<pre class="rawbox">${esc(I.qr)}</pre><div class="wrap" style="margin-top:8px"><button class="btn sm" data-act="flagCopy" data-v="${esc(I.qr)}">${ico('copy','sm')}Copy</button><button class="btn sm" data-act="imgToDecoder" data-v="${esc(I.qr)}">${ico('binary','sm')}Open in Decoder</button></div>${flagBox(findFlags(I.qr))}` : '<p class="t3" style="margin:0;font-size:calc(13.5px * var(--ts,1))">No QR code found in this image. Try a bit plane or crop tighter.</p>'}</div></section>
       <section class="card"><header><h3>${ico('binary','sm')} LSB extraction</h3></header><div class="body">
         <div class="wrap" style="margin-bottom:10px">${['rgb','r','g','b','bgr','rgba'].map(c => `<button class="chip" data-act="imgLsb" data-v="${c}" aria-pressed="${L.ch === c}">${c.toUpperCase()}</button>`).join('')}<button class="chip" data-act="imgLsbOrder" aria-pressed="${UI.imgCol ? 'true' : 'false'}">Column order</button></div>
-        ${L.text !== undefined ? `<p class="t3" style="font-size:12.5px;margin:0 0 6px">${L.lead >= 8 ? `<b style="color:var(--green)">${L.lead} bytes of readable text at the start — likely hidden data</b>` : Math.round(L.printable * 100) + '% of the first 64 bytes are text — probably nothing here'}</p><pre class="rawbox">${esc(L.text.slice(0, 1200).replace(/[^\x09\x0a\x0d\x20-\x7e]/g, '.'))}</pre>${flagBox(findFlags(L.text))}` : '<p class="t3" style="margin:0;font-size:13.5px">Reads the lowest bit of each pixel’s channels and turns it into bytes (like <span class="mono">zsteg</span>). Pick the channel order.</p>'}</div></section>
-      <section class="card"><header><h3>${ico('search','sm')} Reverse image search</h3></header><div class="body"><p class="t3" style="margin:0 0 10px;font-size:13.5px">These sites need the image itself — open one and drop the file in. Nothing is sent from here.</p>
+        ${L.text !== undefined ? `<p class="t3" style="font-size:calc(12.5px * var(--ts,1));margin:0 0 6px">${L.lead >= 8 ? `<b style="color:var(--green)">${L.lead} bytes of readable text at the start — likely hidden data</b>` : Math.round(L.printable * 100) + '% of the first 64 bytes are text — probably nothing here'}</p><pre class="rawbox">${esc(L.text.slice(0, 1200).replace(/[^\x09\x0a\x0d\x20-\x7e]/g, '.'))}</pre>${flagBox(findFlags(L.text))}` : '<p class="t3" style="margin:0;font-size:calc(13.5px * var(--ts,1))">Reads the lowest bit of each pixel’s channels and turns it into bytes (like <span class="mono">zsteg</span>). Pick the channel order.</p>'}</div></section>
+      <section class="card"><header><h3>${ico('search','sm')} Reverse image search</h3></header><div class="body"><p class="t3" style="margin:0 0 10px;font-size:calc(13.5px * var(--ts,1))">These sites need the image itself — open one and drop the file in. Nothing is sent from here.</p>
         <div class="pivots">${[['Google Lens','https://lens.google.com/'],['Bing Visual Search','https://www.bing.com/visualsearch'],['Yandex Images','https://yandex.com/images/'],['TinEye','https://tineye.com/'],['PimEyes (faces)','https://pimeyes.com/en']].map(([n, u]) => `<a href="${u}" target="_blank" rel="noopener noreferrer">${n}${ico('arrow-up-right','sm')}</a>`).join('')}</div></div></section>
     </div></div>`;
 }
@@ -494,9 +495,11 @@ function bindImage(){
     d.ondrop = e => { e.preventDefault(); d.classList.remove('over'); const f = e.dataTransfer.files[0]; if(f) imgLoad(f); }; d.onkeydown = e => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); inp.click(); } }; }
   const cv = $('imgCv'); if(cv && UI.img && UI.img.data){ if(UI.imgCh === 'ela') showEla(cv); else renderPlane(UI.img.data, UI.imgCh || 'rgb', UI.imgBit === undefined ? 'all' : UI.imgBit, cv); }
 }
-async function imgLoad(f){
+async function imgLoad(f, keep = true){
+  if(f.size > 100 * 1048576) return toast('That image is over 100 MB — too big to open here');
+  if(f.type && !/^image\//.test(f.type)) return toast('That is not an image');
   UI.img = {busy:true}; renderMain();
-  try{ const r = await loadImageData(f); UI.img = {name:f.name, w:r.w, h:r.h, scaled:r.scaled, data:r.data, qr:qrDecode(r.data)}; UI.imgCh = 'rgb'; UI.imgBit = 'all'; }
+  try{ const r = await loadImageData(f); UI.img = {name:f.name, w:r.w, h:r.h, scaled:r.scaled, data:r.data, qr:qrDecode(r.data)}; UI.imgCh = 'rgb'; UI.imgBit = 'all'; if(keep) recentKeepFile('image', f); }
   catch(e){ UI.img = null; toast(e.message || 'Could not open that image'); }
   renderMain();
 }
@@ -525,7 +528,7 @@ function emailOut(raw){
   return `${A.flags.length ? `<div class="emflags">${A.flags.map(([c, t]) => `<div class="note ${c === 'red' ? 'red' : 'amber'}"><span class="ic">${ico('triangle-alert','sm')}</span><div>${esc(t)}</div></div>`).join('')}</div>` : `<div class="note" style="margin-bottom:12px"><span class="ic" style="color:var(--green);background:var(--green-soft)">${ico('check','sm')}</span><div>No obvious spoofing signs in these headers.</div></div>`}
     <div class="emgrid"><section class="card"><header><h3>Message</h3></header><div class="body">${kvr('From', A.from, true)}${kvr('Reply-To', A.reply, true)}${kvr('Return-Path', A.ret, true)}${kvr('To', A.to)}${kvr('Subject', A.subject)}${kvr('Date', A.date)}${kvr('Message-ID', A.msgid, true)}${kvr('Mailer', A.mailer)}</div></section>
       <section class="card"><header><h3>Authentication</h3></header><div class="body"><div class="authrow"><span>SPF</span>${badge(A.spf)}</div><div class="authrow"><span>DKIM</span>${badge(A.dkim)}${A.dkimD ? `<span class="t3 mono">d=${esc(A.dkimD)} s=${esc(A.dkimS)}</span>` : ''}</div><div class="authrow"><span>DMARC</span>${badge(A.dmarc)}</div>
-        ${A.originIP ? `<div class="isec"><h4>Sender IP (first external hop)</h4><code class="mono" style="font-size:14px">${esc(A.originIP)}</code> <span class="t3">${esc(E.ipClass(A.originIP))}</span>${pivotSection('ipv4', A.originIP)}</div>` : ''}</div></section></div>
+        ${A.originIP ? `<div class="isec"><h4>Sender IP (first external hop)</h4><code class="mono" style="font-size:calc(14px * var(--ts,1))">${esc(A.originIP)}</code> <span class="t3">${esc(E.ipClass(A.originIP))}</span>${pivotSection('ipv4', A.originIP)}</div>` : ''}</div></section></div>
     <section class="card" style="margin-top:14px"><header><h3>Delivery path</h3><span class="t3">${A.hops.length} hops, oldest first</span></header><div class="hops">${A.hops.map((h, i) => `<div class="hop"><span class="hn">${i + 1}</span><div><b class="mono">${esc(h.from || '?')}</b> → <b class="mono">${esc(h.by || '?')}</b><small>${esc(h.with)} ${h.ips.length ? '· ' + esc(h.ips.join(', ')) : ''}</small></div><span class="t3 mono">${h.ts ? esc(new Date(h.ts).toISOString().slice(11, 19)) + 'Z' : ''}</span><span class="hd ${h.delay != null && (h.delay > 600 || h.delay < -60) ? 'warn' : ''}">${h.delay != null ? '+' + fmtD(h.delay) : ''}</span></div>`).join('') || '<p class="t3" style="padding:14px 18px;margin:0">No Received headers.</p>'}</div></section>
     <section class="card" style="margin-top:14px"><header><h3>${ico('fingerprint','sm')} Indicators</h3><span style="flex:1"></span><button class="btn sm primary" data-act="emlSave">${ico('plus','sm')}Save to ${esc(theCase().code)}</button></header><div class="body"><div class="wrap">${A.iocs.map(e => `<span class="ent">${kindBadge(e.k)}<span class="v">${esc(e.v)}</span></span>`).join('') || '<span class="t3">None.</span>'}</div></div></section>`;
 }
@@ -542,7 +545,7 @@ function uaOut(v){ const r = parseUA(v); if(!r) return '<p class="t3">Paste a Us
   return (r.bot ? `<div class="note amber" style="margin-bottom:10px"><span class="ic">${ico('bot','sm')}</span><div><b>Automated client:</b> ${esc(r.bot)}</div></div>` : '') + kvr('Browser', r.browser || '—') + kvr('Operating system', r.os || '—') + kvr('Device', r.device) + kvr('Engine', r.engine || '—'); }
 async function macOut(v){ const el = $('macOut'); if(!el) return; if(!String(v || '').trim()){ el.innerHTML = '<p class="t3">Paste a MAC address — 00:1A:2B:3C:4D:5E, 001A.2B3C.4D5E or 00-1A-2B…</p>'; return; }
   el.innerHTML = '<p class="t3">Looking up…</p>'; try{ const r = await macVendor(v); if(!r){ el.innerHTML = '<p class="t3">That is not a MAC address.</p>'; return; }
-    el.innerHTML = kvr('OUI', r.oui, true) + kvr('Vendor', r.vendor || (r.local ? 'None — locally administered address' : 'Not in the IEEE register')) + kvr('Scope', (r.multicast ? 'Multicast' : 'Unicast') + ' · ' + (r.local ? 'locally administered' : 'globally unique')) + (r.random ? '<p class="t3" style="font-size:12.5px;margin:8px 0 0">Locally administered addresses are usually randomised by phones and laptops for privacy, so no vendor can be named.</p>' : ''); }
+    el.innerHTML = kvr('OUI', r.oui, true) + kvr('Vendor', r.vendor || (r.local ? 'None — locally administered address' : 'Not in the IEEE register')) + kvr('Scope', (r.multicast ? 'Multicast' : 'Unicast') + ' · ' + (r.local ? 'locally administered' : 'globally unique')) + (r.random ? '<p class="t3" style="font-size:calc(12.5px * var(--ts,1));margin:8px 0 0">Locally administered addresses are usually randomised by phones and laptops for privacy, so no vendor can be named.</p>' : ''); }
   catch(e){ el.innerHTML = `<p class="t3">${esc(e.message)}</p>`; } }
 function labNet(){
   return `<div class="netgrid">
@@ -559,7 +562,7 @@ function genOut(){
   const list = (items, kind) => `<div class="genlist">${items.map(x => `<span><code>${esc(x)}</code>${kind === 'u' ? `<a href="https://whatsmyname.app/?q=${encodeURIComponent(x)}" target="_blank" rel="noopener noreferrer" title="Check on WhatsMyName">${ico('arrow-up-right','sm')}</a>` : ''}</span>`).join('')}</div>`;
   return `<div class="genres"><section><div class="genh"><h4>Usernames <span class="t3">${u.length}</span></h4><button class="btn xs" data-act="flagCopy" data-v="${esc(u.join('\n'))}">${ico('copy','sm')}Copy all</button></div>${list(u, 'u')}</section>
     ${e.length ? `<section><div class="genh"><h4>Email formats <span class="t3">${e.length}</span></h4><button class="btn xs" data-act="flagCopy" data-v="${esc(e.join('\n'))}">${ico('copy','sm')}Copy all</button></div>${list(e, 'e')}
-      <p class="t3" style="font-size:12.5px;margin:10px 0 0">The first four formats cover most companies. Confirm one real address before trusting the pattern.</p></section>` : ''}</div>`;
+      <p class="t3" style="font-size:calc(12.5px * var(--ts,1));margin:10px 0 0">The first four formats cover most companies. Confirm one real address before trusting the pattern.</p></section>` : ''}</div>`;
 }
 function labGen(){
   return `<div class="labgrid one wide"><section class="card"><header><h3>${ico('users','sm')} Username & email permutations</h3></header><div class="body">

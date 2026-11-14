@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Certificates — proposal</title>
+<link rel="stylesheet" href="../css/fonts.css">
+<script src="../js/icons.js"></script>
+<style>
+:root{--font:'Geist',system-ui,sans-serif;--mono:'Geist Mono',ui-monospace,monospace;
+  --bg:#f4f6fa;--side:#fff;--surface:#fff;--surface-2:#f8f9fc;--hover:#f1f4f9;--active:#e9edf6;--border:#dde3ec;--soft:#e9edf3;
+  --text:#0f172a;--text-2:#475569;--text-3:#56657a;--accent:#4f46e5;--accent-bg:#5b54f0;--accent-soft:#5b54f014;--accent-line:#5b54f040;
+  --green:#04704f;--green-bg:#16a34a14;--red:#c81e1e;--red-bg:#dc262612;--amber:#a64b08;--amber-bg:#f59e0b18;--blue:#1d4ed8;--blue-bg:#2563eb12;
+  --sh:0 1px 2px #0f172a0d,0 1px 1px #0f172a08;--sh-lg:0 24px 60px -20px #0f172a40,0 2px 8px #0f172a14}
+[data-theme=dark]{--bg:#0a0e17;--side:#0c111c;--surface:#111827;--surface-2:#141c2c;--hover:#192235;--active:#1f2a41;--border:#2a3550;--soft:#1e273b;
+  --text:#e6eaf2;--text-2:#a3aec2;--text-3:#8d98ad;--accent:#a5a1ff;--accent-bg:#655cf7;--accent-soft:#6d64ff24;--accent-line:#6d64ff66;
+  --green:#4ade80;--green-bg:#22c55e1a;--red:#f87171;--red-bg:#ef44441a;--amber:#fbbf24;--amber-bg:#f59e0b1f;--blue:#93c5fd;--blue-bg:#3b82f61f;--sh:0 1px 2px #0005;--sh-lg:0 24px 60px -16px #000c}
+*{box-sizing:border-box}
+body{margin:0;background:#e5e8ee;font:14px/1.5 var(--font);color:var(--text)}
+.i{width:16px;height:16px;stroke-width:1.8;flex:none}.i.sm{width:14px;height:14px}
+.frame{width:1440px;height:900px;margin:0 auto 40px;display:grid;grid-template-columns:64px 1fr;background:var(--bg);overflow:hidden;position:relative}
+.rail{background:var(--side);border-right:1px solid var(--soft);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:6px}
+.rail .logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#6d64ff,#a855f7);margin-bottom:12px}
+.rail b{width:40px;height:36px;border-radius:9px;display:grid;place-items:center;color:var(--text-3)}.rail b.on{background:var(--accent-soft);color:var(--accent)}
+.rail hr{width:32px;border:0;border-top:1px solid var(--soft);margin:6px 0}
+.main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.top{height:56px;flex:none;display:flex;align-items:center;gap:12px;padding:0 20px;border-bottom:1px solid var(--soft)}
+.search{width:520px;height:34px;border:1px solid var(--border);border-radius:8px;background:var(--surface);display:flex;align-items:center;gap:8px;padding:0 12px;color:var(--text-3);font-size:13.5px;box-shadow:var(--sh)}
+.sp{flex:1}
+.btn{height:32px;padding:0 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);display:inline-flex;align-items:center;gap:7px;font:500 13.5px var(--font);color:var(--text);box-shadow:var(--sh);white-space:nowrap}
+.btn.pri{background:var(--accent-bg);border-color:var(--accent-bg);color:#fff}.btn.sm{height:28px;font-size:12.5px;padding:0 10px}.btn.ghost{border-color:transparent;box-shadow:none;background:none;color:var(--text-2)}
+.mono{font-family:var(--mono)}.caps{font-size:12px;color:var(--text-3);font-weight:500}
+.card{background:var(--surface);border:1px solid var(--soft);border-radius:12px;box-shadow:var(--sh)}
+.pill{height:22px;padding:0 8px;border-radius:6px;border:1px solid var(--soft);background:var(--surface-2);display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--text-2);font-weight:500}
+.pill.g{color:var(--green);background:var(--green-bg);border-color:transparent}.pill.a{color:var(--amber);background:var(--amber-bg);border-color:transparent}.pill.b{color:var(--accent);background:var(--accent-soft);border-color:transparent}
+.lbl{position:absolute;right:20px;bottom:14px;font:500 12px var(--mono);color:var(--text-3)}
+.dot{width:9px;height:9px;border-radius:3px;background:var(--cc);flex:none}
+
+
+/* ---------- certificates ---------- */
+.tabs{display:flex;gap:2px;padding:0 24px;border-bottom:1px solid var(--soft);background:var(--surface);height:46px;align-items:flex-end;flex:none}
+.tabs span{display:inline-flex;align-items:center;gap:7px;padding:0 12px 11px;font-weight:500;color:var(--text-2);font-size:13.5px;box-shadow:inset 0 -2px 0 transparent}
+.tabs span.on{color:var(--text);box-shadow:inset 0 -2px 0 var(--accent-bg)}
+.tabs .t{margin-right:18px;padding-bottom:11px;font-weight:600;font-size:15px;color:var(--text);display:flex;gap:8px;align-items:center}
+.cg{display:grid;grid-template-columns:280px minmax(0,1fr) 330px;flex:1;min-height:0}
+.lp{border-right:1px solid var(--soft);background:var(--side);padding:14px 12px;display:flex;flex-direction:column;gap:10px;overflow:hidden}
+.drop{border:1.5px dashed var(--border);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px;background:var(--surface-2)}
+.drop .pem{font:11px/1.5 var(--mono);color:var(--text-3);white-space:pre;overflow:hidden;height:74px;background:var(--surface);border:1px solid var(--soft);border-radius:8px;padding:6px 8px}
+.drop small{font-size:12px;color:var(--text-3);line-height:1.45}
+.lp h4{margin:6px 4px 0;font-size:12px;color:var(--text-3);font-weight:500}
+.it{display:flex;gap:10px;padding:9px 10px;border-radius:9px;align-items:flex-start}
+.it.on{background:var(--active)}
+.it .ic{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;flex:none}
+.it b{font-size:13px;display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px}
+.it small{font-size:11.5px;color:var(--text-3);display:block}
+.ok{background:var(--green-bg);color:var(--green)}.bad{background:var(--red-bg);color:var(--red)}.warn{background:var(--amber-bg);color:var(--amber)}.inf{background:var(--accent-soft);color:var(--accent)}
+.ct{overflow:hidden;padding:20px 26px;display:flex;flex-direction:column;gap:14px;background:var(--bg)}
+.hero{padding:18px 20px;display:flex;gap:16px;align-items:flex-start}
+.hero .big{width:46px;height:46px;border-radius:12px;display:grid;place-items:center;flex:none}
+.hero .big .i{width:22px;height:22px}
+.hero h1{margin:0;font-size:22px;letter-spacing:-.02em;font-weight:650}
+.hero p{margin:3px 0 10px;color:var(--text-2);font-size:13.5px}
+.pills{display:flex;gap:6px;flex-wrap:wrap}
+.pill.r{color:var(--red);background:var(--red-bg);border-color:transparent}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.sec{padding:14px 16px}
+.sec h3{margin:0 0 10px;font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:8px}
+.sec h3 .i{color:var(--text-3)}
+.kv{display:grid;grid-template-columns:110px minmax(0,1fr);gap:7px 12px;font-size:13px}
+.kv span{color:var(--text-3)}.kv b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.life{margin-top:12px}
+.life .bar{height:8px;border-radius:6px;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--soft);position:relative;overflow:visible}
+.life .bar i{position:absolute;left:0;top:0;bottom:0;width:54%;border-radius:6px;background:linear-gradient(90deg,var(--accent-bg),#8b84ff)}
+.life .bar em{position:absolute;left:54%;top:-5px;width:2px;height:18px;background:var(--text);border-radius:2px}
+.life .lg{display:flex;justify-content:space-between;font-size:11.5px;color:var(--text-3);margin-top:7px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{height:26px;padding:0 9px;border-radius:7px;background:var(--surface-2);border:1px solid var(--soft);font:500 12px var(--mono);display:inline-flex;align-items:center;gap:6px;color:var(--text)}
+.chip.hl{border-color:color-mix(in srgb,var(--red) 35%,transparent);background:var(--red-bg);color:var(--red)}
+.ext{display:flex;flex-direction:column}
+.ext .r{display:grid;grid-template-columns:170px minmax(0,1fr);gap:12px;padding:8px 0;border-bottom:1px solid var(--soft);font-size:13px}
+.ext .r:last-child{border:0}
+.ext .r span{color:var(--text-3)}
+.ext .r b{font-weight:500}.ext .r small{display:block;color:var(--text-3);font-size:12px;font-weight:400;margin-top:1px}
+.fp .r{display:flex;gap:10px;align-items:center;padding:6px 0;font-size:12.5px}
+.fp .r span{width:72px;color:var(--text-3);flex:none}
+.fp .r code{font:12px var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.rp{border-left:1px solid var(--soft);background:var(--side);padding:16px;display:flex;flex-direction:column;gap:18px;overflow:hidden}
+.rp h4{margin:0 0 8px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px}
+.fd{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--soft);font-size:13px;line-height:1.45}
+.fd:last-child{border:0}
+.fd .s{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;flex:none;margin-top:1px}
+.fd small{display:block;color:var(--text-3);font-size:12px}
+.pv{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--soft);border-radius:9px;margin-bottom:6px;font-size:13px;background:var(--surface)}
+.pv small{display:block;color:var(--text-3);font-size:11.5px}
+.pv .i:last-child{margin-left:auto;color:var(--text-3)}
+.cmd{font:11.5px/1.55 var(--mono);background:var(--surface-2);border:1px solid var(--soft);border-radius:9px;padding:9px 11px;white-space:pre-wrap;color:var(--text)}
+/* chain + csr */
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;padding:22px 28px;flex:1;min-height:0}
+.chain{display:flex;flex-direction:column;align-items:stretch}
+.lnk{display:flex;align-items:center;gap:10px;padding:6px 0 6px 26px;color:var(--green);font-size:12.5px;font-weight:500;position:relative}
+.lnk:before{content:'';position:absolute;left:22px;top:-2px;bottom:-2px;width:2px;background:var(--soft)}
+.lnk .i{background:var(--surface);position:relative;z-index:1;margin-left:-8px}
+.lnk.w{color:var(--amber)}
+.node{display:flex;gap:14px;padding:14px 16px;align-items:flex-start}
+.node .big{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;flex:none}
+.node h3{margin:0;font-size:15px;font-weight:600}
+.node p{margin:2px 0 8px;font-size:12.5px;color:var(--text-2)}
+.node.ghost{border-style:dashed;background:none;box-shadow:none}
+.checks .c{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--soft);font-size:13px;align-items:flex-start}
+.checks .c:last-child{border:0}
+.checks .c .s{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;flex:none}
+.checks .c small{display:block;color:var(--text-3);font-size:12px}
+/* guide */
+.gd{display:grid;grid-template-columns:250px minmax(0,1fr) 300px;flex:1;min-height:0}
+.toc{border-right:1px solid var(--soft);background:var(--side);padding:16px 12px;display:flex;flex-direction:column;gap:2px}
+.toc a{display:flex;gap:9px;align-items:center;padding:7px 10px;border-radius:8px;font-size:13.5px;color:var(--text-2)}
+.toc a.on{background:var(--active);color:var(--text);font-weight:600}
+.toc a .n{font:500 11px var(--mono);color:var(--text-3);width:16px}
+.art{overflow:hidden;padding:26px 40px;background:var(--surface)}
+.art h1{margin:0 0 6px;font-size:26px;letter-spacing:-.02em;font-weight:650}
+.art .lead{font-size:15px;color:var(--text-2);max-width:72ch;margin:0 0 18px;line-height:1.65}
+.art h3{font-size:16px;margin:20px 0 8px}
+.art p{font-size:14.5px;line-height:1.7;max-width:74ch;margin:0 0 10px}
+.dia{display:flex;align-items:center;gap:12px;margin:8px 0 6px}
+.dbox{border:1px solid var(--border);border-radius:12px;padding:12px 14px;background:var(--surface);box-shadow:var(--sh);min-width:180px}
+.dbox b{display:block;font-size:13.5px}.dbox small{color:var(--text-3);font-size:12px}
+.dbox.root{border-color:var(--accent-line);background:var(--accent-soft)}
+.arw{display:flex;flex-direction:column;align-items:center;font-size:11px;color:var(--text-3);gap:2px;min-width:80px;text-align:center}
+.arw i{display:block;height:2px;width:80px;background:var(--border);position:relative}
+.arw i:after{content:'';position:absolute;right:-1px;top:-4px;border:5px solid transparent;border-left-color:var(--border)}
+.anno{display:grid;grid-template-columns:minmax(0,1fr) 270px;gap:16px;margin-top:6px}
+.anno pre{margin:0;font:12px/1.75 var(--mono);background:var(--surface-2);border:1px solid var(--soft);border-radius:10px;padding:12px 14px}
+.anno pre .h{background:#fde68a;color:#78350f;border-radius:3px;padding:0 3px}
+[data-theme=dark] .anno pre .h{background:#a1620755;color:#fde68a}
+.anno ol{margin:0;padding-left:18px;font-size:13px;line-height:1.55;color:var(--text-2)}
+.anno li{margin-bottom:8px}.anno li b{color:var(--text)}
+.qa{border:1px solid var(--soft);border-radius:10px;padding:10px 12px;font-size:12.5px;background:var(--surface-2);margin-bottom:8px;line-height:1.45}
+.qa b{display:block;margin-bottom:2px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const I = (n, c='') => `<svg class="i ${c}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">${LUCIDE[n]||''}</svg>`;
+const shell = (inner, lbl) => `<section class="frame"><nav class="rail"><div class="logo"></div>${['layout-dashboard','sticky-note','notebook-pen','book-open'].map(i=>`<b>${I(i)}</b>`).join('')}<hr>${['folder-open'].map(i=>`<b>${I(i)}</b>`).join('')}<hr>${['wrench','file-search','binary'].map(i=>`<b>${I(i)}</b>`).join('')}<b class="on">${I('shield-check')}</b>${['cloud','flag','list-checks'].map(i=>`<b>${I(i)}</b>`).join('')}</nav>
+  <div class="main"><div class="top"><div class="search">${I('search')}Search everything — cases, evidence, certificates…</div><span class="sp"></span><button class="btn pri">${I('plus')}Capture</button></div>${inner}</div><div class="lbl">${lbl}</div></section>`;
+const tabs = on => `<div class="tabs"><span class="t">${I('shield-check')}Certificates</span>${[['Decoder','scroll-text'],['Chain','link-2'],['CSR','file-text'],['How certificates work','book-open']].map(([t,i]) => `<span class="${t===on?'on':''}">${I(i,'sm')}${t}</span>`).join('')}</div>`;
+
+/* 1 — decoder */
+const left = `<aside class="lp">
+  <div class="drop"><div class="pem">-----BEGIN CERTIFICATE-----
+MIIFJzCCBA+gAwIBAgISBHq2fO7Vb0e3kK1M
+qT9dDnI3MA0GCSqGSIb3DQEBCwUAMDMxCzAJ
+BgNVBAYTAlVTMRYwFAYDVQQKEw1MZXQncyBF…</div>
+    <small>Paste PEM or base64, or drop <span class="mono">.crt .cer .der .pem .csr .p7b</span>. A PCAP or HTML page with certificates works too.</small>
+    <div style="display:flex;gap:6px"><button class="btn sm pri">${I('search','sm')}Decode</button><button class="btn sm">${I('upload','sm')}Open file</button></div></div>
+  <h4>Saved in this case</h4>
+  <div class="it on"><span class="ic bad">${I('shield-alert','sm')}</span><div><b>secure-acme-login.com</b><small>3 red flags · Let's Encrypt R11</small></div></div>
+  <div class="it"><span class="ic bad">${I('shield-alert','sm')}</span><div><b>Major Cobalt Strike</b><small>Self-signed · default C2 cert</small></div></div>
+  <div class="it"><span class="ic ok">${I('shield-check','sm')}</span><div><b>portal.acme.example</b><small>OV · DigiCert · 212 days left</small></div></div>
+  <div class="it"><span class="ic warn">${I('clock','sm')}</span><div><b>vpn.acme.example</b><small>Expired 14 days ago</small></div></div>
+  <div class="it"><span class="ic inf">${I('file-text','sm')}</span><div><b>CSR · api.acme.example</b><small>RSA 2048 · signature valid</small></div></div>
+</aside>`;
+const centre = `<div class="ct">
+  <div class="card hero"><span class="big bad">${I('shield-alert')}</span><div style="flex:1;min-width:0"><h1>secure-acme-login.com</h1><p>Issued by <b>Let's Encrypt R11</b> · to no organisation (domain validated)</p>
+    <div class="pills"><span class="pill g">${I('check','sm')}Valid · 61 days left</span><span class="pill">DV · 90-day</span><span class="pill">RSA 2048</span><span class="pill">SHA-256 with RSA</span><span class="pill r">${I('triangle-alert','sm')}3 red flags</span></div></div>
+    <div style="display:flex;gap:6px"><button class="btn sm">${I('plus','sm')}Add to case</button><button class="btn sm">${I('copy','sm')}Copy PEM</button></div></div>
+  <div class="grid2">
+    <div class="card sec"><h3>${I('user','sm')}Subject and issuer</h3><div class="kv"><span>Common name</span><b class="mono">secure-acme-login.com</b><span>Organisation</span><b style="color:var(--text-3)">— not included (DV)</b><span>Issuer</span><b>R11 · Let's Encrypt · US</b><span>Serial</span><b class="mono">04:7a:b6:7c:ee:d5:6f:47…</b><span>Version</span><b>v3</b></div>
+      <div class="life"><div class="bar"><i></i><em></em></div><div class="lg"><span>Issued 29 Oct 2026, 03:14 UTC</span><span><b style="color:var(--text)">today</b></span><span>Expires 27 Jan 2027</span></div></div></div>
+    <div class="card sec"><h3>${I('globe','sm')}Names it covers <span class="pill" style="margin-left:auto">6</span></h3><div class="chips">
+      <span class="chip">secure-acme-login.com</span><span class="chip">www.secure-acme-login.com</span><span class="chip">mail.secure-acme-login.com</span><span class="chip hl">${I('triangle-alert','sm')}acme-sso.microsoftonline-auth.com</span><span class="chip">files-acme.net</span><span class="chip">185.220.101.47</span></div>
+      <div style="display:flex;gap:6px;margin-top:12px"><button class="btn sm">${I('plus','sm')}Add 6 to case as entities</button><button class="btn sm ghost">${I('copy','sm')}Copy list</button></div></div>
+  </div>
+  <div class="card sec"><h3>${I('list','sm')}Extensions, in plain English</h3><div class="ext">
+    <div class="r"><span>Key usage</span><b>Digital signature, key encipherment<small>Normal for a TLS server certificate</small></b></div>
+    <div class="r"><span>Extended key usage</span><b>Server authentication, client authentication</b></div>
+    <div class="r"><span>Basic constraints</span><b>Not a CA<small>It cannot issue other certificates</small></b></div>
+    <div class="r"><span>Authority info</span><b class="mono" style="font-size:12px">OCSP http://r11.o.lencr.org · CA http://r11.i.lencr.org/</b></div>
+    <div class="r"><span>Certificate policy</span><b>2.23.140.1.2.1 — Domain validated<small>The CA only checked control of the domain, not who owns it</small></b></div>
+    <div class="r"><span>Transparency (SCTs)</span><b>2 logs · Google “Xenon2027h1”, Cloudflare “Nimbus2027”<small>Logged publicly — searchable on crt.sh from 29 Oct 03:14 UTC</small></b></div>
+  </div></div>
+  <div class="card sec fp"><h3>${I('fingerprint','sm')}Fingerprints</h3>
+    <div class="r"><span>SHA-256</span><code>5E:2B:9C:41:0D:A7:73:F1:18:6B:C2:9E:44:0A:D3:7F:91:28:EE:5C:B0:63:1A:7D:C8:2F:94:E1:3B:56:A0:D9</code>${I('copy','sm')}</div>
+    <div class="r"><span>SHA-1</span><code>A3:41:7C:09:E2:5D:B8:16:F0:9A:4C:72:3E:D1:85:2B:6F:C0:97:E4</code>${I('copy','sm')}</div>
+    <div class="r"><span>Key pin</span><code>pin-sha256="Tq3m8Yx0b0rVZ5p1QH8kU6m1o2Fv+zj0O2X5c7bLJ8E="</code>${I('copy','sm')}</div></div>
+</div>`;
+const right = `<aside class="rp">
+  <div><h4>${I('triangle-alert','sm')}Findings</h4>
+    <div class="fd"><span class="s bad">${I('triangle-alert','sm')}</span><div><b>Lookalike name in the SANs</b><small>“microsoftonline-auth” imitates Microsoft's sign-in domain</small></div></div>
+    <div class="fd"><span class="s bad">${I('triangle-alert','sm')}</span><div><b>Unrelated domains share one certificate</b><small>files-acme.net and a bare IP sit beside a login domain</small></div></div>
+    <div class="fd"><span class="s warn">${I('clock','sm')}</span><div><b>Issued 14 days ago, DV, free CA</b><small>Typical of short-lived phishing setups — not proof on its own</small></div></div>
+    <div class="fd"><span class="s ok">${I('check','sm')}</span><div><b>Signature and structure are sound</b><small>Not self-signed · key size fine · v3</small></div></div></div>
+  <div><h4>${I('search','sm')}Pivot</h4>
+    <div class="pv">${I('scroll-text','sm')}<div>crt.sh<small>Other certificates for these names</small></div>${I('external-link','sm')}</div>
+    <div class="pv">${I('server','sm')}<div>Censys · Shodan<small>Servers presenting this exact certificate</small></div>${I('external-link','sm')}</div>
+    <div class="pv">${I('fingerprint','sm')}<div>VirusTotal<small>Search by SHA-256 fingerprint</small></div>${I('external-link','sm')}</div></div>
+  <div><h4>${I('binary','sm')}Grab a certificate yourself</h4><div class="cmd">openssl s_client -connect secure-acme-login.com:443 \\
+  -servername secure-acme-login.com -showcerts &lt;/dev/null</div><p style="font-size:12px;color:var(--text-3);margin:6px 0 0">The app makes no network requests — paste the output here.</p></div>
+</aside>`;
+const f1 = tabs('Decoder') + `<div class="cg">${left}${centre}${right}</div>`;
+
+/* 2 — chain + csr */
+const node = (cls, icon, t, p, pills, ghost) => `<div class="card node${ghost ? ' ghost' : ''}"><span class="big ${cls}">${I(icon)}</span><div><h3>${t}</h3><p>${p}</p><div class="pills">${pills}</div></div></div>`;
+const f2 = tabs('Chain') + `<div class="two">
+  <div><div class="caps" style="margin-bottom:10px">Chain · 2 certificates pasted · ordered for you</div><div class="chain">
+    ${node('ok', 'shield-check', 'portal.acme.example', 'Leaf · OV · Acme Industries Ltd, London, GB', '<span class="pill g">212 days left</span><span class="pill">ECDSA P-256</span><span class="pill">Not a CA</span>')}
+    <div class="lnk">${I('circle-check','sm')}Signed by the certificate below — signature checked</div>
+    ${node('ok', 'building-2', 'DigiCert Global G2 TLS RSA SHA256 2020 CA1', 'Intermediate CA · DigiCert Inc', '<span class="pill g">Valid to 2030</span><span class="pill">RSA 2048</span><span class="pill b">CA · path length 0</span>')}
+    <div class="lnk w">${I('info','sm')}Root not pasted — issued by “DigiCert Global Root G2”</div>
+    ${node('inf', 'shield', 'DigiCert Global Root G2', 'A well-known root shipped in browsers and operating systems. Trust ends here.', '<span class="pill">Not included</span>', true)}
+  </div></div>
+  <div class="card" style="padding:18px 20px;align-self:start"><div style="display:flex;gap:12px;align-items:center;margin-bottom:12px"><span class="big inf" style="width:40px;height:40px;border-radius:11px;display:grid;place-items:center">${I('file-text')}</span><div><h3 style="margin:0;font-size:16px">CSR · api.acme.example</h3><p style="margin:2px 0 0;font-size:12.5px;color:var(--text-2)">A request for a certificate — nothing has been issued yet</p></div></div>
+    <div class="kv" style="margin-bottom:14px"><span>Subject</span><b>CN=api.acme.example, O=Acme Industries Ltd, C=GB</b><span>Asks for</span><b class="mono">api.acme.example, api-v2.acme.example</b><span>Key</span><b>RSA 2048 · e=65537</b><span>Signed with</span><b>SHA-256 with RSA</b></div>
+    <div class="checks">
+      <div class="c"><span class="s ok">${I('check','sm')}</span><div><b>Signature is valid</b><small>The request was not changed after it was made</small></div></div>
+      <div class="c"><span class="s ok">${I('check','sm')}</span><div><b>Key is strong enough</b><small>RSA 2048 meets the CA/Browser Forum minimum</small></div></div>
+      <div class="c"><span class="s ok">${I('check','sm')}</span><div><b>Names are in the SAN extension</b><small>Browsers ignore the CN — SANs are what count</small></div></div>
+      <div class="c"><span class="s warn">${I('triangle-alert','sm')}</span><div><b>Requests client authentication too</b><small>Most public CAs drop this for server certificates</small></div></div>
+      <div class="c"><span class="s inf">${I('info','sm')}</span><div><b>Key fingerprint matches “portal.acme.example”?</b><small>No — a new key. Reusing keys across certificates is worth noting.</small></div></div></div></div>
+</div>`;
+
+/* 3 — guide */
+const toc = ['How TLS uses certificates', 'Chain of trust', 'What is inside a certificate', 'CSRs: asking for a certificate', 'DV, OV and EV', 'Certificate Transparency', 'Revocation: CRL and OCSP', 'Certificates in investigations', 'Malicious certificate patterns', 'openssl cheatsheet'];
+const f3 = tabs('How certificates work') + `<div class="gd"><nav class="toc">${toc.map((t, i) => `<a class="${i === 1 ? 'on' : ''}"><span class="n">${i + 1}</span>${t}</a>`).join('')}</nav>
+  <article class="art"><h1>Chain of trust</h1><p class="lead">Your browser trusts a few hundred root CAs. A website's certificate is trusted only if it can be traced, signature by signature, back to one of them.</p>
+    <div class="dia"><div class="dbox root"><b>Root CA</b><small>Built into browsers and OSes · self-signed · kept offline</small></div><div class="arw"><i></i>signs</div>
+      <div class="dbox"><b>Intermediate CA</b><small>Does the daily issuing · can be revoked</small></div><div class="arw"><i></i>signs</div>
+      <div class="dbox"><b>Leaf certificate</b><small>The website · not a CA</small></div></div>
+    <h3>What a certificate says, field by field</h3>
+    <div class="anno"><pre>Certificate:
+  Version: 3
+  Serial Number: 04:7a:b6:7c:ee:d5:6f:47
+  Signature Algorithm: sha256WithRSAEncryption
+  Issuer: <span class="h">C=US, O=Let's Encrypt, CN=R11</span>        ①
+  Validity
+    Not Before: Oct 29 03:14:22 2026 GMT    ②
+    Not After : Jan 27 03:14:21 2027 GMT
+  Subject: <span class="h">CN=secure-acme-login.com</span>          ③
+  X509v3 Subject Alternative Name:
+    <span class="h">DNS:secure-acme-login.com, DNS:files-acme.net</span> ④
+  X509v3 Basic Constraints: CA:FALSE
+  CT Precertificate SCTs: <span class="h">2 logs</span>                ⑤</pre>
+    <ol><li><b>Issuer</b> — who vouches for it. Its signature is checked with the issuer's public key.</li><li><b>Validity</b> — public TLS certificates now last 90–398 days; very short or very long is a clue.</li><li><b>Subject</b> — who it is for. DV certificates carry only a domain.</li><li><b>SANs</b> — every name it covers. Investigators read these first.</li><li><b>SCTs</b> — proof it was published in Certificate Transparency logs, so you can find it on crt.sh.</li></ol></div>
+  </article>
+  <aside class="rp"><div><h4>${I('sparkles','sm')}Try it</h4><button class="btn sm" style="width:100%;justify-content:center">${I('scroll-text','sm')}Open the example in the decoder</button></div>
+    <div><h4>${I('book-open','sm')}Flashcards from this chapter</h4><div class="qa"><b>Why is a root CA certificate self-signed?</b>Nothing above it vouches for it — trust comes from it being shipped in the browser or OS.</div><div class="qa"><b>Which field lists every name a certificate covers?</b>Subject Alternative Name (SAN).</div><button class="btn sm" style="width:100%;justify-content:center">${I('plus','sm')}Add 6 cards to my Notebook</button></div>
+    <div><h4>${I('binary','sm')}Command for this chapter</h4><div class="cmd">openssl verify -CAfile root.pem \\
+  -untrusted intermediate.pem leaf.pem</div></div></aside></div>`;
+
+document.getElementById('root').innerHTML = shell(f1, '1 · Decoder and findings') + shell(f2, '2 · Chain and CSR') + shell(f3, '3 · How certificates work');
+</script></body></html>

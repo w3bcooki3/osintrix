@@ -31,7 +31,7 @@ function evBulkHTML(list){
     <button class="btn xs" data-act="evTag">${ico('tag','sm')}Tag…</button><button class="btn xs" data-act="evKey">${ico('star','sm')}Key evidence</button><button class="btn xs" data-act="evCsv">${ico('download','sm')}CSV</button>
     <button class="btn xs dangerbtn" data-act="evDel">${ico('trash-2','sm')}Delete</button><button class="iconbtn" data-act="evNone" aria-label="Clear selection">${ico('x','sm')}</button></div>`;
 }
-const csvCell = v => { v = String(v == null ? '' : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+const csvCell = v => { v = String(v == null ? '' : csvFormula(v)); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
 function recsCsv(rs){ return ['time,title,type,host,source,tags,entities,body'].concat(rs.map(r => [r.ts ? new Date(r.ts).toISOString() : '', r.title, r.type, r.host, r.source, (r.tags || []).join(' '), r.ents.map(e => e.k + ':' + e.v).join(' '), r.body].map(csvCell).join(','))).join('\n'); }
 const TL_ACTS = {
   tlMore:(id, v) => { const cur = UI.tlLim && UI.tlLim.k === v ? UI.tlLim.n : 300; UI.tlLim = {k:v, n:id === 'all' ? 1e9 : cur + 500}; renderMain(); },
@@ -45,7 +45,7 @@ const TL_ACTS = {
   evKey:() => { const rs = DB.records.filter(r => UI.evPick.has(r.id)), all = rs.every(r => r.tags.includes('key-evidence'));
     for(const r of rs){ r.tags = r.tags.filter(x => x !== 'key-evidence'); if(!all) r.tags.push('key-evidence'); } mutate((all ? 'unmarked ' : 'marked ') + rs.length + ' key evidence'); renderAll(); toast(all ? 'Unmarked' : rs.length + ' marked as key evidence'); },
   evTag:() => { openDlg(dhead('Tag ' + UI.evPick.size + ' records') + `<form data-form="evTag"><div class="in"><div class="field" style="margin:0"><label for="evTagIn">Tags, separated by commas</label><input id="evTagIn" required autofocus placeholder="lateral-movement, phase-2"></div>
-      <p class="t3" style="font-size:13px;margin:10px 0 0">Prefix a tag with “-” to remove it.</p></div><footer><button class="btn" type="button" data-act="dclose">Cancel</button><button class="btn primary" type="submit">Apply</button></footer></form>`); },
+      <p class="t3" style="font-size:calc(13px * var(--ts,1));margin:10px 0 0">Prefix a tag with “-” to remove it.</p></div><footer><button class="btn" type="button" data-act="dclose">Cancel</button><button class="btn primary" type="submit">Apply</button></footer></form>`); },
   evCsv:() => { const rs = sortRecs(DB.records.filter(r => UI.evPick.has(r.id))); download(slug(theCase().name) + '-records.csv', recsCsv(rs), 'text/csv'); },
   evDel:() => { const ids = [...UI.evPick]; confirmDlg('Delete ' + ids.length + ' record' + (ids.length > 1 ? 's' : '') + '?', 'They move to the trash for 30 days. You can undo right after.', 'Move to trash', () => delRecord(ids)); }
 };

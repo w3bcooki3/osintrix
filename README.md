@@ -145,7 +145,12 @@ Press `Ctrl K` or `/`, or click the search bar, to search the whole app at once:
   - **Decoder:** subject, issuer, lifetime, every name, extensions in plain English, fingerprints, raw ASN.1; findings such as lookalike names, tool defaults (Cobalt Strike, openssl), weak keys, over-long lifetimes and AD CS logon certificates.
   - **Chain and CSR:** chains are ordered and every signature verified (RSA, RSA-PSS, ECDSA, Ed25519); requests are checked for signature, key strength and names.
   - **Pivots and cases:** links to crt.sh, Censys, Shodan and VirusTotal; save to a case so names and fingerprints become entities. Certificates from TLS 1.2 captures open straight from the PCAP view.
-  - **Guide:** ten chapters on how certificates work, with flashcards for the Notebook. Private keys are refused and never stored.
+  - **Guide:** eleven chapters on how certificates work — including every type of certificate (website, client, device, CA, code signing, email, Windows logon, document signing, timestamping) and trusted server vs client CAs — with fictional examples to open and flashcards for the Notebook. Private keys are refused and never stored.
+  - **Signed programs:** drop an .exe, .dll or .sys to read its Authenticode signature; the file is hashed and checked against it, and publisher, timestamp and appended data are shown.
+  - **Investigate:** an investigator's read with next steps, every indicator with pivots, and the records in your cases that already mention them; add indicators to the case graph.
+  - **Compare and key reuse:** how two certificates relate (renewal, same owner through a shared key, issuer, moved CA), side by side with a lifetime timeline; a flag when the same key appears in other certificates in the case.
+  - **Transparency logs:** paste crt.sh JSON for a domain to get every name with first and last issue dates, interesting hosts, issuers and a timeline; add the names to the case.
+  - **Hunt and export:** ready-made Shodan, Censys, crt.sh, Suricata and Defender queries; host and date checks; export as PEM, DER, JSON or text.
 
 ![Certificates](docs/certificates.png)
 

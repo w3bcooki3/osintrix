@@ -80,7 +80,7 @@ const X5 = (() => {
 
   /* ---------- extensions ---------- */
   const EKU = {'1.3.6.1.5.5.7.3.1':'Server authentication (TLS server)', '1.3.6.1.5.5.7.3.2':'Client authentication', '1.3.6.1.5.5.7.3.3':'Code signing', '1.3.6.1.5.5.7.3.4':'Email protection (S/MIME)',
-    '1.3.6.1.5.5.7.3.8':'Time stamping', '1.3.6.1.5.5.7.3.9':'OCSP signing', '1.3.6.1.5.5.7.3.5':'IPsec end system', '1.3.6.1.5.5.7.3.6':'IPsec tunnel', '1.3.6.1.5.5.7.3.7':'IPsec user', '1.3.6.1.5.5.7.3.17':'IPsec IKE',
+    '1.3.6.1.5.5.7.3.8':'Time stamping', '1.3.6.1.5.5.7.3.36':'Document signing', '1.3.6.1.5.5.7.3.9':'OCSP signing', '1.3.6.1.5.5.7.3.5':'IPsec end system', '1.3.6.1.5.5.7.3.6':'IPsec tunnel', '1.3.6.1.5.5.7.3.7':'IPsec user', '1.3.6.1.5.5.7.3.17':'IPsec IKE',
     '2.5.29.37.0':'Any purpose', '1.3.6.1.4.1.311.20.2.2':'Smart card logon (Windows)', '1.3.6.1.4.1.311.10.3.12':'Document signing (Microsoft)', '1.3.6.1.4.1.311.10.3.4':'Encrypting File System (EFS)',
     '1.3.6.1.4.1.311.10.3.1':'Microsoft trust list signing', '1.3.6.1.4.1.311.20.2.1':'Certificate request agent (enrollment agent)', '1.3.6.1.5.2.3.4':'Kerberos client auth (PKINIT)', '1.3.6.1.5.2.3.5':'Kerberos KDC',
     '1.3.6.1.4.1.311.21.6':'Key recovery agent', '1.3.6.1.4.1.311.10.3.3':'Server gated crypto (legacy)', '2.16.840.1.113730.4.1':'Netscape server gated crypto (legacy)', '1.3.6.1.4.1.311.61.1.1':'Kernel mode code signing',

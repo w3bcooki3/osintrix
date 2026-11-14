@@ -5,6 +5,7 @@ function applyPrefs(){ const h = document.documentElement, p = DB.prefs; h.datas
   const t = $('themeBtn'); if(t) t.innerHTML = ico(p.theme === 'dark' ? 'sun' : 'moon'); }
 const isNarrow = () => window.innerWidth < 1440;
 function renderMain(){
+  if(typeof workHydrate === 'function') workHydrate();
   const r = UI.route, el = $('main');
   const V = {security:viewSecurity, watch:viewWatch, trash:viewTrash, ctf:viewCTF, lab:viewLab, help:viewHelp, home:viewHome, cases:viewCases, toolbox:viewToolbox, entities:viewEntities, feeds:viewIntel, decoder:viewDecoder, reference:viewReference, settings:viewSettings,
     detections:viewDetections, queries:viewQueries, notes:viewNotes, playbooks:viewPlaybooks, cloud:viewCloud, whatsnew:viewWhatsNew, pad:viewPad, notebook:viewNotebook, certs:viewCerts};
@@ -23,6 +24,7 @@ function renderMain(){
   if(r.area === 'lab') bindLab();
   if(r.area === 'cloud') bindCloud();
   if(r.area === 'whatsnew') bindWhatsNew();
+  if(r.area === 'cases') bindCases();
   if(r.area === 'pad') bindPad();
   if(r.area === 'notebook') bindNotebook();
   if(r.area === 'certs') bindCerts();
@@ -31,9 +33,15 @@ function renderMain(){
   if(r.area === 'case' && r.tab === 'entities') bindCaseEnts();
   if(r.area === 'security') paintFp();
   el.classList.toggle('lock', !!el.querySelector('.drw'));
-  radialHide(); layoutFocus();
+  radialHide(); layoutFocus(); if(typeof placeInsp === 'function') requestAnimationFrame(placeInsp);
+  if(typeof workSync === 'function') workSync();
 }
-function renderAll(){ document.documentElement.dataset.area = UI.route.area; renderNav(); renderMain(); renderInsp(); paintLock(); $('inspBtn').classList.toggle('on', UI.inspOpen); }
+function renderAll(){ document.documentElement.dataset.area = UI.route.area; renderNav(); renderMain(); renderInsp(); paintLock(); $('inspBtn').classList.toggle('on', UI.inspOpen); placeInsp(); }
+/* the floating details card starts below the page's own toolbars (graph tools, case tabs), so it never covers them */
+function placeInsp(){ const t = document.querySelector('.gtools') || document.querySelector('.chead .tabs, .ctabs'); let y = 0;
+  if(t){ const r = t.getBoundingClientRect(); if(r.height) y = Math.round(r.bottom + 10); }
+  document.documentElement.style.setProperty('--insp-top', y ? y + 'px' : ''); }
+window.addEventListener('resize', () => { clearTimeout(placeInsp.t); placeInsp.t = setTimeout(placeInsp, 120); });
 const TITLES = {security:'Security', watch:'Watchlist', trash:'Trash', ctf:'CTF', lab:'Forensics kit', help:'Help', home:'Dashboard', cases:'Cases', toolbox:'Toolbox', entities:'Entities', feeds:'Threat Intel', decoder:'Decoder', reference:'Reference', settings:'Settings', detections:'Detections', queries:'Query library', notes:'Notes', playbooks:'Playbooks', library:'Library', cloud:'Cloud', whatsnew:"What's new", pad:"Scratchpad", notebook:'Notebook', certs:'Certificates'};
 function onRoute(){
   UI.route = parseHash(); $('side').classList.remove('open');
@@ -93,6 +101,7 @@ document.addEventListener('click', ev => {
   if(STO_ACTS[a]) return STO_ACTS[a](id, v, t, ev);
   if(FB_ACTS[a]) return FB_ACTS[a](id, v, t, ev);
   if(CX_ACTS[a]) return CX_ACTS[a](id, v, t, ev);
+  if(typeof RC_ACTS !== 'undefined' && RC_ACTS[a]) return RC_ACTS[a](id, v, t, ev);
   if(NBX_ACTS[a]) return NBX_ACTS[a](id, v, t, ev);
   if(a === 'toolRun') return toolRunDlg(id);
   if(a === 'trPick'){ $('trV').value = v; return $('trV').focus(); }
@@ -124,6 +133,7 @@ document.addEventListener('click', ev => {
     case 'srScope': S.scope = v; S.at = 0; S.q = S.q.replace(/\b(?:in|is):\w+\s*/gi, ''); if($('srQ')){ $('srQ').value = S.q; $('srQ').focus(); } return srchPaint();
     case 'srRecent': S.q = v; S.at = 0; $('srQ').value = v; $('srQ').focus(); return srchPaint();
     case 'srClearRecent': DB.prefs.recentQ = []; save(); $('srQ').focus(); return srchPaint();
+    case 'srForget': DB.prefs.recentQ = (DB.prefs.recentQ || []).filter(x => x !== v); save(); $('srQ').focus(); return srchPaint();
     case 'theme': DB.prefs.theme = DB.prefs.theme === 'dark' ? 'light' : 'dark'; applyPrefs(); save(); return renderAll();
     case 'inspToggle': UI.inspOpen = !UI.inspOpen; return renderAll();
     case 'closeInsp': UI.inspOpen = false; UI.sel = null; renderInsp(); $('inspBtn').classList.remove('on'); layoutFocus(); return refreshGraphTools();
@@ -137,6 +147,8 @@ document.addEventListener('click', ev => {
     case 'editCase': return caseDlg(true);
     case 'archiveCase': { const c = theCase(); c.status = c.status === 'closed' ? 'active' : 'closed'; mutate((c.status === 'closed' ? 'archived ' : 'reopened ') + c.code); closeDlg(); renderAll(); return toast(c.status === 'closed' ? 'Case archived — find it under Cases' : 'Case reopened'); }
     case 'cf': UI.cf = v; return renderMain();
+    case 'casesView': UI.casesView = v; DB.prefs.casesView = v; save(); return caseListRepaint(), document.querySelectorAll('.cs2-view button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === v));
+    case 'caseFindClear': UI.cq = ''; UI.cf = 'all'; return renderMain();
     case 'caseMenu': { const c = theCase(id), r0 = t.getBoundingClientRect(); if(!c) return; return showMenu(Math.max(8, r0.right - 220), r0.bottom + 6, [
       {label:'Open case', icon:'folder-open', fn:() => go(caseHash(c.id))},
       {label:'Edit details…', icon:'pencil', fn:() => { DB.active = c.id; caseDlg(true); }},
@@ -238,7 +250,7 @@ document.addEventListener('click', ev => {
       confirmDlg('Replace everything with this backup?', 'Your current cases, notes, tools and rules in this browser are replaced by the ' + d.cases.length + ' case' + (d.cases.length === 1 ? '' : 's') + ' in the file. You can undo right after.', 'Import backup', async () => {
         await snapshot('Before importing a backup'); if(d.files){ await rekeyFiles(d.files, d.records, d.trash); delete d.files; } const nbfiles = d.nbfiles; delete d.nbfiles;
         d.records.forEach(normRecord); d.entries.forEach(normEntry);
-        const prev = DB; DB = d; DB.prefs = Object.assign({}, prev.prefs, d.prefs || {}); ensureTools(); ensurePlaybooks(); ensureIntel(); ensureQueries(); ensureRules(); ensureNotes(); if(DB.nb){ nbSanitize(); await nbRestoreFiles(nbfiles); } else ensureNB(); UI.nbView = 'lib'; UI.nbRev = null; if(!DB.cases.some(c => c.id === DB.active)) DB.active = DB.cases[0] && DB.cases[0].id;
+        const prev = DB; DB = d; DB.recent = prev.recent; DB.work = prev.work; DB.prefs = Object.assign({}, prev.prefs, d.prefs || {}); ensureTools(); ensurePlaybooks(); ensureIntel(); ensureQueries(); ensureRules(); ensureNotes(); if(DB.nb){ nbSanitize(); await nbRestoreFiles(nbfiles); } else ensureNB(); UI.nbView = 'lib'; UI.nbRev = null; if(!DB.cases.some(c => c.id === DB.active)) DB.active = DB.cases[0] && DB.cases[0].id;
         await hashRecords(); ensurePositions(); mutate('imported backup'); UI.sel = null; applyPrefs(); renderAll(); toast('Backup imported', 'Undo', () => { DB = prev; mutate('undo import'); applyPrefs(); renderAll(); }); }); }));
     case 'freshStart': return confirmDlg('Start fresh?', 'Deletes every case, vault entry, evidence record and note in this browser. Tools, queries, rules and settings stay. Export first if you might need them. You can undo right after.', 'Delete my cases', async () => {
       await snapshot('Before starting fresh'); const prev = JSON.parse(JSON.stringify(DB)); const c = {id:uid('c'), name:'My first case', code:'TN-2026-001', status:'active', owner:'You', created:Date.now(), updated:Date.now(), scope:'', color:CASE_COLORS[0], icon:'briefcase'};
@@ -253,6 +265,7 @@ document.addEventListener('click', ev => {
 
     /* query library */
     case 'qcat': UI.qcat = v; return renderMain();
+    case 'qRunDel': DB.queryLog = (DB.queryLog || []).filter(l => l.at !== +v); save(); return renderMain();
     case 'qStar': { const x = DB.queries.find(z => z.id === id); x.starred = !x.starred; mutate('star query'); return renderMain(); }
     case 'qLay': DB.prefs.qlay = v; save(); return renderMain();
     case 'rLay': if(ruleDirty()) return confirmDlg('Discard unsaved changes?', 'You have edits to this rule that are not saved yet.', 'Discard changes', () => clickAct('rLay2', v), true); DB.prefs.rlay = v; save(); return renderMain();
@@ -287,7 +300,7 @@ document.addEventListener('click', ev => {
     case 'rTest': { const r = DB.rules.find(z => z.id === id), code = $('rCode') ? $('rCode').value : r.code, res = testRule({...r, code}, DB.active), out = $('rTestOut');
       if(res.error){ out.innerHTML = `<div class="note amber"><span class="ic">${ico('triangle-alert','sm')}</span><div><b>Could not run this rule here.</b> ${esc(res.error)}</div></div>`; return; }
       out.innerHTML = `<div class="rtres"><b>${res.hits.length ? res.hits.length + ' of ' + res.total + ' records would trigger this rule' : 'No record in ' + esc(theCase().code) + ' matches'}</b>${res.hits.slice(0, 20).map(x => `<button class="li" data-act="selRec" data-id="${x.id}"><span class="mono t3">${x.ts ? esc(E.fmtClock(x.ts, tz())) : '—'}</span><div class="main2"><b>${esc(x.title)}</b><small>${esc(x.host || x.source)}</small></div></button>`).join('')}
-        <p class="t3" style="font-size:12px;margin:8px 0 0">${r.type === 'sigma' ? 'Sigma fields are read from key=value pairs in the evidence text (Image=…, CommandLine=…, EventID …). A subset of Sigma: selections, lists, modifiers contains / startswith / endswith / re / all, and / or / not, “1 of” and “all of”.' : 'YARA runs on each record’s text.'}</p></div>`; return; }
+        <p class="t3" style="font-size:calc(12px * var(--ts,1));margin:8px 0 0">${r.type === 'sigma' ? 'Sigma fields are read from key=value pairs in the evidence text (Image=…, CommandLine=…, EventID …). A subset of Sigma: selections, lists, modifiers contains / startswith / endswith / re / all, and / or / not, “1 of” and “all of”.' : 'YARA runs on each record’s text.'}</p></div>`; return; }
     case 'rTestFile': { const r = DB.rules.find(z => z.id === id), code = $('rCode') ? $('rCode').value : r.code; const i = document.createElement('input'); i.type = 'file';
       i.onchange = async () => { const f = i.files[0]; if(!f) return; if(f.size > 60 * 1048576) return toast('Up to 60 MB in the browser'); const res = yaraScan(code, new Uint8Array(await f.arrayBuffer())), out = $('rTestOut'); if(!out) return;
         out.innerHTML = `<div class="rtres"><b>${esc(f.name)}</b>${res.map(x => x.error ? `<div class="t3">${esc(x.rule)} — ${esc(x.error)}</div>` : `<div class="yhit" style="${x.match ? '' : 'background:var(--surface-2);color:var(--text-2)'}">${ico(x.match ? 'shield-alert' : 'check','sm')}<b>${esc(x.rule)}: ${x.match ? 'match' : 'no match'}</b><span class="mono t3">${Object.entries(x.strings).map(([n, v]) => esc(n) + '×' + v.hits.length).join('  ')}</span></div>`).join('')}</div>`; };
@@ -385,7 +398,7 @@ document.addEventListener('click', ev => {
     case 'labToPcap': UI.labTab = 'pcap'; return pcLoad(UI.labFile.file);
     case 'labToSql': UI.labTab = 'sqlite'; return sqlLoad(UI.labFile.file);
     case 'labToImage': UI.labTab = 'image'; renderMain(); return imgLoad(UI.labFile.file);
-    case 'imgClear': UI.img = null; return renderMain();
+    case 'imgClear': UI.img = null; recentSetLast('image', null); save(); return renderMain();
     case 'imgCh': UI.imgCh = v; if(v === 'rgb' || v === 'inv') UI.imgBit = 'all'; return renderMain();
     case 'imgBit': UI.imgBit = v === 'all' ? 'all' : +v; return renderMain();
     case 'imgLsb': case 'imgLsbOrder': { const I = UI.img; if(!I || !I.data) return; if(a === 'imgLsbOrder') UI.imgCol = !UI.imgCol; const ch = a === 'imgLsb' ? v : (I.lsb && I.lsb.ch) || 'rgb';
@@ -395,7 +408,7 @@ document.addEventListener('click', ev => {
     case 'emlSave': { const A = analyseEmail(UI.emlIn || ''); if(!A) return; const body = (UI.emlIn || '').slice(0, 20000);
       DB.records.push({id:uid('r'), caseId:DB.active, type:'evidence', title:'Email headers: ' + (A.subject || A.from || 'message'), body, tsRaw:A.date, tsZone:'explicit', ts:Date.parse(A.date) || Date.now(), source:'email-headers', host:'', tags:['email'].concat(A.flags.some(f => f[0] === 'red') ? ['spoofing'] : []), ents:E.extract(body).filter(e => e.k !== 'handle'), answer:'', addedBy:'You', addedAt:Date.now(), hash:''});
       mutate('saved email headers'); hashRecords(); { const r0 = DB.records[DB.records.length - 1]; afterCapture(DB.active, [r0.id]); watchNotify([r0]); } renderNav(); return toast('Saved to ' + theCase().code, 'Open', () => go(caseHash(DB.active, 'timeline'))); }
-    case 'labClear': UI.labFile = null; return renderMain();
+    case 'labClear': UI.labFile = null; recentSetLast('labFile', null); save(); return renderMain();
     case 'labSave': { const r = UI.labFile; if(!r) return; const body = labSummary(r);
       DB.records.push({id:uid('r'), caseId:DB.active, type:'evidence', title:'File inspected: ' + r.name, body, tsRaw:new Date(r.lastModified).toISOString(), tsZone:'explicit', ts:r.lastModified, source:'forensics-kit', host:'', tags:['file'].concat(r.flags.length ? ['flag'] : []), ents:E.extract(body), answer:'', addedBy:'You', addedAt:Date.now(), hash:''});
       if(!DB.entries.some(e => e.caseId === DB.active && e.type === 'file' && e.fields.hash === r.sha256)) DB.entries.push({id:uid('v'), caseId:DB.active, type:'file', fields:{hash:r.sha256, filename:r.name, size:fmtBytes(r.size), type:r.type.name}, priority:'medium', starred:false, tags:['file'], notes:'', src:'', created:Date.now(), pos:null});
@@ -429,7 +442,7 @@ document.addEventListener('click', ev => {
     case 'exportCase': { const c = theCase(id), recs = DB.records.filter(r => r.caseId === c.id); return filesForExport(recs).then(files => { const o = {format:'osintrix-case', v:2, case:c, entries:DB.entries.filter(e => e.caseId === c.id), links:DB.links.filter(l => l.caseId === c.id), records:recs, files};
       if(SEC.key || v === 'enc') return downloadEncrypted(slug(c.name) + '.json', o); download(slug(c.name) + '.json', JSON.stringify(o, null, 2), 'application/json'); }); }
     case 'exportAll': return exportEverything();
-    case 'resetDemo': { snapshot('Before resetting to the demo'); const prev = DB; DB = seedDB(); DB.prefs = prev.prefs; mutate('reset demo'); hashRecords(); UI.sel = null; renderAll(); return toast('Demo data reset', 'Undo', () => { DB = prev; mutate('undo reset'); renderAll(); }); }
+    case 'resetDemo': { snapshot('Before resetting to the demo'); const prev = DB; DB = seedDB(); DB.prefs = prev.prefs; DB.recent = prev.recent; DB.work = prev.work; mutate('reset demo'); hashRecords(); UI.sel = null; renderAll(); return toast('Demo data reset', 'Undo', () => { DB = prev; mutate('undo reset'); renderAll(); }); }
   }
 });
 document.addEventListener('keydown', ev => { if((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches('span[role=button][data-act], div[role=button][data-act], tr[data-act]')){ ev.preventDefault(); ev.target.click(); } });

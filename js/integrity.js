@@ -146,7 +146,7 @@ async function sniffKind(blob){
    written until the person picks an option. */
 function recoveryScreen(copies){
   const c = copies[0] || {}, w = $('welcome'); w.hidden = false; w.classList.add('lockscr');
-  w.innerHTML = `<div class="wcard lockcard recover">${logoMark(56)}<h1 id="wTitle" style="font-size:26px">Your workspace needs attention</h1>
+  w.innerHTML = `<div class="wcard lockcard recover">${logoMark(56)}<h1 id="wTitle" style="font-size:calc(26px * var(--ts,1))">Your workspace needs attention</h1>
     <p>OSINTrix found saved data in this browser but did not open it, because ${esc(c.why || 'it could not be read')}. Nothing has been changed or deleted.</p>
     ${c.newer ? '<p>Open it with the newer version of OSINTrix you used last, or download it to keep a copy.</p>' : '<p>Download it first to keep a copy. If you have an exported backup, you can restore it after starting fresh.</p>'}
     <div class="recover-a"><button class="btn primary" id="recDl" type="button">${ico('download','sm')}Download the stored data</button>

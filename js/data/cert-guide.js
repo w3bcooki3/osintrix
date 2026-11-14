@@ -1,4 +1,4 @@
-/* "How certificates work": ten short chapters. Static, trusted HTML written for this app.
+/* "How certificates work": eleven short chapters. Static, trusted HTML written for this app.
    Each chapter has flashcards (Q/A) that can go to the Notebook, a command, and an example to open. */
 const CERT_GUIDE = [
 {id:'tls', title:'How TLS uses certificates', lead:'A certificate answers one question for your browser: is the server I reached really the one whose name I typed?', sample:'phish', cmd:'openssl s_client -connect example.com:443 -servername example.com -showcerts </dev/null',
@@ -53,6 +53,106 @@ const CERT_GUIDE = [
  <p>A fingerprint is a hash of the whole encoded certificate, worked out by whoever looks at it. SHA-256 is the one to use when searching Censys, Shodan or crt.sh; the public-key hash (SPKI) stays the same when a certificate is renewed with the same key.</p>`,
  cards:[['Which field lists every name a certificate covers?', 'Subject Alternative Name (SAN).'], ['Is the fingerprint stored inside the certificate?', 'No — it is a hash of the encoded certificate, computed by whoever inspects it.'],
   ['Which hash stays the same when a certificate is renewed with the same key?', 'The SPKI (public key) hash, used for key pinning.'], ['Maximum lifetime of a public TLS certificate issued in November 2026?', '200 days (CA/Browser Forum ballot SC-081, from 15 March 2026).']]},
+
+{id:'types', title:'Types of certificates and what they are for', lead:'Every certificate ties a key to a name. What that key is allowed to do — run a website, log a user in, sign software, sign email — is written into three fields. Learn those and you can tell any certificate’s job at a glance.', sample:'client', cmd:'openssl x509 -in cert.pem -noout -ext basicConstraints,keyUsage,extendedKeyUsage,subjectAltName',
+ body:`<h3>How a certificate says what it is for</h3>
+ <div class="tblwrap" tabindex="0" role="region" aria-label="Fields that set a certificate's purpose"><table class="crtg-t"><thead><tr><th>Field</th><th>The question it answers</th><th>Typical values</th></tr></thead><tbody>
+  <tr><td><b>Basic constraints</b></td><td>May this certificate issue other certificates?</td><td><span class="mono">CA:TRUE</span> (a CA, maybe with a path length) or <span class="mono">CA:FALSE</span> (an end certificate)</td></tr>
+  <tr><td><b>Key usage</b></td><td>What may the key do, mechanically?</td><td>Digital signature, key encipherment, certificate signing, CRL signing, non-repudiation</td></tr>
+  <tr><td><b>Extended key usage</b></td><td>Which job is it for?</td><td>Server authentication, client authentication, code signing, email protection, time stamping, smart card logon, document signing</td></tr>
+  <tr><td><b>Subject alternative names</b></td><td>Who or what is it for?</td><td>DNS names and IP addresses for servers, email addresses for people, a UPN for a Windows account</td></tr></tbody></table></div>
+ <p>A certificate with <b>no extended key usage</b> is accepted for almost anything by many programs, and one with <b>“Any purpose”</b> really is. Both are worth a second look, especially from a company CA — in Active Directory Certificate Services that is a known path to domain takeover.</p>
+ <p class="crtg-jump">Jump to: <button class="crtg-lk" data-act="cxJump" data-v="server">Website</button> · <button class="crtg-lk" data-act="cxJump" data-v="client">Client</button> · <button class="crtg-lk" data-act="cxJump" data-v="device">Device</button> · <button class="crtg-lk" data-act="cxJump" data-v="mtls">Trusted server CA vs trusted client CA</button> · <button class="crtg-lk" data-act="cxJump" data-v="ca">Root and intermediate CAs</button> · <button class="crtg-lk" data-act="cxJump" data-v="code">Code signing</button> · <button class="crtg-lk" data-act="cxJump" data-v="smime">Email</button> · <button class="crtg-lk" data-act="cxJump" data-v="smartcard">Windows logon</button> · <button class="crtg-lk" data-act="cxJump" data-v="docsign">Document signing</button> · <button class="crtg-lk" data-act="cxJump" data-v="tsa">Timestamping</button> · <button class="crtg-lk" data-act="cxJump" data-v="table">Side by side</button></p>
+
+ <section class="crtg-tc" id="crtg-ty-server"><header><h3>Website (TLS server) certificate</h3><button class="btn xs" data-act="cxSample" data-v="ov">Open an example</button></header><dl>
+  <dt>What it is for</dt><dd>Proves to a client that the server it reached owns the name it asked for, and lets them agree an encrypted session.</dd>
+  <dt>How to recognise it</dt><dd>Extended key usage <b>Server authentication</b>; DNS names (and sometimes IP addresses) in the subject alternative names; <span class="mono">CA:FALSE</span>. Public ones carry Certificate Transparency timestamps and, since 15 March 2026, live at most 200 days.</dd>
+  <dt>Where you meet it</dt><dd>HTTPS sites and APIs, mail servers (SMTP, IMAP, POP with TLS), VPN gateways, remote desktop (RDP makes a self-signed one named after the machine), databases, IoT dashboards.</dd>
+  <dt>Investigator’s angle</dt><dd>The richest public trail: Certificate Transparency lists every name ever issued, and Shodan and Censys record which IP presents it. Look for lookalike names, unrelated domains on one certificate, default or self-signed certificates on attacker servers, and machine names leaked by RDP and internal services.</dd></dl></section>
+
+ <section class="crtg-tc" id="crtg-ty-client"><header><h3>Client authentication certificate (a person)</h3><button class="btn xs" data-act="cxSample" data-v="client">Open an example</button></header><dl>
+  <dt>What it is for</dt><dd>Proves who the <i>client</i> is — instead of, or as well as, a password. The server asks for it during the TLS handshake, and the client proves it holds the private key.</dd>
+  <dt>How to recognise it</dt><dd>Extended key usage <b>Client authentication</b>; a person’s name in the subject; an email address or Windows UPN in the alternative names; issued by a company CA, usually for one year. The key often lives in a TPM, smart card or YubiKey.</dd>
+  <dt>Where you meet it</dt><dd>Company VPNs (GlobalProtect, AnyConnect, Always On VPN), Wi‑Fi with 802.1X EAP-TLS, mutual TLS to APIs and admin portals, Entra ID certificate-based authentication.</dd>
+  <dt>Investigator’s angle</dt><dd>It is an identity: an exported <span class="mono">.pfx</span> with its key is a stolen login that survives password resets until the certificate is revoked or expires. Private-CA certificates are not in public logs, so the evidence is on endpoints and in the CA’s issued-certificate database. Check whether the key was marked exportable.</dd></dl></section>
+
+ <section class="crtg-tc" id="crtg-ty-device"><header><h3>Device or machine certificate</h3><button class="btn xs" data-act="cxSample" data-v="device">Open an example</button></header><dl>
+  <dt>What it is for</dt><dd>Proves that a <i>machine</i> is one of yours — a managed laptop, phone, server or IoT device — independently of who is logged in.</dd>
+  <dt>How to recognise it</dt><dd>Usually <b>Client authentication</b> (sometimes server authentication too); the subject is the computer’s full domain name or a device ID; issued automatically by AD CS auto-enrolment, Intune (SCEP or PKCS) or another MDM. IoT devices get one at the factory, often valid for decades.</dd>
+  <dt>Where you meet it</dt><dd>802.1X network access, device tunnels in Always On VPN, conditional access (“only managed devices”), IoT and cloud device registries, printers and network gear.</dd>
+  <dt>Investigator’s angle</dt><dd>It proves the device, not the person. A machine certificate copied to an attacker’s laptop can make it pass as managed. The subject reveals the naming scheme (site, type, asset number). On IoT, the same key on many units — or a key extracted from firmware — breaks the whole fleet.</dd></dl></section>
+
+ <section class="crtg-tc crtg-mtls" id="crtg-ty-mtls"><header><h3>Trusted server CA vs trusted client CA</h3><button class="btn xs" data-act="cxSample" data-v="clientca">Open a client-issuing CA</button></header>
+  <p>Ordinary HTTPS checks one side; <b>mutual TLS</b> checks both. Each side keeps its <i>own</i> list of CAs it trusts, and they are different lists:</p>
+  <div class="crtg-dia"><div class="crtg-box"><b>Client · trusted server CAs</b><small>The operating system or browser root store — about 150 public roots — plus any company roots. Used to check the server’s certificate.</small></div><div class="crtg-arw"><i></i>each checks the other</div>
+   <div class="crtg-box root"><b>Server · trusted client CAs</b><small>A short list the server is configured with — usually only the company’s issuing CA. Used to check the client’s certificate.</small></div></div>
+  <ul><li>The server sends a <b>CertificateRequest</b> naming the client CAs it accepts; the client picks a matching certificate and proves it holds the key.</li>
+   <li>A good client-issuing CA is narrow: its extended key usage allows only client, email or logon jobs, and <b>name constraints</b> keep it to the company’s own domains (the example shows both).</li>
+   <li>The classic mistake is putting a <b>public</b> CA in the trusted <i>client</i> list: anyone who buys a certificate from that CA can then log in. The reverse — a company root pushed into every laptop’s <i>server</i> store — is how TLS inspection proxies work, and how malware hides its traffic.</li></ul>
+  <dl><dt>Investigator’s angle</dt><dd>In a TLS 1.2 capture the CertificateRequest lists the accepted client CA names in the clear — it tells you who runs the server. On an endpoint, compare the trusted root store with a clean baseline: an unexpected root is a red flag (adware, interception tools, malware).</dd></dl></section>
+
+ <section class="crtg-tc" id="crtg-ty-ca"><header><h3>Root and intermediate CA certificates</h3><button class="btn xs" data-act="cxSample" data-v="chain">Open a chain</button></header><dl>
+  <dt>What it is for</dt><dd>Issuing other certificates. A root is the anchor that devices trust directly; intermediates do the day-to-day issuing so the root key can stay offline.</dd>
+  <dt>How to recognise it</dt><dd><span class="mono">CA:TRUE</span> in basic constraints, key usage <b>Certificate signing</b> and <b>CRL signing</b>. A root is self-signed. A path length of 0 means it may issue only end certificates; name constraints and extended key usage can narrow it further.</dd>
+  <dt>Where you meet it</dt><dd>Trust stores (Windows “Trusted Root Certification Authorities”, macOS Keychain, Firefox, Java cacerts), and inside every chain a server or signed file presents.</dd>
+  <dt>Investigator’s angle</dt><dd>Roots installed by software or malware, an intermediate with no path length limit, and private CAs that can issue for any name are high-value findings. The Chain tab checks every signature in a chain.</dd></dl></section>
+
+ <section class="crtg-tc" id="crtg-ty-code"><header><h3>Code signing certificate</h3><button class="btn xs" data-act="cxSample" data-v="pe">Open a signed program</button></header><dl>
+  <dt>What it is for</dt><dd>Proves who published a program, script or driver, and that it has not changed since it was signed.</dd>
+  <dt>How to recognise it</dt><dd>Extended key usage <b>Code signing</b>; the subject is the publisher organisation; issued by a public CA only after organisation checks, with the key in hardware (required since June 2023). EV code signing adds stricter checks. A <b>timestamp</b> keeps the signature valid after the certificate expires.</dd>
+  <dt>Where you meet it</dt><dd>Windows Authenticode (.exe, .dll, .sys, .msi, PowerShell scripts), macOS Developer ID, Java and Office macros, firmware and drivers.</dd>
+  <dt>Investigator’s angle</dt><dd>Malware signed with stolen or fraudulently bought certificates is common — some notorious cases used certificates stolen from well-known hardware vendors. Check the file hash against its signature, whether there is a timestamp, whether the publisher fits the product, and whether the certificate has been revoked. Hunt for other files signed with the same certificate.</dd></dl></section>
+
+ <section class="crtg-tc" id="crtg-ty-smime"><header><h3>Email (S/MIME) certificate</h3><button class="btn xs" data-act="cxSample" data-v="smime">Open an example</button></header><dl>
+  <dt>What it is for</dt><dd>Signing email (proving the sender) and encrypting it (only the recipient can read it).</dd>
+  <dt>How to recognise it</dt><dd>Extended key usage <b>Email protection</b>; the email address in the alternative names (and often in the subject); digital signature for signing, key encipherment for encryption — some organisations issue separate certificates for each.</dd>
+  <dt>Where you meet it</dt><dd>Outlook and Apple Mail signed or encrypted messages, government and defence mail, regulated industries.</dd>
+  <dt>Investigator’s angle</dt><dd>A valid signature proves the key holder sent the message — compare the certificate’s address with the visible From. Encryption keys are often escrowed by the company, so encrypted mail can be recovered lawfully through the key recovery agent.</dd></dl></section>
+
+ <section class="crtg-tc" id="crtg-ty-smartcard"><header><h3>Windows logon (smart card) certificate</h3><button class="btn xs" data-act="cxSample" data-v="adcs">Open an example</button></header><dl>
+  <dt>What it is for</dt><dd>Logging on to Windows and Active Directory with a certificate (Kerberos PKINIT) instead of a password — on a smart card, a YubiKey or Windows Hello for Business.</dd>
+  <dt>How to recognise it</dt><dd>Extended key usage <b>Smart card logon</b> and/or <b>Client authentication</b>; a <b>UPN</b> in the alternative names, and on certificates issued since 2022 a security identifier (SID) extension that ties it to one account.</dd>
+  <dt>Where you meet it</dt><dd>Active Directory Certificate Services templates (User, Smartcard Logon, custom ones), Windows Hello for Business, privileged admin workstations.</dd>
+  <dt>Investigator’s angle</dt><dd>A favourite for persistence: it logs in as the user for its whole lifetime, even after password changes. A template that lets the requester choose the alternative name (ESC1) lets anyone request a certificate as a domain admin. Look at who requested it and whose UPN it carries — the decoder flags these.</dd></dl></section>
+
+ <section class="crtg-tc" id="crtg-ty-docsign"><header><h3>Document signing certificate</h3><button class="btn xs" data-act="cxSample" data-v="docsign">Open an example</button></header><dl>
+  <dt>What it is for</dt><dd>Signing PDFs, Office documents, invoices and contracts so the reader can tell who signed and that nothing changed.</dd>
+  <dt>How to recognise it</dt><dd>Extended key usage <b>Document signing</b> (the standard one or Microsoft’s); key usage usually includes <b>non-repudiation</b>. In Europe, qualified signatures under eIDAS carry “qualified certificate” statements.</dd>
+  <dt>Where you meet it</dt><dd>Adobe Acrobat (trusted through the Adobe Approved Trust List), e-invoicing, legal and HR workflows, public-sector forms.</dd>
+  <dt>Investigator’s angle</dt><dd>Check that the signature covers the whole file — content added after signing (an “incremental update”) is a classic trick — and rely on a trusted timestamp, not the signer’s own clock, for when it was signed.</dd></dl></section>
+
+ <section class="crtg-tc" id="crtg-ty-tsa"><header><h3>Timestamping authority certificate</h3><button class="btn xs" data-act="cxSample" data-v="tsa">Open an example</button></header><dl>
+  <dt>What it is for</dt><dd>Signing RFC 3161 timestamps — a trusted third party’s statement that a hash existed at a given moment.</dd>
+  <dt>How to recognise it</dt><dd>Extended key usage <b>Time stamping</b> and nothing else, marked <b>critical</b>; usually long-lived.</dd>
+  <dt>Where you meet it</dt><dd>Countersignatures on signed programs, long-term validation of signed documents, evidence and archiving systems.</dd>
+  <dt>Investigator’s angle</dt><dd>This is the part of a signature you can trust for <i>when</i>. A signature without a timestamp only has the signer’s claimed time, which can be anything.</dd></dl></section>
+
+ <h3>Less common, still worth knowing</h3>
+ <ul><li><b>OCSP signing</b> — signs revocation answers on behalf of a CA.</li><li><b>Kerberos KDC</b> — on domain controllers, so clients can trust them during smart card logon.</li><li><b>Certificate request agent (enrollment agent)</b> — may request certificates <i>for other users</i>; abusing it is ESC3 in AD CS.</li><li><b>Encrypting File System and key recovery agent</b> — Windows file encryption and the escrow that can decrypt it.</li><li><b>IPsec</b> — site-to-site and host VPN tunnels.</li></ul>
+
+ <h3 id="crtg-ty-table">Side by side</h3>
+ <div class="tblwrap" tabindex="0" role="region" aria-label="Certificate types side by side"><table class="crtg-t"><thead><tr><th>Type</th><th>Extended key usage</th><th>Names it carries</th><th>Usually issued by</th><th>Typical life</th><th>In public CT logs?</th></tr></thead><tbody>
+  <tr><td><b>Website</b></td><td>Server authentication</td><td>DNS names, IPs</td><td>Public CA, or a company CA inside</td><td>Up to 200 days (public)</td><td>Yes, if public</td></tr>
+  <tr><td><b>Client (person)</b></td><td>Client authentication</td><td>Email, UPN</td><td>Company CA</td><td>1 year</td><td>No</td></tr>
+  <tr><td><b>Device</b></td><td>Client authentication</td><td>Host name or device ID</td><td>Company CA, MDM, manufacturer</td><td>1 year; IoT often decades</td><td>No</td></tr>
+  <tr><td><b>Root CA</b></td><td>Usually none</td><td>—</td><td>Itself</td><td>20–25 years</td><td>No</td></tr>
+  <tr><td><b>Intermediate CA</b></td><td>Often restricted</td><td>—</td><td>A root</td><td>5–10 years</td><td>Public ones are disclosed</td></tr>
+  <tr><td><b>Code signing</b></td><td>Code signing</td><td>Publisher in the subject</td><td>Public CA, key in hardware</td><td>1–3 years</td><td>No</td></tr>
+  <tr><td><b>Email (S/MIME)</b></td><td>Email protection</td><td>Email</td><td>Public or company CA</td><td>1–2 years</td><td>No</td></tr>
+  <tr><td><b>Windows logon</b></td><td>Smart card logon, client auth</td><td>UPN (+ SID)</td><td>AD CS</td><td>1 year</td><td>No</td></tr>
+  <tr><td><b>Document signing</b></td><td>Document signing</td><td>Email or name</td><td>Public (AATL, eIDAS) or company CA</td><td>1–3 years</td><td>No</td></tr>
+  <tr><td><b>Timestamping</b></td><td>Time stamping (critical)</td><td>—</td><td>Public or company CA</td><td>5–10+ years</td><td>No</td></tr></tbody></table></div>`,
+ cards:[['Which three fields decide what a certificate may be used for?', 'Basic constraints (may it issue certificates), key usage (what the key may do) and extended key usage (which job: server, client, code signing, email…). The subject alternative names say who or what it is for.'],
+  ['What marks a website (TLS server) certificate?', 'Extended key usage Server authentication, DNS names or IPs in the subject alternative names, CA:FALSE; public ones are in Certificate Transparency logs and live at most 200 days (from March 2026).'],
+  ['What is a client authentication certificate, and why does a stolen one matter?', 'It proves the client’s identity (a user or device) during TLS, e.g. for VPN, 802.1X Wi‑Fi or mutual TLS. An exported key plus certificate is a login that survives password resets until revoked or expired.'],
+  ['What does a device certificate prove?', 'That the machine is a managed device of the organisation — not who is using it. Copied to another machine, it can make that machine pass as managed.'],
+  ['Trusted server CA vs trusted client CA?', 'Clients keep a list of CAs they trust for servers (the OS or browser root store). In mutual TLS, servers keep a separate, short list of CAs they trust for client certificates — usually only the company’s issuing CA.'],
+  ['Why is trusting a public CA for client authentication dangerous?', 'Anyone can buy a certificate from that CA, so anyone could log in. Client trust should be limited to your own issuing CA, ideally with name constraints.'],
+  ['What makes a certificate a CA certificate?', 'Basic constraints CA:TRUE and key usage Certificate signing (and CRL signing). A root is self-signed; path length 0 means it may issue only end certificates.'],
+  ['Why does a code signing signature need a timestamp?', 'Without a trusted timestamp the signature stops being trusted when the certificate expires, and the only signing time is the signer’s own claim.'],
+  ['What identifies an S/MIME certificate?', 'Extended key usage Email protection and the email address in the subject alternative names (often also in the subject).'],
+  ['Why are Windows logon certificates attractive to attackers?', 'They log on as the user (Kerberos PKINIT) for their whole lifetime, even after password resets; a misconfigured AD CS template (ESC1) can issue one for any account, including domain admins.'],
+  ['What is special about a timestamping authority certificate?', 'Its only extended key usage is Time stamping, marked critical. Its RFC 3161 tokens are the trustworthy proof of when something was signed.']]},
 
 {id:'csr', title:'CSRs: asking for a certificate', lead:'A certificate signing request carries your public key and the names you want, signed with your private key. The private key never leaves your machine.', sample:'csr', cmd:`openssl req -new -newkey rsa:2048 -nodes -keyout site.key -out site.csr \\
   -subj "/CN=www.example.com" -addext "subjectAltName=DNS:www.example.com,DNS:example.com"`,

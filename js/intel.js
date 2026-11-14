@@ -62,7 +62,7 @@ function intelConsent(){
       <div class="note"><span class="ic" style="color:var(--green);background:var(--green-soft)">${ico('check','sm')}</span><div><b>What leaves your browser:</b> only the feed URLs in your source list.</div></div>
       <div class="note"><span class="ic" style="color:var(--green);background:var(--green-soft)">${ico('lock','sm')}</span><div><b>What never leaves:</b> your cases, vault entries, notes, detections and searches.</div></div>
       <div class="note amber"><span class="ic">${ico('triangle-alert','sm')}</span><div>The relay can see which feeds you follow and when. Articles are shown as plain text; links open only when you click them.</div></div></div>
-    <label style="display:flex;gap:10px;align-items:center;margin-top:16px;font-size:14px"><input type="checkbox" id="intelOk"> I understand, allow requests to api.rss2json.com</label></div>
+    <label style="display:flex;gap:10px;align-items:center;margin-top:16px;font-size:calc(14px * var(--ts,1))"><input type="checkbox" id="intelOk"> I understand, allow requests to api.rss2json.com</label></div>
     <footer><button class="btn" data-act="dclose">Keep offline</button><button class="btn primary" data-act="intelOn" id="intelOnBtn" disabled>${ico('wifi','sm')}Turn on and refresh</button></footer>`, false,
     () => { $('intelOk').onchange = () => { $('intelOnBtn').disabled = !$('intelOk').checked; }; });
 }

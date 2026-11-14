@@ -96,7 +96,7 @@ const ACH_ACTS = {
   achEvDel:id => { const A = achOf(theCase()); A.ev = A.ev.filter(x => x.id !== id); delete A.m[id]; mutate('removed evidence row'); renderMain(); },
   achEvRec:() => achRecDlg(),
   achRecGo:() => { const A = achOf(theCase()), ids = [...document.querySelectorAll('#arList input:checked')].map(x => x.value); for(const r of ids) A.ev.push({id:uid('e'), rec:r, cred:2, rel:2}); closeDlg(); mutate('added ' + ids.length + ' evidence rows'); renderMain(); },
-  achEvText:() => { openDlg(dhead('Add an argument or assumption') + `<form data-form="achEv"><div class="in"><div class="field" style="margin:0"><label for="aeT">Text</label><input id="aeT" required autofocus placeholder="e.g. The attacker knew the finance team's invoice format"></div><p class="t3" style="font-size:13px;margin:10px 0 0">Assumptions and missing evidence count too — “we would expect to see X, and we don't” is often the most diagnostic row.</p></div>
+  achEvText:() => { openDlg(dhead('Add an argument or assumption') + `<form data-form="achEv"><div class="in"><div class="field" style="margin:0"><label for="aeT">Text</label><input id="aeT" required autofocus placeholder="e.g. The attacker knew the finance team's invoice format"></div><p class="t3" style="font-size:calc(13px * var(--ts,1));margin:10px 0 0">Assumptions and missing evidence count too — “we would expect to see X, and we don't” is often the most diagnostic row.</p></div>
     <footer><button class="btn" type="button" data-act="dclose">Cancel</button><button class="btn primary" type="submit">Add</button></footer></form>`); },
   qView:(id, v) => { UI.qView = v; renderMain(); }
 };

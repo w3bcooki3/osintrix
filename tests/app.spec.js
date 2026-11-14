@@ -398,12 +398,25 @@ test('CTF: work log, flag check, write-up and cheatsheets', async ({ page }) => 
   expect(await page.evaluate(() => DB.ctf.chals.find(x => x.name === 'Hidden layers').status)).toBe('solved');
   await page.click('[data-act=wuFromChal]'); await page.click('form[data-form=wu] button[type=submit]');
   await expect(page.locator('.reader .md-code')).toContainText('binwalk');
+  // write-ups: grouped by event, a category filter behind one button
+  await page.click('[data-act=ctfTab][data-v=writeups]');
+  await expect(page.locator('.wl2-g').first()).toBeVisible(); const all = await page.locator('.wl2-i').count();
+  await page.click('[data-act=wuFilt]'); await page.click('#ctx .ctx-it:has-text("Crypto")');
+  await expect(page.locator('.wl2-cf')).toContainText('Crypto only'); expect(await page.locator('.wl2-i').count()).toBeLessThan(all);
+  await page.click('.wl2-cf [data-act=wuCat]'); await expect(page.locator('.wl2-i')).toHaveCount(all);
+  // cheatsheets: the Reference-style tree, values in a popover
   await page.evaluate(() => { UI.ctfTab = 'cheats'; UI.csCat = 'web'; renderMain(); });
+  await expect(page.locator('.cs4-rail .rf4-g.open .rf4-gh')).toContainText('Web');
+  await expect(page.locator('.cs4-pop')).toBeHidden(); await page.click('.cs4-vb'); await expect(page.locator('.cs4-pop')).toBeVisible();
   await page.fill('[data-csvar=target]', '10.10.11.42');
-  await expect(page.locator('.csr code').first()).toContainText('10.10.11.42');
+  await expect(page.locator('.csr code').first()).toContainText('10.10.11.42'); await expect(page.locator('#csValsSum')).toContainText('10.10.11.42');
+  await page.keyboard.press('Escape'); await expect(page.locator('.cs4-pop')).toBeHidden();
+  const grp = page.locator('.cs4-rail .rf4-s').nth(1), gname = (await grp.locator('span').textContent()).trim(); await grp.click();
+  await expect(page.locator('.csl-h')).toHaveCount(1); await expect(page.locator('.csl-h')).toContainText(gname);
   await page.fill('#csq', 'steghide'); await expect(page.locator('.cs-blk')).not.toHaveCount(0);
-  await page.click('[data-act=ctfCheat][data-v=stego]'); await page.click('[data-act=csFm][data-v="0"]');
-  expect(await page.evaluate(() => DB.ctf.fm.stego)).toEqual([0]);
+  await page.click('[data-act=ctfCheat][data-v=stego]'); await page.click('[data-act=csView][data-v=first]'); await page.click('[data-act=csFm][data-v="0"]');
+  expect(await page.evaluate(() => DB.ctf.fm.stego)).toEqual([0]); await expect(page.locator('#csFmN')).toContainText('1/');
+  expect(await page.evaluate(() => csFill('holehe target@example.com'))).toBe('holehe target@example.com');   // an email address is not a target
   noErrors(errors);
 });
 
@@ -423,7 +436,7 @@ test('no serious accessibility problems on the main screens, light and dark', as
   const AxeBuilder = require('@axe-core/playwright').default;
   const errors = await open(page, '#/home');
   const routes = ['#/home', '#/case/c-lantern/graph', '#/case/c-lantern/timeline', '#/case/c-lantern/entities', '#/case/c-lab/map', '#/case/c-lantern/questions', '#/case/c-lantern/overview', '#/case/c-lantern/vault',
-    '#/toolbox', '#/queries', '#/lab', '#/cloud', '#/ctf', '#/reference', '#/playbooks', '#/feeds', '#/detections', '#/notes', '#/security', '#/whatsnew', '#/help', '#/settings', 'ctf-ws', 'ctf-cheats', 'ctf-wu', 'nb-page', 'nb-export', '#/notebook', 'cx-dec', 'cx-chain', 'cx-csr', 'cx-guide', 'welcome'];
+    '#/toolbox', '#/queries', '#/lab', '#/cloud', '#/ctf', '#/reference', '#/playbooks', '#/feeds', '#/detections', '#/notes', '#/security', '#/whatsnew', '#/help', '#/settings', 'ctf-ws', 'ctf-cheats', 'ctf-wu', 'nb-page', 'nb-export', '#/notebook', 'cx-dec', 'cx-chain', 'cx-csr', 'cx-pe', 'cx-cmp', 'cx-ct', 'cx-guide', 'welcome'];
   const found = [];
   for (const theme of ['light', 'dark']) {
     await page.evaluate(t => { DB.prefs.theme = t; applyPrefs(); renderAll(); }, theme);
@@ -570,13 +583,14 @@ test('notebook pictures live outside the save, survive closing the tab, and trav
   // close the tab straight after typing, then open the app again (the test helper's start-up script would race a plain reload)
   await page.keyboard.type('typed just before closing'); await page.close({ runBeforeUnload: true });
   page = await context.newPage(); page.on('pageerror', e => errors.push('pageerror: ' + e.message)); await page.goto(APP + '#/notebook');
-  await expect.poll(() => page.evaluate(() => typeof DB !== 'undefined' && !!DB && !!DB.nb && DB.nb.pages.some(p => p.html.includes('typed just before closing')))).toBe(true);
+  await expect.poll(() => page.evaluate(() => typeof DB !== 'undefined' && !!DB && !!DB.nb && DB.nb.pages.some(p => p.html.includes('typed just before closing'))), { timeout: 15000 }).toBe(true);
   await page.evaluate(() => { if (typeof closeWelcome === 'function') closeWelcome(); });
   const st = await page.evaluate(async () => { const m = Object.values(DB.nb.media).find(x => x.name === 'lab.png'); return { inline: !!m.data, stored: !!(await IDB.get('nbm:' + m.id)), inSave: JSON.stringify(DB).includes('iVBOR') }; });
   expect(st).toEqual({ inline: false, stored: true, inSave: false });
   const [dl] = await Promise.all([page.waitForEvent('download'), page.evaluate(() => exportEverything(false))]);
   const bk = JSON.parse(fs.readFileSync(await dl.path(), 'utf8')); expect(Object.keys(bk.nbfiles).length).toBe(1);
   await page.evaluate(async () => { for (const k of Object.keys(DB.nb.media)) await IDB.del('nbm:' + k); });
+  await page.evaluate(() => { if (typeof closeWelcome === 'function') closeWelcome(); });   // the welcome screen can open late on a fresh tab and cover the dialog
   const [fc] = await Promise.all([page.waitForEvent('filechooser'), page.evaluate(() => clickAct('importAll'))]); await fc.setFiles(await dl.path());
   await page.click('[data-act=confirmOk]');
   await expect.poll(() => page.evaluate(async () => { const m = Object.values(DB.nb.media).find(x => x.name === 'lab.png'); return !!(m && await IDB.get('nbm:' + m.id)); })).toBe(true);
@@ -665,11 +679,69 @@ test('automatic backup to a folder: writes, keeps 7 days, pauses without permiss
   noErrors(errors);
 });
 
+test('trash: items past 30 days are cleared before the sidebar counts them', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  const r = await page.evaluate(() => { trashPut('note', 'expired', { n: { id: 'nx1' } }); trashPut('note', 'fresh', { n: { id: 'nx2' } }); DB.trash.find(x => x.label === 'expired').at = Date.now() - 40 * 864e5; renderNav();
+    return { count: document.querySelector('a.nv[href="#/trash"] .cnt').textContent, left: DB.trash.map(x => x.label) }; });
+  expect(r).toEqual({ count: '1', left: ['fresh'] });
+  noErrors(errors);
+});
+
+test('what\'s new: filters and search repaint only the timeline, matches are marked, releases can be jumped to', async ({ page }) => {
+  const errors = await open(page, '#/whatsnew');
+  await page.evaluate(() => { document.querySelector('.wn2-hero').dataset.keep = '1'; });
+  await page.click('.wn2-f.fix'); await expect(page.locator('.wn2-g h3')).toHaveCount(await page.locator('.wn2-v').count());
+  await expect(page.locator('.wn2-g h3').first()).toContainText('Fixed');
+  await page.fill('#wnQ', 'certificate');
+  await expect(page.locator('.wn2-res')).toContainText('for “certificate”'); await expect(page.locator('.wn2-tl mark').first()).toBeVisible();
+  await page.click('[data-act=wnClear]'); await expect(page.locator('#wnQ')).toHaveValue('');
+  await page.click('.wn2-ni:has-text("v1.10")'); await expect(page.locator('#v1\\.10 .wn2-gs')).toBeVisible();
+  expect(await page.evaluate(() => document.querySelector('.wn2-hero').dataset.keep)).toBe('1');   // the header was never redrawn
+  noErrors(errors);
+});
+
+test('cases: board cards by default, a list view that is remembered, search, sort and status filters', async ({ page }) => {
+  const errors = await open(page, '#/cases');
+  await expect(page.locator('.cs2-card')).toHaveCount(3);
+  await expect(page.locator('.cs2-card:has-text("Op Lantern") .cs2-map .nd.m').first()).toBeVisible();   // its own graph, malicious nodes marked
+  await expect(page.locator('.cs2-card:has-text("Op Lantern") .cs2-ov .r')).toContainText('malicious');
+  await page.fill('#cs2Q', 'portal'); await expect(page.locator('.cs2-card')).toHaveCount(1);
+  await page.fill('#cs2Q', 'zzzz'); await expect(page.locator('.cs2-empty')).toBeVisible();
+  await page.click('[data-act=caseFindClear]'); await expect(page.locator('.cs2-card')).toHaveCount(3);
+  await page.click('[data-act=casesView][data-v=ledger]');
+  await expect(page.locator('.cs2-r')).toHaveCount(3); await expect(page.locator('.cs2-card')).toHaveCount(0);
+  await page.selectOption('#cs2Sort', 'name');
+  await expect(page.locator('.cs2-r b').first()).toContainText('Harbour photo');             // sorted by name inside each status group
+  await page.click('[data-act=cf][data-v=review]'); await expect(page.locator('.cs2-r')).toHaveCount(1);
+  await page.click('[data-act=cf][data-v=all]');
+  await page.click('.cs2-r:has-text("Op Lantern") [data-act=casePin]');
+  await expect(page.locator('.cs2-g').first()).toContainText('Pinned');
+  await expect.poll(() => page.evaluate(() => (localStorage.getItem(STORE_KEY) || '').includes('"casesView":"ledger"'))).toBe(true);
+  await page.reload(); await page.evaluate(() => { if (typeof closeWelcome === 'function') closeWelcome(); });
+  await expect(page.locator('.cs2-r')).toHaveCount(3);                                   // the list view was remembered
+  await page.click('.cs2-r:has-text("Customer portal") .case-hit'); await expect(page).toHaveURL(/#\/case\//);
+  noErrors(errors);
+});
+
+test('text size: every font follows one scale, and the setting changes it everywhere', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  const px = () => page.evaluate(() => [parseFloat(getComputedStyle(document.querySelector('.side .nv')).fontSize), parseFloat(getComputedStyle(document.querySelector('.ph h1, h1')).fontSize)]);
+  const m = await px();
+  await page.evaluate(() => { DB.prefs.size = 'l'; applyPrefs(); }); const l = await px();
+  await page.evaluate(() => { DB.prefs.size = 's'; applyPrefs(); }); const sm = await px();
+  expect(l[0]).toBeGreaterThan(m[0]); expect(sm[0]).toBeLessThan(m[0]); expect(l[1]).toBeGreaterThan(m[1]);
+  expect(m[0]).toBeGreaterThanOrEqual(14);   // a little bigger than before by default
+  await page.evaluate(() => { DB.prefs.size = 'm'; applyPrefs(); });
+  noErrors(errors);
+});
+
+const pasteCert = async (page, text) => { await page.click('.crt-inb [data-act=cxPaste]'); await page.fill('#cxPdIn', text); await page.click('[data-act=cxPdGo]'); };
+
 test('certificates: decode, findings, chain, CSR, private keys refused, save to case, notebook cards', async ({ page }) => {
   const fs = require('fs'), path = require('path'), D = path.join(__dirname, 'fixtures', 'certs');
   const errors = await open(page, '#/certs');
   // a phishing-style leaf with its issuer, pasted as PEM
-  await page.fill('#cxIn', fs.readFileSync(path.join(D, 'chain-phish.pem'), 'utf8')); await page.click('[data-act=cxDecode]');
+  await pasteCert(page, fs.readFileSync(path.join(D, 'chain-phish.pem'), 'utf8'));
   await expect(page.locator('.crt-hero h1')).toHaveText('secure-acme-login.com');
   await expect(page.locator('.crt-r')).toContainText('Lookalike name');
   await expect(page.locator('.crt-chips .chip.hl')).toHaveText(/acme-sso\.microsoftonline-auth\.com/);
@@ -691,8 +763,8 @@ test('certificates: decode, findings, chain, CSR, private keys refused, save to 
   await page.evaluate(() => CX_ACTS.cxSample(null, 'csr'));
   await expect(page.locator('.crt-csr')).toContainText('Signature is valid'); await expect(page.locator('.crt-csr')).toContainText('Contains a challenge password');
   // private keys are refused and removed from the box
-  await page.fill('#cxIn', fs.readFileSync(path.join(D, 'private-key.pem'), 'utf8')); await page.click('[data-act=cxDecode]');
-  await expect(page.locator('.crt-key')).toContainText('private key'); expect(await page.inputValue('#cxIn')).not.toContain('PRIVATE KEY');
+  await pasteCert(page, fs.readFileSync(path.join(D, 'private-key.pem'), 'utf8'));
+  await expect(page.locator('.crt-key')).toContainText('private key'); const keyLine = fs.readFileSync(path.join(D, 'private-key.pem'), 'utf8').split('\n')[1]; expect(await page.evaluate(k => JSON.stringify(DB).includes(k) || JSON.stringify(cxS().input || '').includes(k), keyLine)).toBe(false);
   // Cobalt Strike default, AD CS logon certificate
   await page.evaluate(() => CX_ACTS.cxSample(null, 'cs')); await expect(page.locator('.crt-r')).toContainText('Cobalt Strike default certificate');
   await page.evaluate(() => CX_ACTS.cxSample(null, 'adcs')); await expect(page.locator('.crt-r')).toContainText('Can log on to Windows as j.okafor@corp.example');
@@ -701,10 +773,108 @@ test('certificates: decode, findings, chain, CSR, private keys refused, save to 
   await page.click('.crt-hero [data-act=cxSave]');
   const rec = await page.evaluate(() => { const r = DB.records.find(x => x.source === 'certificate'); return r && { title: r.title, ents: JSON.stringify(r.ents), ts: r.ts }; });
   expect(rec.title).toBe('Certificate: secure-acme-login.com'); expect(rec.ents).toContain('files-acme.net'); expect(rec.ents).toContain(fp); expect(rec.ts).toBeGreaterThan(0);
-  await page.evaluate(() => { cxS().R = null; cxPaint(); }); await page.click('.crt-it'); await expect(page.locator('.crt-hero h1')).toHaveText('secure-acme-login.com');
+  await page.evaluate(() => { cxS().R = null; cxPaint(); }); await page.click('[data-act=cxSaved]'); await page.click('.rc [data-act=cxHistRec]:has-text("secure-acme-login.com")'); await expect(page.locator('.crt-hero h1')).toHaveText('secure-acme-login.com');
   // guide flashcards into the Notebook
   await page.evaluate(() => CX_ACTS.cxCh(null, 'chain')); await page.click('[data-act=cxToNb]');
   expect(await page.evaluate(() => { const b = DB.nb.books.find(x => x.name === 'Certificates'), p = DB.nb.pages.find(x => x.title === 'Chain of trust'); return !!b && nbInfo(p).cards.length; })).toBe(4);
+  noErrors(errors);
+});
+
+test('certificates, advanced: signed programs, host and date checks, hunting, exports, key reuse, compare, transparency logs, paste and drop anywhere', async ({ page }) => {
+  const fs = require('fs'), path = require('path'), crypto = require('crypto'), D = path.join(__dirname, 'fixtures', 'certs');
+  const errors = await open(page, '#/certs');
+  // a signed Windows program: the file still matches its Authenticode hash, the signer's key made the signature
+  let [fc] = await Promise.all([page.waitForEvent('filechooser'), page.click('[data-act=cxFile]')]); await fc.setFiles(path.join(D, 'signed.exe'));
+  await expect(page.locator('.crt-pe')).toContainText('The file is unchanged since it was signed');
+  await expect(page.locator('.crt-pe')).toContainText('Signed with the publisher certificate’s key');
+  await expect(page.locator('.crt-pe')).toContainText('Fabrikam Updater'); await expect(page.locator('.crt-hero h1')).toHaveText('Fabrikam Tools Ltd');
+  expect(await page.evaluate(() => cxS().R.pe.sha256)).toBe(crypto.createHash('sha256').update(fs.readFileSync(path.join(D, 'signed.exe'))).digest('hex'));
+  await page.click('.crt-pe [data-act=cxSave]');
+  expect(await page.evaluate(() => { const r = DB.records.find(x => x.tags.includes('authenticode')); return r && r.title; })).toBe('Signed program: signed.exe (Fabrikam Tools Ltd)');
+  // one changed byte after signing is caught
+  [fc] = await Promise.all([page.waitForEvent('filechooser'), page.click('[data-act=cxFile]')]); await fc.setFiles(path.join(D, 'signed-tampered.exe'));
+  await expect(page.locator('.crt-pe')).toContainText('The file was changed after signing');
+  // does it cover a host, was it valid on a date
+  await page.evaluate(() => CX_ACTS.cxSample(null, 'phish')); await expect(page.locator('.crt-fp code').first()).toContainText(':');
+  await page.fill('#cxHost', 'https://www.secure-acme-login.com/login'); await expect(page.locator('#cxHostR')).toContainText('Yes');
+  await page.fill('#cxHost', 'a.b.secure-acme-login.com'); await expect(page.locator('#cxHostR')).toContainText('No');
+  await page.fill('#cxWhen', '2020-01-01T09:00'); await expect(page.locator('#cxWhenR')).toContainText('not valid yet');
+  // hunting queries and exports
+  const sha1 = await page.evaluate(() => cxCur().fp.sha1.match(/../g).join(':'));
+  await expect(page.locator('.crt-hq')).toContainText('tls.cert_fingerprint; content:"' + sha1 + '"');
+  await page.click('[data-act=cxExport]'); const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#ctx .ctx-it:has-text("JSON")')]);
+  const J = JSON.parse(fs.readFileSync(await dl.path(), 'utf8')); expect(J.names.length).toBe(6); expect(J.findings.some(f => f.title === 'Lookalike name')).toBe(true);
+  expect(await page.evaluate(() => cxText(cxCur()))).toContain('X509v3 extensions:');
+  // the investigation side: an assessment, indicators with pivots, records in the cases that already mention them, and adding them to the graph
+  await expect(page.locator('.crt-as h2')).toHaveText('Looks like attacker infrastructure');
+  await expect(page.locator('#cxInd')).toContainText('185.220.101.47'); await expect(page.locator('#cxInd a', { hasText: 'AbuseIPDB' })).toHaveAttribute('href', /185\.220\.101\.47/);
+  await page.evaluate(() => { const body = 'Proxy: user opened https://files-acme.net/invoice.pdf'; DB.records.push({ id: uid('r'), caseId: DB.active, type: 'evidence', title: 'Proxy log — invoice link', body, ts: Date.now(), source: 'proxy', tags: [], ents: extractRich(body), addedAt: Date.now(), att: [] }); cxPaint(); });
+  await expect(page.locator('#cxSeen')).toContainText('Proxy log — invoice link'); await expect(page.locator('#cxInd')).toContainText('In 1 record');
+  await page.click('[data-act=cxIndAll]'); await page.click('[data-act=cxIndGraph]');
+  expect(await page.evaluate(() => DB.entries.filter(e => e.tags.includes('certificate')).map(e => Object.values(e.fields)[0]))).toContain('files-acme.net');
+  // two certificates sharing one key: flagged, and compared side by side
+  await pasteCert(page, fs.readFileSync(path.join(D, 'reuse-a.pem'), 'utf8'));
+  await expect(page.locator('.crt-fp code').first()).toContainText(':'); await page.click('.crt-hero [data-act=cxSave]');
+  await pasteCert(page, fs.readFileSync(path.join(D, 'reuse-b.pem'), 'utf8'));
+  await expect(page.locator('.crt-hero')).toContainText('Key shared with 1'); await expect(page.locator('.crt-r')).toContainText('Key shared with 1 other certificate');
+  await page.click('[data-act=cxCmpWith]');
+  await expect(page.locator('.crt-verdict h2')).toContainText('Same owner'); await expect(page.locator('.crt-n3')).toContainText('update-cdn.example');
+  await page.click('[data-act=cxPaste][data-v=cmp]'); await page.fill('#cxPdIn', fs.readFileSync(path.join(D, 'ov-ecdsa.pem'), 'utf8')); await page.click('[data-act=cxPdGo]');
+  await expect(page.locator('#cxCmpB option:checked')).toContainText('portal.acme.example'); await expect(page.locator('.crt-verdict')).toContainText('Different keys');
+  // Certificate Transparency: crt.sh JSON pasted in the dialog
+  await page.click('[data-act=cxTab][data-v=ct]'); await page.click('[data-act=cxPaste][data-v=ct]');
+  await page.fill('#cxPdIn', fs.readFileSync(path.join(__dirname, 'fixtures', 'crtsh-northwind.json'), 'utf8')); await page.click('[data-act=cxPdGo]');
+  await expect(page.locator('.crt-cth h1')).toHaveText('northwind-traders.example');
+  await expect(page.locator('.crt-st').first()).toContainText('23');
+  await page.fill('#cxCtF', 'vpn'); await expect(page.locator('.crt-ctt tbody tr')).toHaveCount(1);
+  await page.fill('#cxCtF', ''); await page.click('[data-act=cxCtK][data-v=hot]'); expect(await page.locator('.crt-ctt tbody tr').count()).toBeGreaterThan(5);
+  await page.click('[data-act=cxCtSort][data-v=name]'); await expect(page.locator('.crt-ctt thead th').first()).toHaveAttribute('aria-sort', 'ascending');
+  await page.click('[data-act=cxCtSave]');
+  expect(await page.evaluate(() => JSON.stringify(DB.records.find(x => x.source === 'ct-log').ents))).toContain('vpn.northwind-traders.example');
+  // paste anywhere on the page, and drop a file anywhere
+  await page.click('[data-act=cxTab][data-v=decoder]'); await page.evaluate(() => document.activeElement.blur());
+  await page.evaluate(pem => { const dt = new DataTransfer(); dt.setData('text/plain', pem); document.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); }, fs.readFileSync(path.join(D, 'cobaltstrike-default.pem'), 'utf8'));
+  await expect(page.locator('.crt-r')).toContainText('Cobalt Strike default certificate');
+  await page.evaluate(b64 => { const dt = new DataTransfer(); dt.items.add(new File([Uint8Array.from(atob(b64), c => c.charCodeAt(0))], 'leaf.der')); document.querySelector('.crt-c').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true })); }, fs.readFileSync(path.join(D, 'leaf-phish.der')).toString('base64'));
+  await expect(page.locator('.crt-hero h1')).toHaveText('secure-acme-login.com');
+  noErrors(errors);
+});
+
+test('certificates: hostile names, fields and crt.sh results stay text; exported CSV cannot run formulas; key files are refused', async ({ page }) => {
+  const fs = require('fs'), path = require('path'), D = path.join(__dirname, 'fixtures', 'certs');
+  const errors = await open(page, '#/certs'); let dialogs = 0; page.on('dialog', d => { dialogs++; d.dismiss(); });
+  await pasteCert(page, fs.readFileSync(path.join(D, 'hostile.pem'), 'utf8'));
+  await expect(page.locator('.crt-hero h1')).toContainText('<img src=x');
+  await expect(page.locator('#cxInd')).toContainText('<svg/onload');
+  for (const t of ['decoder', 'chain', 'compare']) { await page.click(`[data-act=cxTab][data-v=${t}]`); await page.waitForTimeout(150); }
+  await page.click('[data-act=cxTab][data-v=decoder]'); await page.click('.crt-hero [data-act=cxSave]');
+  const hostile = JSON.stringify([{ issuer_ca_id: 1, issuer_name: 'C=US, O=<b onmouseover=window.__pwned=5>x</b>, CN=<script>window.__pwned=6</script>', common_name: '=cmd|"/c calc"!A1', name_value: '<img src=y onerror=window.__pwned=7>.evil.test\n=cmd|"/c calc"!A1', id: 1, entry_timestamp: '2026-01-01T00:00:00', not_before: '2026-01-01T00:00:00', not_after: '2027-01-01T00:00:00', serial_number: '01' }]);
+  await page.click('[data-act=cxTab][data-v=ct]'); await page.click('[data-act=cxPaste][data-v=ct]'); await page.fill('#cxPdIn', hostile); await page.click('[data-act=cxPdGo]');
+  await expect(page.locator('.crt-ctt')).toContainText('<img src=y');
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('[data-act=cxCtCsv]')]);
+  const csv = fs.readFileSync(await dl.path(), 'utf8'); expect(csv).toContain(`"'=cmd|""/c calc""!a1"`); expect(csv).not.toMatch(/(^|\n)=cmd/);
+  expect(await page.evaluate(() => ({ p: window.__pwned, img: document.querySelectorAll('.crtw img, .crtw svg[onload], .crtw script, .crtw [onerror], .crtw [onmouseover]').length, js: [...document.querySelectorAll('.crtw a')].some(a => /^javascript:/i.test(a.getAttribute('href') || '')) }))).toEqual({ p: undefined, img: 0, js: false });
+  expect(dialogs).toBe(0);
+  // private key bundles are refused before anything is read
+  await page.click('[data-act=cxTab][data-v=decoder]');
+  const [fc] = await Promise.all([page.waitForEvent('filechooser'), page.click('.crt-inb [data-act=cxFile]')]); await fc.setFiles({ name: 'server.pfx', mimeType: 'application/x-pkcs12', buffer: Buffer.from([0x30, 0x82, 0x01, 0x00]) });
+  await expect(page.locator('.crt-key')).toContainText('private key');
+  noErrors(errors);
+});
+
+test('certificates: every type is recognised, explained in the guide, and its example opens', async ({ page }) => {
+  const errors = await open(page, '#/certs');
+  const want = { ov: 'server', client: 'client', device: 'device', clientca: 'ca', pe: 'code', smime: 'smime', adcs: 'smartcard', docsign: 'docsign', tsa: 'tsa' };
+  for (const [k, kind] of Object.entries(want)) {
+    await page.evaluate(k => CX_ACTS.cxSample(null, k), k); await expect(page.locator('.crt-kind')).toHaveAttribute('data-v', kind);
+    await page.click('.crt-kind'); await expect(page.locator('.crt-art h1')).toHaveText('Types of certificates and what they are for');
+    await expect(page.locator('#crtg-ty-' + kind)).toBeInViewport();
+    await page.click(`#crtg-ty-${kind} [data-act=cxSample]`); await expect(page.locator('.crt-hero h1, .crt-node').first()).toBeVisible();
+  }
+  // the client-issuing CA is narrowed by extended key usage and name constraints, and its chain verifies
+  await page.evaluate(() => CX_ACTS.cxSample(null, 'clientca')); await expect(page.locator('.crt-ext')).toContainText('Name constraints');
+  await page.click('[data-act=cxTab][data-v=chain]'); await expect(page.locator('.crt-lnk.ok')).toHaveCount(2);
+  expect(await page.evaluate(() => location.hash)).toBe('#/certs');
   noErrors(errors);
 });
 
@@ -717,5 +887,57 @@ test('certificates from a TLS 1.2 capture open in the decoder', async ({ page })
   await page.click('[data-act=pcCerts]');
   await expect(page.locator('.crt-hero h1')).toHaveText('shop.acme.example');
   await expect(page.locator('.crt-chips')).toContainText('pay.acme.example');
+  noErrors(errors);
+});
+
+test('nothing is lost on refresh: certificates, decoder, cloud and Lab files come back, and each can be deleted on its own', async ({ page }) => {
+  const errors = await open(page, '#/certs');
+  const reboot = async hash => { await expect.poll(() => page.evaluate(() => !isDirty())).toBe(true); await page.reload(); await expect.poll(() => page.evaluate(() => typeof DB !== 'undefined' && !!DB && !!document.querySelector('#sidenav .nv')), { timeout: 15000 }).toBe(true); await page.evaluate(h => { location.hash = h; }, hash); };
+  // a certificate pasted with its private key: the certificate is kept, the key never is
+  const key = '-----BEGIN PRIVATE KEY-----\nMIIBVQIBADANBgkqhkiG9w0BAQEFAASCAT8wggE7AgEAAkEAq7BFUpkGp3+LQmlQ\n-----END PRIVATE KEY-----\n';
+  await page.evaluate(k => cxIngest(k + CERT_SAMPLES.client.pem), key);
+  await expect(page.locator('.crt-src b')).toContainText('Dana Whitfield');
+  await expect.poll(() => page.evaluate(() => (DB.recent || []).filter(x => x.tool === 'certs').length)).toBe(1);
+  expect(await page.evaluate(() => DB.recent.some(x => /PRIVATE KEY/.test(x.text || '')))).toBe(false);
+  // decoder input, a cloud scan, a Lab file
+  await page.evaluate(() => { location.hash = '#/decoder'; }); await page.fill('#decIn', 'aGVsbG8gd29ybGQ=');
+  await page.evaluate(() => { location.hash = '#/cloud'; cloudRunScan(CLOUD_SAMPLES[Object.keys(CLOUD_SAMPLES).find(k => !/CloudTrail/.test(k))], 'my-policy.json'); });
+  await page.evaluate(() => { UI.labTab = 'file'; location.hash = '#/lab'; });
+  await page.setInputFiles('#labIn', { name: 'note.txt', mimeType: 'text/plain', buffer: Buffer.from('hello flag{abc}') });
+  await expect(page.locator('[data-act=labClear]')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => DB.recent.map(x => x.tool).sort().join())).toBe('certs,cloudScan,labFile');
+  await reboot('#/certs');
+  await expect(page.locator('.crt-src b')).toContainText('Dana Whitfield');                         // the certificate is back
+  await page.evaluate(() => { location.hash = '#/decoder'; }); await expect(page.locator('#decIn')).toHaveValue('aGVsbG8gd29ybGQ=');
+  await page.evaluate(() => { location.hash = '#/cloud'; }); await expect.poll(() => page.evaluate(() => UI.cloudScan && UI.cloudScan.name)).toBe('my-policy.json');
+  await page.evaluate(() => { location.hash = '#/lab'; }); await expect.poll(() => page.evaluate(() => UI.labFile && UI.labFile.name)).toBe('note.txt');
+  // History: delete one item; the one on screen closes, the others stay
+  await page.evaluate(() => { location.hash = '#/certs'; }); await page.click('[data-act=cxSaved]');
+  await expect(page.locator('.rc-r')).toHaveCount(1); await page.click('.rc-r .rc-d');
+  await expect(page.locator('.rc-none').first()).toBeVisible(); await page.click('.rc [data-act=dclose] >> nth=-1');
+  await expect(page.locator('.crt-src b')).toContainText('Nothing open');
+  expect(await page.evaluate(() => DB.recent.map(x => x.tool).sort().join())).toBe('cloudScan,labFile');
+  // Settings → Storage lists every recent input; delete the Lab file from there
+  await page.evaluate(() => recentDlg('*')); await expect(page.locator('.rc-r')).toHaveCount(2);
+  await page.click('.rc-r:has-text("note.txt") .rc-d'); await expect(page.locator('.rc-r')).toHaveCount(1);
+  expect(await page.evaluate(async () => (await IDB.keys()).filter(k => String(k).startsWith('wk:')).length)).toBe(0);  // its stored copy is gone too
+  // restore points and recent searches can be removed one by one
+  await page.keyboard.press('Escape'); await page.evaluate(() => { DB.prefs.recentQ = ['alpha', 'beta']; });
+  await page.keyboard.press('Control+k'); await page.click('[data-act=srForget][data-v=alpha]');
+  expect(await page.evaluate(() => DB.prefs.recentQ)).toEqual(['beta']);
+  noErrors(errors);
+});
+
+test('decompression bombs are stopped and download names are made safe', async ({ page }) => {
+  const errors = await open(page, '#/decoder');
+  const r = await page.evaluate(async () => {
+    const big = new Uint8Array(80 * 1048576);                                                     // 80 MB of zeros compresses to ~80 KB
+    const gz = new Uint8Array(await new Response(new Blob([big]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
+    let stopped = ''; try{ await decompressCapped(gz, 'gzip', 16 * 1048576); }catch(e){ stopped = e.message; }
+    const ok = await decompressCapped(gz.slice(), 'gzip');
+    return {small:gz.length < 1048576, stopped, okLen:ok.length, names:[safeName('../../evil.sh'), safeName('a‮txt.exe'), safeName('CON'), safeName('')]};
+  });
+  expect(r.small).toBe(true); expect(r.stopped).toMatch(/decompression bomb/); expect(r.okLen).toBe(80 * 1048576);
+  expect(r.names).toEqual(['_.._evil.sh', 'atxt.exe', '_CON', 'download']);
   noErrors(errors);
 });

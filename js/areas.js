@@ -133,8 +133,8 @@ function viewEntities(){
     <div class="toolbar"><div class="search-in">${ico('search')}<label class="sr" for="entq">Search entities</label><input id="entq" class="inp" placeholder="Search values…" value="${esc(UI.entq || '')}"></div><label class="sr" for="entCase">Case</label><select id="entCase" class="gsel bord"><option value="">All cases</option>${DB.cases.map(c => `<option value="${c.id}"${ec === c.id ? ' selected' : ''}>${esc(c.code + ' · ' + c.name.split(' — ')[0])}</option>`).join('')}</select><div class="seg">${[['','All ' + g.length],['malicious','Malicious'],['cross','In 2+ cases']].map(([v, l]) => `<button data-act="entKind" data-v="${v}" aria-pressed="${(UI.entKind || '') === v}">${l}</button>`).join('')}</div><span style="flex:1"></span><span class="t3">${list.length} shown</span><button class="btn" data-act="entExport">${ico('download','sm')}Export CSV</button></div>
     <section class="card" style="overflow:hidden"><table class="tbl cardify"><thead><tr><th>Entity</th><th>Verdict</th><th style="text-align:right">Records</th><th class="hide-m">Cases</th><th>What it is</th></tr></thead><tbody>
     ${list.slice(0, 150).map(e => { const m = E.meaning(e.k, e.v);
-      return `<tr data-act="selEnt" data-id="${esc(e.id)}"><td><div style="display:flex;gap:10px;align-items:center;min-width:0">${kindBadge(e.k,'sm')}<div style="min-width:0"><div class="v">${esc(e.v)}</div><div class="t3" style="font-size:12.5px">${esc(E.LABEL[e.k] || e.k)}</div></div></div></td>
-        <td>${vdLabel(verdictOf(e.id)) || '<span class="t3">—</span>'}</td><td class="n">${e.recs.length}</td><td class="hide-m"><div class="wrap" style="gap:4px">${[...e.cases].filter(theCase).slice(0, 3).map(cid => { const o = theCase(cid); return `<a class="ce-case" href="${caseHash(cid, 'entities')}" style="--cc:${esc(o.color)}" title="${esc(o.name)}">${esc(o.code)}</a>`; }).join('')}${e.cases.size > 3 ? `<span class="t3">+${e.cases.size - 3}</span>` : ''}</div></td><td class="t2 hide-m" style="font-size:13.5px">${m ? esc(m.t) : '—'}</td></tr>`; }).join('')}
+      return `<tr data-act="selEnt" data-id="${esc(e.id)}"><td><div style="display:flex;gap:10px;align-items:center;min-width:0">${kindBadge(e.k,'sm')}<div style="min-width:0"><div class="v">${esc(e.v)}</div><div class="t3" style="font-size:calc(12.5px * var(--ts,1))">${esc(E.LABEL[e.k] || e.k)}</div></div></div></td>
+        <td>${vdLabel(verdictOf(e.id)) || '<span class="t3">—</span>'}</td><td class="n">${e.recs.length}</td><td class="hide-m"><div class="wrap" style="gap:4px">${[...e.cases].filter(theCase).slice(0, 3).map(cid => { const o = theCase(cid); return `<a class="ce-case" href="${caseHash(cid, 'entities')}" style="--cc:${esc(o.color)}" title="${esc(o.name)}">${esc(o.code)}</a>`; }).join('')}${e.cases.size > 3 ? `<span class="t3">+${e.cases.size - 3}</span>` : ''}</div></td><td class="t2 hide-m" style="font-size:calc(13.5px * var(--ts,1))">${m ? esc(m.t) : '—'}</td></tr>`; }).join('')}
     </tbody></table></section></div></div>`;
 }
 
@@ -256,8 +256,8 @@ function viewReference(){
 function stub(title, sub, from, what){
   return `<div class="scroll"><div class="page narrow"><div class="ph"><div><h1>${title}</h1><div class="sub">${sub}</div></div></div>
     <section class="card"><div class="body" style="display:flex;gap:16px;align-items:flex-start"><span class="tb lg" style="--c:var(--text-3)">${ico('history')}</span>
-      <div><div style="display:flex;gap:10px;align-items:center;margin-bottom:6px"><h3 style="font-size:16px">Coming soon</h3>${impl('planned')}</div>
-      <p class="t2" style="margin:0 0 8px">${what}</p><p class="t3" style="margin:0;font-size:13.5px">Source: <code class="mono">${esc(from)}</code>. On the roadmap.</p></div></div></section></div></div>`;
+      <div><div style="display:flex;gap:10px;align-items:center;margin-bottom:6px"><h3 style="font-size:calc(16px * var(--ts,1))">Coming soon</h3>${impl('planned')}</div>
+      <p class="t2" style="margin:0 0 8px">${what}</p><p class="t3" style="margin:0;font-size:calc(13.5px * var(--ts,1))">Source: <code class="mono">${esc(from)}</code>. On the roadmap.</p></div></div></section></div></div>`;
 }
 
 function viewSettings(){
@@ -268,7 +268,7 @@ function viewSettings(){
     <section class="card" style="margin-bottom:18px"><div class="body" style="padding:22px"><div class="about">${logoMark(64)}<div style="flex:1;min-width:220px"><h2>${wordmark().replace('wordmark','wordmark big')}</h2>
       <div class="t2" style="margin-top:4px">${esc(BRAND.tagline)} · <span class="mono">${esc(BRAND.version)}</span></div>
       <div class="wrap" style="align-items:center"><button class="btn" data-act="showWelcome">${ico('eye','sm')}Show welcome</button></div></div>
-      <p class="t3" style="margin:16px 0 0;font-size:13px">A private, browser-only OSINT workspace. Geist, Geist Mono, Inter and JetBrains Mono (OFL 1.1) · Lucide icons (ISC) · Cytoscape.js (MIT) · jsQR (Apache-2.0) · IEEE OUI list via oui-data (BSD-2) — all bundled, nothing loads from the network. <a href="#/help">Help &amp; FAQ</a></p></div></section>
+      <p class="t3" style="margin:16px 0 0;font-size:calc(13px * var(--ts,1))">A private, browser-only OSINT workspace. Geist, Geist Mono, Inter and JetBrains Mono (OFL 1.1) · Lucide icons (ISC) · Cytoscape.js (MIT) · jsQR (Apache-2.0) · IEEE OUI list via oui-data (BSD-2) — all bundled, nothing loads from the network. <a href="#/help">Help &amp; FAQ</a></p></div></section>
     <div class="grid cols-2" style="align-items:start">
       <section class="card"><header><h3>Appearance</h3></header><div class="body">
         <div class="field"><span class="label">Theme</span>${seg('theme', [['dark','Dark','moon'],['light','Light','sun']])}</div>
@@ -278,8 +278,8 @@ function viewSettings(){
       <section class="card"><header><h3>Data</h3></header><div class="body">
         <p class="t2" style="margin:0 0 14px">Everything lives in this browser. Export regularly — see <a href="#/help">Help</a> for backup, import and reset.</p>
         <div class="wrap"><button class="btn" data-act="exportAll">${ico('download','sm')}Export everything</button>${DB.sample ? `<button class="btn" data-act="removeSample">${ico('trash-2','sm')}Remove sample data</button>` : ''}<button class="btn danger" data-act="resetDemo">${ico('undo-2','sm')}Reset to demo</button></div>
-        <p class="t3" style="font-size:13px;margin:12px 0 0">${DB.prefs.lastExport ? 'Last exported ' + esc(ago(DB.prefs.lastExport)) + '.' : 'Never exported.'} <a href="#/trash">Trash &amp; restore points</a> · <a href="#/security">Security &amp; audit</a>${(DB.trash || []).length ? ' · ' + DB.trash.length + ' in trash' : ''}</p>
-        <div class="isec"><h4>Recent changes</h4>${DB.log.slice(0, 6).map(l => `<div class="li" style="padding:6px 0"><div class="main2"><b style="font-weight:500;font-size:13.5px">${esc(l.what)}</b></div><span class="end mono">${esc(E.fmtClock(l.at, tz()))}</span></div>`).join('') || '<span class="t3" style="font-size:13.5px">Nothing yet.</span>'}</div></div></section>
+        <p class="t3" style="font-size:calc(13px * var(--ts,1));margin:12px 0 0">${DB.prefs.lastExport ? 'Last exported ' + esc(ago(DB.prefs.lastExport)) + '.' : 'Never exported.'} <a href="#/trash">Trash &amp; restore points</a> · <a href="#/security">Security &amp; audit</a>${(DB.trash || []).length ? ' · ' + DB.trash.length + ' in trash' : ''}</p>
+        <div class="isec"><h4>Recent changes</h4>${DB.log.slice(0, 6).map(l => `<div class="li" style="padding:6px 0"><div class="main2"><b style="font-weight:500;font-size:calc(13.5px * var(--ts,1))">${esc(l.what)}</b></div><span class="end mono">${esc(E.fmtClock(l.at, tz()))}</span></div>`).join('') || '<span class="t3" style="font-size:calc(13.5px * var(--ts,1))">Nothing yet.</span>'}</div></div></section>
       
       ${storageCard()}
     </div></div></div>`;
@@ -380,7 +380,7 @@ function viewHelp(){
         ${kb(['Ctrl','K'],'Search everything — cases, IOCs, tools, notes, rules, actions')}${kb(['N'],'Capture evidence')}${kb(['E'],'Add a vault entry')}${kb(['/'],'Search everything')}
         ${kb(['1','–','8'],'Switch case tabs')}${kb(['Esc'],'Close a panel or dialog')}${kb(['Ctrl','S'],'Save the rule you are editing')}${kb(['Ctrl','Enter'],'Save a capture or note')}${kb(['Shift','F10'],'Graph menu for the selected node')}</div></section>
       <section><h2 class="hh">Search syntax</h2><div class="card hkeys">
-        <p class="t2" style="margin:0 0 10px;font-size:13.5px">The filter box on a case's Timeline tab (or the top search, which offers it) narrows the records. Combine words with filters:</p>
+        <p class="t2" style="margin:0 0 10px;font-size:calc(13.5px * var(--ts,1))">The filter box on a case's Timeline tab (or the top search, which offers it) narrows the records. Combine words with filters:</p>
         ${[['in:tools shodan','Search one area (cases, vault, evidence, indicators, notes, tools, queries, rules, playbooks, ctf, news)'],['case:TN-2026-014 dns','Only inside one case'],['"lamp loader" -firewall','Exact phrase, exclude a word'],['host:DC01','Records from one machine'],['verdict:malicious','Only bad indicators'],['type:finding','Findings, notes, questions…'],['tag:intel','Records with a tag'],['after:2026-09-14','Time windows (also before:)'],['source:sysmon','Where the evidence came from']].map(([c, d]) => `<div class="hk hs-i"><code class="mono">${c}</code><span>${d}</span></div>`).join('')}</div></section>
       </div></section>
       <p class="hx2-empty" id="hxqE" hidden></p>

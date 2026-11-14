@@ -173,7 +173,7 @@ function paintBuild(){
   const o = BUILD.opts, P = graphPlan(DB.active, o); BUILD.plan = P;
   const kchk = k => { const n = P.byKind.find(x => x[0] === k); return `<label class="chk kchk"><input type="checkbox" data-bk="${k}"${o.kinds.includes(k) ? ' checked' : ''}>${esc(E.LABEL[k] || k)}${n ? ` <b>${n[1]}</b>` : ''}</label>`; };
   const labels = countBy(P.newRels, x => x.label);
-  $('bgIn').innerHTML = `<p class="t2" style="margin:0 0 14px;font-size:14px">Scanned <b style="color:var(--text)">${P.scanned}</b> records. Relations written in the evidence — DNS answers, email headers, WHOIS, “resolves to”, “aka”, URLs and their domains — become relationships. Everything else is added unlinked and appears under <b style="color:var(--text)">Suggested links</b> for you to decide.</p>
+  $('bgIn').innerHTML = `<p class="t2" style="margin:0 0 14px;font-size:calc(14px * var(--ts,1))">Scanned <b style="color:var(--text)">${P.scanned}</b> records. Relations written in the evidence — DNS answers, email headers, WHOIS, “resolves to”, “aka”, URLs and their domains — become relationships. Everything else is added unlinked and appears under <b style="color:var(--text)">Suggested links</b> for you to decide.</p>
     ${P.byKind.length ? '' : `<p class="note" style="margin:0 0 12px"><span class="ic">${ico('check','sm')}</span><span>Every entity in this case's evidence is already on the graph.</span></p>`}
     ${KIND_GROUP_LABEL.map(([g, l, ks]) => { const list = ks.split(' ').filter(k => P.byKind.some(x => x[0] === k)); return list.length ? `<div class="bgrow"><span class="caps">${l}</span><div class="wrap">${list.map(kchk).join('')}</div></div>` : ''; }).join('')}
     <div class="bgopts"><label class="chk"><input type="checkbox" id="bgPriv"${o.skipPrivate ? ' checked' : ''}>Skip private and reserved IPs</label><label class="chk"><input type="checkbox" id="bgBen"${o.skipBenign ? ' checked' : ''}>Skip entities marked benign</label>
@@ -292,7 +292,7 @@ function gPanelHTML(){
     <section><h5>Bridges <span class="t3">connect separate groups</span></h5>${I.bridges.map(x => row(x, 'b')).join('') || '<p class="t3">None — every node has another route.</p>'}</section>
     <section><h5>Clusters <span class="t3">${I.clusters.length}</span></h5><label class="chk" style="margin:0 0 8px"><span class="sw"><input type="checkbox" data-act="gClusters"${UI.graph.clusters ? ' checked' : ''}><span></span></span>Colour by cluster</label>
       ${I.clusters.slice(0, 6).map((g, i) => `<div class="gp-cl"><i style="background:${CLUSTER_COLS[i % CLUSTER_COLS.length]}"></i><span>${g.slice(0, 3).map(nm).join(', ')}${g.length > 3 ? ` +${g.length - 3}` : ''}</span></div>`).join('')}</section>
-    ${I.lonely.length ? `<section><h5>Unconnected <span class="t3">${I.lonely.length}</span></h5><p class="t3" style="margin:0 0 8px;font-size:12.5px">${I.lonely.slice(0, 6).map(nm).join(', ')}${I.lonely.length > 6 ? '…' : ''}</p><button class="btn xs" data-act="gPanel" data-v="sugg">${ico('sparkles','sm')}See suggested links</button></section>` : ''}`}</aside>`;
+    ${I.lonely.length ? `<section><h5>Unconnected <span class="t3">${I.lonely.length}</span></h5><p class="t3" style="margin:0 0 8px;font-size:calc(12.5px * var(--ts,1))">${I.lonely.slice(0, 6).map(nm).join(', ')}${I.lonely.length > 6 ? '…' : ''}</p><button class="btn xs" data-act="gPanel" data-v="sugg">${ico('sparkles','sm')}See suggested links</button></section>` : ''}`}</aside>`;
 }
 function bindGPanel(gp){
   gp.querySelectorAll('.sg').forEach(el => { const s = UI.graph.sugg[+el.dataset.i]; if(!s) return;
@@ -304,10 +304,10 @@ let PICK = null;
 function pickDlg(){
   const P = graphPlan(DB.active, {kinds:GRAPH_KINDS, skipPrivate:false, skipBenign:false, focus:false, min:1});
   PICK = {P, sel:new Set(), q:'', kind:''};
-  openDlg(dhead('Add entities to the graph') + `<div class="in"><p class="t2" style="margin:0 0 12px;font-size:14px">Everything below is mentioned in this case's evidence but is not on the graph yet. Adding an entity puts it in the vault and on the graph. Relations stated in the evidence between the ones you pick are linked too.</p>
+  openDlg(dhead('Add entities to the graph') + `<div class="in"><p class="t2" style="margin:0 0 12px;font-size:calc(14px * var(--ts,1))">Everything below is mentioned in this case's evidence but is not on the graph yet. Adding an entity puts it in the vault and on the graph. Relations stated in the evidence between the ones you pick are linked too.</p>
     <div class="toolbar" style="margin:0 0 10px"><div class="search-in">${ico('search')}<label class="sr" for="pkQ">Search</label><input id="pkQ" class="inp" placeholder="Search…" autocomplete="off"></div><label class="sr" for="pkK">Kind</label><select id="pkK" class="gsel bord"><option value="">All kinds</option>${P.byKind.map(([k, n]) => `<option value="${k}">${esc(E.LABEL[k] || k)} (${n})</option>`).join('')}</select><button class="btn sm" data-act="pkAll">Select shown</button></div>
     <div id="pkList" class="pklist"></div></div>
-    <footer><span class="t3" id="pkN" style="margin-right:auto;font-size:13.5px"></span><button class="btn" data-act="dclose">Cancel</button><button class="btn primary" data-act="pkGo" id="pkGo" disabled>Add to graph</button></footer>`, true, () => {
+    <footer><span class="t3" id="pkN" style="margin-right:auto;font-size:calc(13.5px * var(--ts,1))"></span><button class="btn" data-act="dclose">Cancel</button><button class="btn primary" data-act="pkGo" id="pkGo" disabled>Add to graph</button></footer>`, true, () => {
       $('pkQ').oninput = e => { PICK.q = e.target.value.toLowerCase(); paintPick(); }; $('pkK').onchange = e => { PICK.kind = e.target.value; paintPick(); }; paintPick(); });
 }
 function pickShown(){ const {P, q, kind} = PICK; return [...P.mentions.keys()].filter(k => !P.D.byKey.has(k) && entryFor(k) && (!kind || k.startsWith(kind + ':')) && (!q || k.toLowerCase().includes(q)))

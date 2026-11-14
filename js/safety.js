@@ -11,7 +11,7 @@ const TRASH_KIND = {case:['folder-open','Case'], entry:['layers','Vault entry'],
 function trashPut(kind, label, data, caseId){ DB.trash = DB.trash || []; const x = {id:uid('x'), kind, label:String(label || '').slice(0, 140), caseId:caseId || null, at:Date.now(), data}; DB.trash.unshift(x); return x; }
 function trashPurge(){
   if(!DB.trash || !DB.trash.length) return; const cut = Date.now() - TRASH_DAYS * 864e5, old = DB.trash.filter(x => x.at < cut);
-  if(!old.length) return; DB.trash = DB.trash.filter(x => x.at >= cut); for(const x of old) dropFilesOf(x); save();
+  if(!old.length) return; DB.trash = DB.trash.filter(x => x.at >= cut); for(const x of old) dropFilesOf(x); if(typeof TABS === 'undefined' || TABS.writer) save();
 }
 function filesOfItem(x){ const d = x.data || {}; const recs = x.kind === 'record' ? [d.r] : x.kind === 'case' ? d.records || [] : []; return recs.flatMap(r => (r && r.att) || []).map(a => a.id); }
 function dropFilesOf(x){ for(const fid of filesOfItem(x)) if(!fileInUse(fid)) IDB.del('file:' + fid); }
@@ -68,7 +68,7 @@ async function snapNow(){ if(await snapshot('Made by hand')){ renderMain(); toas
 
 function viewTrash(){
   if(!SNAPS){ snapsLoad().then(() => { if(UI.route.area === 'trash') renderMain(); }); }
-  trashPurge(); const T = DB.trash || [];
+  const T = DB.trash || [];
   const row = x => { const [ic, kl] = TRASH_KIND[x.kind] || ['file','Item'], c = x.caseId && theCase(x.caseId), left = Math.max(0, TRASH_DAYS - Math.floor((Date.now() - x.at) / 864e5)), nf = filesOfItem(x).length;
     return `<div class="binrow"><span class="binic">${ico(ic)}</span><div class="main2"><b>${esc(x.label || '(untitled)')}</b><small>${kl}${c && c.id ? ' · ' + esc(c.code || c.name) : ''}${nf ? ' · ' + nf + ' file' + (nf > 1 ? 's' : '') : ''} · deleted ${esc(ago(x.at))} · ${left} day${left === 1 ? '' : 's'} left</small></div>
       <button class="btn xs" data-act="trRestore" data-id="${x.id}">${ico('undo-2','sm')}Restore</button><button class="iconbtn" data-act="trDel" data-id="${x.id}" title="Delete forever" aria-label="Delete forever">${ico('trash-2','sm')}</button></div>`; };
@@ -78,9 +78,9 @@ function viewTrash(){
       <div class="body flush">${T.length ? T.map(row).join('') : `<p class="t3" style="padding:18px 20px;margin:0">Nothing in the trash. Deleted cases, vault entries, evidence records, relationships and notes land here.</p>`}</div></section>
     <section class="card"><header><h3>Restore points <span class="t3">${S2.length} of ${SNAP_MAX}</span></h3><button class="btn xs" data-act="snapNow">${ico('save','sm')}Make one now</button></header>
       <div class="body flush">${S2.length ? S2.map(s => `<div class="binrow"><span class="binic">${ico('history')}</span><div class="main2"><b>${esc(s.why)}</b><small>${esc(E.fmtFull(s.at, tz()).slice(0, 16))} · ${s.cases} cases · ${s.records} records · ${fmtBytes(s.size * 2)}</small></div>
-        <button class="btn xs" data-act="snapRestore" data-id="${s.at}">${ico('undo-2','sm')}Restore</button><button class="iconbtn" data-act="snapDl" data-id="${s.at}" title="Download as a backup file" aria-label="Download">${ico('download','sm')}</button></div>`).join('')
+        <button class="btn xs" data-act="snapRestore" data-id="${s.at}">${ico('undo-2','sm')}Restore</button><button class="iconbtn" data-act="snapDl" data-id="${s.at}" title="Download as a backup file" aria-label="Download">${ico('download','sm')}</button><button class="iconbtn" data-act="snapDel" data-id="${s.at}" title="Delete this restore point" aria-label="Delete this restore point">${ico('trash-2','sm')}</button></div>`).join('')
         : `<p class="t3" style="padding:18px 20px;margin:0">${STORE.idb ? 'None yet. One is made automatically before importing a backup, resetting, removing sample data, starting fresh or importing a log file.' : 'This browser blocked IndexedDB, so restore points are off. Export backups by hand instead.'}</p>`}</div></section>
-    <p class="t3" style="font-size:13px;margin-top:16px">Both live in this browser only. Clearing site data removes them too — keep an exported backup somewhere safe.</p></div></div>`;
+    <p class="t3" style="font-size:calc(13px * var(--ts,1));margin-top:16px">Both live in this browser only. Clearing site data removes them too — keep an exported backup somewhere safe.</p></div></div>`;
 }
 
 /* ---------- backup reminder ---------- */
@@ -150,8 +150,8 @@ async function attAct(a, rid, fid){
     if(kind === 'markup' || kind === 'image') return safeView(rid, fid);
     if(kind === 'binary') return attAct('attDl', rid, fid);
     const u = URL.createObjectURL(new Blob([b], {type:kind === 'pdf' ? 'application/pdf' : 'text/plain;charset=utf-8'})); window.open(u, '_blank', 'noopener'); setTimeout(() => URL.revokeObjectURL(u), 60000); return; }
-  if(a === 'attDl'){ const b = await fileBlob(fid); if(!b) return toast('That file is missing from this browser'); const u = URL.createObjectURL(b), l = document.createElement('a'); l.href = u; l.download = m.name; document.body.appendChild(l); l.click(); setTimeout(() => { URL.revokeObjectURL(u); l.remove(); }, 200); return; }
-  if(a === 'attKit'){ const b = await fileBlob(fid); if(!b) return toast('That file is missing from this browser'); go('#/lab'); UI.labTab = 'file'; return labLoad(new File([b], m.name, {type:m.type, lastModified:m.modified})); }
+  if(a === 'attDl'){ const b = await fileBlob(fid); if(!b) return toast('That file is missing from this browser'); const u = URL.createObjectURL(b), l = document.createElement('a'); l.href = u; l.download = safeName(m.name, 'file'); document.body.appendChild(l); l.click(); setTimeout(() => { URL.revokeObjectURL(u); l.remove(); }, 200); return; }
+  if(a === 'attKit'){ const b = await fileBlob(fid); if(!b) return toast('That file is missing from this browser'); go('#/lab'); UI.labTab = 'file'; return labLoad(new File([b], m.name, {type:m.type, lastModified:m.modified}), false); }
   if(a === 'attDel') return confirmDlg('Remove ' + m.name + '?', 'The file is removed from this record and deleted from the browser. The record stays.', 'Remove file', () => { r.att = r.att.filter(x => x !== m); if(!fileInUse(fid) && !(DB.trash || []).some(x => filesOfItem(x).includes(fid))) IDB.del('file:' + fid); mutate('removed file ' + m.name); renderAll(); });
 }
 /* backups carry files as data URLs */
@@ -165,7 +165,8 @@ async function filesFromImport(files){ let n = 0; for(const [fid, url] of Object
 async function backupObject(){
   const all = DB.records.concat((DB.trash || []).flatMap(x => x.kind === 'record' ? [x.data.r] : x.kind === 'case' ? x.data.records : []));
   const files = await filesForExport(all), nbfiles = typeof nbBackupFiles === 'function' ? await nbBackupFiles() : {}, n = Object.keys(files).length;
-  return Object.assign({}, DB, n ? {files} : {}, Object.keys(nbfiles).length ? {nbfiles} : {}, DB.security && DB.security.sign ? {security:Object.assign({}, DB.security, {sign:{pub:DB.security.sign.pub, made:DB.security.sign.made}})} : {});   // the signing key's private half never goes into a backup
+  // recent tool inputs belong to this browser: they are not part of a backup
+  return Object.assign({}, DB, {recent:undefined, work:undefined}, n ? {files} : {}, Object.keys(nbfiles).length ? {nbfiles} : {}, DB.security && DB.security.sign ? {security:Object.assign({}, DB.security, {sign:{pub:DB.security.sign.pub, made:DB.security.sign.made}})} : {});   // the signing key's private half never goes into a backup
 }
 async function exportEverything(enc){
   if(enc == null) enc = !!SEC.key;
@@ -236,7 +237,7 @@ function logRec(row, M, name){
 }
 function logImportDlg(){
   const L = LOGIMP, sel = (k, lbl) => `<div class="field" style="margin:0"><label for="lm_${k}">${lbl}</label><select id="lm_${k}" data-lm="${k}"><option value="">—</option>${L.cols.map(c => `<option${L.map[k] === c ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select></div>`;
-  openDlg(dhead(esc(L.title || 'Import log file')) + `<div class="in"><p class="t2" style="margin:0 0 14px;font-size:14px"><b style="color:var(--text)">${esc(L.name)}</b> · ${esc(L.fmt)} · ${L.rows.length.toLocaleString()} rows · ${L.cols.length} columns. Each row becomes one evidence record in <b style="color:var(--text)">${esc(theCase(L.caseId).name)}</b>, with every column kept as <span class="mono">key=value</span> so detections can test it.</p>
+  openDlg(dhead(esc(L.title || 'Import log file')) + `<div class="in"><p class="t2" style="margin:0 0 14px;font-size:calc(14px * var(--ts,1))"><b style="color:var(--text)">${esc(L.name)}</b> · ${esc(L.fmt)} · ${L.rows.length.toLocaleString()} rows · ${L.cols.length} columns. Each row becomes one evidence record in <b style="color:var(--text)">${esc(theCase(L.caseId).name)}</b>, with every column kept as <span class="mono">key=value</span> so detections can test it.</p>
     <div class="frow4">${sel('time', 'Time column')}${sel('title', 'Title column')}${sel('host', 'Host column')}${sel('source', 'Source column')}</div>
     <h4 class="caps" style="margin:18px 0 8px">Preview</h4><div id="lmPrev" class="lmprev"></div>
     ${L.rows.length > 5000 ? `<p class="note amber" style="margin-top:12px"><span class="ic">${ico('triangle-alert','sm')}</span><span>Only the first 5,000 rows are imported. Filter the file first for the rest.</span></p>` : ''}</div>
@@ -256,6 +257,8 @@ async function logGo(){
 const SAFE_ACTS = {
   trRestore:id => trashRestore(id), trDel:id => trashDelete(id), trEmpty:() => trashEmpty(),
   snapNow:() => snapNow(), snapRestore:id => snapRestore(id), snapDl:id => snapDownload(id),
+  snapDel:id => confirmDlg('Delete this restore point?', 'It is removed from this browser and cannot be restored. Your workspace is not changed.', 'Delete', async () => { await snapsLoad(); const at = +id, i = SNAPS.findIndex(s => s.at === at); if(i < 0) return;
+    SNAPS.splice(i, 1); await IDB.del('osintrix-snap:' + at); await IDB.set('osintrix-snaps', await sealStr(JSON.stringify(SNAPS))); renderMain(); toast('Restore point deleted'); }),
   bkpLater:() => { DB.prefs.remindAt = Date.now() + 7 * 864e5; save(); renderMain(); },
   recDel:id => delRecord(id),
   attAdd:(id, v, t) => attAct('attAdd', id, v), attOpen:(id, v) => attAct('attOpen', id, v), attDl:(id, v) => attAct('attDl', id, v), attKit:(id, v) => attAct('attKit', id, v), attDel:(id, v) => attAct('attDel', id, v),
