@@ -199,14 +199,25 @@ Press `Ctrl K` or `/`, or click the search bar, to search the whole app at once:
 ![Cloud field guide](docs/cloud.png)
 
 ### 🛡️ Intelligence
-- **Watchlist:** watch any indicator. New evidence, log imports and news that mention it are flagged, with a notice, a Dashboard card and a list of sightings.
+- **Watchlist:** watch any indicator. New evidence, log imports and news that mention it are flagged, with a notice, a Dashboard card and a list of sightings. Watched IPs, domains, URLs, hashes and CVEs can be re-checked online on a schedule, and changes — new ports, more detections, a worse verdict — are announced.
 - **Around this time:** every record shows what else happened within ±5 minutes, on any host, one click from a filtered timeline.
 - **Detections:** 405 built-in Sigma and YARA rules, common and advanced, across Windows, Linux, macOS, AWS, Azure, GCP, Kubernetes, M365, Okta, network and web. Write, keep and import your own.
   - Filter by type, severity, platform and level; search title, technique and rule content.
   - Editor with syntax highlighting and a live structure check.
   - **Test a rule** against a case's evidence (Sigma and YARA) or against a file (YARA). The engines are subsets that run in the page; anything they cannot evaluate is reported, never silently passed.
   - Link a rule to a case, or generate starter rules from a case's malicious indicators.
-- **Threat Intel:** security news from your RSS sources, classified by category and severity, and checked against every entity in your cases. It is off until you turn it on.
+- **Threat Intel:** a working CTI desk, checked against every case. Each live source is off until you switch it on, and names the one host it contacts.
+  - **Investigate:** paste an IP, domain, URL, hash, CVE or ASN and every lookup source you switched on is asked at once — Shodan, VirusTotal, AbuseIPDB, GreyNoise, AlienVault OTX, urlscan.io, abuse.ch, RDAP, DNS, certificate transparency, ipinfo, RIPEstat, Tor, the Wayback Machine, CVE.org and EPSS. The answers are weighed into **one scored verdict with its reasons** (by how trusted each source is, how strong and how recent its evidence, and whether independent sources agree), and the leads they reveal are one click away.
+  - **Investigate a case:** every public indicator in a case checked in a queue, ranked by score, and **correlated** — indicators that share a certificate, IP, favicon, name servers, JARM, registration day, page title or malware family are grouped, weighted by how rare the shared trait is, and can be drawn on the case graph.
+  - **Your relay:** services that refuse browsers (VirusTotal, AbuseIPDB, GreyNoise, urlscan, crt.sh, NVD, abuse.ch) are reached through a tiny Cloudflare Worker you deploy to your own account ([tools/relay](tools/relay/README.md)). It holds your API keys, so they never sit in the page.
+  - **News:** 16 security sources (CISA, NCSC, Talos, Unit 42, Securelist, The DFIR Report, vendor advisories…). The same story from several sources becomes one. CVEs, ATT&CK techniques, threat actors, malware and vendors are read from every story. Inbox / Relevant / Starred / Dismissed triage, and "Needs attention" when a story touches your cases or your stack. **For you** puts the stories that touch your cases, watchlist and stack first, learns from your triage, and says why.
+  - **Vulnerabilities:** the CISA Known Exploited catalog (bundled, refreshable), FIRST EPSS and the CVE.org record with CISA's exploitation assessment on demand, a **My stack** watchlist of the vendors and products you run, and a page per CVE with the stories that mention it.
+  - **Indicators:** an indicator store with TLP, confidence, first/last seen and expiry. Import STIX 2.1, MISP, ThreatFox and Feodo exports, CSV or plain lists; pull abuse.ch feeds; export STIX 2.1, MISP or CSV — including a whole case. Every value is re-validated, and indicators that also appear in your cases are flagged there too.
+  - **Actors & ATT&CK:** MITRE ATT&CK groups and software, refreshed live from MITRE with a bundled copy as fallback, a page per actor, technique heatmaps and an ATT&CK Navigator layer export.
+  - **Briefs:** a weekly threat brief from what you starred, with a TLP marking — saved to the Notebook or downloaded as Markdown.
+
+![Threat Intel](docs/threat-intel.png)
+
 - **Entities:** every indicator across every case, with verdicts and cross-case matches. Filter by case.
 
 ![Detections](docs/detections.png)
@@ -234,7 +245,7 @@ Press `Ctrl K` or `/`, or click the search bar, to search the whole app at once:
 | | |
 |---|---|
 | **Where your data lives** | Only in this browser (IndexedDB, with a localStorage copy). Nothing is uploaded. There is no backend and no analytics. |
-| **Network access** | The page's Content Security Policy blocks every outside connection except one, and it is opt-in: `api.rss2json.com` if you turn on live Threat Intel feeds (only feed addresses are sent). Places, the PCAP reader and the SQLite viewer work fully offline. Map and lookup links open other sites in a new tab only when you click them. |
+| **Network access** | The page's Content Security Policy blocks every outside connection except a named list of hosts, and each source is opt-in from Threat Intel → Sources: `api.rss2json.com` for news (only feed addresses are sent); `raw.githubusercontent.com` for the CISA KEV catalog and MITRE ATT&CK; and, for live lookups, only the indicator you investigate is sent to the sources you switched on (Shodan, OTX, RDAP registries, Google DNS, ipinfo, RIPEstat, Onionoo, CertSpotter, HackerTarget, archive.org, Have I Been Pwned, CVE.org, FIRST). Everything else goes through your own relay on `*.workers.dev`. API keys are kept encrypted with the workspace and never put in backups. Places, the PCAP reader and the SQLite viewer work fully offline. |
 | **Untrusted content** | Feed articles and pasted evidence are shown as plain text. Links open only when you click them, in a new tab with no referrer. |
 | **Storage** | Saved in **IndexedDB**, with a localStorage copy while it fits. Every change is written within about 250 ms, and again when you switch tabs or close the page. Room depends on the browser and free disk space: usually hundreds of MB or more, compared with roughly 5 MB for localStorage alone. Help shows how much you are using. |
 | **One browser, one address** | Data belongs to one browser profile *and* one address. A copy opened from disk (`file://`) and the GitHub Pages copy each keep their own data, and so do Chrome and Firefox. Private windows and embedded previews keep nothing; a red banner warns you when saving is blocked. |

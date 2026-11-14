@@ -78,6 +78,7 @@ function inspEnt(id){
     ${m ? `<div style="font-size:calc(13px * var(--ts,1));margin-top:3px;color:${m.hot ? 'var(--amber)' : 'var(--text-3)'}">${esc(m.t)}</div>` : ''}<div class="cxts">${ctxChips(k, v)}</div></div></div>
     <div class="wrap" style="margin-top:14px"><button class="btn sm${isWatched(id) ? ' on' : ''}" data-act="watch" data-id="${esc(id)}">${ico(isWatched(id) ? 'eye-off' : 'eye','sm')}${isWatched(id) ? 'Unwatch' : 'Watch'}</button></div>
     ${canVault && !derive().byKey.has(id) ? `<button class="btn primary sm" data-act="promote" data-id="${esc(id)}" style="margin-top:14px">${ico('plus','sm')}Add to ${esc(theCase().code)} vault</button>` : ''}
+    ${typeof lkInspSection === 'function' ? lkInspSection(k, v) : ''}
     ${pivotSection(k, v)}
     <div class="isec"><h4>Verdict <span class="t3">applies in every case</span></h4><div class="seg v">${[['malicious','Malicious'],['suspicious','Suspicious'],['benign','Benign'],['','Unknown']].map(([x, l]) => `<button data-act="entVerdict" data-id="${esc(id)}" data-v="${x}" aria-pressed="${vd === x}">${l}</button>`).join('')}</div></div>
     <div class="isec"><h4>Appears in <span class="t3">${recs.length} records · ${g ? g.cases.size : 0} cases</span></h4>${recs.slice(0, 10).map(r => `<button class="li" data-act="selRec" data-id="${r.id}" style="padding:8px 0"><div class="main2"><b style="font-weight:520;font-size:calc(14px * var(--ts,1))">${esc(r.title)}</b><small>${esc(theCase(r.caseId).code)}${r.ts ? ' · ' + esc(E.fmtFull(r.ts, tz()).slice(5, 16)) : ''}</small></div></button>`).join('')}</div>
@@ -85,10 +86,17 @@ function inspEnt(id){
 }
 function inspFeed(f){
   if(!f) return '';
-  const g = globalEnts(), hits = E.extract(f.title + ' ' + f.body);
-  return ihead('Feed item') + `<div class="ibody"><h2>${esc(f.title)}</h2><p class="t3" style="font-size:calc(13px * var(--ts,1));margin:6px 0 14px">${esc(f.source)} · ${esc(E.fmtDate(f.ts, tz()))}</p><pre class="rawbox" style="font-family:var(--font);font-size:calc(14px * var(--ts,1))">${esc(f.body)}</pre>
-    <div class="isec"><h4>Entities</h4><div class="wrap">${hits.map(e => entPill(entKey(e))).join('')}</div>${hits.some(e => g.has(entKey(e))) ? '<p class="heur">Highlighted entities already exist in your cases.</p>' : ''}</div>
-    <div class="wrap" style="margin-top:18px"><button class="btn primary" data-act="feedToCase" data-id="${f.id}">${ico('plus','sm')}Add to ${esc(theCase().code)}</button>${E.safeUrl(f.link) ? `<a class="btn" href="${esc(E.safeUrl(f.link))}" target="_blank" rel="noopener noreferrer">Read original ${ico('arrow-up-right','sm')}</a>` : ''}</div></div>`;
+  if(!f.read){ f.read = true; save(); }
+  const g = globalEnts(), x = typeof ctiX === 'function' ? ctiX(f) : {iocs:E.extract(f.title + ' ' + f.body), cve:[], ttp:[], act:[], mal:[], ven:[]}, hits = x.iocs;
+  const others = typeof ctiStoryOf === 'function' ? ctiStoryOf(f.id).filter(o => o !== f) : [], t = f.st || 'new';
+  const sec = (title, html) => html ? `<div class="isec"><h4>${title}</h4><div class="wrap">${html}</div></div>` : '';
+  return ihead('Story') + `<div class="ibody"><h2>${esc(f.title)}</h2><p class="t3" style="font-size:calc(13px * var(--ts,1));margin:6px 0 14px">${esc(f.source)} · ${esc(E.fmtDate(f.ts, tz()))}${f.sev && f.sev !== 'normal' ? ' · ' + esc(f.sev) : ''}</p>
+    <div class="wrap" style="margin-bottom:14px"><button class="btn sm${f.star ? ' on' : ''}" data-act="ctiStar" data-id="${f.id}" aria-pressed="${!!f.star}">${ico('star','sm')}${f.star ? 'Starred' : 'Star'}</button><button class="btn sm${t === 'relevant' ? ' on' : ''}" data-act="ctiTri" data-id="${f.id}" data-v="relevant" aria-pressed="${t === 'relevant'}">${ico('check','sm')}Relevant</button><button class="btn sm" data-act="ctiTri" data-id="${f.id}" data-v="${t === 'actioned' ? 'new' : 'actioned'}">${ico('check-check','sm')}${t === 'actioned' ? 'Actioned ✓' : 'Actioned'}</button><button class="btn sm" data-act="ctiTri" data-id="${f.id}" data-v="${t === 'dismissed' ? 'new' : 'dismissed'}">${ico(t === 'dismissed' ? 'undo-2' : 'x','sm')}${t === 'dismissed' ? 'Restore' : 'Dismiss'}</button></div>
+    <pre class="rawbox" style="font-family:var(--font);font-size:calc(14px * var(--ts,1))">${esc(f.body)}</pre>
+    ${typeof cveChip === 'function' ? sec('Vulnerabilities', x.cve.map(cveChip).join('')) + sec('Actors &amp; malware', [...x.act, ...x.mal].map(actChip).join('')) + sec('ATT&amp;CK techniques', x.ttp.map(ttpChip).join('')) + sec('Vendors', x.ven.map(venChip).join('')) : ''}
+    ${hits.length ? `<div class="isec"><h4>Indicators</h4><div class="wrap">${hits.map(e => entPill(entKey(e))).join('')}</div>${hits.some(e => g.has(entKey(e))) ? '<p class="heur">Highlighted indicators already exist in your cases.</p>' : ''}</div>` : ''}
+    ${others.length ? `<div class="isec"><h4>Also reported by</h4>${others.map(o => `<button class="li" data-act="selFeed" data-id="${o.id}"><div class="main2"><b>${esc(o.source)}</b><span class="t3">${esc(o.title)}</span></div></button>`).join('')}</div>` : ''}
+    <div class="wrap" style="margin-top:18px"><button class="btn primary" data-act="feedToCase" data-id="${f.id}">${ico('plus','sm')}Add to ${esc(theCase().code)}</button>${E.safeUrl(f.link) ? `<a class="btn" href="${esc(E.safeUrl(f.link))}" target="_blank" rel="noopener noreferrer">Read original ${ico('external-link','sm')}</a>` : ''}</div></div>`;
 }
 
 /* ---------- dialogs ---------- */

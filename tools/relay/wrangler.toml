@@ -1,0 +1,8 @@
+name = "osintrix-relay"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+[vars]
+# Where you open OSINTrix from. "null" is a page opened straight from a file (file://).
+# Add your own address if you host it, e.g. "https://osintrix.example.org".
+ALLOWED_ORIGINS = "null,http://localhost:8000,http://127.0.0.1:8000"

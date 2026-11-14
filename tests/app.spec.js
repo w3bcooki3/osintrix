@@ -941,3 +941,236 @@ test('decompression bombs are stopped and download names are made safe', async (
   expect(r.names).toEqual(['_.._evil.sh', 'atxt.exe', '_CON', 'download']);
   noErrors(errors);
 });
+
+test('threat intel news: stories merge across sources, CVEs/actors/techniques are read, triage, stack alerts and CVE pages', async ({ page }) => {
+  const errors = await open(page, '#/feeds'); const outside = [];
+  page.on('request', r => { if (!/^(file|data|blob):/.test(r.url())) outside.push(r.url()); });
+  await page.click('[data-act=itri][data-v=all]');
+  const pan = page.locator('.ti-st:has-text("PAN-OS GlobalProtect zero-day")');
+  await expect(pan.locator('.ti-more')).toHaveText('+1 source');                                         // two sources, one story
+  await expect(pan.locator('.ti-chip.cve.kev')).toContainText('CVE-2024-3400');                          // known exploited
+  await expect(pan.locator('.ti-chip.ttp')).toContainText('T1190');
+  const volt = page.locator('.ti-st:has-text("Volt Typhoon pre-positions")');
+  await expect(volt.locator('.ti-chip.act')).toHaveText(['Volt Typhoon']);                               // no false "Group 74" → APT28
+  // my stack: watching Palo Alto Networks flags the story and the KEV entry
+  await page.click('[data-act=itab][data-v=vulns]');
+  await page.fill('#ctiStackIn', 'Palo Alto Networks'); await page.click('.ti-sadd button[type=submit]');
+  await expect(page.locator('.ti-sv')).toContainText('Palo Alto Networks');
+  await expect(page.locator('.ti-tr2:has-text("CVE-2024-3400") .ti-in.s')).toBeVisible();
+  await page.click('.ti-tr2:has-text("CVE-2024-3400")');
+  await expect(page.locator('.ti-kevbox')).toContainText('Known exploited');
+  await page.click('[data-act=ctiCveToCase]');
+  expect(await page.evaluate(() => DB.entries.some(e => e.caseId === DB.active && e.type === 'vulnerability' && e.fields.cve === 'CVE-2024-3400'))).toBe(true);
+  await page.click('[data-act=itab][data-v=feed]'); await page.click('[data-act=itri][data-v=all]');
+  await expect(pan.locator('.ti-alert')).toContainText('exploited vulnerability in your stack');
+  // triage: star, then dismiss leaves the inbox; undo brings it back
+  await pan.locator('[data-act=ctiStar]').click(); expect(await page.evaluate(() => DB.feed.filter(f => f.star).length)).toBe(2);   // both copies of the story
+  await page.click('[data-act=itri][data-v=inbox]'); const n0 = await page.locator('.ti-st').count();
+  await page.locator('.ti-st:has-text("QakBot") [data-act=ctiTri][data-v=dismissed]').click();
+  await expect(page.locator('.ti-st')).toHaveCount(n0 - 1);
+  await page.click('[data-act=itri][data-v=dismissed]'); await expect(page.locator('.ti-st')).toHaveCount(1);
+  // filters by an extracted entity
+  await page.evaluate(() => CTI_ACTS.ient(null, 'cve:CVE-2024-3400')); await expect(page.locator('.ti-st')).toHaveCount(1); await expect(page.locator('.ti-filt')).toContainText('CVE-2024-3400');
+  // refresh with no source switched on asks first — and nothing has gone over the network
+  await page.evaluate(() => CTI_ACTS.ient(null, '')); await page.click('[data-act=feedRefresh]'); await expect(page.locator('.ti-dtabs')).toBeVisible();
+  expect(outside).toEqual([]);
+  // the page may only ever connect to the named, opt-in hosts — never to "any https site"
+  const csp = await page.evaluate(() => document.querySelector('meta[http-equiv=Content-Security-Policy]').content.match(/connect-src ([^;]*)/)[1].split(' '));
+  expect(csp.every(h => /^https:\/\/[a-z0-9.-]+$/.test(h) || h === 'https://*.workers.dev')).toBe(true);          // named https hosts; the only wildcard is your own relay
+  expect(csp).not.toContain('https:'); expect(csp).not.toContain('*');
+  expect(await page.evaluate(() => CTI_SOURCES.every(s => !s.url || s.relay || document.querySelector('meta[http-equiv=Content-Security-Policy]').content.includes(new URL(s.url).origin)))).toBe(true);
+  expect(await page.evaluate(() => LK_PROVIDERS.filter(p => p.via !== 'relay').every(p => document.querySelector('meta[http-equiv=Content-Security-Policy]').content.includes('https://' + p.host)))).toBe(true);
+  noErrors(errors);
+});
+
+test('threat intel indicators: STIX, MISP, CSV and ThreatFox imports are validated, hostile values dropped, exports round-trip, hits in cases', async ({ page }) => {
+  const errors = await open(page, '#/feeds');
+  const r = await page.evaluate(async () => {
+    const stix = {type:'bundle', id:'bundle--1', objects:[
+      {type:'marking-definition', id:'marking-definition--5e57c739-391a-4eb3-b6be-7d15ca92d5ed', definition_type:'tlp', definition:{tlp:'red'}},
+      {type:'malware', id:'malware--1', name:'Lamp loader', is_family:true},
+      {type:'indicator', id:'indicator--1', spec_version:'2.1', created:'2026-09-01T00:00:00Z', modified:'2026-09-02T00:00:00Z', valid_from:'2026-09-01T00:00:00Z', valid_until:'2030-01-01T00:00:00Z', confidence:85,
+       pattern:"[ipv4-addr:value = '203.0.113.47'] OR [url:value = 'javascript:alert(1)'] OR [domain-name:value = '<img src=x onerror=alert(1)>']", pattern_type:'stix', object_marking_refs:['marking-definition--5e57c739-391a-4eb3-b6be-7d15ca92d5ed']},
+      {type:'relationship', id:'relationship--1', relationship_type:'indicates', source_ref:'indicator--1', target_ref:'malware--1'},
+      {type:'indicator', id:'indicator--2', pattern:"[file:hashes.'SHA-256' = '9f2c1d0b7e4a6c8f3b5d2e1a0c9b8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a']", pattern_type:'stix', valid_from:'2026-09-01T00:00:00Z'},
+      {type:'indicator', id:'indicator--3', pattern:"[domain-name:value = 'it\\'s.bad']", pattern_type:'stix', valid_from:'2026-09-01T00:00:00Z'}]};
+    const a = await ctiImportText(JSON.stringify(stix), 'Partner ISAC');
+    const misp = {Event:{info:'Phish kit', Tag:[{name:'tlp:amber'}], Attribute:[{type:'domain', value:'update-lamp.test', to_ids:true}, {type:'filename|md5', value:'invoice.lnk|d41d8cd98f00b204e9800998ecf8427e'}, {type:'ip-dst|port', value:'198.51.100.9|8443'}, {type:'text', value:'ignore me'}, {type:'url', value:'file:///etc/passwd'}]}};
+    const b = await ctiImportText(JSON.stringify(misp), '');
+    const c = await ctiImportText('value,type,tags\n=cmd|\' /C calc\'!A0,url,x\nhttps://evil.example/payload.exe,url,"dropper,=HYPERLINK(1)"\n192.0.2.300,ip,bad-ip', 'CSV feed');
+    const d = await ctiImportText(JSON.stringify({query_status:'ok', data:[{ioc_value:'203.0.113.99:4444', ioc_type:'ip:port', malware_printable:'Cobalt Strike', threat_type:'botnet_cc', confidence_level:100, first_seen_utc:'2026-09-03 10:00:00 UTC', tags:['CobaltStrike']}]}), 'ThreatFox', {fmt:'threatfox'});
+    const vals = CTI.iocs.map(x => x.v);
+    const stixOut = ctiStix(CTI.iocs, 'test', 'amber'), back = ctiParse(JSON.stringify(stixOut));
+    const csv = ctiCsv(CTI.iocs);
+    return {a, b, c, d, vals, kinds:CTI.iocs.map(x => x.k + ':' + x.tlp), lamp:CTI.iocs.find(x => x.v === '203.0.113.47'), back:back.items.map(x => x.v).sort(), csv,
+      nav:JSON.stringify(stixOut).includes('javascript')};
+  });
+  expect(r.a.fmt).toBe('STIX 2.1'); expect(r.b.fmt).toBe('MISP'); expect(r.c.fmt).toBe('CSV'); expect(r.d.fmt).toBe('ThreatFox JSON');
+  expect(r.vals.some(v => /javascript:|<img|file:|=cmd|192\.0\.2\.300/i.test(v))).toBe(false);          // hostile and invalid values never get in
+  expect(r.vals).toEqual(expect.arrayContaining(['203.0.113.47', 'update-lamp.test', 'd41d8cd98f00b204e9800998ecf8427e', '198.51.100.9', 'https://evil.example/payload.exe', '203.0.113.99:4444']));
+  expect(r.lamp.tlp).toBe('red'); expect(r.lamp.conf).toBe(85); expect(r.lamp.tags).toContain('Lamp loader');
+  expect(r.back).toEqual(expect.arrayContaining(['203.0.113.47', 'update-lamp.test', 'https://evil.example/payload.exe']));   // STIX export reads back
+  expect(r.csv).not.toMatch(/\n=|,=HYPERLINK/); expect(r.nav).toBe(false);
+  // the store is shown, and the indicator also seen in a case is flagged — in Threat Intel and in the case
+  await page.click('[data-act=itab][data-v=iocs]');
+  await expect(page.locator('.ti-tr3.hit:has-text("203.0.113.47")')).toBeVisible();
+  await page.click('.ti-tr3.hit:has-text("203.0.113.47") [data-act=ctiIocCase]'); await expect(page.locator('#insp')).toContainText('In your feeds');
+  // it survives a reload
+  await page.reload(); await expect.poll(() => page.evaluate(async () => { await ctiLoad(); return CTI.iocs.length; })).toBeGreaterThan(5);
+  // delete one, then export the shown set as MISP
+  await page.evaluate(() => { UI.itab = 'iocs'; renderMain(); });
+  const before = await page.evaluate(() => CTI.iocs.length);
+  await page.locator('.ti-tr3:has-text("update-lamp.test") [data-act=ctiIocDel]').click();
+  await expect.poll(() => page.evaluate(() => CTI.iocs.length)).toBe(before - 1);
+  await page.click('[data-act=ctiExport]'); await page.selectOption('#ctiExFmt', 'misp');
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('[data-act=ctiExportGo]')]);
+  const m = JSON.parse(require('fs').readFileSync(await dl.path(), 'utf8'));
+  expect(m.Event.Attribute.length).toBe(before - 1); expect(m.Event.Tag[0].name).toBe('tlp:amber');
+  noErrors(errors);
+});
+
+test('threat intel actors, ATT&CK and briefs: actor pages, Navigator layer, brief to Notebook and Markdown', async ({ page }) => {
+  const errors = await open(page, '#/feeds');
+  await page.click('[data-act=itab][data-v=attack]');
+  await page.fill('#aq', 'volt'); await page.click('.ti-al-i:has-text("Volt Typhoon")');
+  await expect(page.locator('.ti-actor-h h2')).toHaveText('Volt Typhoon');
+  await expect(page.locator('.ti-mx-t').first()).toBeVisible();
+  const [nav] = await Promise.all([page.waitForEvent('download'), page.click('[data-act=ctiNav]')]);
+  const layer = JSON.parse(require('fs').readFileSync(await nav.path(), 'utf8'));
+  expect(layer.domain).toBe('enterprise-attack'); expect(layer.techniques.map(t => t.techniqueID)).toContain('T1003.003');
+  // brief: star a story, widen the period, save to the Notebook and download Markdown
+  await page.evaluate(() => { DB.feed.find(f => f.id === 'f4').star = true; UI.itab = 'brief'; UI.bdays = 3650; renderMain(); });
+  await expect(page.locator('.ti-bp')).toContainText('PAN-OS GlobalProtect zero-day');
+  const [md] = await Promise.all([page.waitForEvent('download'), page.click('[data-act=ctiBriefMd]')]);
+  const text = require('fs').readFileSync(await md.path(), 'utf8');
+  expect(text).toMatch(/^# Threat brief/); expect(text).toContain('TLP:GREEN'); expect(text).toContain('CVE-2024-3400 (exploited)');
+  await page.click('[data-act=ctiBriefNb]');
+  await expect(page).toHaveURL(/#\/notebook/);
+  expect(await page.evaluate(() => { const p = DB.nb.pages.find(x => /^Threat brief/.test(x.title)); return p && /PAN-OS/.test(p.html) && !/<script/i.test(p.html); })).toBe(true);
+  noErrors(errors);
+});
+
+test('threat intel live sources (services faked): only switched-on sources are called, KEV/EPSS/CVE.org, ThreatFox through the relay and news are read correctly', async ({ page }) => {
+  const errors = await open(page, '#/feeds'); const hits = [];
+  const cors = { 'access-control-allow-origin': '*', 'content-type': 'application/json' };
+  await page.route('https://raw.githubusercontent.com/mitre/**', r => { hits.push('attack'); const T = Array.from({ length: 120 }, (_, i) => ({ type: 'attack-pattern', id: 'attack-pattern--' + i, name: 'Tech ' + i, external_references: [{ source_name: 'mitre-attack', external_id: 'T' + (1000 + i) }], kill_chain_phases: [{ kill_chain_name: 'mitre-attack', phase_name: 'execution' }] }));
+    r.fulfill({ headers: cors, body: JSON.stringify({ type: 'bundle', objects: [{ type: 'x-mitre-matrix', modified: '2099-02-02T00:00:00Z', tactic_refs: ['x-mitre-tactic--1'] }, { type: 'x-mitre-tactic', id: 'x-mitre-tactic--1', name: 'Execution', x_mitre_shortname: 'execution', external_references: [{ source_name: 'mitre-attack', external_id: 'TA0002' }] }, ...T,
+      { type: 'intrusion-set', id: 'intrusion-set--1', name: 'Zebra <b>Panda</b>', aliases: ['Zebra <b>Panda</b>', 'ZP-99'], description: 'A test group that does things. More text here.', external_references: [{ source_name: 'mitre-attack', external_id: 'G9999' }] },
+      { type: 'relationship', relationship_type: 'uses', source_ref: 'intrusion-set--1', target_ref: 'attack-pattern--3' }] }) }); });
+  await page.route('https://raw.githubusercontent.com/cisagov/**', r => { hits.push('kev'); r.fulfill({ headers: cors, body: JSON.stringify({ catalogVersion: '2099.01.01', dateReleased: '2099-01-01T00:00:00Z', count: 2, vulnerabilities: [
+    { cveID: 'CVE-2099-0001', vendorProject: 'Palo Alto Networks', product: 'PAN-OS', vulnerabilityName: 'Test <b>bug</b>', dateAdded: '2099-01-01', dueDate: '2099-01-22', knownRansomwareCampaignUse: 'Known', shortDescription: 'x', cwes: ['CWE-77'] },
+    { cveID: 'not-a-cve', vendorProject: 'x' }] }) }); });
+  await page.route('https://api.first.org/**', r => { hits.push('epss:' + new URL(r.request().url()).searchParams.get('cve')); r.fulfill({ headers: cors, body: JSON.stringify({ status: 'OK', data: [{ cve: 'CVE-2024-3400', epss: '0.95700', percentile: '0.99900' }, { cve: 'CVE-2024-21762', epss: '7', percentile: '0.5' }] }) }); });
+  await page.route('https://cveawg.mitre.org/**', r => { hits.push('cveorg'); r.fulfill({ headers: cors, body: JSON.stringify({ cveMetadata: { cveId: 'CVE-2024-3400', datePublished: '2024-04-12T08:15:06.230Z' }, containers: {
+    cna: { descriptions: [{ lang: 'en', value: 'A command injection <script>alert(1)</script> in PAN-OS.' }], metrics: [{ cvssV3_1: { version: '3.1', vectorString: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H', baseScore: 10.0, baseSeverity: 'CRITICAL' } }],
+      problemTypes: [{ descriptions: [{ cweId: 'CWE-77' }] }], affected: [{ vendor: 'Palo Alto Networks', product: 'PAN-OS' }] },
+    adp: [{ title: 'CISA ADP Vulnrichment', metrics: [{ other: { type: 'ssvc', content: { options: [{ Exploitation: 'active' }, { Automatable: 'yes' }] } } }] }] } }) }); });
+  await page.route('https://r.workers.dev/**', r => { const u = new URL(r.request().url()); hits.push('relay:' + u.pathname + ':' + (r.request().headers()['x-relay-token'] || '')); r.fulfill({ headers: cors, body: JSON.stringify({ query_status: 'ok', data: [{ ioc_value: '203.0.113.47:4444', ioc_type: 'ip:port', malware_printable: 'Lamp loader', confidence_level: 90, first_seen_utc: '2026-09-14 08:00:00 UTC' }] }) }); });
+  await page.route('https://threatfox.abuse.ch/**', r => { hits.push('direct-abusech'); r.abort(); });
+  await page.route('https://api.rss2json.com/**', r => { hits.push('rss'); r.fulfill({ headers: cors, body: JSON.stringify({ status: 'ok', items: [{ title: 'New <img src=x onerror=alert(1)>CVE-2024-3400 exploitation by ZP-99 group', description: '<p>Details <script>alert(1)</script>with 198.51.100.23</p>', link: 'javascript:alert(1)', pubDate: '2026-11-13 10:00:00' }] }) }); });
+  // nothing is on: refresh asks instead of fetching
+  await page.click('[data-act=feedRefresh]'); await expect(page.locator('.ti-dtabs')).toBeVisible(); expect(hits).toEqual([]);
+  // switch on KEV, EPSS, NVD and ThreatFox (with a key), but not the news relay
+  await page.click('[data-act=srcTab][data-v=data]');
+  for (const id of ['kev', 'epss', 'nvd', 'attack']) await page.check(`[data-act=ctiSrcToggle][data-id=${id}]`);
+  await page.click('[data-act=srcTab][data-v=ioc]'); await page.check('[data-act=ctiSrcToggle][data-id=tfx]');
+  await page.click('[data-act=srcTab][data-v=look]'); await page.fill('#lkRelayUrl', 'https://r.workers.dev/'); await page.locator('#lkRelayUrl').blur(); await page.fill('#lkRelayTok', 'k3y'); await page.locator('#lkRelayTok').blur();
+  await page.click('.dlg [data-act=dclose] >> nth=-1');
+  await page.click('[data-act=feedRefresh]');
+  await expect.poll(() => page.evaluate(() => intelBusy)).toBe(false);
+  expect(hits).toContain('kev'); expect(hits).toContain('relay:/threatfox-export/export/json/recent/:k3y'); expect(hits).not.toContain('direct-abusech'); expect(hits).not.toContain('rss'); expect(hits.some(h => /^epss:/.test(h))).toBe(true);
+  const r = await page.evaluate(() => ({ kev: kevOf('CVE-2099-0001'), bad: kevOf('not-a-cve'), meta: CTI.kevMeta, epss: DB.intel.cve['CVE-2024-3400'], bogus: DB.intel.cve['CVE-2024-21762'], tfx: CTI.iocIx.get('hostport:203.0.113.47:4444') }));
+  expect(r.kev.ransom).toBe(true); expect(r.bad).toBe(null); expect(r.meta.live).toBe(true);
+  expect(r.epss.epss).toBeCloseTo(0.957); expect(r.bogus && r.bogus.epss).toBeFalsy();                // an out-of-range score is ignored
+  expect(r.tfx.threat).toBe('Lamp loader');
+  // ATT&CK came from MITRE live and replaced the shipped copy: the new group is recognised, its techniques kept
+  expect(await page.evaluate(() => ({ v: ATTACK.v, g: ATTACK.groups.find(g => g.id === 'G9999'), live: !!ATTACK.live }))).toEqual({ v: 'Enterprise 2099-02-02', g: expect.objectContaining({ n: 'Zebra <b>Panda</b>', a: ['ZP-99'], t: ['T1003'] }), live: true });
+  expect(await page.evaluate(() => ctiFind('Attacks by ZP-99 group continue').act)).toEqual(['G9999']);
+  // the CVE record on demand from the CVE page (CVE.org, with CISA's assessment); hostile text stays text
+  await page.evaluate(() => ctiCveDlg('CVE-2024-3400')); await page.click('[data-act=ctiNvdOne]');
+  await expect(page.locator('.ti-scores')).toContainText('10.0'); await expect(page.locator('.ti-scores')).toContainText('CRITICAL');
+  await expect(page.locator('.ti-ssvc')).toContainText('active');
+  expect(await page.evaluate(() => DB.intel.cve['CVE-2024-3400'].refs)).toEqual(['https://www.cve.org/CVERecord?id=CVE-2024-3400']);
+  expect(await page.locator('.dlg script').count()).toBe(0);
+  // now allow the news relay: the article is stored as plain text with no javascript: link
+  await page.evaluate(() => { DB.prefs.liveFeeds = true; }); await page.click('[data-act=dclose] >> nth=0').catch(() => {});
+  await page.evaluate(() => refreshFeeds()); await expect.poll(() => page.evaluate(() => intelBusy)).toBe(false);
+  const f = await page.evaluate(() => DB.feed.find(x => /exploitation by ZP-99 group/.test(x.title)));
+  expect(f.title).not.toMatch(/<img/); expect(f.body).not.toMatch(/<script|alert/); expect(f.link).toBe('');
+  expect(await page.evaluate(id => ctiX(DB.feed.find(x => x.id === id)).act.length, f.id)).toBe(1);
+  noErrors(errors);
+});
+
+test('investigate (services faked): live lookups are weighed into a verdict with reasons, a case is checked and correlated, keys stay out of backups, watch notices changes', async ({ page }) => {
+  test.setTimeout(90000);
+  const errors = await open(page, '#/feeds'); const hits = [];
+  const cors = { 'access-control-allow-origin': '*', 'content-type': 'application/json' }, J = (r, o) => r.fulfill({ headers: cors, body: JSON.stringify(o) });
+  const day = new Date(Date.now() - 3 * 864e5).toISOString(); let ports = [22, 443, 50050];
+  await page.route(/^https:\/\/(?!r\.workers\.dev)[^/]+\//, r => { hits.push('other:' + new URL(r.request().url()).host); r.abort(); });
+  await page.route('https://internetdb.shodan.io/**', r => { hits.push('idb'); J(r, { ip: '45.77.10.20', ports, hostnames: [], tags: ['c2'], vulns: ['CVE-2023-48795'], cpes: ['cpe:/a:openbsd:openssh:8.2'] }); });
+  await page.route('https://dns.google/**', r => { const u = new URL(r.request().url()), n = u.searchParams.get('name'), t = u.searchParams.get('type'); hits.push('dns');
+    J(r, { Status: 0, Answer: t === 'A' ? [{ name: n, type: 1, TTL: 60, data: '45.77.10.20' }] : t === 'NS' ? [{ name: n, type: 2, TTL: 60, data: 'ns1.badns.top.' }] : [] }); });
+  await page.route('https://rdap.org/**', r => { hits.push('rdap'); /\/ip\//.test(r.request().url()) ? J(r, { name: 'VULTR', country: 'US', startAddress: '45.77.0.0', endAddress: '45.77.255.255', cidr0_cidrs: [{ v4prefix: '45.77.0.0', length: 16 }] })
+    : J(r, { ldhName: 'x', events: [{ eventAction: 'registration', eventDate: day }], entities: [{ roles: ['registrar'], vcardArray: ['vcard', [['fn', {}, 'text', 'NameSilo, LLC']]] }], nameservers: [{ ldhName: 'NS1.BADNS.TOP' }], status: ['client transfer prohibited'] }); });
+  await page.route('https://ipinfo.io/**', r => { hits.push('ipinfo'); J(r, { ip: '45.77.10.20', org: 'AS20473 The Constant Company, LLC', country: 'US', city: 'Piscataway' }); });
+  await page.route('https://otx.alienvault.com/**', r => { hits.push('otx'); J(r, { pulse_info: { count: 1, pulses: [{ name: '<img src=x onerror="window.__pwned=1">Cobalt Strike servers', modified: new Date().toISOString(), malware_families: [{ display_name: 'Cobalt Strike' }], adversary: '', attack_ids: [{ id: 'T1071' }] }] }, validation: [] }); });
+  await page.route('https://r.workers.dev/**', r => { const u = new URL(r.request().url()); hits.push('relay' + u.pathname); J(r, { data: { attributes: { last_analysis_stats: { malicious: 12, suspicious: 1, harmless: 50, undetected: 10 }, reputation: -30 } } }); });
+  // nothing is on yet: investigating asks no one
+  await page.click('[data-act=itab][data-v=look]');
+  await page.fill('#lkQ', 'hxxp://45[.]77[.]10[.]20'); await page.press('#lkQ', 'Enter');
+  await expect(page.locator('.lk-head')).toContainText('45.77.10.20'); expect(hits).toEqual([]);
+  // turn on the free sources; the relay ones stay unavailable without a relay
+  await page.click('.lk-q ~ .ti-relay [data-act=lkFreeOn]'); await page.evaluate(() => { const S = lkSettings(); delete S.on.ht; delete S.on.cs; });
+  await page.click('[data-act=lookAgain]');
+  await expect.poll(() => page.evaluate(() => LKV.pending.size), { timeout: 20000 }).toBe(0);
+  expect(hits).toContain('idb'); expect(hits).toContain('otx'); expect(hits.some(h => /^relay/.test(h))).toBe(false);
+  const V = await page.evaluate(() => lkVerdict('ipv4', '45.77.10.20', LKV.res));
+  expect(V.band).toBe('malicious'); expect(V.reasons[0].why).toMatch(/Shodan tags it c2|OTX/); expect(V.attrs.asn).toBe('AS20473');
+  await expect(page.locator('.lk-why')).toContainText('Shodan tags it c2');
+  expect(await page.evaluate(() => ({ p: window.__pwned, img: document.querySelectorAll('.lk img, .lk [onerror]').length }))).toEqual({ p: undefined, img: 0 });
+  await page.click('[data-act=lookVerdict]'); expect(await page.evaluate(() => DB.verdicts['ipv4:45.77.10.20'])).toBe('malicious');
+  // answers are kept: asking again without "Check again" calls no one
+  const n0 = hits.length; await page.evaluate(() => lookGo('ipv4', '45.77.10.20')); await page.waitForTimeout(300); expect(hits.slice(n0)).toEqual([]);
+  // a relay: VirusTotal is reached through it with the token, never directly
+  await page.evaluate(() => { const S = lkSettings(); S.relay = { url: 'https://r.workers.dev', token: 'TOK' }; S.on.vt = true; S.keys.shodan = 'SECRET-KEY'; });
+  await page.evaluate(() => lookGo('domain', 'paypa1-secure.com', true)); await expect.poll(() => page.evaluate(() => LKV.pending.size), { timeout: 20000 }).toBe(0);
+  expect(hits).toContain('relay/vt/api/v3/domains/paypa1-secure.com');
+  expect(await page.evaluate(() => lkVerdict('domain', 'paypa1-secure.com', LKV.res).reasons.map(e => e.why).join('|'))).toMatch(/12\/73 VirusTotal engines.*|Registered 3 days ago/);
+  // keys and the relay token never go into a backup
+  const bk = await page.evaluate(() => JSON.stringify(backupObject ? Object.assign({}, DB, { intel: Object.assign({}, DB.intel, { look: { on: DB.intel.look.on, keys: {}, relay: { url: DB.intel.look.relay.url, token: '' } } }) }) : ''));
+  const real = await page.evaluate(async () => JSON.stringify(await backupObject()));
+  expect(real).not.toContain('SECRET-KEY'); expect(real).not.toContain('TOK"'); expect(bk).toBeTruthy();
+  // a whole case: the two look-alike domains share an address, name servers and registration day → one group, linked on the graph
+  await page.evaluate(() => { const c = { id: uid('c'), name: 'Phish', code: 'PH-1', status: 'active', owner: 'You', created: Date.now(), updated: Date.now(), scope: '', color: CASE_COLORS[0], icon: 'briefcase' }; DB.cases.push(c); DB.active = c.id; DB.records.push({ id: uid('r'), caseId: DB.active, type: 'evidence', title: 'phish', body: 'paypa1-secure.com paypa1-verify.com 45.77.10.20', tsRaw: '', tsZone: 'explicit', ts: Date.now(), source: 't', host: '', tags: [], ents: E.extract('paypa1-secure.com paypa1-verify.com 45.77.10.20'), answer: '', addedBy: 'You', addedAt: Date.now(), hash: '' }); mutate('t'); });
+  await page.click('[data-act=lookCase]');
+  await expect.poll(() => page.evaluate(() => !!(LKV.bulk && LKV.bulk.fin)), { timeout: 45000 }).toBe(true);
+  const C = await page.evaluate(() => LKV.bulk.corr.clusters);
+  expect(C.length).toBe(1); expect(C[0]).toEqual(expect.arrayContaining(['domain:paypa1-secure.com', 'domain:paypa1-verify.com']));
+  await expect(page.locator('.lk-cl')).toContainText(/same IP address|same name servers/);
+  const l0 = await page.evaluate(() => DB.links.length); await page.click('[data-act=lookLink]');
+  expect(await page.evaluate(() => DB.links.length)).toBeGreaterThan(l0);
+  // the watch monitor: a new open port is noticed
+  await page.evaluate(async () => { toggleWatch('ipv4:45.77.10.20'); await watchCheck(['ipv4:45.77.10.20'], { quiet: true }); });
+  ports = [22, 443, 50050, 3389];
+  await page.evaluate(async () => { await watchCheck(['ipv4:45.77.10.20'], { quiet: true }); });
+  expect(await page.evaluate(() => DB.watch['ipv4:45.77.10.20'].alerts[0].d.map(d => d.t).join('|'))).toContain('New port: 3389');
+  await page.goto(page.url().replace(/#.*/, '#/watch')); await expect(page.locator('.wl-ch')).toContainText('3389');
+  noErrors(errors.filter(e => !/Failed to load resource/.test(e)));          // the services this test refuses on purpose
+});
+
+test('threat intel "For you": stories touching your cases, watchlist and stack come first with reasons, and triage teaches the order', async ({ page }) => {
+  const errors = await open(page, '#/feeds');
+  const r = await page.evaluate(() => {
+    const now = Date.now(), mk = (title, ago, extra = {}) => ({ id: uid('f'), title, body: title, source: 'Test', cat: 'general', ts: now - ago * 36e5, link: '', live: true, ...extra });
+    DB.feed = [mk('Quarterly gardening trends report', 1), mk('Gardening tools roundup', 2), mk('Gardening season opens', 3), mk('Ransomware gang hits hospital', 30), mk('Ransomware group leaks data', 31), mk('Ransomware actors use new loader', 40), mk('Infrastructure at 198.51.100.77 used by attackers', 50)];
+    DB.watch = { 'ipv4:198.51.100.77': { at: now - 864e5 * 10 } };
+    DB.feed.slice(0, 2).forEach(f => f.st = 'dismissed'); DB.feed[3].st = 'relevant'; DB.feed[4].st = 'relevant'; mutate('t');
+    UI.itri = 'all'; UI.isort = 'you'; const S = ctiFeedList();
+    return { first: S[0].lead.title, why: S[0].rk.why, order: S.map(s => s.lead.title), learned: ctiModel().wt.get('ransomware') > 0 && ctiModel().wt.get('gardening') < 0 };
+  });
+  expect(r.first).toMatch(/198\.51\.100\.77/); expect(r.why.join(' ')).toMatch(/watched indicator/);
+  expect(r.learned).toBe(true);
+  expect(r.order.indexOf('Ransomware actors use new loader')).toBeLessThan(r.order.indexOf('Gardening season opens'));        // learned from triage, despite being older
+  await page.evaluate(() => renderMain()); await expect(page.locator('.ti-why').first()).toContainText('watched');
+  noErrors(errors);
+});

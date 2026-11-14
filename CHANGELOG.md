@@ -2,6 +2,61 @@
 
 All notable changes to OSINTrix, newest first. The format is based on [Keep a Changelog](https://keepachangelog.com); this file is generated from `js/data/changelog.js` by `tools/changelog.py`.
 
+## [1.26] — Live investigation engine (2026-11-14)
+
+_Threat Intel now asks the services analysts use — Shodan, VirusTotal, AbuseIPDB, GreyNoise, OTX, urlscan, abuse.ch, RDAP, DNS, certificate logs and more — at the moment you investigate, and weighs every answer into one scored verdict with its reasons. A whole case can be checked at once and its indicators grouped by shared infrastructure. Bundled data is now only a fallback: KEV, ATT&CK and CVE records come live._
+
+### Added
+- Investigate tab: paste an IP, domain, URL, file hash, CVE or ASN and every lookup source you switched on is asked in parallel. Answers appear as they arrive, one card per source with its key facts and a link to the source's own page.
+- Verdict engine: one score out of 100 (Malicious, Suspicious, Benign or Nothing found) from all sources, weighted by how much each source is trusted, how strong its evidence is and how old it is, with agreement between independent sources counting for more. Every verdict lists its reasons and a confidence level. Mark it as your verdict in one click.
+- Lookup sources that work straight from the browser: Shodan InternetDB, DNS (Google DoH), RDAP registration data, ipinfo, RIPEstat, Tor relays (Onionoo), CertSpotter, HackerTarget, the Wayback Machine, AlienVault OTX, Have I Been Pwned breaches, CVE.org with CISA's exploitation assessment, and FIRST EPSS. Shodan works with your key.
+- Through your own relay: VirusTotal, AbuseIPDB, GreyNoise, urlscan.io, crt.sh, NVD and abuse.ch ThreatFox, URLhaus and MalwareBazaar — services that refuse browser requests.
+- The relay: a small Cloudflare Worker in tools/relay that you deploy to your own account. It keeps API keys server-side, forwards only to listed hosts and paths, checks a token, allows only your origins and rate-limits. Set its address and token, and test it, in Sources → Lookups.
+- Leads: hostnames, subdomains, resolved addresses, certificate names and related samples found by the sources, each one click from its own investigation or the case.
+- Investigate a whole case: every public IP, domain, URL, hash and CVE is checked in a queue with progress, ranked by score, and the flagged ones can be marked together.
+- Correlation: indicators that share a TLS certificate, IP address, favicon, name servers, JARM fingerprint, registration day and registrar, page title, malware family or network are grouped, with links weighted by how rare the shared trait is. Link on the graph draws the groups as relationships in the case.
+- News, For you: stories are ordered by what matters to you — indicators from your cases and watchlist, your stack, known-exploited CVEs, severity, feed hits and how many sources report it — and the order learns from what you mark relevant or dismiss. Each story says why it is near the top. Newest first is still available.
+- Watchlist online checks: watched IPs, domains, URLs, hashes and CVEs can be re-checked every hour, 6 hours or day while the app is open, or with Check now. New ports and addresses, more detections, higher abuse scores, new reports and verdict changes are listed under Changes and announced.
+- The indicator details panel shows the last live verdict and an Investigate button.
+- MITRE ATT&CK can be refreshed live from MITRE (checked at most once a week) and kept in this browser; the bundled copy is the fallback.
+
+### Changed
+- CVE details come from the official CVE.org record, which allows browser access, with CISA's exploitation assessment shown on the CVE page. NVD scores fill in through the relay when the record has none.
+- abuse.ch indicator feeds are fetched through the relay, which holds the Auth-Key, since abuse.ch does not allow browser access.
+- The Content Security Policy names each lookup host; the only wildcard is *.workers.dev for your relay.
+- Answers from sources are kept for a while (encrypted with the workspace) so the same indicator is not asked twice; Sources → Lookups → Clear saved answers removes them. API keys and the relay token are never put in backups.
+
+### Fixed
+- Watchlist showed "just now ago".
+
+## [1.25] — Threat Intel, professional edition (2026-11-14)
+
+_Threat Intel becomes a full CTI desk: news read for CVEs, actors, malware and ATT&CK techniques; known-exploited vulnerabilities with EPSS and CVSS and a My stack watchlist; an indicator store that imports and exports STIX 2.1, MISP and CSV; offline MITRE ATT&CK with actor pages and Navigator layers; and one-click threat briefs. Every live source is off until you switch it on._
+
+### Added
+- Threat Intel has five tabs: News, Vulnerabilities, Indicators, Actors & ATT&CK and Briefs.
+- News: the same story from several sources is grouped into one, with +N sources. CVEs, ATT&CK technique IDs, threat actors, malware, vendors and indicators are read from every story and shown as chips you can click.
+- News triage: Inbox, Relevant, Starred, All and Dismissed, with unread markers, Mark all read, actioned and undo. Filter by category, source, an extracted CVE, actor or vendor, Mentions my cases or My stack.
+- News: a Needs attention panel when feed indicators appear in your cases or exploited vulnerabilities hit your stack, and a This week panel with the most mentioned CVEs, actors, techniques and vendors.
+- Ten more news sources you can switch on: CISA advisories, NCSC UK, Cisco Talos, Unit 42, Securelist, Check Point Research, The DFIR Report, SecurityWeek, Dark Reading and MSRC.
+- Vulnerabilities: the CISA Known Exploited Vulnerabilities catalog is bundled (1,781 entries) and can be refreshed live. See CVEs in the news, all KEV or only your stack, with ransomware use, EPSS and CVSS columns.
+- My stack: watch the vendors and products you run. Stories and exploited vulnerabilities that touch them are flagged in News, Vulnerabilities and the brief.
+- CVE pages: the KEV entry and due date, EPSS from FIRST and CVSS from NVD on demand, the stories that mention it, reference links, and Add to case.
+- Indicators: a store of up to 50,000 indicators with TLP, confidence, first and last seen, expiry, tags and sources, kept in this browser and encrypted when encryption is on.
+- Indicator import: STIX 2.1 bundles (patterns, observables, TLP markings, indicates relationships), MISP events (tags, objects, composite types), ThreatFox and Feodo exports, CSV with any common header, or plain lists. The format is detected automatically.
+- Indicator feeds you can switch on: abuse.ch ThreatFox, Feodo Tracker and URLhaus, with an optional Auth-Key. They merge into the store with a 14-day expiry when you refresh.
+- Indicator export: STIX 2.1, MISP or CSV of the indicators shown, every live indicator, or a whole case, with a TLP marking.
+- Indicators from your feeds that also appear in a case are flagged in Threat Intel and on the indicator in the case (In your feeds), and CVEs in CISA KEV are marked Known exploited.
+- Actors & ATT&CK: MITRE ATT&CK Enterprise is bundled offline (706 techniques, 178 groups, 842 malware and tools). Each actor page shows aliases, techniques, software, related groups and your stories.
+- ATT&CK heatmaps by tactic for techniques in the news or for one actor, exportable as an ATT&CK Navigator layer.
+- Briefs: build a threat brief for 24 hours to 30 days from starred, relevant and critical stories, new KEV entries, top actors and techniques and feed hits in your cases, with a TLP marking. Save it to the Notebook, download Markdown or copy it.
+- Sources has three tabs: News feeds, Vulnerability data (KEV, EPSS, NVD) and Indicator feeds. Each source shows the one host it contacts and its last status, and is off until you switch it on.
+
+### Changed
+- The story panel adds Star, Relevant, Actioned and Dismiss, the extracted CVEs, actors, techniques and vendors, and the other sources that reported the same story.
+- Backups now include the indicator store. Feed API keys are never included.
+- Security: the page may connect only to named hosts, each opt-in: api.rss2json.com, raw.githubusercontent.com, api.first.org, services.nvd.nist.gov and three abuse.ch hosts. Every imported value is re-validated, text is capped and stripped of HTML, javascript: links are dropped, and CSV exports neutralise formulas.
+
 ## [1.24] — Cases board and design pass (2026-11-14)
 
 _The Cases page gets two views you can switch between: board cards that show each case's own relationship graph, and a list built for scanning. Buttons, inputs, filters, menus and search are larger and more consistent across every page._

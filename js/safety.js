@@ -166,7 +166,10 @@ async function backupObject(){
   const all = DB.records.concat((DB.trash || []).flatMap(x => x.kind === 'record' ? [x.data.r] : x.kind === 'case' ? x.data.records : []));
   const files = await filesForExport(all), nbfiles = typeof nbBackupFiles === 'function' ? await nbBackupFiles() : {}, n = Object.keys(files).length;
   // recent tool inputs belong to this browser: they are not part of a backup
-  return Object.assign({}, DB, {recent:undefined, work:undefined}, n ? {files} : {}, Object.keys(nbfiles).length ? {nbfiles} : {}, DB.security && DB.security.sign ? {security:Object.assign({}, DB.security, {sign:{pub:DB.security.sign.pub, made:DB.security.sign.made}})} : {});   // the signing key's private half never goes into a backup
+  // threat intel: the indicator store goes with the backup; feed API keys never do
+  if(typeof ctiLoad === 'function') await ctiLoad();
+  const intel = DB.intel ? Object.assign({}, DB.intel, {sources:(DB.intel.sources || []).map(s => Object.assign({}, s, {key:''})), look:DB.intel.look ? {on:DB.intel.look.on || {}, keys:{}, relay:{url:(DB.intel.look.relay || {}).url || '', token:''}} : undefined}) : undefined, ctiIocs = typeof CTI !== 'undefined' && CTI.iocs && CTI.iocs.length ? CTI.iocs : undefined;
+  return Object.assign({}, DB, {recent:undefined, work:undefined, intel, ctiIocs}, n ? {files} : {}, Object.keys(nbfiles).length ? {nbfiles} : {}, DB.security && DB.security.sign ? {security:Object.assign({}, DB.security, {sign:{pub:DB.security.sign.pub, made:DB.security.sign.made}})} : {});   // the signing key's private half never goes into a backup
 }
 async function exportEverything(enc){
   if(enc == null) enc = !!SEC.key;

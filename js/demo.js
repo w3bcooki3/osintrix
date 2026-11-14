@@ -121,7 +121,26 @@ const feed = [
   {id:'f2',source:'Sample CERT Bulletin',date:'2026-09-13T12:00:00Z',title:'Credential-stuffing wave against customer portals',
    body:'Automated login attempts with python-requests user agents from 192.0.2.66 and others.'},
   {id:'f3',source:'Sample Vendor Blog',date:'2026-09-11T09:30:00Z',title:'Patch Tuesday: CVE-2026-21001 in print spooler under active exploitation',
-   body:'No indicators published yet.'}
+   body:'No indicators published yet.'},
+  /* summaries of well-documented public events (real CVEs, advisories and actor names), written for the demo */
+  {id:'f4',source:'Sample advisory digest',date:'2024-04-12T15:00:00Z',title:'PAN-OS GlobalProtect zero-day CVE-2024-3400 exploited in the wild',
+   body:'Palo Alto Networks disclosed a critical command injection in the GlobalProtect feature of PAN-OS, exploited before a fix was available. Volexity tracked the activity as UTA0218: exploitation of the public-facing firewall (T1190) followed by a Python backdoor and lateral movement. Apply the hotfix and hunt for signs of compromise.'},
+  {id:'f5',source:'Sample vendor watch',date:'2024-04-13T09:00:00Z',title:'Attackers exploit CVE-2024-3400 in Palo Alto Networks firewalls; CISA adds it to KEV',
+   body:'CISA added the PAN-OS GlobalProtect vulnerability CVE-2024-3400 to the Known Exploited Vulnerabilities catalog. Organisations running affected Palo Alto Networks firewalls should patch and review logs.'},
+  {id:'f6',source:'Sample advisory digest',date:'2023-11-21T14:00:00Z',title:'LockBit 3.0 affiliates exploit Citrix Bleed (CVE-2023-4966)',
+   body:'A joint CISA and FBI advisory describes LockBit 3.0 ransomware affiliates exploiting Citrix NetScaler ADC and Gateway session token leakage, CVE-2023-4966, to hijack sessions (T1550.004) and deploy ransomware (T1486).'},
+  {id:'f7',source:'Sample research notes',date:'2023-06-07T16:00:00Z',title:'CL0P ransomware gang exploits MOVEit Transfer CVE-2023-34362',
+   body:'The CL0P ransomware gang mass-exploited a SQL injection in Progress MOVEit Transfer, CVE-2023-34362, installing the LEMURLOOT web shell and stealing data for extortion (T1190, T1505.003).'},
+  {id:'f8',source:'Sample advisory digest',date:'2024-02-07T17:00:00Z',title:'Volt Typhoon pre-positions in critical infrastructure networks',
+   body:'Agencies warn that Volt Typhoon, a People\'s Republic of China state-sponsored group, compromised IT networks of critical infrastructure. The actor relies on living-off-the-land techniques, valid accounts (T1078) and dumping NTDS.dit with ntdsutil (T1003.003).'},
+  {id:'f9',source:'Sample research notes',date:'2024-01-10T18:00:00Z',title:'Ivanti Connect Secure zero-days CVE-2023-46805 and CVE-2024-21887 chained',
+   body:'An authentication bypass and a command injection in Ivanti Connect Secure VPN appliances were chained for unauthenticated remote code execution. Exploitation was observed before patches; Ivanti published mitigations.'},
+  {id:'f10',source:'Sample vendor watch',date:'2024-02-09T12:00:00Z',title:'Fortinet FortiOS SSL VPN flaw CVE-2024-21762 potentially exploited',
+   body:'Fortinet patched a critical out-of-bounds write in FortiOS SSL VPN, CVE-2024-21762, noting it was potentially being exploited in the wild. CISA added it to the KEV catalog.'},
+  {id:'f11',source:'Sample advisory digest',date:'2023-11-16T15:00:00Z',title:'Scattered Spider targets IT help desks with social engineering',
+   body:'Scattered Spider operators impersonate staff to persuade help desks to reset credentials and enroll new MFA devices, use MFA request flooding (T1621) and phishing (T1566), and have deployed ALPHV ransomware.'},
+  {id:'f12',source:'Sample research notes',date:'2023-08-29T19:00:00Z',title:'International operation disrupts QakBot botnet infrastructure',
+   body:'Law enforcement disrupted the QakBot malware botnet, used for years as an initial access loader for ransomware groups, and redirected infected computers to an uninstaller.'}
 ];
 return {cases, R, answers, verdicts, attrs, edges, feed};
 })();

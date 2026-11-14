@@ -25,6 +25,7 @@ function renderMain(){
   if(r.area === 'cloud') bindCloud();
   if(r.area === 'whatsnew') bindWhatsNew();
   if(r.area === 'cases') bindCases();
+  if(r.area === 'feeds' && typeof bindIntel === 'function') bindIntel();
   if(r.area === 'pad') bindPad();
   if(r.area === 'notebook') bindNotebook();
   if(r.area === 'certs') bindCerts();
@@ -102,6 +103,8 @@ document.addEventListener('click', ev => {
   if(FB_ACTS[a]) return FB_ACTS[a](id, v, t, ev);
   if(CX_ACTS[a]) return CX_ACTS[a](id, v, t, ev);
   if(typeof RC_ACTS !== 'undefined' && RC_ACTS[a]) return RC_ACTS[a](id, v, t, ev);
+  if(typeof CTI_ACTS !== 'undefined' && CTI_ACTS[a]) return CTI_ACTS[a](id, v, t, ev);
+  if(typeof LK_ACTS !== 'undefined' && LK_ACTS[a]) return LK_ACTS[a](id, v, t, ev);
   if(NBX_ACTS[a]) return NBX_ACTS[a](id, v, t, ev);
   if(a === 'toolRun') return toolRunDlg(id);
   if(a === 'trPick'){ $('trV').value = v; return $('trV').focus(); }
@@ -205,10 +208,9 @@ document.addEventListener('click', ev => {
     case 'feedRefresh': return refreshFeeds();
     case 'intelOn': DB.prefs.liveFeeds = true; save(); closeDlg(); return refreshFeeds();
     case 'intelOff': DB.prefs.liveFeeds = false; mutate('feeds offline'); closeDlg(); renderAll(); return toast('Live feeds off — nothing will be fetched');
-    case 'feedSources': return sourcesDlg();
     case 'srcToggle': { const s = DB.feedSources.find(x => x.id === id); s.on = t.checked; mutate('source ' + s.name); return; }
     case 'srcDel': DB.feedSources = DB.feedSources.filter(x => x.id !== id); mutate('removed source'); return sourcesDlg();
-    case 'srcReset': DB.feedSources = DEFAULT_SOURCES.map(s => ({...s})); mutate('reset sources'); return sourcesDlg();
+    case 'srcReset': DB.feedSources = [...DEFAULT_SOURCES.map(s => ({...s})), ...MORE_NEWS.map(([name, url]) => ({id:uid('s'), name, url, on:false, status:'', last:0}))]; mutate('reset sources'); return sourcesDlg('news');
     case 'icat': UI.icat = v; return renderMain();
     case 'imatch': UI.imatch = !UI.imatch; return renderMain();
     /* toolbox */
@@ -250,7 +252,7 @@ document.addEventListener('click', ev => {
       confirmDlg('Replace everything with this backup?', 'Your current cases, notes, tools and rules in this browser are replaced by the ' + d.cases.length + ' case' + (d.cases.length === 1 ? '' : 's') + ' in the file. You can undo right after.', 'Import backup', async () => {
         await snapshot('Before importing a backup'); if(d.files){ await rekeyFiles(d.files, d.records, d.trash); delete d.files; } const nbfiles = d.nbfiles; delete d.nbfiles;
         d.records.forEach(normRecord); d.entries.forEach(normEntry);
-        const prev = DB; DB = d; DB.recent = prev.recent; DB.work = prev.work; DB.prefs = Object.assign({}, prev.prefs, d.prefs || {}); ensureTools(); ensurePlaybooks(); ensureIntel(); ensureQueries(); ensureRules(); ensureNotes(); if(DB.nb){ nbSanitize(); await nbRestoreFiles(nbfiles); } else ensureNB(); UI.nbView = 'lib'; UI.nbRev = null; if(!DB.cases.some(c => c.id === DB.active)) DB.active = DB.cases[0] && DB.cases[0].id;
+        const prev = DB, inIocs = Array.isArray(d.ctiIocs) ? d.ctiIocs.slice(0, CTI_IOC_MAX) : null; delete d.ctiIocs; DB = d; DB.recent = prev.recent; DB.work = prev.work; if(DB.intel && prev.intel) (DB.intel.sources || []).forEach(s => { const o = (prev.intel.sources || []).find(x => x.id === s.id); s.key = o ? o.key || '' : ''; }); if(DB.intel){ const pl = prev.intel && prev.intel.look || {}; DB.intel.look = Object.assign({on:{}}, DB.intel.look || {}, {keys:pl.keys || {}, relay:{url:(DB.intel.look && DB.intel.look.relay && DB.intel.look.relay.url) || (pl.relay && pl.relay.url) || '', token:(pl.relay && pl.relay.token) || ''}}); } if(inIocs){ await ctiLoad(); CTI.iocs = []; ctiIocIndex(); const iso = t => { const z = new Date(t); return t && !isNaN(z) ? z.toISOString() : ''; }; ctiAddIocs(inIocs.filter(x => x && typeof x === 'object').map(x => ({v:x.v, type:x.k, tags:x.tags, threat:x.threat, desc:x.desc, ref:x.ref, tlp:x.tlp, conf:x.conf, srcs:x.srcs, first:iso(x.first), last:iso(x.last), exp:iso(x.exp)})), 'Backup'); await ctiSaveIocs(); } DB.prefs = Object.assign({}, prev.prefs, d.prefs || {}); ensureTools(); ensurePlaybooks(); ensureIntel(); ensureQueries(); ensureRules(); ensureNotes(); if(DB.nb){ nbSanitize(); await nbRestoreFiles(nbfiles); } else ensureNB(); UI.nbView = 'lib'; UI.nbRev = null; if(!DB.cases.some(c => c.id === DB.active)) DB.active = DB.cases[0] && DB.cases[0].id;
         await hashRecords(); ensurePositions(); mutate('imported backup'); UI.sel = null; applyPrefs(); renderAll(); toast('Backup imported', 'Undo', () => { DB = prev; mutate('undo import'); applyPrefs(); renderAll(); }); }); }));
     case 'freshStart': return confirmDlg('Start fresh?', 'Deletes every case, vault entry, evidence record and note in this browser. Tools, queries, rules and settings stay. Export first if you might need them. You can undo right after.', 'Delete my cases', async () => {
       await snapshot('Before starting fresh'); const prev = JSON.parse(JSON.stringify(DB)); const c = {id:uid('c'), name:'My first case', code:'TN-2026-001', status:'active', owner:'You', created:Date.now(), updated:Date.now(), scope:'', color:CASE_COLORS[0], icon:'briefcase'};
@@ -536,7 +538,14 @@ document.addEventListener('submit', ev => {
     UI.noteColorEdit = null; mutate('edited note'); closeDlg(); return renderAll(); }
   if(k === 'src'){ const url = $('srcUrl').value.trim(), sn = $('srcName').value.trim().replace(/\s+/g, ' ') || hostOf(url); if(!E.safeUrl(url)) return fieldErr('srcUrl', 'Enter the feed address, starting with http:// or https://.');
     if(DB.feedSources.some(x => x.url.replace(/\/+$/, '') === url.replace(/\/+$/, ''))) return fieldErr('srcUrl', 'This feed is already in your sources.'); if(clash(DB.feedSources, sn)) return fieldErr('srcName', `A source called “${sn}” already exists.`); if(!checkLen('srcName', sn, 60, 'Name')) return;
-    DB.feedSources.push({id:uid('s'), name:sn, url, on:true, status:'', last:0}); mutate('added source'); return sourcesDlg(); }
+    DB.feedSources.push({id:uid('s'), name:sn.slice(0, 80), url, on:true, status:'', last:0}); mutate('added source'); return sourcesDlg('news'); }
+  if(k === 'ctiLook'){ const q = $('lkQ').value.trim(), n = lkParse(q); if(!n) return fieldErr('lkQ', 'Enter an IP address, domain, URL, MD5/SHA-1/SHA-256 hash, CVE ID or ASN.'); return lookGo(n.k, n.v); }
+  if(k === 'ctiStack'){ const raw = $('ctiStackIn').value.trim().replace(/\s+/g, ' ').slice(0, 160); if(!raw) return fieldErr('ctiStackIn', 'Type a vendor, or vendor / product.');
+    const [vendor, product] = raw.split(/\s*\/\s*/); const known = ctiVendors().find(v => v.vendor.toLowerCase() === vendor.toLowerCase());
+    const item = {vendor:known ? known.vendor : vendor.slice(0, 80), product:(product || '').slice(0, 80)};
+    if(DB.intel.stack.some(s => s.vendor.toLowerCase() === item.vendor.toLowerCase() && (s.product || '').toLowerCase() === item.product.toLowerCase())) return fieldErr('ctiStackIn', 'You already watch that.');
+    if(DB.intel.stack.length >= 200) return fieldErr('ctiStackIn', 'Up to 200 products.');
+    DB.intel.stack.push(item); mutate('watching ' + item.vendor); renderMain(); const n = ctiVendors().find(v => v.vendor === item.vendor); return toast(known ? item.vendor + ' — ' + n.n + ' known exploited vulnerabilit' + (n.n === 1 ? 'y' : 'ies') + ' in the catalog' : 'Watching ' + item.vendor + ' — not in the KEV catalog yet; news mentions still count'); }
   if(k === 'answer'){ const r = recById(f.dataset.id); if(!checkLen('ansIn', $('ansIn').value.trim(), LIMITS.body, 'Answer')) return; r.answer = $('ansIn').value.trim(); mutate('answered a question'); renderAll(); return toast('Answer saved'); }
   if(k === 'cusTrust'){ const l = $('cusTL').value.trim(); if(!l || !UI.cusTrust) return; trustKey(UI.cusTrust, l); UI.cusTrust = null; closeDlg(); return toast('Key trusted: ' + l); }
   if(k === 'addQ'){ const q = $('newQ').value.trim().replace(/\s+/g, ' '); if(!q) return fieldErr('newQ', 'Type the question first.'); if(!checkLen('newQ', q, 300, 'Question')) return;
@@ -657,7 +666,7 @@ async function bootRest(unlocked){
   UI.inspOpen = false; UI.graph.legendMin = window.innerWidth < 1100;
   if(window.innerWidth <= 760) $('gq').placeholder = 'Search everything';
   $('gq').addEventListener('focus', () => { $('gq').blur(); srchOpen(); }); $('gq').addEventListener('mousedown', ev => { ev.preventDefault(); srchOpen(); });
-  ensureTools(); ensureToolTpl(); ensurePlaybooks(); ensureIntel(); ensureQueries(); ensureRules(); ensureNotes(); ensureSample(); ensureCTF(); ensureNB(); ensureAchDemo(); applyPrefs(); storageCheck(); await hashRecords(); migrateFieldEnts(); ensurePositions(); flush(); onRoute(); nbFlushMedia(); fbInit();
+  ensureTools(); ensureToolTpl(); ensurePlaybooks(); ensureIntel(); if(typeof ctiLoad === 'function') ctiLoad(); if(typeof watchMonitor === 'function'){ lkLoad(); watchMonitor(); } ensureQueries(); ensureRules(); ensureNotes(); ensureSample(); ensureCTF(); ensureNB(); ensureAchDemo(); applyPrefs(); storageCheck(); await hashRecords(); migrateFieldEnts(); ensurePositions(); flush(); onRoute(); nbFlushMedia(); fbInit();
   let seen = false; try{ seen = !!localStorage.getItem('osintrix:welcomed'); }catch(e){}
   if(!unlocked) setTimeout(() => { $('splash').classList.add('out'); setTimeout(() => $('splash').remove(), 320); if(!seen) showWelcome(); }, 350);
   armAutolock();

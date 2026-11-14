@@ -26,6 +26,9 @@ const phoneCountry = v => { if(!/^\+/.test(v)) return null; const d = v.slice(1)
 /* tags: [label, tone] where tone is red | amber | blue | '' */
 function ctxOf(k, v){
   const out = [], host = k === 'url' ? ((v.match(/^https?:\/\/(?:[^/@\s]*@)?([^/:?#\s]+)/i) || [])[1] || '').toLowerCase() : k === 'email' ? v.split('@')[1] : k === 'domain' ? v : '';
+  /* threat intel: CISA known-exploited, and indicators from your feeds */
+  if(k === 'cve' && typeof kevOf === 'function'){ const kv = kevOf(v); if(kv) out.push(['Known exploited (CISA)' + (kv.ransom ? ' · ransomware' : ''), 'red']); }
+  if(typeof CTI !== 'undefined' && CTI.iocIx){ const x = CTI.iocIx.get(k + ':' + v); if(x && iocLive(x)) out.push(['In your feeds: ' + (x.threat || x.srcs[0] || 'indicator') + (x.tlp && x.tlp !== 'clear' ? ' · TLP:' + x.tlp.toUpperCase() : ''), 'red']); }
   if(k === 'ipv4' || k === 'ipv6'){ const c = E.ipClass(v); if(!/^Public/.test(c)){ out.push([c, '']); return out; }
     if(ENR){ const p = provOf(v); if(p) out.push([p, 'blue']); if(ENR.tor.has(ipNum(v))) out.push(['Tor exit node', 'red']); } }
   if(k === 'hostport'){ const h = v.slice(0, v.lastIndexOf(':')); if(ENR){ const p = provOf(h); if(p) out.push([p, 'blue']); if(ENR.tor.has(ipNum(h))) out.push(['Tor exit node', 'red']); } }
@@ -59,17 +62,23 @@ function watchNotify(recs){ const W = DB.watch || {}; const hit = [...new Set(re
 function watchCard(){
   const W = DB.watch || {}, n = Object.keys(W).length, H = watchHits();
   return `<section class="card"><header><h3>${ico('eye','sm')} Watchlist</h3><span class="t3">${n} watched</span><a class="btn sm ghost" href="#/watch" style="margin-left:auto">Open ${ico('chevron-right','sm')}</a></header><div class="body flush">
-    ${H.length ? H.slice(0, 6).map(h => h.r ? `<button class="li" data-act="selRec" data-id="${h.r.id}"><span class="tb sm" style="--c:var(--amber)">${ico('eye')}</span><div class="main2"><b style="font-weight:540">${esc(entSplit(h.k).v)}</b><small>${esc((theCase(h.r.caseId) || {}).code || '')} · ${esc(h.r.title.slice(0, 70))} · ${esc(E.fmtAgo(Date.now() - h.r.addedAt))} ago</small></div></button>`
+    ${H.length ? H.slice(0, 6).map(h => h.r ? `<button class="li" data-act="selRec" data-id="${h.r.id}"><span class="tb sm" style="--c:var(--amber)">${ico('eye')}</span><div class="main2"><b style="font-weight:540">${esc(entSplit(h.k).v)}</b><small>${esc((theCase(h.r.caseId) || {}).code || '')} · ${esc(h.r.title.slice(0, 70))} · ${esc(E.fmtAgo(Date.now() - h.r.addedAt))}</small></div></button>`
       : `<button class="li" data-act="selFeed" data-id="${h.f.id}"><span class="tb sm" style="--c:var(--red)">${ico('rss')}</span><div class="main2"><b style="font-weight:540">${esc(entSplit(h.k).v)}</b><small>In the news · ${esc(h.f.title.slice(0, 70))}</small></div></button>`).join('')
       : `<p class="t3" style="padding:14px 18px;margin:0;font-size:calc(13.5px * var(--ts,1))">${n ? 'No new sightings. You will see them here, and get a notice, when a watched entity turns up in new evidence or the news.' : 'Watch an IP, domain, handle or wallet from its details panel, and new sightings show up here.'}</p>`}</div></section>`;
 }
 function viewWatch(){
   const W = DB.watch || {}, g = globalEnts(), H = watchHits(), keys = Object.keys(W).sort((a, b) => W[b].at - W[a].at);
-  return `<div class="scroll"><div class="page">${pageHead('eye','var(--amber)','Watchlist','Entities you are tracking. Any new evidence, log import or news item that mentions one is flagged — across every case.', '')}
-    ${keys.length ? `<section class="card" style="overflow:hidden"><table class="tbl cardify"><thead><tr><th>Entity</th><th>Verdict</th><th class="n">New sightings</th><th class="hide-m">Cases</th><th class="hide-m">Watching since</th><th></th></tr></thead><tbody>
+  return `<div class="scroll"><div class="page">${pageHead('eye','var(--amber)','Watchlist','Entities you are tracking. Any new evidence, log import or news item that mentions one is flagged — across every case. IPs, domains, URLs, hashes and CVEs can also be re-checked online, and you are told what changed.',
+      typeof watchEvery === 'function' ? `<label class="sr" for="watchEvery">Check online</label><select id="watchEvery" class="inp ti-sel" title="Re-check watched indicators with your lookup sources while the app is open">${[[0, 'Online checks off'], [1, 'Check every hour'], [6, 'Check every 6 hours'], [24, 'Check daily']].map(([h, l]) => `<option value="${h}"${(+DB.prefs.watchEvery || 0) === h ? ' selected' : ''}>${l}</option>`).join('')}</select>
+        <button class="btn" data-act="watchNow">${ico('radar','sm')}Check now</button>` : '')}
+    ${(() => { const A = keys.flatMap(k => (W[k].alerts || []).map(a => ({k, ...a}))).sort((a, b) => b.at - a.at); const un = keys.some(k => W[k].unseen);
+      return A.length ? `<section class="card wl-ch"><header><h3>${ico('activity','sm')} Changes${un ? ' <span class="chip amber sq">new</span>' : ''}</h3>${un ? `<button class="btn sm ghost" data-act="watchSeen" style="margin-left:auto">${ico('check','sm')}Mark seen</button>` : ''}</header><div class="body flush">
+        ${A.slice(0, 30).map(a => `<button class="li" data-act="lookEnt" data-id="${esc(a.k)}"><span class="mono t3" style="width:120px;font-size:calc(12.5px * var(--ts,1))">${esc(E.fmtFull(a.at, tz()).slice(0, 16))}</span><div class="main2"><b style="font-weight:540">${esc(entSplit(a.k).v)}</b><small>${a.d.map(d => (d.hot ? '▲ ' : '') + esc(d.t)).join(' · ')}</small></div></button>`).join('')}</div></section>` : ''; })()}
+    ${keys.length ? `<section class="card" style="overflow:hidden"><table class="tbl cardify"><thead><tr><th>Entity</th><th>Verdict</th><th class="n">New sightings</th><th class="hide-m">Last online check</th><th class="hide-m">Cases</th><th class="hide-m">Watching since</th><th></th></tr></thead><tbody>
       ${keys.map(k => { const {k:kind, v} = entSplit(k), ge = g.get(k), n = H.filter(h => h.k === k).length;
         return `<tr data-act="selEnt" data-id="${esc(k)}"><td><div class="ce-e">${kindBadge(kind,'sm')}<div style="min-width:0"><div class="v mono">${esc(v)}</div><div class="t3" style="font-size:calc(12.5px * var(--ts,1))">${esc(E.LABEL[kind] || kind)} ${ctxChips(kind, v)}</div></div></div></td>
           <td>${vdLabel(verdictOf(k)) || '<span class="t3">—</span>'}</td><td class="n">${n ? `<span class="chip amber sq">${n}</span>` : '0'}</td>
+          <td class="hide-m">${W[k].snap && typeof VD_NAME !== 'undefined' ? `<span class="lk-band" style="--c:${VD_COL[W[k].snap.band]}">${esc(VD_NAME[W[k].snap.band])} ${W[k].snap.score}</span> <span class="t3">${esc(iAgo(W[k].checked))}</span>` : '<span class="t3">—</span>'}</td>
           <td class="hide-m">${ge ? [...ge.cases].filter(theCase).map(cid => { const o = theCase(cid); return `<a class="ce-case" href="${caseHash(cid, 'entities')}" style="--cc:${esc(o.color)}">${esc(o.code)}</a>`; }).join(' ') : '<span class="t3">—</span>'}</td>
           <td class="hide-m t3">${esc(E.fmtDate(W[k].at, tz()))}</td><td><button class="iconbtn" data-act="watch" data-id="${esc(k)}" aria-label="Stop watching" title="Stop watching">${ico('x','sm')}</button></td></tr>`; }).join('')}</tbody></table></section>
       <h2 class="hh" style="margin-top:26px">New sightings</h2>
