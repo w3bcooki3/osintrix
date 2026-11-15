@@ -295,7 +295,7 @@ function caseVault(c, D){
       ${GROUPS.map(([g, l,, col]) => catBtn(g, l, D.entries.filter(e => TYPES[e.type].group === g).length, col)).join('')}</aside>
     <div class="vmain">
       <div class="toolbar"><div class="search-in">${ico('search')}<label class="sr" for="vq">Search this vault</label><input id="vq" class="inp" placeholder="Search entries, fields, tags…" value="${esc(UI.vq)}"></div>
-        <span class="t3" style="font-size:calc(13.5px * var(--ts,1))">${list.length} entries</span><span style="flex:1"></span>${layoutSeg('vLay', DB.prefs.vLay || 'cards', [['cards','layout-grid','Cards'],['list','rows-3','List']])}
+        <span class="t3" style="font-size:calc(13.5px * var(--ts,1))">${list.length} entries</span><span style="flex:1"></span>${(n => n ? `<button class="btn sm" data-act="dupOpen">${ico('merge','sm')}${n} possible duplicate${n > 1 ? 's' : ''}</button>` : '')(typeof dupGroups === 'function' ? dupGroups(c.id).length : 0)}${layoutSeg('vLay', DB.prefs.vLay || 'cards', [['cards','layout-grid','Cards'],['list','rows-3','List']])}
         <button class="btn primary" data-act="addEntry">${ico('plus','sm')}Add entry</button></div>
       ${list.length && DB.prefs.vLay === 'list' ? entryRows(list) : list.length ? (groups ? groups.map(([g, l, i, col]) => { const gl = list.filter(e => TYPES[e.type].group === g);
           return `<div class="vgroup"><span class="tb sm" style="--c:var(${col})">${ico(i)}</span><h3>${l}</h3><span class="t3">${gl.length}</span></div><div class="egrid">${gl.map(entryCard).join('')}</div>`; }).join('')
@@ -316,7 +316,7 @@ function dayOf(ts){ const z = tz(), k = z + '|' + Math.floor(ts / 9e5); let v = 
 function caseTimeline(c, D){
   const list = D.recs.filter(passes);
   const hosts = countBy(D.recs, r => r.host);
-  const bar = `<div class="tlbar"><div class="seg" role="group" aria-label="View"><button data-act="tlMode" data-v="events" aria-pressed="${UI.tlMode === 'events'}">${ico('clock','sm')}Events</button><button data-act="tlMode" data-v="story" aria-pressed="${UI.tlMode === 'story'}">${ico('book-open','sm')}Story</button><button data-act="tlMode" data-v="patterns" aria-pressed="${UI.tlMode === 'patterns'}">${ico('activity','sm')}Patterns</button></div>
+  const bar = `<div class="tlbar"><div class="seg" role="group" aria-label="View"><button data-act="tlMode" data-v="events" aria-pressed="${UI.tlMode === 'events'}">${ico('clock','sm')}Events</button><button data-act="tlMode" data-v="story" aria-pressed="${UI.tlMode === 'story'}">${ico('book-open','sm')}Story</button><button data-act="tlMode" data-v="patterns" aria-pressed="${UI.tlMode === 'patterns'}">${ico('activity','sm')}Patterns</button><button data-act="tlMode" data-v="chain" aria-pressed="${UI.tlMode === 'chain'}">${ico('route','sm')}Attack chain</button></div>
     ${UI.tlMode === 'events' ? `<div class="search-in tlq">${ico('filter')}<label class="sr" for="tlq">Filter the timeline</label><input id="tlq" class="inp" placeholder="Filter — host:DC01 verdict:malicious 4624" value="${esc(UI.q || '')}" autocomplete="off" spellcheck="false"></div><span class="t3" style="font-size:calc(13.5px * var(--ts,1))">${list.length} of ${D.recs.length}</span>
     ${hosts.slice(0, 5).map(([h, n]) => `<button class="chip" data-act="facet" data-f="host" data-v="${esc(h)}" aria-pressed="${UI.facet.host === h}">${esc(h)}<span class="n">${n}</span></button>`).join('')}
     ${UI.pivot ? `<span class="chip accent">Pivot: ${esc(entSplit(UI.pivot).v)} <button data-act="pivotOff" aria-label="Exit pivot">${ico('x','sm')}</button></span>` : ''}
@@ -326,6 +326,7 @@ function caseTimeline(c, D){
     <span class="sp"></span><button class="btn xs${UI.tlSel ? ' on' : ''}" data-act="tlSel" aria-pressed="${!!UI.tlSel}">${ico('square-check','sm')}Select</button><button class="btn xs${UI.tlHeat ? ' on' : ''}" data-act="tlHeat" aria-pressed="${!!UI.tlHeat}">${ico('grid-3x3','sm')}Heatmap</button>` : ''}</div>`;
   if(UI.tlMode === 'story') return `<div class="scroll">${bar}${storyHTML(D)}</div>`;
   if(UI.tlMode === 'patterns') return `<div class="scroll">${bar}${tlxView(D)}</div>`;
+  if(UI.tlMode === 'chain') return `<div class="scroll">${bar}${chainView(c, D)}</div>`;
   /* every matching event is in the list; only the ones near the screen are drawn (vlist.js) */
   const items = [], dayN = new Map(); let lastDay = null, prev = null;
   for(const r of list) if(r.ts){ const d = dayOf(r.ts); dayN.set(d, (dayN.get(d) || 0) + 1); }

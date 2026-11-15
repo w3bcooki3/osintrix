@@ -1380,6 +1380,9 @@ test('no serious accessibility problems on the newer screens (copilot, investiga
     ruleQueries: () => { UI.rtab = 'queries'; location.hash = '#/detections'; },
     ruleTests: () => { const r = DB.rules.find(x => x.id === UI.rule); r.tests = [{ id: 't1', kind: 'hit', text: 'CommandLine="powershell -enc AAA" Image="C:\\x\\powershell.exe"' }, { id: 't2', kind: 'miss', text: 'CommandLine="cmd"' }]; UI.rtab = 'tests'; location.hash = '#/detections'; },
     notesBar: () => { location.hash = '#/notes'; },
+    today: () => { location.hash = '#/today'; },
+    chain: () => { UI.tlMode = 'chain'; location.hash = '#/case/c-lantern/timeline'; },
+    dupes: () => { location.hash = '#/case/c-lantern/vault'; setTimeout(() => { const e = { id: 'vdup', caseId: 'c-lantern', type: 'person', fields: { name: 'Okafor Jordan' }, priority: 'low', starred: false, tags: [], notes: '', src: '', created: Date.now() }; normEntry(e); if(!entryById('vdup')) DB.entries.push(e); dupDlg(); }, 60); },
     vaultCards: () => { DB.prefs.vLay = 'cards'; location.hash = '#/case/c-lantern/vault'; },
     vaultList: () => { DB.prefs.vLay = 'list'; location.hash = '#/case/c-lantern/vault'; },
     picInsights: () => { UI.mdV = 'pic'; location.hash = '#/case/c-lantern/media'; },
@@ -1926,5 +1929,44 @@ test('a new rule opens its editor from any Detections view; vault cards and the 
   await page.click('[data-act=vSort][data-v=recs]');
   const first = await page.locator('.vl-t tbody tr').first().locator('.vl-v').textContent(); expect(first).toContain('203.0.113.47');
   await page.locator('.vl-t tbody tr').first().click(); await expect(page.locator('#insp')).toBeVisible();
+  noErrors(errors);
+});
+
+test('today, duplicates and the attack chain', async ({ page }) => {
+  const errors = await open(page, '#/today');
+  // demo cases until there is an own case; overdue notes come first
+  await expect(page.locator('.ph .sub')).toContainText('from the demo cases');
+  await expect(page.locator('.td-h').first()).toContainText('Now');
+  await expect(page.locator('.td-l').first()).toContainText('Overdue since 2026-09-17: Before handoff');
+  await expect(page.locator('.td-l')).toContainText(['open questions']);
+  // an unjudged lookup hit in an own case goes to the top
+  await page.evaluate(() => { const c = { id: 'c-own', code: 'OWN-1', name: 'Own', status: 'active', color: '#4f46e5', icon: 'folder', scope: '', created: Date.now() }; normCase(c); DB.cases.push(c);
+    const b = 'beacon to 203.0.113.99'; DB.records.push({ id: 'ro1', caseId: 'c-own', type: 'evidence', title: 'Beacon', body: b, tsRaw: '', tsZone: 'explicit', ts: Date.now(), host: 'H', source: 's', tags: [], ents: E.extract(b), answer: '', addedBy: 'You', addedAt: Date.now(), hash: '' });
+    ctiEnsure(); DB.intel.lookHist = [{ k: 'ipv4', v: '203.0.113.99', at: Date.now(), band: 'malicious', score: 88 }]; mutate('x'); renderMain(); });
+  await expect(page.locator('.td-l').first()).toContainText('a lookup flagged, with no verdict from you');
+  await expect(page.locator('.ph .sub')).not.toContainText('demo');
+  await page.locator('.td-l li:has-text("a lookup flagged") [data-act=tdGo]').click();
+  await expect(page.locator('#insp')).toContainText('203.0.113.99');
+  // duplicates: same email written differently and the same person with the words swapped
+  await page.evaluate(() => { const mk = (type, f, tags) => { const e = { id: uid('v'), caseId: 'c-lantern', type, fields: f, priority: 'critical', starred: false, tags, notes: 'second copy', src: '', created: Date.now() }; normEntry(e); DB.entries.push(e); return e; };
+    const a = mk('email', { email: 'Billing@lantern-invoice[.]example', provider: 'other.example' }, ['dup']); mk('person', { name: 'Okafor Jordan' }, []);
+    DB.links.push({ id: 'lx', caseId: 'c-lantern', a: a.id, b: DB.entries.find(e => e.id === 'v-actor').id, label: 'sent by', conf: 2 }); mutate('d'); go(caseHash('c-lantern', 'vault')); });
+  await page.click('[data-act=dupOpen]');
+  await expect(page.locator('.dp-g')).toHaveCount(2);
+  const n0 = await page.evaluate(() => DB.entries.length);
+  await page.locator('.dp-g:has-text("Email address") [data-act=dupMerge]').click();
+  const m = await page.evaluate(() => { const e = DB.entries.find(x => x.id === 'v-sender'); return [DB.entries.length, e.tags.includes('dup'), e.priority, /Also recorded as/.test(e.notes), DB.links.filter(l => l.a === 'v-sender' || l.b === 'v-sender').some(l => l.label === 'sent by')]; });
+  expect(m).toEqual([n0 - 1, true, 'critical', true, true]);
+  await page.click('#toastBtn'); expect(await page.evaluate(() => DB.entries.length)).toBe(n0);   // the merge can be undone
+  await page.evaluate(() => dupDlg()); await page.locator('.dp-g:has-text("Person") [data-act=dupNot]').click();
+  await expect(page.locator('.dp-g:has-text("Person")')).toHaveCount(0);   // "not the same" is remembered
+  // the attack chain: stages from tags, recognised behaviour and techniques; gaps in the middle named
+  await page.evaluate(() => { closeDlg(); UI.tlMode = 'chain'; go(caseHash('c-lantern', 'timeline')); });
+  await expect(page.locator('.ch-s.on[aria-label="Initial Access"]')).toContainText('Invoice email delivered to finance');
+  await expect(page.locator('.ch-s.on[aria-label="Persistence"]')).toContainText('Scheduled task');
+  await expect(page.locator('.ch-s.on[aria-label="Defense Impairment"], .ch-s.on[aria-label="Defense Evasion"]').first()).toContainText('log');
+  await expect(page.locator('.ch-sum')).toContainText('That is where to look next');
+  await page.locator('.ch-s.ch-gap [data-act=chRules]').first().click();
+  await expect(page.locator('.chip.accent:has-text("Stage:")')).toBeVisible();
   noErrors(errors);
 });

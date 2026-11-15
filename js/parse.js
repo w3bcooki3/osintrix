@@ -59,6 +59,9 @@ function flat(o, p = '', out = {}){ for(const [k, v] of Object.entries(o || {}))
 const SYSLOG = /^(?:<(\d{1,3})>)?(?:1\s+)?((?:\d{4}-\d\d-\d\dT[\d:.]+(?:Z|[+-]\d\d:?\d\d)?)|(?:[A-Z][a-z]{2}\s+\d{1,2}\s+\d\d:\d\d:\d\d))\s+([\w.\-:]+)\s+([\w.\-/]+?)(?:\[(\d+)\])?:\s+([\s\S]*)$/;
 
 /* ---------- built-in formats; each returns {format, fields} or null ---------- */
+const WIN_LBL = [['New Process Name','Image'],['Process Command Line','CommandLine'],['Creator Process Name','ParentImage'],['Parent Process Name','ParentImage'],['Process Name','Image'],['Account Name','User'],['Account Domain','Domain'],['Logon Type','LogonType'],
+  ['Source Network Address','IpAddress'],['Source Port','IpPort'],['Workstation Name','WorkstationName'],['Service File Name','ServiceFileName'],['Service Name','ServiceName'],['Task Name','TaskName'],['Object Name','ObjectName'],['Failure Reason','FailureReason'],['Logon Process','LogonProcess'],['Authentication Package','AuthenticationPackage']];
+const WIN_LBL_RE = /\b(New Process Name|Process Command Line|Source Network Address|Service File Name|Logon Type|Creator Process Name)\s*:/i;
 const BUILTIN = [
   ['JSON', s => { const t = s.trim(); if(!/^\{[\s\S]*\}$/.test(t)) return null; try{ return flat(JSON.parse(t)); }catch(e){ return null; } }],
   ['CEF', s => { const m = s.match(/CEF:(\d+)\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|(.*)$/); if(!m) return null;
@@ -83,6 +86,11 @@ const BUILTIN = [
   ['W3C / Zeek', (s, all) => { const h = (all || '').match(/^#fields[:\s]+(.+)$/im); if(!h) return null; const names = h[1].trim().split(/\t|\s+/), sep = /\t/.test(s) ? '\t' : ' ', vals = s.split(sep);
     if(vals.length < names.length - 1 || /^#/.test(s)) return null; const o = {}; names.forEach((n, i) => { if(vals[i] != null && vals[i] !== '-') o[n] = vals[i]; }); return o; }],
   ['key=value', s => kvParse(s)],
+  /* Windows events copied as text (Event Viewer, or a SIEM's message field): "New Process Name: … Process Command Line: …" on one line or many */
+  ['Windows event text', s => { if(!WIN_LBL_RE.test(s)) return null; const o = {}, re = new RegExp('(' + WIN_LBL.map(x => x[0].replace(/ /g, '\\s+')).join('|') + '):\\s*', 'gi'), hits = [...s.matchAll(re)];
+    hits.forEach((m, i) => { const end = i + 1 < hits.length ? hits[i + 1].index : s.length, v = s.slice(m.index + m[0].length, end).split('\n')[0].trim(); const L = WIN_LBL.find(x => new RegExp('^' + x[0].replace(/ /g, '\\s+') + '$', 'i').test(m[1])); if(L && v && v !== '-' && o[L[1]] == null) o[L[1]] = v; });
+    const ev = s.match(/\b(?:Event ID|EventID)\s*[:=]?\s*(\d{3,5})\b/i) || s.match(/A new process has been created/i) && [0, '4688'] || s.match(/An account was successfully logged on/i) && [0, '4624'] || s.match(/An account failed to log on/i) && [0, '4625'] || s.match(/A service was installed/i) && [0, '7045'] || s.match(/A scheduled task was created/i) && [0, '4698'];
+    if(ev) o.EventID = ev[1]; return Object.keys(o).length >= 2 ? o : null; }],
   ['Label: value', s => { const lines = s.split('\n'); if(lines.length < 3) return null; const o = {}; let n = 0;
     for(const l of lines){ const m = l.match(/^\s*([A-Za-z][\w .\/()-]{1,40}?)\s*:\s+(.+?)\s*$/); if(m && !/^https?$/i.test(m[1])){ const k = m[1].trim(); if(o[k] == null){ o[k] = m[2]; n++; } } }
     return n >= 3 ? o : null; }]
@@ -115,6 +123,7 @@ function parseLog(text, all){
   if(fields && !fields.EventID){ const ev = s.match(/\bEventID[:= ]\s*(\d{1,5})\b/i); if(ev) fields.EventID = ev[1]; }
   if(fields && fields.logid && (fields.devname || fields.vd)) format = 'FortiGate (' + format + ')';
   else if(fields && fields['cef.vendor']) format = 'CEF · ' + fields['cef.vendor'] + ' ' + fields['cef.product'];
+  else if(fields && /Windows event text/.test(format)) format = 'Windows event' + (fields.EventID ? ' ' + fields.EventID : '') + ' (text)';
   else if(fields && fields.EventID && (fields.Image || fields.CommandLine || fields.QueryName)) format = format.includes('XML') ? 'Sysmon (XML)' : 'Sysmon (' + format + ')';
   const out = fields ? {format, fields, norm:normalise(fields)} : null;
   if(key){ if(P_CACHE.size > 3000) P_CACHE.clear(); P_CACHE.set(key, out); }

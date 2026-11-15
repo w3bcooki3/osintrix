@@ -99,6 +99,8 @@ const PATTERNS = [
   ['asn',/\bAS\s?(\d{2,10})\b/g],
   ['file',/\b[\w][\w.\-()]{0,60}\.(?:exe|dll|sys|ps1|bat|cmd|vbs|js|hta|scr|jar|lnk|iso|zip|rar|7z|docm|xlsm|msi|evtx|pcap)\b/gi],
   ['ipv4',/\b(?:\d{1,3}\.){3}\d{1,3}\b/g],
+  /* internationalised domains written in other scripts (раураl.com): kept whole, so a look-alike is not cut down to "l.com" */
+  ['domain',/(?<![\w\u00C0-\uFFFF-])(?=[\w-]*[\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF])[\w\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF-]{1,63}(?:\.[\w\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF-]{1,63})*\.[a-z\u0400-\u04FF]{2,24}\b/gi],
   ['domain',/\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:[a-z]{2,24})\b/gi],
 ];
 const KINDS = ['ipv4','ipv6','hostport','domain','url','email','handle','social','phone','btc','eth','xmr','ltc','trx','doge','iban','md5','sha1','sha256','sha512',
@@ -149,6 +151,7 @@ function extract(text){
       if(/^(btc|ltc|trx|doge|xmr)$/.test(kind) && !/^(bc1|ltc1)/.test(v) && !mixedB58(v)) continue;
       if(kind === 'uname' && /^(name|password|id|agent|none|null|admin|root|unknown|required|here|the|and|for|with|from)$/i.test(v)) continue;
       if(kind === 'domain' && (/^\d+\./.test(v) || FILE_EXT_TLD.test(v) || !plausibleTLD(v))) continue;
+      if(kind === 'domain' && m.index > 0 && /[\u00C0-\uFFFF]/.test(work[m.index - 1])) continue;   // the tail of a word in another script is not a domain
       hits.push([m.index, m[0].length, v]);
     }
     if(hits.length){ // mask in one rebuild — linear, not quadratic
@@ -325,8 +328,28 @@ function observations0(rec){
   if(val('hostport').some(v => EVIL_PORTS[+v.slice(v.lastIndexOf(':') + 1)])) add('c2', 'Traffic to a port commonly used for reverse shells.');
   if(val('regkey').some(r => HOTKEY.some(([re]) => re.test(r))) || eids.some(n => [4697,7045,4698].includes(n))) add('persistence', 'Sets something up to run again later.');
   if(val('file').some(f => /\.(pdf|doc|docx|xls|txt)\.(exe|lnk|scr|js|hta)$/i.test(f))) add('lure', 'Disguised attachment — double extension.');
+  /* what the command line or log text itself shows — the same few dozen tricks turn up in almost every intrusion */
+  const txt = (rec.title || '') + '\n' + body, have = new Set(out.map(o => o.tag));
+  for(const [tag, re, t] of BEHAVIOUR) if(!have.has(tag) && re.test(txt)){ add(tag, t); have.add(tag); }
+  if(val('domain').some(d => /[^\x00-\x7f]/.test(d))) add('look-alike domain', 'Domain written with non-Latin letters (IDN homograph) — check what it imitates, T1583.001.');
   return out;
 }
+/* [tag, pattern, what it means]. Tags already used elsewhere keep their meaning (download, anti-forensics, persistence, c2). */
+const BEHAVIOUR = [
+  ['download', /\bcertutil(?:\.exe)?\b[^\n]{0,80}(?:-urlcache|-verifyctl|-split\s+-f)|\bbitsadmin(?:\.exe)?\b[^\n]{0,40}\/transfer|\b(?:invoke-webrequest|iwr|downloadstring|downloadfile|start-bitstransfer|net\.webclient)\b|\b(?:curl|wget)\b[^\n|;]{1,200}\|\s*(?:ba)?sh\b/i, 'Downloads a file with a built-in tool — ingress tool transfer, T1105.'],
+  ['anti-forensics', /\bwevtutil(?:\.exe)?\s+(?:cl|clear-log)\b|\bclear-eventlog\b|\baudit log was cleared\b|\bhistory\s+-c\b|\bunset\s+histfile\b|\brm\s+(?:-\w+\s+)*[^\s]*\.bash_history\b|\bfsutil\s+usn\s+deletejournal\b/i, 'Clears logs or shell history — what came before is missing on purpose, T1070.'],
+  ['impact', /\bvssadmin(?:\.exe)?\s+delete\s+shadows\b|\bwmic(?:\.exe)?\s+shadowcopy\s+delete\b|\bwbadmin(?:\.exe)?\s+delete\s+(?:catalog|systemstatebackup)\b|\bbcdedit(?:\.exe)?\b[^\n]{0,40}recoveryenabled\s+no\b/i, 'Deletes backups or shadow copies — typical just before ransomware, T1490.'],
+  ['persistence', /\bschtasks(?:\.exe)?\s+\/create\b|\bregister-scheduledtask\b|\bsc(?:\.exe)?\s+(?:\\\\\S+\s+)?create\b|\bnew-service\b|\\currentversion\\run(?:once)?\b|\bcrontab\b|>>?\s*\/etc\/cron|\bauthorized_keys\b|\bsystemctl\s+enable\b/i, 'Sets something up to run again later — T1053 / T1543 / T1547.'],
+  ['account', /\bnet1?(?:\.exe)?\s+user\s+\S+\s+\S*\s*\/add\b|\bnet1?(?:\.exe)?\s+(?:local)?group\s+"?(?:administrators|domain admins|enterprise admins)"?\s+\S+\s+\/add\b|\buseradd\b|\badd-localgroupmember\b|\bnew-localuser\b/i, 'Creates an account or adds one to an admin group — T1136 / T1098.'],
+  ['proxy execution', /\bmshta(?:\.exe)?\s+(?:https?:|javascript:|vbscript:)|\brundll32(?:\.exe)?\s+(?:javascript:|[^\n]*\\(?:users|programdata|temp|appdata)\\[^\n]*\.dll)|\bregsvr32(?:\.exe)?\b[^\n]{0,40}\/i:\s*https?:|\bmsiexec(?:\.exe)?\b[^\n]{0,30}\/[iq]\w*\s+https?:|\binstallutil(?:\.exe)?\b|\bmsbuild(?:\.exe)?\b[^\n]{0,80}\.(?:xml|csproj)\b/i, 'Runs code through a signed Windows program — system binary proxy execution, T1218.'],
+  ['credentials', /\bmimikatz\b|\bsekurlsa::|\blsadump::|\bprocdump(?:64)?(?:\.exe)?\b[^\n]{0,40}\blsass\b|\bcomsvcs(?:\.dll)?[^\n]{0,30}minidump\b|\breg(?:\.exe)?\s+save\s+hklm\\(?:sam|security|system)\b|\bntdsutil\b[^\n]{0,60}\bifm\b|\/etc\/shadow\b|\bkerberoast|\bRubeus\b/i, 'Goes after passwords or hashes — OS credential dumping, T1003.'],
+  ['discovery', /\bnltest(?:\.exe)?\s+\/(?:domain_trusts|dclist)\b|\bnet1?(?:\.exe)?\s+group\s+"?domain (?:admins|computers)\b|\badfind(?:\.exe)?\b|\bwhoami(?:\.exe)?\s+\/(?:all|priv|groups)\b|\bget-ad(?:user|computer|group|domain)\b|\bbloodhound|sharphound\b|\bnet1?(?:\.exe)?\s+view\s+\\\\/i, 'Maps the domain, its admins and computers — T1087 / T1482.'],
+  ['lateral movement', /\bpsexec(?:64)?(?:\.exe)?\b|\bwmic(?:\.exe)?\s+\/node:|\binvoke-command\b[^\n]{0,40}-computername\b|\benter-pssession\b|\bwinrs(?:\.exe)?\b|\\\\[\w.-]+\\(?:admin|c)\$|\blogon type:?\s*(?:3|10)\b[^\n]{0,200}\b(?:administrator|admin)\b/i, 'Moves to another machine — remote services, T1021 / T1570.'],
+  ['defenses off', /\bset-mppreference\b[^\n]{0,60}-disable\w*\s+\$?true|\badd-mppreference\b[^\n]{0,40}-exclusion|\bsc(?:\.exe)?\s+(?:stop|config)\s+windefend\b|\bnetsh(?:\.exe)?\s+(?:advfirewall\s+set\s+\w+\s+state\s+off|firewall\s+set\s+opmode\s+disable)\b|\bauditpol(?:\.exe)?\s+\/(?:clear|remove)\b|\bsetenforce\s+0\b|\bstoplogging\b|\bdeletetrail\b/i, 'Turns off antivirus, firewall or logging — impair defenses, T1562.'],
+  ['staging', /\b7za?(?:\.exe)?\s+a\b[^\n]{0,120}\s-p\S+|\brar(?:\.exe)?\s+a\b[^\n]{0,80}\s-hp\S*/i, 'Packs files into a password-protected archive — often a step before taking them, T1560.'],
+  ['exfiltration', /\brclone(?:\.exe)?\b[^\n]{0,40}\b(?:copy|sync)\b|\bmegacmd|\bmega(?:put|sync)\b|\bcurl\b[^\n]{0,60}(?:-T\s|--upload-file|-F\s+["']?file=@)|\btransfer\.sh\b|\bfile\.io\b/i, 'Sends files out to an online service — exfiltration to cloud storage, T1567.'],
+  ['c2', /\bnc(?:at)?(?:\.exe)?\s+(?:-\w+\s+)*-e\s+\S*(?:sh|cmd)\b|\bbash\s+-i\s+>&\s*\/dev\/tcp\/|\bsocat\b[^\n]{0,60}exec:|\bngrok\b|\bcobalt ?strike\b|\bbeacon(?:ing)?\b[^\n]{0,40}\b(?:interval|jitter|sleep)\b/i, 'Reverse shell or command-and-control channel — T1059 / T1071.'],
+];
 
 function beaconOf(times){
   const t = times.filter(Boolean).slice().sort((a, b) => a - b); if(t.length < 4) return null;

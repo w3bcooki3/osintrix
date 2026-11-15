@@ -7,7 +7,7 @@ const isNarrow = () => window.innerWidth < 1440;
 function renderMain(){
   if(typeof workHydrate === 'function') workHydrate();
   const r = UI.route, el = $('main');
-  const V = {security:viewSecurity, watch:viewWatch, trash:viewTrash, ctf:viewCTF, lab:viewLab, help:viewHelp, home:viewHome, cases:viewCases, toolbox:viewToolbox, entities:viewEntities, feeds:viewIntel, decoder:viewDecoder, reference:viewReference, settings:viewSettings,
+  const V = {today:viewToday, security:viewSecurity, watch:viewWatch, trash:viewTrash, ctf:viewCTF, lab:viewLab, help:viewHelp, home:viewHome, cases:viewCases, toolbox:viewToolbox, entities:viewEntities, feeds:viewIntel, decoder:viewDecoder, reference:viewReference, settings:viewSettings,
     detections:viewDetections, queries:viewQueries, notes:viewNotes, playbooks:viewPlaybooks, cloud:viewCloud, whatsnew:viewWhatsNew, pad:viewPad, notebook:viewNotebook, certs:viewCerts};
   if(cy && !(r.area === 'case' && r.tab === 'graph')){ cy.destroy(); cy = null; }
   const key = r.area + '/' + (r.tab || ''), sc = el.querySelector('.scroll'), keepY = renderMain.key === key && sc ? sc.scrollTop : 0; renderMain.key = key;
@@ -44,7 +44,7 @@ function placeInsp(){ const t = document.querySelector('.gtools') || document.qu
   if(t){ const r = t.getBoundingClientRect(); if(r.height) y = Math.round(r.bottom + 10); }
   document.documentElement.style.setProperty('--insp-top', y ? y + 'px' : ''); }
 window.addEventListener('resize', () => { clearTimeout(placeInsp.t); placeInsp.t = setTimeout(placeInsp, 120); });
-const TITLES = {security:'Security', watch:'Watchlist', trash:'Trash', ctf:'CTF', lab:'Forensics kit', help:'Help', home:'Dashboard', cases:'Cases', toolbox:'Toolbox', entities:'Entities', feeds:'Threat Intel', decoder:'Decoder', reference:'Reference', settings:'Settings', detections:'Detections', queries:'Query library', notes:'Notes', playbooks:'Playbooks', library:'Library', cloud:'Cloud', whatsnew:"What's new", pad:"Scratchpad", notebook:'Notebook', certs:'Certificates'};
+const TITLES = {today:'Today', security:'Security', watch:'Watchlist', trash:'Trash', ctf:'CTF', lab:'Forensics kit', help:'Help', home:'Dashboard', cases:'Cases', toolbox:'Toolbox', entities:'Entities', feeds:'Threat Intel', decoder:'Decoder', reference:'Reference', settings:'Settings', detections:'Detections', queries:'Query library', notes:'Notes', playbooks:'Playbooks', library:'Library', cloud:'Cloud', whatsnew:"What's new", pad:"Scratchpad", notebook:'Notebook', certs:'Certificates'};
 function onRoute(){
   UI.route = parseHash(); $('side').classList.remove('open');
   document.title = (UI.route.area === 'case' ? theCase().name.split(' — ')[0] + ' · ' + CASE_TABS.find(t => t[0] === UI.route.tab)[1] : TITLES[UI.route.area] || 'OSINTrix') + ' — OSINTrix';
@@ -123,6 +123,9 @@ document.addEventListener('click', ev => {
   if(typeof AU_ACTS !== 'undefined' && AU_ACTS[a]) return AU_ACTS[a](id, v, t, ev);
   if(typeof TOUR_ACTS !== 'undefined' && TOUR_ACTS[a]) return TOUR_ACTS[a](id, v, t, ev);
   if(typeof DL_ACTS !== 'undefined' && DL_ACTS[a]) return DL_ACTS[a](id, v, t, ev);
+  if(typeof CH_ACTS !== 'undefined' && CH_ACTS[a]) return CH_ACTS[a](id, v, t, ev);
+  if(typeof TD_ACTS !== 'undefined' && TD_ACTS[a]) return TD_ACTS[a](id, v, t, ev);
+  if(typeof DUP_ACTS !== 'undefined' && DUP_ACTS[a]) return DUP_ACTS[a](id, v, t, ev);
   if(NBX_ACTS[a]) return NBX_ACTS[a](id, v, t, ev);
   if(a === 'toolRun') return toolRunDlg(id);
   if(a === 'trPick'){ $('trV').value = v; return $('trV').focus(); }
@@ -205,7 +208,7 @@ document.addEventListener('click', ev => {
     case 'editLink': return linkDlg({id});
     case 'delLink': { const l = DB.links.find(x => x.id === id); DB.links = DB.links.filter(x => x.id !== id); UI.sel = null; const ea = entryById(l.a), eb = entryById(l.b), tx = trashPut('link', (ea ? primary(ea) : '?') + ' — ' + l.label + ' → ' + (eb ? primary(eb) : '?'), {l}, l.caseId); mutate('deleted relationship'); renderAll();
       return toast('Relationship deleted', 'Undo', () => { DB.trash = DB.trash.filter(x => x !== tx); DB.links.push(l); mutate('restored relationship'); renderAll(); }); }
-    case 'showInGraph': UI.sel = {kind:'entry', id}; return;
+    case 'showInGraph': { const e = entryById(id); if(!e) return; UI.sel = {kind:'entry', id}; UI.inspOpen = true; UI.gFocus = id; if(t.tagName === 'A') return; ev.preventDefault(); return go(caseHash(e.caseId, 'graph')); }   // a link navigates by itself; a button has to
     case 'promote': return promote(id);
     case 'vcat': UI.vcat = v; if(UI.route.tab !== 'vault') return go(caseHash(DB.active, 'vault')); return renderMain();
     case 'selRec': { const r = recById(id); if(!r) return; if(r.caseId !== DB.active){ DB.active = r.caseId; UI.sel = {kind:'rec', id}; UI.inspOpen = true; return go(caseHash(r.caseId, 'timeline')); } return select('rec', id); }

@@ -150,7 +150,7 @@ function mountGraph(){
   el.onkeydown = e => { if((e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) && UI.sel && UI.sel.kind === 'entry'){ e.preventDefault(); const n = cy.getElementById(UI.sel.id), r = el.getBoundingClientRect(), p = n.renderedPosition(); nodeMenu(UI.sel.id, r.left + p.x, r.top + p.y); } };
   cy.on('mouseover', 'node', ev => { const n = ev.target, nb = n.closedNeighborhood(); cy.elements().not(nb).addClass('faded'); });
   cy.on('mouseout', 'node', () => { cy.elements().removeClass('faded'); applyFind(); });
-  if(UI.sel && UI.sel.kind === 'entry'){ const n = cy.getElementById(UI.sel.id); if(n.length) n.select(); }
+  if(UI.sel && UI.sel.kind === 'entry'){ const n = cy.getElementById(UI.sel.id); if(n.length){ n.select(); if(UI.gFocus === UI.sel.id){ UI.gFocus = null; cy.animate({center:{eles:n}, zoom:Math.max(cy.zoom(), 1.1)}, {duration:280}); } } }
   if(UI.graph.first){ const n = cy.getElementById(UI.graph.first); if(n.length) n.addClass('src'); }
   applyFind(); applyPath(); applyAsof();
   if(UI.graph.panel){ const gp = $('gpanel'); if(gp){ gp.innerHTML = gPanelHTML(); bindGPanel(gp); } }

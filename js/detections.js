@@ -86,12 +86,14 @@ const RTYPE = {sigma:['Sigma','scroll-text','#14b8a6','Log detection'], yara:['Y
 const sevOf = s => SEV[s] || SEV.medium;
 const rLay = () => ['table','gallery','ide'].includes(DB.prefs.rlay) ? DB.prefs.rlay : 'table';
 const SEV_ORDER = {critical:4, high:3, medium:2, low:1, informational:0};
+/* the ATT&CK stages a rule's techniques belong to */
+const ruleTactics = r => { if(typeof ATTACK === 'undefined') return []; const T = ruleTactics.m || (ruleTactics.m = new Map(ATTACK.tech.map(t => [t[0], t[2]]))); return [...new Set((String(r.technique || '').match(/T\d{4}(?:\.\d{3})?/g) || []).flatMap(id => T.get(id) || T.get(id.split('.')[0]) || []))]; };
 function viewDetections(){
   ensureRules();
   const lay = rLay(), q = (UI.dq || '').toLowerCase(), t = UI.dtype || 'all', sv = UI.dsev || '', dc = UI.dcat || '', pf = UI.dplat || '', lv = UI.dlvl || '';
   const words = q.split(/\s+/).filter(Boolean);
   let list = DB.rules.filter(r => (t === 'all' || r.type === t || (t === 'fav' && r.starred) || (t === 'case' && r.caseId === DB.active)) && (!sv || r.severity === sv) && (!dc || (r.category || 'other') === dc)
-    && (!pf || r.platform === pf) && (!lv || (lv === 'mine' ? !r.builtin : (r.level || 'common') === lv)) && (!words.length || ((h) => words.every(w => h.includes(w)))(ruleHay(r))));
+    && (!pf || r.platform === pf) && (!lv || (lv === 'mine' ? !r.builtin : (r.level || 'common') === lv)) && (!words.length || ((h) => words.every(w => h.includes(w)))(ruleHay(r))) && (!UI.dtac || ruleTactics(r).includes(UI.dtac)));
   const LIM = UI.dlim || 120, total = list.length;
   const sk = UI.rsk || 'modified', sd = UI.rsd || -1;
   const cmp = {title:(a, b) => a.title.localeCompare(b.title), type:(a, b) => a.type.localeCompare(b.type), severity:(a, b) => (SEV_ORDER[a.severity] || 0) - (SEV_ORDER[b.severity] || 0), technique:(a, b) => (a.technique || '~').localeCompare(b.technique || '~'), modified:(a, b) => a.modified - b.modified}[sk];
@@ -147,7 +149,7 @@ function viewDetections(){
           <td class="c-cat">${typeTag(r)}</td><td class="c-sev">${sevTag(r)}</td><td class="c-tech mono">${esc(r.technique || '—')}</td><td class="c-plat">${esc(r.platform || '—')}</td><td class="c-upd">${ago(r)}</td>
           <td class="c-act">${ico('chevron-right','sm')}</td></tr>`; }})), {tbody:true, cols:8})}</table></div>`;
   return `<div class="scroll"><div class="page wide">${head}
-    <div class="toolbar ltb">${search}${typeSeg}${sevSel}${platSel}${lvlSel}<span style="flex:1"></span><span class="t3 lcount">${total} rule${total === 1 ? '' : 's'}</span></div>
+    <div class="toolbar ltb">${search}${typeSeg}${sevSel}${platSel}${lvlSel}${UI.dtac ? `<span class="chip accent">Stage: ${esc((ATTACK.tactics.find(t => t[1] === UI.dtac) || [,,UI.dtac])[2])} <button data-act="dtacOff" aria-label="Clear stage filter">${ico('x','sm')}</button></span>` : ''}<span style="flex:1"></span><span class="t3 lcount">${total} rule${total === 1 ? '' : 's'}</span></div>
     ${body}</div></div>${lay === 'table' && open ? drawer(ruleEditor(cur), 'rClose', cur.title, ico(RTYPE[cur.type][1],'sm') + RTYPE[cur.type][0] + ' rule') : ''}`;
 }
 function ruleEditor(r){

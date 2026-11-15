@@ -64,9 +64,12 @@ Press `Ctrl K` or `/`, or click the search bar, to search the whole app at once:
 - **Timeline:** every record in order, with day headers, event markers and filters. Search with `host:`, `verdict:`, `type:`, `tag:`, `after:` and `before:`.
   - **Activity heatmap** (day × hour): click a cell to see just that hour.
   - **Multi-select:** tag, mark as key evidence, export to CSV or delete many records at once.
+  - **Attack chain:** the events on the ATT&CK stages, from technique IDs, recognised behaviour, tags and your rules; stages missing in the middle are named, with what to look for.
   - **Patterns:** the likely first sign of compromise (with its reasons and the dwell time after it), bursts against the usual rate, quiet periods, hosts that went silent early, cleared logs, time zone mix-ups and impossible dates, and the working hours the activity fits. Each finding opens just its events.
 - **Media:** drop pictures, videos, audio or saved web pages anywhere on a case, or paste a screenshot. Originals are kept with their SHA-256, stored once, with small previews; videos play in the app; files over 50 MB are recorded by fingerprint.
   - **Picture insights:** the same or a near-identical picture in other cases, the same camera (serial number or model), pictures taken within 250 m of each other, and signs of editing.
+- **Today:** one page across all cases — alerts, due notes, unjudged hits, what arrived, open questions, quiet cases, a due backup — most urgent first.
+- **Duplicates:** the vault finds the same thing entered twice (case, defanged, punctuation, word order, one letter apart) and merges it, keeping every tag, note and link.
 - **Since you were last here:** a case's Overview lists what arrived while it was closed — new evidence and entries, lookups that came back, indicator-store and news matches, and its indicators turning up in other cases.
 - **Automations:** "when a new domain appears, check it against the indicator store and look it up", "when evidence mentions phishing, run the phishing playbook". They run in the browser while the app is open, act once per item, skip the demo cases and log everything they do.
 - **Places:** every location in the case on one page. Points come from Location entries, coordinates in evidence and photo GPS; countries come from country fields, phone country codes and log fields.
@@ -332,6 +335,9 @@ osintrix/
 │   ├── auto.js             ← automations: when this happens in a case, do that
 │   ├── tour.js             ← the guided tour of the demo case
 │   ├── detlab.js           ← detection lab: Sigma → SIEM queries, rule tests, evasion check, rules from events
+│   ├── chain.js            ← attack chain: a case's events on the ATT&CK stages, and the stages missing
+│   ├── today.js            ← Today: what needs you now across every case
+│   ├── dupes.js            ← duplicates in a vault, and merging them
 │   ├── map.js · ach.js     ← case places, hypothesis board
 │   ├── pcap.js · sqlite.js ← packet capture reader, SQLite viewer
 │   ├── validate.js         ← form checks, duplicate names

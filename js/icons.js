@@ -31,3 +31,5 @@ LUCIDE['list-ordered'] = '<path d="M10 12h11" /> <path d="M10 18h11" /> <path d=
 LUCIDE['heading'] = '<path d="M6 12h12" /> <path d="M6 20V4" /> <path d="M18 20V4" />';
 LUCIDE['bold'] = '<path d="M6 12h9a4 4 0 0 1 0 8H7a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h7a4 4 0 0 1 0 8" />';
 LUCIDE['minus'] = '<path d="M5 12h14" />';
+LUCIDE['hourglass'] = '<path d="M5 22h14" /> <path d="M5 2h14" /> <path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22" /> <path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2" />';
+LUCIDE['merge'] = '<path d="m8 6 4-4 4 4" /> <path d="M12 2v10.3a4 4 0 0 1-1.172 2.872L4 22" /> <path d="m20 22-5-5" />';

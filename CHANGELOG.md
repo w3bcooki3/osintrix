@@ -2,6 +2,24 @@
 
 All notable changes to OSINTrix, newest first. The format is based on [Keep a Changelog](https://keepachangelog.com); this file is generated from `js/data/changelog.js` by `tools/changelog.py`.
 
+## [1.36] — Today, the attack chain and sharper reading (2026-11-15)
+
+_A Today page across all cases, an ATT&CK attack-chain view, duplicate finding and merging in the vault, and a much broader reading of real-world logs and command lines — checked by a new suite of real-world tests._
+
+### Added
+- Today (in the sidebar): what needs you now across every case, most urgent first — watch alerts, overdue and due notes, indicators a lookup or your indicator store flagged that you have not judged, what arrived in cases since you last opened them, open questions, cases gone quiet for a week, and a due backup. Each with the button that deals with it.
+- Timeline → Attack chain: the case's events placed on the ATT&CK stages (including the new Stealth and Defense Impairment) from technique IDs, recognised behaviour, tags and your Sigma rules. Stages missing between the first and last one seen are named as where to look next, each with what to look for and the rules for it.
+- Vault → possible duplicates: the same email, domain, URL, phone, handle or person entered twice — different case, defanged, www., trailing slashes, phone punctuation, accents or word order — and names one letter apart, marked “probably”. Merging fills empty fields, keeps every tag, note and link, notes differing values, and can be undone. “Not the same” is remembered.
+- Windows events copied as text (Event Viewer or a SIEM message field: “New Process Name: … Process Command Line: …”) are now read into fields, so rules and the timeline understand them.
+
+### Changed
+- Behaviour recognised in command lines and logs grew from 7 patterns to more than 20: downloads with certutil, bitsadmin, PowerShell and curl | bash; cleared logs and shell history; shadow-copy deletion; scheduled tasks, services, cron and SSH keys; new admin accounts; mshta, rundll32, regsvr32 and msiexec abuse; LSASS dumps, SAM saves and /etc/shadow; domain discovery; PsExec, WMI and WinRM; disabled Defender, firewall or logging; password-protected archives; rclone and upload sites; reverse shells. Everyday admin commands are not flagged.
+- A new real-world test suite: indicators in messy forms and things that must not be indicators, ten log formats reaching the same fields and rule, 30 attacker command lines and 15 everyday ones, duplicates that must and must not merge, odd timelines, broken files, every built-in rule converted to every SIEM, and random input fed to every engine.
+
+### Fixed
+- A domain written in another script (раураl.com) is kept whole and flagged as a look-alike, instead of being cut down to “l.com”.
+- The graph button on vault cards opens the graph on that entry; the star is yellow everywhere; the coloured side stripes are gone from cards.
+
 ## [1.35] — Detection lab and better notes (2026-11-15)
 
 _Build, test and harden detection rules inside OSINTrix — SIEM queries, rule tests, an evasion check and rules drafted from evidence — and a formatting bar for notes._
