@@ -9,7 +9,8 @@ const CHANGELOG_DATA = [
     "date": "2026-11-15",
     "summary": "Detections can now be picked several at a time, notes can go under headings of your own, and the rule editor says right away when a title is taken.",
     "changes": [
-      {"type": "added", "text": "Notes → headings: your own groups for notes, next to General and your cases (+ Heading in the filter row). New notes go under the selected heading, or pick one in the note bar or the edit dialog; a note can be under a heading and pinned to a case. Names are cleaned (hidden and direction-changing characters out, spaces collapsed, up to 40 characters) and must not repeat another heading, a case name or a built-in filter. Renaming and deleting are on the pencil next to the selected heading; deleting keeps the notes and can be undone."},
+      {"type": "fixed", "text": "Every script and stylesheet address now carries a fingerprint of the file, so a browser never keeps an older copy after an update — even between two drops of the same version."},
+      {"type": "added", "text": "Notes → headings: your own groups for notes, next to General and your cases (+ Heading in the filter row). New notes go under the selected heading, or pick one in the note bar or the edit dialog; a note can be under a heading and pinned to a case. Names are cleaned (hidden and direction-changing characters out, spaces collapsed, up to 40 characters) and must not repeat another heading, a case name or a built-in filter. Renaming and deleting are on the pencil next to the selected heading; deleting keeps the notes and can be undone. A note's ⋯ menu has Change heading."},
       {"type": "fixed", "text": "A rule title that is already taken is flagged right under the title as you type, instead of at the very bottom of the editor after saving."},
       {
         "type": "added",

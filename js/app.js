@@ -360,6 +360,7 @@ document.addEventListener('click', ev => {
     case 'nMenu': { const n = DB.notes.find(z => z.id === id), r0 = t.getBoundingClientRect(); return showMenu(r0.left - 180, r0.bottom + 4, [
       {label:n.pinned ? 'Unpin' : 'Pin', icon:'pin', fn:() => { n.pinned = !n.pinned; mutate('pin note'); renderAll(); }},
       {label:'Edit…', icon:'pencil', fn:() => noteDlg(id)},
+      {label:noteHeads().length ? 'Change heading…' : 'Add a heading…', icon:'heading', fn:() => { if(!noteHeads().length) return nhDlg(); noteDlg(id); setTimeout(() => { const x = $('nHead'); if(x) x.focus(); }, 60); }},
       {label:'Colour', seg:NOTE_COLORS.map(([k]) => ({label:k[0].toUpperCase() + k.slice(1), on:n.color === k, fn:() => { n.color = k; mutate('note colour'); renderAll(); }}))},
       {label:'Duplicate', icon:'copy', fn:() => { const first = (n.text.split('\n')[0] || '').trim(), rest = n.text.slice(n.text.indexOf('\n') < 0 ? n.text.length : n.text.indexOf('\n')), c2 = {...n, id:uid('n'), pinned:false, created:Date.now(), updated:Date.now(), text:(copyName(first.slice(0, 200) || 'Note', DB.notes.map(x => (x.text.split('\n')[0] || '').trim())) + rest).slice(0, 4000), copyOf:n.id}; DB.notes.splice(DB.notes.indexOf(n) + 1, 0, c2); mutate('duplicated note'); renderAll(); toast('Duplicated as “' + c2.text.split('\n')[0].slice(0, 60) + '”'); }},
       {sep:true}, {label:'Delete', icon:'trash-2', danger:true, fn:() => clickAct('nDel', id)}]); }

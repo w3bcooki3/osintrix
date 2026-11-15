@@ -2072,3 +2072,15 @@ test('a rule title that is already taken is flagged right under the title, as yo
   await page.fill('#rTitle', 'A unique title here'); await expect(page.locator('#rTitleWarn')).toBeHidden();
   noErrors(errors);
 });
+
+test('a note\'s menu changes its heading', async ({ page }) => {
+  const errors = await open(page, '#/notes');
+  await page.locator('.note-card:has-text("This week") [data-act=nMenu]').click(); await page.click('.ctx-it:has-text("Add a heading")');
+  await page.fill('#nhName', 'Personal'); await page.click('#dlg [type=submit]');
+  await page.click('[data-act=nf][data-v=all]');
+  await page.locator('.note-card:has-text("This week") [data-act=nMenu]').click(); await page.click('.ctx-it:has-text("Change heading")');
+  await expect(page.locator('#nHead')).toBeFocused();
+  await page.selectOption('#nHead', { label: 'Personal' }); await page.click('#dlg [type=submit]');
+  await expect(page.locator('.note-card:has-text("This week") .ncase.hd')).toHaveText('Personal');
+  noErrors(errors);
+});

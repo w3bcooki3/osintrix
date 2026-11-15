@@ -7,10 +7,11 @@ All notable changes to OSINTrix, newest first. The format is based on [Keep a Ch
 _Detections can now be picked several at a time, notes can go under headings of your own, and the rule editor says right away when a title is taken._
 
 ### Added
-- Notes → headings: your own groups for notes, next to General and your cases (+ Heading in the filter row). New notes go under the selected heading, or pick one in the note bar or the edit dialog; a note can be under a heading and pinned to a case. Names are cleaned (hidden and direction-changing characters out, spaces collapsed, up to 40 characters) and must not repeat another heading, a case name or a built-in filter. Renaming and deleting are on the pencil next to the selected heading; deleting keeps the notes and can be undone.
+- Notes → headings: your own groups for notes, next to General and your cases (+ Heading in the filter row). New notes go under the selected heading, or pick one in the note bar or the edit dialog; a note can be under a heading and pinned to a case. Names are cleaned (hidden and direction-changing characters out, spaces collapsed, up to 40 characters) and must not repeat another heading, a case name or a built-in filter. Renaming and deleting are on the pencil next to the selected heading; deleting keeps the notes and can be undone. A note's ⋯ menu has Change heading.
 - Detections → pick several rules with the boxes in the table or gallery (or every rule the current filters show) to star or unstar them, download them, or delete them together. One rule downloads as its .yml or .yar file; several download as a zip with each rule's file in sigma/ and yara/ folders, plus a JSON bundle that Import reads back with tests and metadata. Deleting asks first and can be undone.
 
 ### Fixed
+- Every script and stylesheet address now carries a fingerprint of the file, so a browser never keeps an older copy after an update — even between two drops of the same version.
 - A rule title that is already taken is flagged right under the title as you type, instead of at the very bottom of the editor after saving.
 - The rule editor's “Revert” is now “Discard changes”: it stays greyed out until you edit something, then throws your unsaved edits away and puts the saved rule back. Before, it could be clicked any number of times and only showed a message.
 

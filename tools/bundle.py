@@ -7,6 +7,7 @@ Python 3, standard library only.
 """
 import base64, pathlib, re
 root = pathlib.Path(__file__).resolve().parent.parent
+import runpy; runpy.run_path(str(root / 'tools' / 'stamp.py'))   # fresh cache-busting addresses first
 html = (root / 'index.html').read_text(encoding='utf-8')
 
 def css(href):
