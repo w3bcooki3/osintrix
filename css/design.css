@@ -2649,3 +2649,22 @@ body.md-dropping .md-drop,body.md-dropping #main{outline:2px dashed var(--accent
 .ds .dp-e{display:flex;gap:10px;align-items:flex-start;padding:8px 6px;border-radius:8px;cursor:pointer}.ds .dp-e:hover{background:var(--hover)}
 .ds .dp-e input{margin-top:4px}.ds .dp-e div{display:flex;flex-direction:column;gap:1px;min-width:0}.ds .dp-e small{color:var(--text-2);overflow-wrap:anywhere}
 .ds .dp-g .wrap{margin-top:8px}
+
+/* detections: picking several rules */
+.rbk{margin:0 0 12px;max-width:100%}
+.dt .c-pick{width:36px;padding-right:0}
+.dt .c-pick + .c-star{width:36px;padding-left:4px}
+.dt tbody tr.sel,.dt tbody tr.sel td{background:var(--accent-soft)}
+.gcard .tpk{position:relative;z-index:2}
+.gcard.picked{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.rx-f [data-act=rRevert]:disabled{opacity:.45;cursor:default}
+/* rule title: the duplicate warning sits right under it */
+.rx-tw{display:flex;flex-direction:column}
+.rx-tw .ferr{margin:2px 0 6px}
+.rx-title.invalid{border-color:var(--red)!important;box-shadow:0 0 0 3px color-mix(in srgb,var(--red) 18%,transparent)}
+/* notes: headings */
+.ncase.hd{--cc:var(--text-2);font-family:var(--font);border:0;cursor:pointer}
+.ncase.hd:hover{background:color-mix(in srgb,var(--cc) 34%,transparent)}
+.ds .nquick .nqbar .nqhead{height:32px;max-width:180px;margin-left:auto}
+.ds .nquick .nqbar .nqhead + .btn{margin-left:0}
+.chip.nhchip svg.i{color:var(--text-3)}

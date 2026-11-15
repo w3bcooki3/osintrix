@@ -1970,3 +1970,105 @@ test('today, duplicates and the attack chain', async ({ page }) => {
   await expect(page.locator('.chip.accent:has-text("Stage:")')).toBeVisible();
   noErrors(errors);
 });
+
+test('detections: pick several rules to star, download or delete together; discard changes only when there are some', async ({ page }) => {
+  const errors = await open(page, '#/detections');
+  await page.evaluate(() => { DB.prefs.rlay = 'table'; UI.dview = 'rules'; UI.dq = 'powershell'; renderMain(); });
+  const shown = await page.evaluate(() => UI.rShown.length); expect(shown).toBeGreaterThan(2);
+  await expect(page.locator('#rbk')).toBeHidden();
+  const boxes = page.locator('.dt tbody [data-act=rPick]');
+  await boxes.nth(0).check(); await boxes.nth(1).check();
+  await expect(page.locator('#rbk')).toBeVisible(); await expect(page.locator('#rbk')).toContainText('2 selected');
+  await expect(page.locator('form.rx')).toHaveCount(0);                    // ticking a box does not open the rule
+  await expect(page.locator('.dt tbody tr.sel')).toHaveCount(2);
+  // star both, then unstar both
+  await page.click('[data-act=rbStar]');
+  expect(await page.evaluate(() => [...UI.rpick].map(id => DB.rules.find(r => r.id === id).starred))).toEqual([true, true]);
+  await expect(page.locator('[data-act=rbStar]')).toContainText('Unstar'); await page.click('[data-act=rbStar]');
+  expect(await page.evaluate(() => [...UI.rpick].every(id => !DB.rules.find(r => r.id === id).starred))).toBe(true);
+  // download: two rules make a zip, one rule its own file
+  let dl = page.waitForEvent('download'); await page.click('[data-act=rbDl]'); expect((await dl).suggestedFilename()).toBe('osintrix-rules-2.zip');
+  // select all shown (header box), then delete with undo
+  await page.locator('[data-act=rPickAll]').check(); await expect(page.locator('#rbk')).toContainText(shown + ' selected');
+  await page.locator('[data-act=rPickAll]').uncheck(); await expect(page.locator('#rbk')).toBeHidden();
+  await boxes.nth(0).check();
+  dl = page.waitForEvent('download'); await page.click('[data-act=rbDl]'); expect((await dl).suggestedFilename()).toMatch(/\.ya?ml$|\.yar$/);
+  await boxes.nth(1).check();
+  const n0 = await page.evaluate(() => DB.rules.length), ids = await page.evaluate(() => [...UI.rpick]);
+  await page.click('[data-act=rbDel]'); await page.click('[data-act=confirmOk]');
+  expect(await page.evaluate(i => [DB.rules.length, i.some(id => DB.rules.some(r => r.id === id))], ids)).toEqual([n0 - 2, false]);
+  await expect(page.locator('#rbk')).toBeHidden();
+  await page.click('#toastBtn'); expect(await page.evaluate(() => DB.rules.length)).toBe(n0);
+  // gallery has the same boxes
+  await page.evaluate(() => { DB.prefs.rlay = 'gallery'; renderMain(); });
+  await page.locator('.gcard [data-act=rPick]').first().check(); await expect(page.locator('.gcard.picked')).toHaveCount(1); await expect(page.locator('#rbk')).toContainText('1 selected');
+  await page.click('[data-act=rbClear]'); await expect(page.locator('#rbk')).toBeHidden();
+  // a new rule: Discard changes is off until something is edited, then puts the saved rule back
+  await page.evaluate(() => { DB.prefs.rlay = 'table'; UI.dq = ''; renderMain(); });
+  await page.locator('.page [data-act=rNew]').first().click(); await page.click('.ctx-it:has-text("Sigma")');
+  const disc = page.locator('form.rx [data-act=rRevert]');
+  await expect(disc).toHaveText('Discard changes'); await expect(disc).toBeDisabled();
+  const t0 = await page.inputValue('#rTitle');
+  await page.fill('#rTitle', 'Changed title'); await expect(disc).toBeEnabled(); await expect(page.locator('form.rx')).toHaveClass(/dirty/);
+  await disc.click();
+  await expect(page.locator('#rTitle')).toHaveValue(t0); await expect(page.locator('form.rx [data-act=rRevert]')).toBeDisabled();
+  await expect(page.locator('#toast')).toContainText('Unsaved changes discarded');
+  noErrors(errors);
+});
+
+test('notes headings: add, file notes under them, names cleaned and checked for duplicates, rename, delete with undo, bad backups tidied', async ({ page }) => {
+  const errors = await open(page, '#/notes');
+  const add = async name => { await page.click('[data-act=nhNew]'); await page.fill('#nhName', name); await page.click('#dlg [type=submit]'); };
+  // blank, reserved, too long, case name — refused with the reason under the field
+  for (const [name, msg] of [['   ', 'Give the heading a name'], ['general', 'already one of the note filters'], ['x'.repeat(41), 'up to 40 characters'], ['op lantern', 'A case is called']]) {
+    await add(name); await expect(page.locator('#dlg .ferr')).toContainText(msg); await page.click('#dlg [data-act=dclose]');
+  }
+  // control and direction characters are taken out, spaces collapsed
+  await add('  Re‮search \u0007  ideas  ');
+  await expect(page.locator('.nhchip')).toHaveCount(1); await expect(page.locator('.nhchip')).toContainText('Research ideas');
+  expect(await page.evaluate(() => UI.nf.startsWith('h:'))).toBe(true);           // the new heading is selected
+  // same name in another case and spacing: duplicate
+  await add('RESEARCH   Ideas'); await expect(page.locator('#dlg .ferr')).toContainText('already exists'); await page.click('#dlg [data-act=dclose]');
+  // a note added while the heading is selected goes under it; markup in the name or note is shown as text
+  await page.fill('.nquick textarea', 'Check <img src=x onerror=alert(1)> later'); await page.click('.nquick [type=submit]');
+  await expect(page.locator('.note-card')).toHaveCount(1); await expect(page.locator('.note-card .ncase.hd')).toHaveText('Research ideas');
+  await expect(page.locator('.note-card img')).toHaveCount(0);
+  // General no longer lists it; All does
+  await page.click('[data-act=nf][data-v=general]'); await expect(page.locator('.note-card:has-text("Check")')).toHaveCount(0);
+  // move an existing note under the heading from the edit dialog
+  await page.click('[data-act=nf][data-v=all]');
+  await page.locator('.note-card:has-text("This week") [data-act=nEdit]').click();
+  const hid = await page.evaluate(() => noteHeads()[0].id); await page.selectOption('#nHead', hid); await page.click('#dlg [type=submit]');
+  await page.locator('.nhchip').click(); await expect(page.locator('.note-card')).toHaveCount(2); await expect(page.locator('.nhchip .n')).toHaveText('2');
+  // rename to a clean new name; renaming to itself is fine
+  await page.click('[data-act=nhEdit]'); await page.fill('#nhName', 'Research ideas'); await page.click('#dlg [type=submit]'); await expect(page.locator('#dlg')).toBeHidden();
+  await page.click('[data-act=nhEdit]'); await page.fill('#nhName', 'Follow-ups'); await page.click('#dlg [type=submit]');
+  await expect(page.locator('.nhchip')).toContainText('Follow-ups');
+  // delete: notes stay, without a heading; undo puts both back
+  await page.click('[data-act=nhEdit]'); await page.click('#dlg [data-act=nhDel]');
+  await expect(page.locator('.nhchip')).toHaveCount(0); expect(await page.evaluate(() => DB.notes.filter(n => n.head).length)).toBe(0);
+  expect(await page.evaluate(() => DB.notes.some(n => n.text.startsWith('Check')))).toBe(true);
+  await page.click('#toastBtn'); await expect(page.locator('.nhchip')).toHaveCount(1); expect(await page.evaluate(() => DB.notes.filter(n => n.head).length)).toBe(2);
+  // a backup with junk headings: tidied, nothing breaks
+  await page.evaluate(() => { DB.noteHeads = [null, 5, { id: 'bad id!', name: 'x' }, { id: 'nh-a', name: '  Dup ' }, { id: 'nh-b', name: 'dup' }, { id: 'nh-c', name: '' }, { id: 'nh-d', name: '<b>bold</b>' }];
+    DB.notes[0].head = 'nh-gone'; UI.nf = 'h:nh-gone'; renderMain(); });
+  expect(await page.evaluate(() => noteHeads().map(h => h.name))).toEqual(['Dup', '<b>bold</b>']);
+  await expect(page.locator('.nhchip:has-text("<b>bold</b>")')).toHaveCount(1); await expect(page.locator('.nhchip b')).toHaveCount(0);
+  expect(await page.evaluate(() => UI.nf)).toBe('all');                              // a filter for a heading that is gone falls back to All
+  noErrors(errors);
+});
+
+test('a rule title that is already taken is flagged right under the title, as you type', async ({ page }) => {
+  const errors = await open(page, '#/detections');
+  await page.locator('.page [data-act=rNew]').first().click(); await page.click('.ctx-it:has-text("YARA")');
+  await expect(page.locator('#rTitleWarn')).toBeHidden();
+  const other = await page.evaluate(() => DB.rules[1].title);
+  await page.fill('#rTitle', other.toUpperCase());
+  await expect(page.locator('#rTitleWarn')).toBeVisible(); await expect(page.locator('#rTitleWarn')).toContainText('already exists');
+  const box = await page.locator('#rTitleWarn').boundingBox(), tb = await page.locator('#rTitle').boundingBox();
+  expect(box.y - (tb.y + tb.height)).toBeLessThan(20);                               // next to the title, not at the bottom of the panel
+  await page.keyboard.press('Control+s'); await expect(page.locator('#rTitleWarn')).toBeVisible();
+  expect(await page.evaluate(t => DB.rules.filter(r => r.title.toLowerCase() === t.toLowerCase()).length, other)).toBe(1);
+  await page.fill('#rTitle', 'A unique title here'); await expect(page.locator('#rTitleWarn')).toBeHidden();
+  noErrors(errors);
+});

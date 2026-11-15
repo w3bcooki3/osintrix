@@ -73,6 +73,7 @@ function checkImport(d, kind){
     checkItems(errs, d.tools, 'tools', {id:'id', name:'str', url:'str'});
     checkItems(errs, d.notes, 'notes', {id:'id'}); checkItems(errs, d.rules, 'rules', {id:'id'});
     checkItems(errs, d.trash, 'trash', {id:'id', kind:'str'});
+    need(errs, d.noteHeads == null || Array.isArray(d.noteHeads), 'note headings must be a list');
     need(errs, d.verdicts == null || isObj(d.verdicts), 'verdicts must be an object');
     need(errs, d.prefs == null || isObj(d.prefs), 'settings must be an object');
     checkEntryTypes(errs, d.entries); checkAtt(errs, d.records);

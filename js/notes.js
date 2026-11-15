@@ -14,10 +14,55 @@ function ensureNotes(){
     {id:'n5', caseId:'c-portal', color:'purple', pinned:false, text:'203.0.113.47 is also the Lantern C2. Same actor, or shared hosting? Compare timing.', due:'', created:T - 180000e3, updated:T - 180000e3},
   ];
 }
+/* Headings: your own groups for notes, next to General and the cases. A note can sit under a heading and be
+   pinned to a case at the same time. Names are cleaned (control and direction-changing characters out,
+   spaces collapsed, at most 40 characters), must differ from each other, from "General" and the other
+   filters, and from case names, ignoring case and spacing. A backup or import with bad entries is tidied. */
+const NH_MAX = 40, NH_RESERVED = ['general', 'all', 'pinned', 'open to-dos', 'to-dos', 'no heading'];
+const nhClean = s => String(s == null ? '' : s).normalize('NFKC').replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u2069\ufeff]/g, '').replace(/\s+/g, ' ').trim();
+function noteHeads(){
+  const L = Array.isArray(DB.noteHeads) ? DB.noteHeads : [], seen = new Set(), out = [];
+  for(const h of L){ if(!h || typeof h !== 'object' || typeof h.id !== 'string' || !/^[\w-]{1,40}$/.test(h.id)) continue; const nm = nhClean(h.name).slice(0, NH_MAX), k = normName(nm);
+    if(!nm || seen.has(k) || seen.has('#' + h.id)) continue; seen.add(k); seen.add('#' + h.id); out.push({id:h.id, name:nm, created:+h.created || 0}); }
+  if(out.length !== L.length || out.some((h, i) => h.name !== L[i].name)) DB.noteHeads = out;
+  return out;
+}
+const noteHead = n => n && n.head ? noteHeads().find(h => h.id === n.head) || null : null;
+function nhProblem(raw, selfId){
+  const nm = nhClean(raw); if(!nm) return 'Give the heading a name.';
+  if(nm.length > NH_MAX) return `Headings can be up to ${NH_MAX} characters — this one is ${nm.length}.`;
+  if(NH_RESERVED.includes(normName(nm))) return `“${nm}” is already one of the note filters. Pick another name.`;
+  if(clash(noteHeads(), nm, 'name', selfId)) return `A heading called “${nm}” already exists.`;
+  const c = DB.cases.find(c => normName(c.name.split(' — ')[0]) === normName(nm) || normName(c.code) === normName(nm) || normName(c.name) === normName(nm));
+  if(c) return `A case is called “${c.name.split(' — ')[0]}”. Pick a different name so the two are easy to tell apart.`;
+  return '';
+}
+function nhDlg(id){
+  const h = id ? noteHeads().find(x => x.id === id) : null, n = h ? DB.notes.filter(x => x.head === h.id).length : 0;
+  openDlg(dhead(h ? 'Edit heading' : 'New heading') + `<form data-form="nh" data-id="${h ? esc(h.id) : ''}"><div class="in">
+    <div class="field" style="margin:0"><label for="nhName">Name</label><input id="nhName" value="${h ? esc(h.name) : ''}" maxlength="${NH_MAX + 20}" autocomplete="off" autofocus placeholder="e.g. Research, Personal, Follow-ups">
+      <span class="hint">A group for notes of your own, next to General and your cases. ${h ? `${n} note${n === 1 ? '' : 's'} under it.` : 'New notes go under it while it is the selected filter.'}</span></div></div>
+    <footer>${h ? `<button class="btn danger" type="button" data-act="nhDel" data-id="${esc(h.id)}" style="margin-right:auto">${ico('trash-2','sm')}Delete heading</button>` : ''}<button class="btn" type="button" data-act="dclose">Cancel</button><button class="btn primary" type="submit">${h ? 'Save' : 'Add heading'}</button></footer></form>`);
+  $('dlg').classList.add('narrow');
+}
+function nhSubmit(f){
+  const id = f.dataset.id || null, raw = $('nhName').value, err = nhProblem(raw, id); if(err) return fieldErr('nhName', err);
+  const nm = nhClean(raw), L = noteHeads();
+  if(id){ const h = L.find(x => x.id === id); if(!h) return closeDlg(); h.name = nm; DB.noteHeads = L; mutate('renamed note heading ' + nm); }
+  else { const h = {id:uid('nh'), name:nm, created:Date.now()}; DB.noteHeads = [...L, h]; UI.nf = 'h:' + h.id; mutate('added note heading ' + nm); }
+  closeDlg(); renderAll(); toast(id ? 'Heading renamed' : `Heading “${nm}” added`);
+}
+const NH_ACTS = {
+  nhNew:() => nhDlg(), nhEdit:id => nhDlg(id),
+  nhDel:id => { const L = noteHeads(), h = L.find(x => x.id === id); if(!h) return; const moved = DB.notes.filter(n => n.head === id);
+    DB.noteHeads = L.filter(x => x.id !== id); moved.forEach(n => n.head = null); if(UI.nf === 'h:' + id) UI.nf = 'all'; closeDlg(); mutate('deleted note heading ' + h.name); renderAll();
+    toast(`Heading “${h.name}” deleted${moved.length ? ' — its ' + moved.length + ' note' + (moved.length > 1 ? 's are' : ' is') + ' kept, without a heading' : ''}`, 'Undo', () => { if(!noteHeads().some(x => x.id === h.id) && !clash(noteHeads(), h.name)) DB.noteHeads = [...noteHeads(), h]; moved.forEach(n => { if(DB.notes.includes(n)) n.head = h.id; }); mutate('restored note heading'); renderAll(); }); },
+};
+const noteHeadOpts = sel => `<option value="">No heading</option>${noteHeads().map(h => `<option value="${esc(h.id)}"${sel === h.id ? ' selected' : ''}>${esc(h.name)}</option>`).join('')}`;
 const noteTasks = n => n.text.split('\n').map((l, i) => { const m = l.match(/^\s*(?:[-*]\s*)?\[( |x|X)\]\s*(.*)$/); return m ? {i, done:m[1] !== ' ', t:m[2]} : null; }).filter(Boolean);
 const noteCol = c => (NOTE_COLORS.find(x => x[0] === c) || NOTE_COLORS[0])[1];
 function noteCard(n, compact){
-  const lines = n.text.split('\n'), tasks = noteTasks(n), done = tasks.filter(t => t.done).length, c = n.caseId ? theCase(n.caseId) : null;
+  const lines = n.text.split('\n'), tasks = noteTasks(n), done = tasks.filter(t => t.done).length, c = n.caseId ? theCase(n.caseId) : null, hd = noteHead(n);
   const overdue = n.due && Date.parse(n.due + 'T23:59:59Z') < Date.now() && tasks.some(t => !t.done);
   const body = lines.map((l, i) => { const t = tasks.find(x => x.i === i);
     if(t) return `<label class="ntask${t.done ? ' done' : ''}"><input type="checkbox" data-act="nTick" data-id="${n.id}" data-v="${i}" ${t.done ? 'checked' : ''}><span>${noteInline(t.t)}</span></label>`;
@@ -27,7 +72,7 @@ function noteCard(n, compact){
     const o = l.match(/^\s*(\d{1,3})[.)]\s+(.*)$/); if(o) return `<p class="nli num" data-n="${o[1]}.">${noteInline(o[2])}</p>`;
     return `<p>${noteInline(l)}</p>`; }).join('');
   return `<article class="note-card${n.pinned ? ' npinned' : ''}" style="--nc:${noteCol(n.color)}">
-    <div class="nhead">${n.pinned ? `<span class="npin">${ico('pin','sm')}</span>` : ''}${c && !compact ? `<a class="ncase" href="${caseHash(c.id)}" style="--cc:${esc(c.color)}">${esc(c.code)}</a>` : !c && !compact ? '<span class="ncase gen">General</span>' : ''}
+    <div class="nhead">${n.pinned ? `<span class="npin">${ico('pin','sm')}</span>` : ''}${c && !compact ? `<a class="ncase" href="${caseHash(c.id)}" style="--cc:${esc(c.color)}">${esc(c.code)}</a>` : ''}${hd ? `<button class="ncase hd" data-act="nf" data-v="h:${esc(hd.id)}" title="Show notes under ${esc(hd.name)}">${esc(hd.name)}</button>` : !c && !compact ? '<span class="ncase gen">General</span>' : ''}
       <span style="flex:1"></span><button class="nbtn" data-act="nEdit" data-id="${n.id}" aria-label="Edit note">${ico('pencil','sm')}</button><button class="nbtn" data-act="nMenu" data-id="${n.id}" aria-label="More">${ico('ellipsis','sm')}</button></div>
     <div class="nbody">${body}</div>
     ${tasks.length || n.due ? `<div class="nfoot">${tasks.length ? `<span class="nprog"><i style="width:${Math.round(done / tasks.length * 100)}%"></i></span><span>${done}/${tasks.length}</span>` : ''}${n.due ? `<span class="ndue${overdue ? ' late' : ''}">${ico('calendar-clock','sm')}${esc(n.due.slice(5))}</span>` : ''}</div>` : ''}</article>`;
@@ -61,24 +106,29 @@ document.addEventListener('keydown', ev => {
   else { const next = m[3] ? (+m[3] + 1) + m[4] : /^\[/.test(m[2]) ? '[ ]' : m[2]; ta.setRangeText('\n' + m[1] + next + ' ', s, s, 'end'); }
   ta.dispatchEvent(new Event('input', {bubbles:true}));
 });
-function quickNote(caseId){
-  return `<form data-form="nQuick" data-case="${caseId || ''}" class="nquick"><label class="sr" for="nq-${caseId || 'g'}">New note</label>
+function quickNote(caseId, headId){
+  const H = noteHeads();
+  return `<form data-form="nQuick" data-case="${esc(caseId || '')}" class="nquick"><label class="sr" for="nq-${caseId || 'g'}">New note</label>
     <textarea id="nq-${caseId || 'g'}" class="ned" rows="1" placeholder="Jot something down… Ctrl+Enter to add"></textarea>
     <div class="nqbar">${noteTools('nq-' + (caseId || 'g'))}<span class="nqsep" aria-hidden="true"></span><div class="ncolors">${NOTE_COLORS.map(([k, col], i) => `<button type="button" data-act="nColorPick" data-v="${k}" style="--nc:${col}" aria-pressed="${(UI.ncolor || 'yellow') === k}" aria-label="${k}"></button>`).join('')}</div>
-      <button class="btn sm primary" type="submit">${ico('plus','sm')}Add note</button></div></form>`;
+      ${H.length ? `<label class="sr" for="nqHead-${caseId || 'g'}">Heading</label><select id="nqHead-${caseId || 'g'}" class="gsel bord nqhead" data-nq="head">${noteHeadOpts(headId && H.some(h => h.id === headId) ? headId : '')}</select>` : ''}<button class="btn sm primary" type="submit">${ico('plus','sm')}Add note</button></div></form>`;
 }
 function viewNotes(){
   ensureNotes();
   const f = UI.nf || 'all', q = (UI.nq || '').toLowerCase();
-  let list = DB.notes.filter(n => (f === 'all' || (f === 'general' ? !n.caseId : f === 'tasks' ? noteTasks(n).some(t => !t.done) : f === 'pinned' ? n.pinned : n.caseId === f)) && (!q || n.text.toLowerCase().includes(q)));
+  const H = noteHeads(), fh = f.startsWith('h:') ? H.find(h => 'h:' + h.id === f) : null; if(f.startsWith('h:') && !fh){ UI.nf = 'all'; return viewNotes(); }
+  let list = DB.notes.filter(n => (f === 'all' || (f === 'general' ? !n.caseId && !noteHead(n) : f === 'tasks' ? noteTasks(n).some(t => !t.done) : f === 'pinned' ? n.pinned : fh ? n.head === fh.id : n.caseId === f)) && (!q || n.text.toLowerCase().includes(q) || ((noteHead(n) || {}).name || '').toLowerCase().includes(q)));
   list.sort((a, b) => (b.pinned - a.pinned) || b.updated - a.updated);
   const open = DB.notes.reduce((s, n) => s + noteTasks(n).filter(t => !t.done).length, 0);
   return `<div class="scroll"><div class="page">
-    <div class="ph"><div><h1>Notes</h1><div class="sub">Sticky notes and to-dos — general, or pinned to a case. ${open} open to-do${open === 1 ? '' : 's'}.</div></div></div>
-    ${quickNote(f !== 'all' && f !== 'general' && f !== 'tasks' && f !== 'pinned' ? f : '')}
+    <div class="ph"><div><h1>Notes</h1><div class="sub">Sticky notes and to-dos — general, under a heading of your own, or pinned to a case. ${open} open to-do${open === 1 ? '' : 's'}.</div></div></div>
+    ${quickNote(f !== 'all' && f !== 'general' && f !== 'tasks' && f !== 'pinned' && !fh ? f : '', fh ? fh.id : '')}
     <div class="toolbar" style="margin-top:18px"><div class="catbar" style="margin:0"><button class="chip" data-act="nf" data-v="all" aria-pressed="${f === 'all'}">All <span class="n">${DB.notes.length}</span></button>
       <button class="chip" data-act="nf" data-v="pinned" aria-pressed="${f === 'pinned'}">${ico('pin','sm')}Pinned</button><button class="chip" data-act="nf" data-v="tasks" aria-pressed="${f === 'tasks'}">${ico('square-check','sm')}Open to-dos</button>
       <button class="chip" data-act="nf" data-v="general" aria-pressed="${f === 'general'}">General</button>
+      ${H.map(h => `<button class="chip nhchip" data-act="nf" data-v="h:${esc(h.id)}" aria-pressed="${f === 'h:' + h.id}">${ico('heading','sm')}${esc(h.name)} <span class="n">${DB.notes.filter(n => n.head === h.id).length}</span></button>`).join('')}
+      ${fh ? `<button class="chip" data-act="nhEdit" data-id="${esc(fh.id)}" aria-label="Rename or delete the heading ${esc(fh.name)}" title="Rename or delete">${ico('pencil','sm')}</button>` : ''}
+      <button class="chip ghost" data-act="nhNew">${ico('plus','sm')}Heading</button>
       ${DB.cases.map(c => `<button class="chip" data-act="nf" data-v="${c.id}" aria-pressed="${f === c.id}"><i class="cdot" style="background:${esc(c.color)}"></i>${esc(c.name.split(' — ')[0])}</button>`).join('')}</div>
       <span style="flex:1"></span><div class="search-in" style="max-width:260px">${ico('search')}<label class="sr" for="nqs">Search notes</label><input id="nqs" class="inp" placeholder="Search notes…" value="${esc(UI.nq || '')}"></div></div>
     ${list.length ? `<div class="board">${list.map(n => noteCard(n)).join('')}</div>` : empty('notebook-pen','No notes here','Write one above. Start a line with [ ] and it becomes a to-do you can tick off.')}
@@ -89,6 +139,7 @@ function noteDlg(id){
   openDlg(dhead('Edit note') + `<form data-form="note" data-id="${n.id}"><div class="in">
     <div class="field"><label for="nText">Note</label>${noteTools('nText')}<textarea id="nText" class="ned" rows="8" autofocus>${esc(n.text)}</textarea><span class="hint">Use the buttons above, or type <span class="mono">[ ]</span> for a to-do, <span class="mono">-</span> for a bullet, <span class="mono">#</span> for a heading. Enter continues a list.</span></div>
     <div class="frow"><div class="field"><label for="nCase">Case</label><select id="nCase"><option value="">General (no case)</option>${DB.cases.map(c => `<option value="${c.id}"${n.caseId === c.id ? ' selected' : ''}>${esc(c.code + ' · ' + c.name.split(' — ')[0])}</option>`).join('')}</select></div>
+      <div class="field"><label for="nHead">Heading</label><select id="nHead">${noteHeadOpts(noteHead(n) ? n.head : '')}</select></div>
       <div class="field"><label for="nDue">Due</label><input id="nDue" type="date" value="${esc(n.due || '')}"></div></div>
     <div class="field" style="margin:0"><span class="label">Colour</span><div class="ncolors big">${NOTE_COLORS.map(([k, col]) => `<button type="button" data-act="nColor" data-id="${n.id}" data-v="${k}" style="--nc:${col}" aria-pressed="${n.color === k}" aria-label="${k}"></button>`).join('')}</div></div>
     <label style="display:flex;gap:10px;align-items:center;margin-top:14px;font-size:calc(14px * var(--ts,1))"><input type="checkbox" id="nPin" ${n.pinned ? 'checked' : ''}> Pin to the top and to the Dashboard</label></div>

@@ -98,6 +98,7 @@ function viewDetections(){
   const sk = UI.rsk || 'modified', sd = UI.rsd || -1;
   const cmp = {title:(a, b) => a.title.localeCompare(b.title), type:(a, b) => a.type.localeCompare(b.type), severity:(a, b) => (SEV_ORDER[a.severity] || 0) - (SEV_ORDER[b.severity] || 0), technique:(a, b) => (a.technique || '~').localeCompare(b.technique || '~'), modified:(a, b) => a.modified - b.modified}[sk];
   list.sort((a, b) => lay === 'table' ? (cmp(a, b) * sd || a.title.localeCompare(b.title)) : (b.starred - a.starred) || b.modified - a.modified);
+  UI.rShown = list.map(r => r.id);
   let cur = DB.rules.find(r => r.id === UI.rule) || null;
   if(lay === 'ide' && !cur && list[0]){ cur = list[0]; UI.rule = cur.id; }
   const open = cur && (lay === 'ide' || UI.ropen);
@@ -136,20 +137,21 @@ function viewDetections(){
   }
 
   const body = !list.length ? none : lay === 'gallery'
-    ? `<div class="gal">${list.slice(0, LIM).map(r => `<article class="gcard"><button class="gcard-hit" data-act="rSel" data-id="${esc(r.id)}" aria-label="Open ${esc(r.title)}"></button>
-        <div class="gcard-h">${typeTag(r)}${sevTag(r)}<span style="flex:1"></span><button class="tb-ic${r.starred ? ' on star' : ''}" data-act="rStar" data-id="${esc(r.id)}" aria-label="Star">${ico('star','sm')}</button></div>
+    ? `<div class="gal">${list.slice(0, LIM).map(r => `<article class="gcard${rPicked(r.id) ? ' picked' : ''}" data-pick="${esc(r.id)}"><button class="gcard-hit" data-act="rSel" data-id="${esc(r.id)}" aria-label="Open ${esc(r.title)}"></button>
+        <div class="gcard-h">${rPickBox(r)}${typeTag(r)}${sevTag(r)}<span style="flex:1"></span><button class="tb-ic${r.starred ? ' on star' : ''}" data-act="rStar" data-id="${esc(r.id)}" aria-label="Star">${ico('star','sm')}</button></div>
         <h3>${esc(r.title)}</h3>${r.desc ? `<p>${esc(r.desc)}</p>` : ''}
         <pre class="gcode hl">${hlCode(r.type, r.code.split('\n').slice(0, 7).join('\n'))}</pre>
         <div class="gcard-f"><span class="mono t3">${esc(r.technique || '—')}</span>${r.platform ? `<span class="t3">· ${esc(r.platform)}</span>` : ''}<span style="flex:1"></span><span class="t3">${ago(r)}</span></div></article>`).join('')}</div>${more}`
-    : `<div class="card dtw"><table class="dt"><thead><tr><th class="c-star"></th>${sortTh('rSort','title',sk,sd,'Rule')}${sortTh('rSort','type',sk,sd,'Type','c-cat')}${sortTh('rSort','severity',sk,sd,'Severity','c-sev')}${sortTh('rSort','technique',sk,sd,'Technique','c-tech')}<th class="c-plat">Platform</th>${sortTh('rSort','modified',sk,sd,'Updated','c-upd')}<th class="c-act"></th></tr></thead>
+    : `<div class="card dtw"><table class="dt"><thead><tr><th class="c-pick"><label class="tpk"><span class="sr">Select all ${total} shown</span><input type="checkbox" data-act="rPickAll" aria-label="Select all ${total} shown"${total && list.every(r => rPicked(r.id)) ? ' checked' : ''}></label></th><th class="c-star"></th>${sortTh('rSort','title',sk,sd,'Rule')}${sortTh('rSort','type',sk,sd,'Type','c-cat')}${sortTh('rSort','severity',sk,sd,'Severity','c-sev')}${sortTh('rSort','technique',sk,sd,'Technique','c-tech')}<th class="c-plat">Platform</th>${sortTh('rSort','modified',sk,sd,'Updated','c-upd')}<th class="c-act"></th></tr></thead>
       ${vlist('dtV', list.map(r => ({k:r.id, h:66, r:() => { const c = r.caseId ? theCase(r.caseId) : null;
-        return `<tr data-act="rSel" data-id="${esc(r.id)}" aria-current="${!!(open && cur.id === r.id)}" tabindex="0">
-          <td class="c-star"><button class="tb-ic${r.starred ? ' on star' : ''}" data-act="rStar" data-id="${esc(r.id)}" aria-label="Star">${ico('star','sm')}</button></td>
+        return `<tr data-act="rSel" data-id="${esc(r.id)}" data-pick="${esc(r.id)}" class="${rPicked(r.id) ? 'sel' : ''}" aria-current="${!!(open && cur.id === r.id)}" tabindex="0">
+          <td class="c-pick">${rPickBox(r)}</td><td class="c-star"><button class="tb-ic${r.starred ? ' on star' : ''}" data-act="rStar" data-id="${esc(r.id)}" aria-label="Star">${ico('star','sm')}</button></td>
           <td class="c-name"><b>${esc(r.title)}</b><span>${esc(r.desc || '')}</span>${c ? `<em class="c-case" style="--c:${esc(c.color)}">${esc(c.code)}</em>` : ''}</td>
           <td class="c-cat">${typeTag(r)}</td><td class="c-sev">${sevTag(r)}</td><td class="c-tech mono">${esc(r.technique || '—')}</td><td class="c-plat">${esc(r.platform || '—')}</td><td class="c-upd">${ago(r)}</td>
-          <td class="c-act">${ico('chevron-right','sm')}</td></tr>`; }})), {tbody:true, cols:8})}</table></div>`;
+          <td class="c-act">${ico('chevron-right','sm')}</td></tr>`; }})), {tbody:true, cols:9})}</table></div>`;
   return `<div class="scroll"><div class="page wide">${head}
     <div class="toolbar ltb">${search}${typeSeg}${sevSel}${platSel}${lvlSel}${UI.dtac ? `<span class="chip accent">Stage: ${esc((ATTACK.tactics.find(t => t[1] === UI.dtac) || [,,UI.dtac])[2])} <button data-act="dtacOff" aria-label="Clear stage filter">${ico('x','sm')}</button></span>` : ''}<span style="flex:1"></span><span class="t3 lcount">${total} rule${total === 1 ? '' : 's'}</span></div>
+    <div class="tbk rbk" id="rbk" role="toolbar" aria-label="Selected rules"${rPickN() ? '' : ' hidden'}>${rBulkInner()}</div>
     ${body}</div></div>${lay === 'table' && open ? drawer(ruleEditor(cur), 'rClose', cur.title, ico(RTYPE[cur.type][1],'sm') + RTYPE[cur.type][0] + ' rule') : ''}`;
 }
 function ruleEditor(r){
@@ -160,7 +162,7 @@ function ruleEditor(r){
       <span style="flex:1"></span><span class="rx-dirty">Unsaved changes</span>
       <button type="button" class="iconbtn${r.starred ? ' on' : ''}" data-act="rStar" data-id="${esc(r.id)}" aria-label="${r.starred ? 'Unstar' : 'Star'}" title="Star">${ico('star','sm')}</button>
       <button type="button" class="iconbtn" data-act="rMenu" data-id="${esc(r.id)}" aria-label="More actions" title="More">${ico('ellipsis','sm')}</button></div>
-    <label class="sr" for="rTitle">Title</label><input id="rTitle" class="rx-title" value="${esc(r.title)}" required autocomplete="off" placeholder="Rule title">
+    <div class="rx-tw"><label class="sr" for="rTitle">Title</label><input id="rTitle" class="rx-title" value="${esc(r.title)}" required autocomplete="off" placeholder="Rule title" aria-describedby="rTitleWarn"><p class="ferr" id="rTitleWarn" role="status" hidden></p></div>
     <label class="sr" for="rDesc">Description</label><input id="rDesc" class="rx-desc" value="${esc(r.desc)}" placeholder="What does this detect, and why does it matter?" autocomplete="off">
     <div class="rx-tabs" role="tablist"><button type="button" role="tab" data-rtab="rule" aria-selected="${tab === 'rule'}">${ico('code','sm')}Rule</button><button type="button" role="tab" data-rtab="meta" aria-selected="${tab === 'meta'}">${ico('tag','sm')}Details</button><button type="button" role="tab" data-rtab="tests" aria-selected="${tab === 'tests'}">${ico('circle-check','sm')}Tests${(r.tests || []).length ? ' <span class="t3">' + r.tests.length + '</span>' : ''}</button>${r.type === 'sigma' ? `<button type="button" role="tab" data-rtab="queries" aria-selected="${tab === 'queries'}">${ico('terminal','sm')}Queries</button><button type="button" role="tab" data-rtab="evasion" aria-selected="${tab === 'evasion'}">${ico('shield-alert','sm')}Evasion</button>` : ''}
       <span style="flex:1"></span><span class="rx-edited">Edited ${esc(E.fmtAgo(Math.max(0, Date.now() - r.modified)))}</span></div>
@@ -181,7 +183,7 @@ function ruleEditor(r){
         <div class="field"><label for="rTags">Tags</label><input id="rTags" value="${esc(r.tags.join(', '))}" placeholder="comma, separated"></div></div>
       <p class="hint">Created ${esc(new Date(r.created).toISOString().slice(0, 10))} · ${r.code.split('\n').length} lines · ${esc(r.id)}</p></div>
     <div class="rx-f"><span class="t3 rx-kb"><kbd>Ctrl</kbd> <kbd>S</kbd> to save</span><span style="flex:1"></span>
-      <button class="btn" type="button" data-act="rRevert" data-id="${esc(r.id)}">Revert</button><button class="btn primary" type="submit">${ico('check','sm')}Save rule</button></div></form>`;
+      <button class="btn" type="button" data-act="rRevert" data-id="${esc(r.id)}" disabled title="Throw away the edits you have not saved and go back to the saved rule">Discard changes</button><button class="btn primary" type="submit">${ico('check','sm')}Save rule</button></div></form>`;
 }
 function bindRuleEditor(){
   const ta = $('rCode'), r = DB.rules.find(z => z.id === UI.rule); if(!ta || !r) return;
@@ -193,9 +195,10 @@ function bindRuleEditor(){
     st.innerHTML = `<span class="cx-v">${ico(iss.length ? 'triangle-alert' : 'circle-check','sm')}${iss.length ? iss.map(esc).join(' · ') : 'Structure OK'}</span><span style="flex:1"></span><span>${n} line${n > 1 ? 's' : ''}</span><span>${RTYPE[r.type][0]}</span><span class="hide-m" title="Checks required sections only — test in your SIEM or with yara before deploying">Structural check only</span>`; };
   const paint = () => { hl.innerHTML = hlCode(r.type, ta.value) + '\n'; const n = ta.value.split('\n').length; ta.rows = n;
     gut.innerHTML = Array.from({length:n}, (_, i) => `<span>${i + 1}</span>`).join(''); };
-  const dirty = () => f.classList.toggle('dirty', snap() !== base);
+  const rv = f.querySelector('[data-act=rRevert]'), dirty = () => { const d = snap() !== base; f.classList.toggle('dirty', d); if(rv) rv.disabled = !d; };
   ta.addEventListener('input', () => { paint(); dirty(); clearTimeout(vt); vt = setTimeout(status, 200); });
-  f.addEventListener('input', ev => { if(ev.target !== ta) dirty(); if(ev.target.id === 'rTitle'){ clearTimeout(vt); vt = setTimeout(status, 200); } });
+  const tw = $('rTitleWarn'), tcheck = () => { if(!tw) return; const v = $('rTitle').value.trim().replace(/\s+/g, ' '), x = v && clash(DB.rules, v, 'title', r.id); tw.hidden = !x; tw.textContent = x ? `A rule called “${v}” already exists — rename this one before saving.` : ''; $('rTitle').classList.toggle('invalid', !!x); };
+  f.addEventListener('input', ev => { if(ev.target !== ta) dirty(); if(ev.target.id === 'rTitle'){ tcheck(); clearTimeout(vt); vt = setTimeout(status, 200); } });
   f.addEventListener('change', ev => { dirty(); if(ev.target.id === 'rSev'){ const [l, c] = sevOf(ev.target.value), p = $('rSevPill'); if(p){ p.textContent = l; p.style.setProperty('--c', c); } } });
   ta.addEventListener('keydown', ev => {
     if(ev.key === 'Tab' && !ev.shiftKey && !ev.ctrlKey && !ev.altKey){ ev.preventDefault(); const s = ta.selectionStart; ta.setRangeText('    ', s, ta.selectionEnd, 'end'); ta.dispatchEvent(new Event('input', {bubbles:true})); }
@@ -204,8 +207,48 @@ function bindRuleEditor(){
   f.addEventListener('keydown', ev => { if((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 's'){ ev.preventDefault(); f.requestSubmit(); } });
   f.querySelectorAll('[data-rtab]').forEach(b => b.onclick = () => { UI.rtab = b.dataset.rtab; f.querySelectorAll('[data-rtab]').forEach(x => x.setAttribute('aria-selected', String(x === b)));
     const pane = /^(tests|queries|evasion)$/.test(UI.rtab) ? 'lab' : UI.rtab; f.querySelectorAll('[data-pane]').forEach(p => p.hidden = p.dataset.pane !== pane); if(pane === 'lab') dlPaneFill(); });
-  paint(); status(); if(/^(tests|queries|evasion)$/.test(UI.rtab || '')) dlPaneFill();
+  paint(); status(); tcheck(); if(/^(tests|queries|evasion)$/.test(UI.rtab || '')) dlPaneFill();
 }
+/* picking several rules at once: star, download or delete them together */
+const rPicked = id => !!(UI.rpick && UI.rpick.has(id));
+const rPickBox = r => `<label class="tpk"><span class="sr">Select ${esc(r.title)}</span><input type="checkbox" data-act="rPick" data-id="${esc(r.id)}"${rPicked(r.id) ? ' checked' : ''}></label>`;
+const rPickedRules = () => UI.rpick ? DB.rules.filter(r => UI.rpick.has(r.id)) : [];
+const rPickN = () => rPickedRules().length;
+function rBulkInner(){
+  const xs = rPickedRules(), n = xs.length, shown = (UI.rShown || []).length; if(!n) return '';
+  const allOn = xs.every(r => r.starred);
+  return `<b>${n} selected</b>${shown > n ? `<button class="btn xs" data-act="rbAll">Select all ${shown} shown</button>` : ''}<span class="sep"></span>
+    <button class="btn xs" data-act="rbStar">${ico('star','sm')}${allOn ? 'Unstar' : 'Star'}</button><button class="btn xs" data-act="rbDl">${ico('download','sm')}Download</button>
+    <button class="btn xs rd" data-act="rbDel">${ico('trash-2','sm')}Delete</button><button class="iconbtn" data-act="rbClear" aria-label="Clear selection">${ico('x','sm')}</button>`;
+}
+function paintRBulk(){
+  const el = $('rbk'); if(!el) return; const n = rPickN(); el.hidden = !n; el.innerHTML = rBulkInner();
+  const all = document.querySelector('[data-act=rPickAll]'), shown = UI.rShown || []; if(all){ all.checked = !!shown.length && shown.every(rPicked); all.indeterminate = !all.checked && shown.some(rPicked); }
+}
+const ruleExportObj = r => ({type:r.type, title:r.title, description:r.desc, code:ruleText(r), severity:r.severity, category:r.category, technique:r.technique, author:r.author, platform:r.platform, tags:r.tags, refs:r.refs || [], starred:!!r.starred, caseId:r.caseId || null, created:r.created, tests:r.tests && r.tests.length ? r.tests : undefined});
+const ruleFileName = r => safeName(slug(r.title) || 'rule').slice(0, 60) + (r.type === 'yara' ? '.yar' : '.yml');
+/* one rule: its .yml / .yar file. Several: a zip with each rule's file, and a JSON bundle that Import reads back with tests and metadata */
+function rulesDownload(xs){
+  if(!xs.length) return; if(xs.length === 1) return download(ruleFileName(xs[0]), ruleText(xs[0]), 'text/plain');
+  const used = new Set(), files = xs.map(r => { let n = ruleFileName(r), i = 2; while(used.has(n)) n = ruleFileName(r).replace(/(\.\w+)$/, '-' + i++ + '$1'); used.add(n); return {name:'osintrix-rules/' + (r.type === 'yara' ? 'yara/' : 'sigma/') + n, data:ruleText(r)}; });
+  files.push({name:'osintrix-rules/osintrix-detections.json', data:JSON.stringify(xs.map(ruleExportObj), null, 2)});
+  try{ const blob = nbZip(files), a = document.createElement('a'), u = URL.createObjectURL(blob); a.href = u; a.download = 'osintrix-rules-' + xs.length + '.zip'; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(u); a.remove(); }, 150); toast('Saved ' + xs.length + ' rules as a zip'); }
+  catch(e){ toast('The browser blocked the download'); }
+}
+const RB_ACTS = {
+  rPick:(id, v, t) => { const s = UI.rpick || (UI.rpick = new Set()); t.checked ? s.add(id) : s.delete(id); const c = t.closest('[data-pick]'); if(c) c.classList.toggle(c.tagName === 'TR' ? 'sel' : 'picked', t.checked); paintRBulk(); },
+  rPickAll:(id, v, t) => { const s = UI.rpick || (UI.rpick = new Set()); (UI.rShown || []).forEach(x => t.checked ? s.add(x) : s.delete(x)); renderMain(); },
+  rbAll:() => { const s = UI.rpick || (UI.rpick = new Set()); (UI.rShown || []).forEach(x => s.add(x)); renderMain(); },
+  rbClear:() => { UI.rpick = new Set(); renderMain(); },
+  rbStar:() => { const xs = rPickedRules(), on = !xs.every(r => r.starred); xs.forEach(r => r.starred = on); mutate((on ? 'starred ' : 'unstarred ') + xs.length + ' rules'); renderMain(); toast(xs.length + ' rule' + (xs.length > 1 ? 's ' : ' ') + (on ? 'starred' : 'unstarred')); },
+  rbDl:() => rulesDownload(rPickedRules()),
+  rbDel:() => { const xs = rPickedRules(); if(!xs.length) return; const bi = xs.filter(r => r.builtin).length;
+    confirmDlg('Delete ' + xs.length + ' rule' + (xs.length > 1 ? 's' : '') + '?', (bi ? bi + ' of them came with OSINTrix and stay deleted when the app updates its rules. ' : '') + 'You can undo right after.', 'Delete ' + xs.length, () => {
+      const prev = DB.rules.slice(), prevGone = (DB.deletedRules || []).slice(), gone = new Set(xs.map(r => r.id));
+      DB.rules = DB.rules.filter(r => !gone.has(r.id)); if(bi) DB.deletedRules = [...new Set([...prevGone, ...xs.filter(r => r.builtin).map(r => r.id)])];
+      if(gone.has(UI.rule)){ UI.rule = null; UI.ropen = false; } UI.rpick = new Set(); closeDlg(); mutate('deleted ' + xs.length + ' rules'); renderAll();
+      toast('Deleted ' + xs.length + ' rule' + (xs.length > 1 ? 's' : ''), 'Undo', () => { DB.rules = prev; DB.deletedRules = prevGone; mutate('restored ' + xs.length + ' rules'); renderAll(); }); }); },
+};
 const ruleDirty = () => { const f = document.querySelector('form.rx'); return !!(f && f.classList.contains('dirty')); };
 function ruleFromCase(){
   const c = theCase(), D = derive(); const mal = new Map();

@@ -126,6 +126,8 @@ document.addEventListener('click', ev => {
   if(typeof CH_ACTS !== 'undefined' && CH_ACTS[a]) return CH_ACTS[a](id, v, t, ev);
   if(typeof TD_ACTS !== 'undefined' && TD_ACTS[a]) return TD_ACTS[a](id, v, t, ev);
   if(typeof DUP_ACTS !== 'undefined' && DUP_ACTS[a]) return DUP_ACTS[a](id, v, t, ev);
+  if(typeof RB_ACTS !== 'undefined' && RB_ACTS[a]) return RB_ACTS[a](id, v, t, ev);
+  if(typeof NH_ACTS !== 'undefined' && NH_ACTS[a]) return NH_ACTS[a](id, v, t, ev);
   if(NBX_ACTS[a]) return NBX_ACTS[a](id, v, t, ev);
   if(a === 'toolRun') return toolRunDlg(id);
   if(a === 'trPick'){ $('trV').value = v; return $('trV').focus(); }
@@ -323,7 +325,7 @@ document.addEventListener('click', ev => {
       mutate('imported ' + n + ' queries'); renderAll(); toast(n + ' queries imported'); });
     /* detections */
     case 'dtype': UI.dtype = v; UI.dcat = ''; UI.dlim = 0; return renderMain();
-    case 'rSel': if(id === UI.rule && (UI.ropen || rLay() === 'ide')) return; if(ruleDirty()) return confirmDlg('Discard unsaved changes?', 'You have edits to this rule that are not saved yet.', 'Discard changes', () => clickAct('rSel', id), true); UI.rule = id; UI.ropen = true; UI.dview = 'rules'; renderMain(); { const r = document.querySelector('.wb-main'); if(r && window.innerWidth <= 1180) r.scrollIntoView({block:'start'}); } return;
+    case 'rSel': if(ev.target.closest('.tpk')) return; if(id === UI.rule && (UI.ropen || rLay() === 'ide')) return; if(ruleDirty()) return confirmDlg('Discard unsaved changes?', 'You have edits to this rule that are not saved yet.', 'Discard changes', () => clickAct('rSel', id), true); UI.rule = id; UI.ropen = true; UI.dview = 'rules'; renderMain(); { const r = document.querySelector('.wb-main'); if(r && window.innerWidth <= 1180) r.scrollIntoView({block:'start'}); } return;
     case 'rNew': { const r0 = t.getBoundingClientRect(); return showMenu(r0.left, r0.bottom + 6, [
       {label:'Sigma rule (log detection)', icon:'file-code', fn:() => newRule('sigma')}, {label:'YARA rule (file / memory)', icon:'binary', fn:() => newRule('yara')}], 'New rule'); }
     case 'rTest': { const r = DB.rules.find(z => z.id === id), code = $('rCode') ? $('rCode').value : r.code, res = testRule({...r, code}, DB.active), out = $('rTestOut');
@@ -334,7 +336,7 @@ document.addEventListener('click', ev => {
       i.onchange = async () => { const f = i.files[0]; if(!f) return; if(f.size > 60 * 1048576) return toast('Up to 60 MB in the browser'); const res = yaraScan(code, new Uint8Array(await f.arrayBuffer())), out = $('rTestOut'); if(!out) return;
         out.innerHTML = `<div class="rtres"><b>${esc(f.name)}</b>${res.map(x => x.error ? `<div class="t3">${esc(x.rule)} — ${esc(x.error)}</div>` : `<div class="yhit" style="${x.match ? '' : 'background:var(--surface-2);color:var(--text-2)'}">${ico(x.match ? 'shield-alert' : 'check','sm')}<b>${esc(x.rule)}: ${x.match ? 'match' : 'no match'}</b><span class="mono t3">${Object.entries(x.strings).map(([n, v]) => esc(n) + '×' + v.hits.length).join('  ')}</span></div>`).join('')}</div>`; };
       i.click(); return; }
-    case 'rRevert': renderMain(); return toast('Changes discarded');
+    case 'rRevert': if(!ruleDirty()) return; { const f = document.querySelector('form.rx'); if(f) f.classList.remove('dirty'); } renderMain(); return toast('Unsaved changes discarded');
     case 'rMenu': { const r = DB.rules.find(z => z.id === id), r0 = t.getBoundingClientRect(); if(!r) return; return showMenu(Math.max(8, r0.right - 220), r0.bottom + 6, [
       {label:'Duplicate', icon:'copy', fn:() => clickAct('rDup', id)},
       {label:'Copy rule text', icon:'file-code', fn:() => clickAct('rCopy', id)},
@@ -347,11 +349,11 @@ document.addEventListener('click', ev => {
     case 'rDup': { const r = DB.rules.find(z => z.id === id); const c2 = {...r, builtin:false, id:uid('r'), title:copyName(r.title, DB.rules.map(x => x.title)), created:Date.now(), modified:Date.now(), starred:false}; DB.rules.unshift(c2); UI.rule = c2.id; UI.ropen = true; UI.dview = 'rules'; mutate('duplicated rule'); return renderMain(); }
     case 'rCopy': { const r = DB.rules.find(z => z.id === id); return copyText(ruleText(r, $('rCode') ? $('rCode').value : r.code)); }
     case 'rExport': { const r = DB.rules.find(z => z.id === id); return download(slug(r.title) + (r.type === 'sigma' ? '.yml' : '.yar'), ruleText(r, $('rCode') ? $('rCode').value : r.code), 'text/plain'); }
-    case 'rExportAll': return download('osintrix-detections.json', JSON.stringify(DB.rules.map(r => ({type:r.type, title:r.title, description:r.desc, code:ruleText(r), severity:r.severity, category:r.category, technique:r.technique, author:r.author, platform:r.platform, tags:r.tags, refs:r.refs || [], starred:!!r.starred, caseId:r.caseId || null, created:r.created, tests:r.tests && r.tests.length ? r.tests : undefined})), null, 2), 'application/json');
+    case 'rExportAll': return download('osintrix-detections.json', JSON.stringify(DB.rules.map(ruleExportObj), null, 2), 'application/json');
     case 'rImport': return importRules();
     case 'rFromCase': return ruleFromCase();
     /* notes */
-    case 'nf': UI.nf = v; if(UI.route.area !== 'notes') return; return renderMain();
+    case 'nf': UI.nf = v; if(UI.route.area !== 'notes'){ if(String(v).startsWith('h:')) go('#/notes'); return; } return renderMain();
     case 'nTick': { const n = DB.notes.find(z => z.id === id); const L = n.text.split('\n'); L[+v] = L[+v].replace(/\[( |x|X)\]/, m => m === '[ ]' ? '[x]' : '[ ]'); n.text = L.join('\n'); n.updated = Date.now(); mutate('ticked a to-do'); renderNav(); const card = t.closest('.ntask'); if(card) card.classList.toggle('done', t.checked);
       const art = t.closest('.note-card'); if(art){ const tk = noteTasks(n), dn = tk.filter(x => x.done).length, pr = art.querySelector('.nprog i'), lab = art.querySelector('.nprog + span'); if(pr) pr.style.width = Math.round(dn / tk.length * 100) + '%'; if(lab) lab.textContent = dn + '/' + tk.length; } return; }
     case 'nEdit': return noteDlg(id);
@@ -550,7 +552,7 @@ document.addEventListener('submit', ev => {
     mutate('saved query ' + vals.name); closeDlg(); renderAll(); return toast('Query saved'); }
   if(k === 'rule'){ const r = DB.rules.find(z => z.id === f.dataset.id); if(!r) return;
     const rt = $('rTitle').value.trim().replace(/\s+/g, ' '); if(!rt) return fieldErr('rTitle', 'Give the rule a title.'); if(!checkLen('rTitle', rt, LIMITS.title, 'Title')) return;
-    if(clash(DB.rules, rt, 'title', r.id)) return fieldErr('rTitle', `A rule called “${rt}” already exists.`);
+    if(clash(DB.rules, rt, 'title', r.id)){ const w = $('rTitleWarn'); if(w){ w.hidden = false; w.textContent = `A rule called “${rt}” already exists — rename this one before saving.`; $('rTitle').classList.add('invalid'); $('rTitle').focus(); $('rTitle').scrollIntoView({block:'nearest'}); return; } return fieldErr('rTitle', `A rule called “${rt}” already exists.`); }
     const tech = $('rTech').value.trim().toUpperCase(); if(tech && !/^(T\d{4}(\.\d{3})?)(\s*,\s*T\d{4}(\.\d{3})?)*$/.test(tech)) return fieldErr('rTech', 'Use MITRE ATT&CK IDs like T1059 or T1059.001 (comma-separated).');
     if(!$('rCode').value.trim()) return fieldErr('rCode', 'The rule body is empty.');
     Object.assign(r, {title:rt, severity:$('rSev').value, technique:$('rTech').value.trim().toUpperCase(), caseId:$('rCase').value || null, desc:$('rDesc').value.trim(), code:$('rCode').value,
@@ -564,10 +566,12 @@ document.addEventListener('submit', ev => {
     if(vals.flagRe && !checkRegex('evR', vals.flagRe)) return; if(vals.url && !E.safeUrl(vals.url)) return fieldErr('evU', 'Enter a full address starting with http:// or https://.');
     if(f.dataset.id) Object.assign(DB.ctf.events.find(e => e.id === f.dataset.id), vals); else { const ev = {id:uid('ev'), ...vals, created:Date.now()}; DB.ctf.events.push(ev); UI.ctfEv = ev.id; }
     mutate('saved event'); closeDlg(); return renderAll(); }
+  if(k === 'nh') return nhSubmit(f);
   if(k === 'nQuick'){ const ta = f.querySelector('textarea'), text = ta.value.trim(); if(!text) return; if(text.length > 4000) return fieldErr(ta, `Notes can be up to 4,000 characters — this one is ${text.length.toLocaleString()}.`);
-    DB.notes.unshift({id:uid('n'), caseId:f.dataset.case || null, color:UI.ncolor || 'yellow', pinned:false, text:text.slice(0, 4000), due:'', created:Date.now(), updated:Date.now()});
+    const hs = f.querySelector('[data-nq=head]'), head = hs && noteHeads().some(h => h.id === hs.value) ? hs.value : null;
+    DB.notes.unshift({id:uid('n'), caseId:f.dataset.case || null, head, color:UI.ncolor || 'yellow', pinned:false, text:text.slice(0, 4000), due:'', created:Date.now(), updated:Date.now()});
     mutate('added note'); renderAll(); const x = document.querySelector('.nquick textarea'); if(x) x.focus(); return; }
-  if(k === 'note'){ const n = DB.notes.find(z => z.id === f.dataset.id); if(!$('nText').value.trim()) return fieldErr('nText', 'A note cannot be empty — delete it instead if you no longer need it.'); if(!checkLen('nText', $('nText').value, 4000, 'Note')) return; Object.assign(n, {text:$('nText').value.slice(0, 4000), caseId:$('nCase').value || null, due:$('nDue').value, pinned:$('nPin').checked, color:UI.noteColorEdit || n.color, updated:Date.now()});
+  if(k === 'note'){ const n = DB.notes.find(z => z.id === f.dataset.id); if(!$('nText').value.trim()) return fieldErr('nText', 'A note cannot be empty — delete it instead if you no longer need it.'); if(!checkLen('nText', $('nText').value, 4000, 'Note')) return; Object.assign(n, {text:$('nText').value.slice(0, 4000), caseId:$('nCase').value || null, head:$('nHead') && noteHeads().some(h => h.id === $('nHead').value) ? $('nHead').value : null, due:$('nDue').value, pinned:$('nPin').checked, color:UI.noteColorEdit || n.color, updated:Date.now()});
     UI.noteColorEdit = null; mutate('edited note'); closeDlg(); return renderAll(); }
   if(k === 'src'){ const url = $('srcUrl').value.trim(), sn = $('srcName').value.trim().replace(/\s+/g, ' ') || hostOf(url); if(!E.safeUrl(url)) return fieldErr('srcUrl', 'Enter the feed address, starting with http:// or https://.');
     if(DB.feedSources.some(x => x.url.replace(/\/+$/, '') === url.replace(/\/+$/, ''))) return fieldErr('srcUrl', 'This feed is already in your sources.'); if(clash(DB.feedSources, sn)) return fieldErr('srcName', `A source called “${sn}” already exists.`); if(!checkLen('srcName', sn, 60, 'Name')) return;
