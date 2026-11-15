@@ -304,7 +304,10 @@ function meaning(k, v){
 }
 
 /* Observations: what the indicators in one record mean together. Heuristic, never a verdict. */
-function observations(rec){
+/* observations are read many times (copilot, report, coverage); keep them per record until its text changes */
+const OBS_C = new WeakMap();
+function observations(rec){ const k = (rec.body || '').length + ':' + (rec.ents || []).length + ':' + (rec.title || '').length, c = OBS_C.get(rec); if(c && c.k === k) return c.v; const v = observations0(rec); OBS_C.set(rec, {k, v}); return v; }
+function observations0(rec){
   const out = [], ents = rec.ents || [], body = rec.body || '';
   const val = k => ents.filter(e => e.k === k).map(e => e.v);
   const add = (tag, t, hot = true) => out.push({tag, t, hot});

@@ -44,4 +44,6 @@ relay on your own domain, add it to `connect-src` in `index.html` (and `tools/bu
   Rotate it with `wrangler secret put RELAY_TOKEN`.
 - The built-in rate limit (120 requests a minute per address) is per Worker instance. For a strict
   limit add a Cloudflare **Rate limiting rule** on the Worker's route.
+- `"null"` in `ALLOWED_ORIGINS` admits any page opened from a file, sandboxed frames and `data:` pages — the token still protects the relay, but remove `"null"` if you host OSINTrix at an address.
+- Failed token guesses count towards the rate limit.
 - To remove a service, delete its line from `P` in `worker.js` and redeploy.

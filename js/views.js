@@ -30,7 +30,7 @@ function viewHome(){
   const buckets = perDay(DB.records, r => r.ts), mx = Math.max(1, ...buckets);
   const recSpark = perDay(DB.records, r => r.ts), entSpark = perDay(DB.entries, e => e.created);
   return `<div class="scroll"><div class="page">
-    ${sampleBanner()}${backupBanner()}
+    ${sampleBanner()}${backupBanner()}${typeof setupBanner === 'function' ? setupBanner() : ''}
     <header class="brief">
       <div><span class="ix">${esc(new Date().toLocaleDateString(undefined, {weekday:'long', day:'numeric', month:'long', year:'numeric'}))}</span><h1>Dashboard</h1>
         <p>${top ? `Most active: <a href="${caseHash(top.id)}">${esc(top.name.split(' — ')[0])}</a> — ${openQ.filter(r => r.caseId === top.id).length} open questions, ${derive(top.id).entries.filter(e => entryVerdict(e) === 'malicious').length} malicious entries.` : 'No investigations yet. Create a case or capture your first piece of evidence.'}${cross.length ? ` <span class="mono">${esc(cross[0].v)}</span> appears in ${cross[0].cases.size} cases.` : ''}${fm.length ? ` ${fm.length} feed item${fm.length > 1 ? 's' : ''} mention your entities.` : ''}</p></div>

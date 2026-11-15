@@ -1345,3 +1345,143 @@ test('file triage: a disguised script that deletes backups scores malicious with
   await expect(page.locator('.tri')).toContainText('Nothing alarming', { timeout: 15000 });
   noErrors(errors);
 });
+
+test('speed: a 10,000-record case stays responsive (copilot, smart search, risk, overview edits, graph)', async ({ page }) => {
+  test.setTimeout(120000);
+  const errors = await open(page, '#/home');
+  await page.evaluate(() => (() => { const N = 10000;
+    const c = { id: 'c-big', name: 'Big case — load test', code: 'BIG-1', status: 'active', owner: 'You', created: Date.now(), updated: Date.now(), scope: 'Load', color: CASE_COLORS[1], icon: 'briefcase' }; DB.cases.push(c);
+    const hosts = Array.from({ length: 60 }, (_, i) => 'WS-' + i), t0 = Date.parse('2026-09-01T00:00:00Z');
+    for (let i = 0; i < N; i++) { const ip = '45.' + (i % 200) + '.' + ((i * 7) % 250) + '.' + ((i * 13) % 250), dom = 'host' + (i % 900) + '.evil' + (i % 37) + '.top';
+      const body = `EventID=${[4624, 4625, 1, 3, 11, 7045][i % 6]} Image=C:\\Windows\\System32\\cmd.exe CommandLine="cmd /c ping ${dom}" DestinationIp=${ip} DestinationPort=${[443, 80, 4444, 8080][i % 4]} User=CORP\\u${i % 300}`;
+      DB.records.push({ id: 'rb' + i, caseId: c.id, type: 'evidence', title: 'Event ' + i + ' on ' + hosts[i % 60], body, tsRaw: '', tsZone: 'explicit', ts: t0 + i * 61000, source: ['sysmon', 'security', 'proxy'][i % 3], host: hosts[i % 60], tags: [], ents: E.extract(body), answer: '', addedBy: 'You', addedAt: Date.now(), hash: '' }); }
+    for (let i = 0; i < 300; i++) { const e = { id: 'vb' + i, caseId: c.id, type: 'domain', fields: { domain: 'host' + i + '.evil' + (i % 37) + '.top' }, priority: 'medium', starred: false, tags: [], notes: '', src: '', created: Date.now(), pos: { x: (i % 20) * 80, y: Math.floor(i / 20) * 80 } }; DB.entries.push(e); if (i % 5 === 0) DB.verdicts['domain:' + e.fields.domain] = 'malicious'; }
+    for (let i = 1; i < 300; i++) DB.links.push({ id: 'lb' + i, caseId: c.id, a: 'vb' + i, b: 'vb' + Math.floor(i / 3), label: 'resolves to', conf: 2, src: '' });
+    DB.active = c.id; mutate("gen");
+  })());
+  const T = await page.evaluate(async () => { const t = (f) => { const a = performance.now(); f(); return performance.now() - a; };
+    const r = {}; CP.memo.clear(); r.copilot = t(() => copilot()); r.nlq = t(() => nlqRun(nlqParse('malicious domains last week'))); r.risk = t(() => gRisk()); r.suggest = t(() => suggestLinks(DB.active));
+    go(caseHash(DB.active, 'overview')); await new Promise(res => setTimeout(res, 200)); r.edit = t(() => { mutate('x'); renderMain(); }); r.byId = t(() => { for (let i = 0; i < 20000; i++) recById('rb' + (i % 10000)); }); return r; });
+  expect(T.copilot).toBeLessThan(2500); expect(T.nlq).toBeLessThan(400); expect(T.risk).toBeLessThan(200); expect(T.suggest).toBeLessThan(500); expect(T.edit).toBeLessThan(800); expect(T.byId).toBeLessThan(100);
+  await expect(page.locator('#cpCard')).toContainText('Next steps', { timeout: 10000 });
+  noErrors(errors);
+});
+
+test('no serious accessibility problems on the newer screens (copilot, investigate, coverage, health, look-alikes, identity, report, watchlist), light and dark', async ({ page }) => {
+  test.setTimeout(300_000);
+  const AxeBuilder = require('@axe-core/playwright').default;
+  const errors = await open(page, '#/home');
+  const setups = {
+    overview: () => { location.hash = '#/case/c-lantern/overview'; },
+    report: () => { DB.prefs.repT = 'full'; location.hash = '#/case/c-lantern/report'; },
+    investigate: () => { UI.itab = 'look'; UI.look = { k: 'ipv4', v: '203.0.113.47' }; LKV.key = 'ipv4:203.0.113.47'; LKV.res = { idb: { ok: true, at: Date.now(), sig: [{ t: 'mal', w: 0.8, why: 'Shodan tags it c2', ts: 0 }], facts: [['Open ports', '4444']], attrs: { ports: [4444] }, related: [{ k: 'domain', v: 'update-lamp.test', rel: 'hostname' }], link: 'https://www.shodan.io/host/203.0.113.47' } }; LKV.pending = new Set(); location.hash = '#/feeds'; },
+    investigateEmpty: () => { UI.itab = 'look'; UI.look = null; LKV.bulk = null; location.hash = '#/feeds'; },
+    coverage: () => { UI.dview = 'coverage'; location.hash = '#/detections'; },
+    health: () => { UI.dview = 'health'; location.hash = '#/detections'; },
+    twist: () => { UI.labTab = 'twist'; UI.tw = { d: 'paypal.com', list: twGen('paypal.com').map((x, i) => i < 3 ? Object.assign(x, { done: true, exists: true, ips: ['45.77.10.' + i], mx: i ? [] : ['mx.x.com'], ns: [] }) : x) }; location.hash = '#/lab'; },
+    identEmail: () => { UI.labTab = 'ident'; UI.idq = 'jordan.okafor1992@gmail.com'; location.hash = '#/lab'; },
+    identUser: () => { UI.labTab = 'ident'; UI.idq = 'n1ghtlamp'; location.hash = '#/lab'; },
+    graphIns: () => { UI.graph.panel = 'ins'; location.hash = '#/case/c-lantern/graph'; },
+    setup1: () => { location.hash = '#/home'; setTimeout(() => { SU.mode = 'free'; setupOpen(1); }, 60); },
+    setup4: () => { location.hash = '#/home'; setTimeout(() => { setupOpen(4); }, 60); },
+    share: () => { location.hash = '#/case/c-lantern/report'; setTimeout(() => shareDlg(), 60); },
+    watch: () => { DB.watch = { 'ipv4:203.0.113.47': { at: Date.now(), checked: Date.now(), snap: { band: 'malicious', score: 80 }, alerts: [{ at: Date.now(), d: [{ hot: true, t: 'New port: 3389' }] }], unseen: true } }; location.hash = '#/watch'; },
+  };
+  const found = [];
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate(t => { DB.prefs.theme = t; applyPrefs(); renderAll(); }, theme);
+    for (const name of Object.keys(setups)) {
+      if (name === 'health') await page.evaluate(() => ruleHealth());
+      await page.evaluate(src => { closeDlg(); (0, eval)('(' + src + ')')(); setTimeout(renderMain, 20); }, setups[name].toString());
+      await page.waitForTimeout(500);
+      const res = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
+      for (const v of res.violations) if (['serious', 'critical'].includes(v.impact)) for (const n of v.nodes.slice(0, 3)) found.push(`${theme} ${name} ${v.id}: ${n.target.join(' ')} ${n.failureSummary ? n.failureSummary.split('\n')[1] : ''}`);
+    }
+  }
+  expect(found, found.join('\n')).toEqual([]);
+  noErrors(errors.filter(e => !/Connecting to 'file:.*violates the following Content Security Policy directive: "connect-src/.test(e)));
+});
+
+test('security: a crafted backup cannot redirect the relay or switch on lookups; history it carries is plain values; restore-point downloads hold no secrets; hostile STIX patterns stay fast', async ({ page }) => {
+  const errors = await open(page, '#/settings');
+  await page.evaluate(() => { const S = lkSettings(); S.relay = { url: 'https://mine.workers.dev', token: 'MY-TOKEN' }; S.keys.shodan = 'MY-KEY'; S.on = { dns: true }; mutate('t'); });
+  const evil = await page.evaluate(async () => { const o = JSON.parse(JSON.stringify(await backupObject())); o.intel.look = { on: { vt: true, idb: true }, keys: { shodan: 'THEIRS' }, relay: { url: 'https://evil.workers.dev', token: '' } };
+    o.intel.sources = [{ id: 'kev', on: true, url: 'https://raw.githubusercontent.com/attacker/x/kev.json', host: 'evil' }]; o.prefs.watchEvery = 1; o.cases[0].autoLook = true;
+    o.intel.lookHist = [{ k: 'ipv4', v: '1.1.1.1', band: 'malicious', score: '<a href=https://phish>Re-authenticate</a>' }, { k: 'x', v: '<img>' }];
+    o.watch = { 'ipv4:1.1.1.1': { at: 1, snap: { band: '<b>x</b>', score: '<i>9</i>' }, alerts: [{ at: 1, d: [{ hot: 1, t: 'x'.repeat(5000) }] }] } }; return JSON.stringify(o); });
+  page.once('filechooser', fc => fc.setFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(evil) }));
+  await page.evaluate(() => clickAct('importAll')); await page.click('#dlg .btn.primary, #dlg button:has-text("Import backup")');
+  await expect.poll(() => page.evaluate(() => (DB.intel.lookHist || []).length), { timeout: 10000 }).toBe(1);
+  const S = await page.evaluate(() => ({ relay: DB.intel.look.relay, keys: DB.intel.look.keys, on: DB.intel.look.on, kev: ctiSrc('kev').url, every: DB.prefs.watchEvery || 0, auto: DB.cases.some(c => c.autoLook), h: DB.intel.lookHist[0], w: DB.watch['ipv4:1.1.1.1'] }));
+  expect(S.relay).toEqual({ url: 'https://mine.workers.dev', token: 'MY-TOKEN' }); expect(S.keys).toEqual({ shodan: 'MY-KEY' }); expect(S.on).toEqual({ dns: true });
+  expect(S.kev).toBe(await page.evaluate(() => CTI_SOURCES.find(s => s.id === 'kev').url)); expect(S.kev).not.toContain('attacker');
+  expect(S.every).toBe(0); expect(S.auto).toBe(false); expect(S.h.score).toBe(0); expect(S.w.snap).toMatchObject({ band: 'unknown', score: 0 }); expect(S.w.alerts[0].d[0].t.length).toBe(300);
+  // restore-point downloads never contain keys or the relay token
+  await page.evaluate(() => { const S = lkSettings(); S.keys.shodan = 'SECRET-K'; S.relay.token = 'SECRET-T'; mutate('t'); }); await page.evaluate(() => snapshot('test'));
+  const at = await page.evaluate(async () => (await snapsLoad())[0].at);
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.evaluate(at => snapDownload(at), at)]);
+  const txt = require('fs').readFileSync(await dl.path(), 'utf8'); expect(txt).not.toContain('SECRET-K'); expect(txt).not.toContain('SECRET-T'); expect(txt).toContain('"cases"');
+  // the STIX pattern reader is linear
+  const ms = await page.evaluate(() => { const t = performance.now(); for (let i = 0; i < 50; i++) stixPatternValues("[a:" + ' '.repeat(19990) + "x = 'y']"); return performance.now() - t; });
+  expect(ms).toBeLessThan(500);
+  // redaction on a long run of dots is fast
+  expect(await page.evaluate(() => { const r = redactor({ entries: [] }, true), t = performance.now(); r('a.'.repeat(20000)); return performance.now() - t; })).toBeLessThan(300);
+  noErrors(errors);
+});
+
+test('share package: one ZIP with a read-only page (no scripts, its own CSP), STIX, MISP, rules, CSV and a manifest of SHA-256s; redaction and TLP reach every file', async ({ page }) => {
+  const errors = await open(page, '#/case/c-lantern/report');
+  await page.evaluate(() => ruleFromCase());                      // gives the case two rules
+  await page.goto(page.url().replace(/#.*/, '#/case/c-lantern/report'));
+  await page.click('[data-act=shareDlg]'); await expect(page.locator('#dlg')).toContainText('Traffic Light Protocol');
+  await page.click('[data-act=shTlp][data-v=green]');
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('[data-act=shGo]')]);
+  expect(dl.suggestedFilename()).toMatch(/^TN-2026-014-.*-green\.zip$/);
+  const out = require('child_process').execFileSync('python3', ['-I', '-c', `
+import zipfile, hashlib, json, sys
+z = zipfile.ZipFile(sys.argv[1]); names = z.namelist(); r = {'names': names}
+html = [n for n in names if n.endswith('.html')][0]; h = z.read(html).decode()
+r['csp'] = "default-src 'none'" in h; r['script'] = '<script' in h.lower(); r['tlp'] = 'TLP:GREEN' in h; r['email'] = 'billing@lantern-invoice.example' in h; r['defanged'] = 'lantern-invoice[.]example' in h; r['svg'] = '<svg' in h
+st = json.loads(z.read([n for n in names if n.endswith('.stix.json')][0])); r['stix'] = sorted(set(o['type'] for o in st['objects'])); r['stix_email'] = any("email-addr" in o.get('pattern', '') for o in st['objects'])
+r['green'] = any('marking-definition' in m for o in st['objects'] for m in o.get('object_marking_refs', []))
+mi = json.loads(z.read([n for n in names if n.endswith('.misp.json')][0])); r['misp_tag'] = mi['Event']['Tag'][0]['name']; r['misp_n'] = len(mi['Event']['Attribute'])
+man = z.read([n for n in names if n.endswith('MANIFEST.txt')][0]).decode(); ok = True
+for line in man.splitlines():
+  p = line.split('  ', 1)
+  if len(p) == 2 and len(p[0]) == 64:
+    data = z.read(names[0].split('/')[0] + '/' + p[1]); ok = ok and hashlib.sha256(data).hexdigest() == p[0]
+r['manifest_ok'] = ok and 'TLP:GREEN' in man; r['rules'] = len([n for n in names if '/rules/' in n])
+print(json.dumps(r))`, await dl.path()]).toString();
+  const R = JSON.parse(out);
+  expect(R).toMatchObject({ csp: true, script: false, tlp: true, email: false, defanged: true, svg: true, stix_email: false, green: true, misp_tag: 'tlp:green', manifest_ok: true });
+  expect(R.stix).toEqual(expect.arrayContaining(['identity', 'indicator', 'report']));
+  expect(R.rules).toBeGreaterThanOrEqual(2); expect(R.misp_n).toBeGreaterThan(3);
+  noErrors(errors);
+});
+
+test('first-run setup: offline mode switches nothing on; free mode turns on only browser sources; relay step appears only when chosen; finish leads somewhere useful; re-runnable from Settings', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  await expect(page.locator('.su-ban')).toBeVisible();
+  await page.click('.su-ban [data-act=setupOpen]'); await expect(page.locator('#dlg')).toContainText('How should OSINTrix use the internet?');
+  await expect(page.locator('[data-act=suNext]')).toBeDisabled();
+  // offline: straight to threat intel, nothing on
+  await page.click('[data-act=suMode][data-v=off]'); await page.click('[data-act=suNext]');
+  await expect(page.locator('#dlg')).toContainText('Keep up with threats'); expect(await page.evaluate(() => LK_PROVIDERS.filter(lkOn).length)).toBe(0);
+  await page.click('[data-act=suBack]'); await expect(page.locator('#dlg')).toContainText('How should OSINTrix use the internet?');
+  // free: browser sources only, no relay step
+  await page.click('[data-act=suMode][data-v=free]'); await page.click('[data-act=suNext]');
+  await expect(page.locator('#dlg')).toContainText('Which services may see what you investigate?');
+  const on = await page.evaluate(() => LK_PROVIDERS.filter(p => lkSettings().on[p.id]).map(p => p.via));
+  expect(on.length).toBeGreaterThan(8); expect(on.every(v => v === 'direct')).toBe(true);
+  await page.locator('[data-act=suProv][data-id=hibp]').uncheck(); expect(await page.evaluate(() => !!lkSettings().on.hibp)).toBe(false);
+  await page.click('[data-act=suNext]'); await expect(page.locator('#dlg')).toContainText('Keep up with threats');
+  await page.locator('[data-act=suSrc][data-id=kev]').check(); expect(await page.evaluate(() => ctiSrc('kev').on)).toBe(true);
+  await page.click('[data-act=suNext]'); await expect(page.locator('#dlg')).toContainText('You are set up'); await expect(page.locator('.su-sum')).toContainText('lookup sources on');
+  await page.click('[data-act=suGo][data-v=look]'); await expect(page).toHaveURL(/#\/feeds/); await expect(page.locator('#lkQ')).toBeVisible();
+  expect(await page.evaluate(() => !!DB.prefs.setupDone)).toBe(true);
+  await page.goto(page.url().replace(/#.*/, '#/home')); await expect(page.locator('.su-ban')).toHaveCount(0);
+  // relay mode shows the relay step
+  await page.goto(page.url().replace(/#.*/, '#/settings')); await page.click('[data-act=setupOpen]'); await page.click('[data-act=suMode][data-v=relay]'); await page.click('[data-act=suNext]'); await page.click('[data-act=suNext]');
+  await expect(page.locator('#dlg')).toContainText('Connect your relay'); await expect(page.locator('[data-act=suNext]')).toContainText('Skip for now');
+  noErrors(errors);
+});

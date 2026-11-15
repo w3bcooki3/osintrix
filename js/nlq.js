@@ -85,7 +85,7 @@ function nlqParse(q){
 function nlqRun(N){
   const {F} = N, G = globalEnts(), H = typeof cpHist === 'function' ? cpHist() : new Map(), keys = new Map();
   for(const [id, g] of G) keys.set(id, g);
-  for(const e of DB.entries){ const k = entryKey(e); if(k && !keys.has(k)) keys.set(k, {k:entSplit(k).k, v:entSplit(k).v, recs:[], cases:new Set([e.caseId])}); }
+  const EK = new Map(); for(const e of DB.entries){ const k = entryKey(e); if(!k) continue; if(!EK.has(k)) EK.set(k, e); if(!keys.has(k)) keys.set(k, {k:entSplit(k).k, v:entSplit(k).v, recs:[], cases:new Set([e.caseId])}); }
   let rel = null; if(F.rel){ const key = F.rel.k + ':' + F.rel.v; rel = new Set();
     for(const r of DB.records) if((r.ents || []).some(e => e.k + ':' + e.v === key)) for(const e of r.ents) rel.add(e.k + ':' + e.v);
     const ids = DB.entries.filter(e => entryKey(e) === key).map(e => e.id); for(const l of DB.links) if(ids.includes(l.a) || ids.includes(l.b)){ for(const x of [l.a, l.b]){ const e = entryById(x); const k = e && entryKey(e); if(k) rel.add(k); } }
@@ -95,7 +95,7 @@ function nlqRun(N){
   for(const [id, g] of keys){
     const k = g.k, v = g.v; if(F.kinds && !F.kinds.has(k)) continue; if(typeof CE_SKIP !== 'undefined' && CE_SKIP.has(k) && !(F.kinds && F.kinds.has(k))) continue;
     if(rel && !rel.has(id)) continue;
-    const vd = verdictOf(id) || (DB.entries.find(e => entryKey(e) === id) ? entryVerdict(DB.entries.find(e => entryKey(e) === id)) : '');
+    const vd = verdictOf(id) || (EK.has(id) ? entryVerdict(EK.get(id)) : '');
     if(F.verdict === 'none' ? !!vd : F.verdict && vd !== F.verdict) continue;
     const h = H.get(id);
     if(F.flagged && !(h && /malicious|suspicious/.test(h.band))) continue; if(F.unchecked && h) continue; if(F.checked && !h) continue;

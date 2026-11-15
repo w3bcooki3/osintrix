@@ -90,6 +90,9 @@ function copilot(caseId){
   CP.memo.set(caseId, {mk, v}); return v;
 }
 
+/* actor and malware names in the evidence: only re-read when the evidence changes */
+const CP_FIND = new Map();
+function cpFind(caseId, ev, text){ const k = ev.length + ':' + (ev[ev.length - 1] || {}).id + ':' + text.length, o = CP_FIND.get(caseId); if(o && o.k === k) return o.v; const v = ctiFind(text); CP_FIND.set(caseId, {k, v}); return v; }
 /* ---------- the story so far ---------- */
 function cpStory(c, D, I, H, obs, mal, kev, feed){
   const P = [], ts = D.recs.map(r => r.ts).filter(Boolean).sort((a, b) => a - b), ev = D.recs.filter(r => r.type !== 'lead');
@@ -105,7 +108,7 @@ function cpStory(c, D, I, H, obs, mal, kev, feed){
   if(tg.length) P.push(`What the evidence shows: ${listOf(tg.map(([t, n]) => `<b>${esc(t)}</b>${n > 1 ? ' ×' + n : ''}`), 5)}${(() => { const b = [...D.ents.values()].map(e => ({e, b:E.beaconOf(e.recs.map(r => r.ts))})).find(x => x.b && x.b.regular); return b ? `, and a <b>regular beacon</b> to <span class="mono">${esc(b.e.v)}</span> every ${esc(E.fmtGap(b.b.mean))}` : ''; })()}.`);
   const T = new Set(); for(const x of obs) for(const m of x.o.t.match(/T\d{4}(?:\.\d{3})?/g) || []) T.add(m); for(const [key] of D.ents) if(key.startsWith('ttp:')) T.add(key.slice(4).toUpperCase());
   if(T.size && typeof ATTACK !== 'undefined'){ const nm = id => (ATTACK.tech.find(t => t[0] === id) || [, ''])[1]; P.push(`ATT&CK: ${listOf([...T].sort().map(id => `<b>${esc(id)}</b>${nm(id) ? ' ' + esc(nm(id)) : ''}`), 5)}.`); }
-  const text = ev.slice(0, 400).map(r => (r.title || '') + ' ' + (r.body || '').slice(0, 4000)).join('\n'), F = typeof ctiFind === 'function' ? ctiFind(text) : {act:[], mal:[]};
+  const text = ev.slice(0, 400).map(r => (r.title || '') + ' ' + (r.body || '').slice(0, 1500)).join('\n').slice(0, 150000), F = typeof ctiFind === 'function' ? cpFind(c.id, ev, text) : {act:[], mal:[]};
   const actors = F.act.map(id => (ATTACK.groups.find(g => g.id === id) || {}).n).filter(Boolean), soft = F.mal.map(id => ATTACK.soft.find(g => g.id === id)).filter(s => s && s.k === 'm').map(s => s.n);
   if(actors.length || soft.length || feed.length || kev.length) P.push([actors.length ? `The evidence mentions ${listOf(actors.map(a => '<b>' + esc(a) + '</b>'), 3)}` : '', soft.length ? `${actors.length ? 'and' : 'The evidence mentions'} ${listOf(soft.map(a => '<b>' + esc(a) + '</b>'), 3)}` : '', feed.length ? `${actors.length || soft.length ? '; ' : ''}${plural(feed.length, 'indicator')} ${feed.length > 1 ? 'are' : 'is'} in your threat feeds` : '', kev.length ? `${actors.length || soft.length || feed.length ? '; ' : ''}${listOf(kev.map(x => esc(x.v.toUpperCase())), 2)} ${kev.length > 1 ? 'are' : 'is'} exploited in the wild` : ''].join(' ').trim() + '.');
   const leads = D.recs.filter(r => r.type === 'lead'), done = leads.filter(r => r.answer).length;
@@ -116,10 +119,14 @@ const cpStoryText = caseId => copilot(caseId).story.map(p => p.replace(/<[^>]+>/
 
 /* ---------- drawing ---------- */
 function cpCard(c){
+  /* on a very large case, draw the page first and read the case a moment later */
+  const fresh = (() => { const h = CP.memo.get(c.id); return h && h.mk === c.id + ':' + rev + ':' + ((DB.intel && DB.intel.lookHist || [])[0] || {}).at; })();
+  if(!fresh && derive(c.id).recs.length > 3000){ clearTimeout(CP.late); CP.late = setTimeout(() => { if(DB.active !== c.id) return; copilot(c.id); const el = $('cpCard'); if(el) el.outerHTML = cpCard(c); }, 40);
+    return `<section class="card cp" id="cpCard" aria-busy="true"><header><h3>${ico('sparkles','sm')}Copilot</h3><span class="t3">Reading ${derive(c.id).recs.length.toLocaleString()} records…</span></header></section>`; }
   const C = copilot(c.id), N = UI.cpAll ? 20 : 4, S = C.steps.slice(0, N), lookOn = typeof LK_PROVIDERS !== 'undefined' && LK_PROVIDERS.some(lkOn);
   const row = (x, g) => `<li class="cp-s${g ? ' gap' : ''}"><span class="cp-i">${ico(x.icon,'sm')}</span><div><b>${esc(x.title)}</b><small>${esc(x.why)}</small></div>
     ${x.act ? `<button class="btn sm${!g && x === C.steps[0] ? ' primary' : ''}" data-act="${x.act}"${x.id ? ` data-id="${esc(x.id)}"` : ''}${x.v ? ` data-v="${esc(x.v)}"` : ''}>${esc(x.label || 'Open')}</button>` : ''}</li>`;
-  return `<section class="card cp" aria-labelledby="cpH"><header><h3 id="cpH">${ico('sparkles','sm')}Copilot</h3>${C.kind ? `<span class="t3">Looks like: ${esc(C.kind)}</span>` : ''}
+  return `<section class="card cp" id="cpCard" aria-labelledby="cpH"><header><h3 id="cpH">${ico('sparkles','sm')}Copilot</h3>${C.kind ? `<span class="t3">Looks like: ${esc(C.kind)}</span>` : ''}
       <label class="cp-auto" title="${lookOn ? 'New public indicators in this case are looked up with your switched-on sources as evidence arrives' : 'Switch on lookup sources in Threat Intel first'}"><span class="sw sm"><input type="checkbox" data-act="cpAuto" ${c.autoLook ? 'checked' : ''} ${lookOn ? '' : 'disabled'}><span></span></span>Check new indicators online</label></header>
     <div class="cp-grid"><div><h4>Next steps</h4>${S.length ? `<ol class="cp-l">${S.map(x => row(x)).join('')}</ol>` : '<p class="t3">Nothing pressing — the case is in good shape.</p>'}
         ${C.steps.length > 4 ? `<button class="btn sm ghost" data-act="cpAll">${UI.cpAll ? 'Show fewer' : 'Show all ' + C.steps.length}</button>` : ''}

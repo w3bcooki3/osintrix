@@ -110,6 +110,8 @@ document.addEventListener('click', ev => {
   if(typeof OS_ACTS !== 'undefined' && OS_ACTS[a]) return OS_ACTS[a](id, v, t, ev);
   if(typeof DQ_ACTS !== 'undefined' && DQ_ACTS[a]) return DQ_ACTS[a](id, v, t, ev);
   if(typeof TRI_ACTS !== 'undefined' && TRI_ACTS[a]) return TRI_ACTS[a](id, v, t, ev);
+  if(typeof SH_ACTS !== 'undefined' && SH_ACTS[a]) return SH_ACTS[a](id, v, t, ev);
+  if(typeof SU_ACTS !== 'undefined' && SU_ACTS[a]) return SU_ACTS[a](id, v, t, ev);
   if(NBX_ACTS[a]) return NBX_ACTS[a](id, v, t, ev);
   if(a === 'toolRun') return toolRunDlg(id);
   if(a === 'trPick'){ $('trV').value = v; return $('trV').focus(); }
@@ -135,6 +137,7 @@ document.addEventListener('click', ev => {
     case 'refFind': return srchOpen(v);
     case 'welcomeDemo': closeWelcome(); return go(caseHash('c-lantern', 'overview'));
     case 'welcomeClose': closeWelcome(); return go('#/home');
+    case 'welcomeSetup': closeWelcome(); go('#/home'); return setTimeout(() => setupOpen(0), 60);
     case 'showWelcome': return showWelcome();
     case 'palette': return srchOpen();
     case 'srClose': return srchClose();
@@ -257,7 +260,7 @@ document.addEventListener('click', ev => {
       confirmDlg('Replace everything with this backup?', 'Your current cases, notes, tools and rules in this browser are replaced by the ' + d.cases.length + ' case' + (d.cases.length === 1 ? '' : 's') + ' in the file. You can undo right after.', 'Import backup', async () => {
         await snapshot('Before importing a backup'); if(d.files){ await rekeyFiles(d.files, d.records, d.trash); delete d.files; } const nbfiles = d.nbfiles; delete d.nbfiles;
         d.records.forEach(normRecord); d.entries.forEach(normEntry);
-        const prev = DB, inIocs = Array.isArray(d.ctiIocs) ? d.ctiIocs.slice(0, CTI_IOC_MAX) : null; delete d.ctiIocs; DB = d; DB.recent = prev.recent; DB.work = prev.work; if(DB.intel && prev.intel) (DB.intel.sources || []).forEach(s => { const o = (prev.intel.sources || []).find(x => x.id === s.id); s.key = o ? o.key || '' : ''; }); if(DB.intel){ const pl = prev.intel && prev.intel.look || {}; DB.intel.look = Object.assign({on:{}}, DB.intel.look || {}, {keys:pl.keys || {}, relay:{url:(DB.intel.look && DB.intel.look.relay && DB.intel.look.relay.url) || (pl.relay && pl.relay.url) || '', token:(pl.relay && pl.relay.token) || ''}}); } if(inIocs){ await ctiLoad(); CTI.iocs = []; ctiIocIndex(); const iso = t => { const z = new Date(t); return t && !isNaN(z) ? z.toISOString() : ''; }; ctiAddIocs(inIocs.filter(x => x && typeof x === 'object').map(x => ({v:x.v, type:x.k, tags:x.tags, threat:x.threat, desc:x.desc, ref:x.ref, tlp:x.tlp, conf:x.conf, srcs:x.srcs, first:iso(x.first), last:iso(x.last), exp:iso(x.exp)})), 'Backup'); await ctiSaveIocs(); } DB.prefs = Object.assign({}, prev.prefs, d.prefs || {}); ensureTools(); ensurePlaybooks(); ensureIntel(); ensureQueries(); ensureRules(); ensureNotes(); if(DB.nb){ nbSanitize(); await nbRestoreFiles(nbfiles); } else ensureNB(); UI.nbView = 'lib'; UI.nbRev = null; if(!DB.cases.some(c => c.id === DB.active)) DB.active = DB.cases[0] && DB.cases[0].id;
+        const prev = DB, inIocs = Array.isArray(d.ctiIocs) ? d.ctiIocs.slice(0, CTI_IOC_MAX) : null; delete d.ctiIocs; DB = d; DB.recent = prev.recent; DB.work = prev.work; if(DB.intel && prev.intel) (DB.intel.sources || []).forEach(s => { const o = (prev.intel.sources || []).find(x => x.id === s.id); s.key = o ? o.key || '' : ''; }); importSafeIntel(prev); if(inIocs){ await ctiLoad(); CTI.iocs = []; ctiIocIndex(); const iso = t => { const z = new Date(t); return t && !isNaN(z) ? z.toISOString() : ''; }; ctiAddIocs(inIocs.filter(x => x && typeof x === 'object').map(x => ({v:x.v, type:x.k, tags:x.tags, threat:x.threat, desc:x.desc, ref:x.ref, tlp:x.tlp, conf:x.conf, srcs:x.srcs, first:iso(x.first), last:iso(x.last), exp:iso(x.exp)})), 'Backup'); await ctiSaveIocs(); } DB.prefs = Object.assign({}, prev.prefs, d.prefs || {}); ensureTools(); ensurePlaybooks(); ensureIntel(); ensureQueries(); ensureRules(); ensureNotes(); if(DB.nb){ nbSanitize(); await nbRestoreFiles(nbfiles); } else ensureNB(); UI.nbView = 'lib'; UI.nbRev = null; if(!DB.cases.some(c => c.id === DB.active)) DB.active = DB.cases[0] && DB.cases[0].id;
         await hashRecords(); ensurePositions(); mutate('imported backup'); UI.sel = null; applyPrefs(); renderAll(); toast('Backup imported', 'Undo', () => { DB = prev; mutate('undo import'); applyPrefs(); renderAll(); }); }); }));
     case 'freshStart': return confirmDlg('Start fresh?', 'Deletes every case, vault entry, evidence record and note in this browser. Tools, queries, rules and settings stay. Export first if you might need them. You can undo right after.', 'Delete my cases', async () => {
       await snapshot('Before starting fresh'); const prev = JSON.parse(JSON.stringify(DB)); const c = {id:uid('c'), name:'My first case', code:'TN-2026-001', status:'active', owner:'You', created:Date.now(), updated:Date.now(), scope:'', color:CASE_COLORS[0], icon:'briefcase'};
@@ -647,7 +650,7 @@ function showWelcome(){
         <span class="wl3-eye">${ico('lock','sm')}OSINT and DFIR workspace · runs in your browser</span>
         <h1 id="wTitle">Follow every thread.</h1>
         <p class="wl3-sub">Collect evidence, map the people and infrastructure behind it, and hand over a report you can defend. No server, no account, nothing leaves this browser unless you export it.</p>
-        <div class="wl3-acts"><button class="btn primary lg" data-act="welcomeDemo">Explore the demo case${ico('arrow-right','sm')}</button><button class="btn lg" data-act="welcomeClose">Open the dashboard</button></div>
+        <div class="wl3-acts"><button class="btn primary lg" data-act="welcomeDemo">Explore the demo case${ico('arrow-right','sm')}</button><button class="btn lg" data-act="welcomeSetup">${ico('sparkles','sm')}Set up in 2 minutes</button><button class="btn lg ghost" data-act="welcomeClose">Open the dashboard</button></div>
         <ul class="wl3-trust"><li>${ico('wifi-off','sm')}Works offline</li><li>${ico('eye-off','sm')}No account, no tracking</li><li>${ico('key-round','sm')}Optional encryption</li></ul>
       </div>
       <figure class="wl3-shot" aria-hidden="true"><div class="wl3-back">${pic('timeline', '')}</div><div class="wl3-front">${pic('graph', '')}</div></figure>

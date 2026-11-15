@@ -9,10 +9,10 @@ function redactor(D, on){
   const names = D.entries.filter(e => e.type === 'person').map(primary).filter(n => n && n.length > 2).sort((a, b) => b.length - a.length), alias = new Map(names.map((n, i) => [n.toLowerCase(), 'Person ' + String.fromCharCode(65 + i % 26) + (i >= 26 ? Math.floor(i / 26) : '')]));
   const nameRe = names.length ? new RegExp('\\b(' + names.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')\\b', 'gi') : null;
   return s => { s = String(s == null ? '' : s);
-    s = s.replace(/\b([A-Za-z0-9._%+-])[A-Za-z0-9._%+-]*@([A-Za-z0-9-]+\.)+[A-Za-z]{2,}\b/g, (m, a) => a + '•••@' + '•••.' + m.split('.').pop());
+    s = s.replace(/(?<![A-Za-z0-9._%+-])([A-Za-z0-9._%+-])[A-Za-z0-9._%+-]*@([A-Za-z0-9-]+\.)+[A-Za-z]{2,}\b/g, (m, a) => a + '•••@' + '•••.' + m.split('.').pop());
     s = s.replace(/\b(\d{1,3})\.(\d{1,3})\.\d{1,3}\.\d{1,3}\b/g, '$1.$2.x.x');
     s = s.replace(/\b([0-9a-f]{1,4}:[0-9a-f]{1,4}):[0-9a-f:]{2,}\b/gi, '$1:…');
-    s = s.replace(/(\+?\d[\d ().-]{7,}\d)/g, m => m.replace(/\d(?=[\d ().-]{4})/g, '•'));
+    s = s.replace(/(\+?\d[\d ().-]{7,}\d)/g, m => /^\d{4}-\d\d-\d\d|^\d{1,2}:\d\d|^(\d{1,3}\.){3}\d{1,3}$/.test(m.trim()) ? m : m.replace(/\d(?=[\d ().-]{4})/g, '•'));          /* dates, times and IPs are not phone numbers */
     s = s.replace(/(^|[\s(])@([A-Za-z0-9_.]{2,})/g, (m, p, h) => p + '@' + h[0] + '•••');
     if(nameRe) s = s.replace(nameRe, m => alias.get(m.toLowerCase()) || '[name]');
     return s; };
@@ -114,7 +114,7 @@ function caseReport(c, D){
   return `<div class="scroll"><div class="page">
     <div class="toolbar rep-tb"><div class="seg" role="group" aria-label="Template">${REP_T.map(([v, l, i]) => `<button data-act="repT" data-v="${v}" aria-pressed="${tpl === v}">${ico(i,'sm')}${l}</button>`).join('')}</div>
       <label class="chk swl"><span class="sw"><input type="checkbox" data-act="repRedact"${UI.redact ? ' checked' : ''}><span></span></span>Redact personal data</label>
-      <span class="sp"></span><button class="btn primary" data-act="exportMd">${ico('download','sm')}Markdown</button><button class="btn" data-act="exportDocx">${ico('download','sm')}Word</button><button class="btn" data-act="printReport">${ico('file-text','sm')}Print / PDF</button><button class="btn" data-act="iocMenu">${ico('fingerprint','sm')}IOCs &amp; case data${ico('chevron-down','sm')}</button></div>
+      <span class="sp"></span><button class="btn primary" data-act="shareDlg">${ico('share-2','sm')}Share…</button><button class="btn" data-act="exportMd">${ico('download','sm')}Markdown</button><button class="btn" data-act="exportDocx">${ico('download','sm')}Word</button><button class="btn" data-act="printReport">${ico('file-text','sm')}Print / PDF</button><button class="btn" data-act="iocMenu">${ico('fingerprint','sm')}IOCs &amp; case data${ico('chevron-down','sm')}</button></div>
     ${UI.redact ? `<p class="note" style="margin:0 0 14px"><span class="ic">${ico('eye-off','sm')}</span><span>Emails, phone numbers, IP addresses, @handles and the names of Person entries are masked in this view, the Markdown and the PDF. Check it before sharing — free-text can still hold personal details.</span></p>` : ''}
     <article class="doc"><h1>${esc(M.red(c.name))}</h1><p class="mono t3" style="font-size:13px">${esc(c.code)} · ${esc(REP_T.find(x => x[0] === tpl)[1])} report · generated from ${D.recs.length} records and ${D.entries.length} vault entries · ${esc(tz())}${UI.redact ? ' · redacted' : ''}</p>
       ${reportHTML(c, D, M)}</article></div></div>`;

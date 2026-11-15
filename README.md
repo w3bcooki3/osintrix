@@ -205,6 +205,8 @@ Press `Ctrl K` or `/`, or click the search bar, to search the whole app at once:
 - **OSINT research:** hunt look-alike domains (typos, homoglyphs, bit flips, other endings) and see which exist and can receive mail; pivot on a username across 50+ sites, take an email address apart, read a phone number; and get suggested next steps for any indicator.
 - **Detection coverage and health:** see your rules on the ATT&CK tactics next to what your cases show, turn gaps into draft rules, and check every rule for errors, noise and duplicates across all your evidence — with tuning suggestions.
 - **File triage:** the file inspector opens with a score, every reason behind it and an entropy map of the file.
+- **Share package:** hand a case to another team in one ZIP: a read-only page, STIX 2.1, MISP, Sigma and YARA rules, CSV and Markdown, all marked with a TLP and listed with SHA-256s in a manifest, with optional redaction.
+- **Two-minute setup:** choose how OSINTrix may use the internet, which services may see what you investigate, your relay and threat feeds — nothing is switched on without your click.
 - **Smart search:** ask in plain words — `malicious IPs last week in TN-2026-014`, `domains registered this month`, `what talks to 203.0.113.47`, `unchecked hashes on DC01` — and see how it was understood.
 - **Watchlist:** watch any indicator. New evidence, log imports and news that mention it are flagged, with a notice, a Dashboard card and a list of sightings. Watched IPs, domains, URLs, hashes and CVEs can be re-checked online on a schedule, and changes — new ports, more detections, a worse verdict — are announced.
 - **Around this time:** every record shows what else happened within ±5 minutes, on any host, one click from a filtered timeline.

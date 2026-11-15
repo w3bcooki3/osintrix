@@ -103,7 +103,7 @@ function exportIOCs(fmt){
 function iocMenu(anchor){
   const r = anchor.getBoundingClientRect(), n = caseIOCs(DB.active).length;
   showMenu(r.left, r.bottom + 6, [{label:'CSV — every indicator with verdicts', icon:'download', fn:() => exportIOCs('csv')}, {label:'Text — defanged, for tickets & chat', icon:'file-text', fn:() => exportIOCs('txt')},
-    {label:'STIX 2.1 — malicious & suspicious', icon:'shield-alert', fn:() => exportIOCs('stix')}, {sep:true}, {label:'Whole case as JSON (with files)', icon:'download', fn:() => clickAct('exportCase', DB.active)}], n + ' indicators in ' + theCase().code);
+    {label:'STIX 2.1 — malicious & suspicious', icon:'shield-alert', fn:() => exportIOCs('stix')}, {sep:true}, {label:'Share package — page, STIX, MISP, rules…', icon:'share-2', fn:() => shareDlg()}, {label:'Whole case as JSON (with files)', icon:'download', fn:() => clickAct('exportCase', DB.active)}], n + ' indicators in ' + theCase().code);
 }
 /* ---------- print / save as PDF ---------- */
 function printReport(){

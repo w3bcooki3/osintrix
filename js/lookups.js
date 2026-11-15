@@ -241,7 +241,7 @@ const lkFresh = (p, r) => r && Date.now() - r.at < (p.ttl || 24) * 3600e3;
 async function lkFetch(url, opts = {}){
   const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), opts.timeout || 20000);
   try{
-    const res = await fetch(url, {method:opts.method || 'GET', body:opts.body, signal:ctl.signal, credentials:'omit', referrerPolicy:'no-referrer', cache:'no-store', redirect:'follow', headers:opts.headers || {}});
+    const res = await fetch(url, {method:opts.method || 'GET', body:opts.body, signal:ctl.signal, credentials:'omit', referrerPolicy:'no-referrer', cache:'no-store', redirect:opts.noRedirect ? 'error' : 'follow', headers:opts.headers || {}});
     if(res.status === 429) throw Object.assign(new Error('Rate limited — try again later'), {code:429});
     if(res.status === 401 || res.status === 403) throw Object.assign(new Error('Refused (' + res.status + ') — check the API key or relay token'), {code:res.status});
     const len = +res.headers.get('content-length') || 0; if(len > 20 * 1048576) throw new Error('Answer is over 20 MB');
@@ -256,7 +256,7 @@ function lkWire(p, spec){
   if(route === 'relay'){ const r = lkRelay(); if(!spec.relay) throw new Error('This lookup is not available through the relay');
     return {url:r.url.replace(/\/+$/, '') + '/' + spec.relay, method:spec.method || 'GET', body:spec.body, headers:{'X-Relay-Token':r.token || '', ...(spec.form ? {'Content-Type':'application/x-www-form-urlencoded'} : spec.body ? {'Content-Type':'application/json'} : {})}}; }
   const h = {...(spec.headers || {})}; if(p.key && p.key.header && key && !h[p.key.header]) h[p.key.header] = (p.key.prefix || '') + key;
-  return {url:spec.url, method:spec.method || 'GET', body:spec.body, headers:h};
+  return {url:spec.url, method:spec.method || 'GET', body:spec.body, headers:h, noRedirect:!!(p.key && key)};          /* a key never follows a redirect to another host */
 }
 const lkGap = {cs:2000, ht:4000, nvd:6500, vt:15500, abuse:1000, gn:2000, urlscan:2000, otx:1200};          // polite spacing between calls
 async function lkPace(id){ const g = lkGap[id] || 400, last = LK.last.get(id) || 0, w = last + g - Date.now(); LK.last.set(id, Math.max(Date.now(), last + g)); if(w > 0) await new Promise(r => setTimeout(r, w)); }

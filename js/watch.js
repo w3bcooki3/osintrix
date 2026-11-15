@@ -78,7 +78,7 @@ function viewWatch(){
       ${keys.map(k => { const {k:kind, v} = entSplit(k), ge = g.get(k), n = H.filter(h => h.k === k).length;
         return `<tr data-act="selEnt" data-id="${esc(k)}"><td><div class="ce-e">${kindBadge(kind,'sm')}<div style="min-width:0"><div class="v mono">${esc(v)}</div><div class="t3" style="font-size:calc(12.5px * var(--ts,1))">${esc(E.LABEL[kind] || kind)} ${ctxChips(kind, v)}</div></div></div></td>
           <td>${vdLabel(verdictOf(k)) || '<span class="t3">—</span>'}</td><td class="n">${n ? `<span class="chip amber sq">${n}</span>` : '0'}</td>
-          <td class="hide-m">${W[k].snap && typeof VD_NAME !== 'undefined' ? `<span class="lk-band" style="--c:${VD_COL[W[k].snap.band]}">${esc(VD_NAME[W[k].snap.band])} ${W[k].snap.score}</span> <span class="t3">${esc(iAgo(W[k].checked))}</span>` : '<span class="t3">—</span>'}</td>
+          <td class="hide-m">${W[k].snap && typeof VD_NAME !== 'undefined' ? `<span class="lk-band" style="--c:${VD_COL[W[k].snap.band]}">${esc(VD_NAME[W[k].snap.band])} ${+W[k].snap.score | 0}</span> <span class="t3">${esc(iAgo(W[k].checked))}</span>` : '<span class="t3">—</span>'}</td>
           <td class="hide-m">${ge ? [...ge.cases].filter(theCase).map(cid => { const o = theCase(cid); return `<a class="ce-case" href="${caseHash(cid, 'entities')}" style="--cc:${esc(o.color)}">${esc(o.code)}</a>`; }).join(' ') : '<span class="t3">—</span>'}</td>
           <td class="hide-m t3">${esc(E.fmtDate(W[k].at, tz()))}</td><td><button class="iconbtn" data-act="watch" data-id="${esc(k)}" aria-label="Stop watching" title="Stop watching">${ico('x','sm')}</button></td></tr>`; }).join('')}</tbody></table></section>
       <h2 class="hh" style="margin-top:26px">New sightings</h2>

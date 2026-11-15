@@ -2425,3 +2425,32 @@ html.ds[data-theme=light] select,html.ds[data-theme=light] input{color-scheme:li
 .ds .tri-ent{display:block;width:100%;height:56px;margin-top:12px;background:var(--surface-2);border-radius:8px}
 .ds .tri-axis{display:flex;justify-content:space-between;gap:8px;font-size:calc(11.5px * var(--ts,1));color:var(--text-3);margin-top:4px}
 .ds .tri .heur{margin:8px 0 0;font-size:calc(12px * var(--ts,1));color:var(--text-3)}
+@media (max-width:640px){.ds .ti-relay{flex-wrap:wrap}.ds .ti-relay>span{flex:1 1 100%}}
+
+/* ---------- v1.30 Share package ---------- */
+.ds .sh-tlp{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0}
+.ds .sh-tlp button{border:2px solid transparent;border-radius:8px;padding:2px;background:none;cursor:pointer}.ds .sh-tlp button[aria-checked=true]{border-color:var(--accent)}
+.ds .sh-tlp i{display:block;font:700 calc(12px * var(--ts,1)) var(--font);font-style:normal;padding:5px 9px;border-radius:5px;background:#000!important;letter-spacing:.02em}
+.ds .sh-tlp button:nth-child(1) i{color:#fff!important}.ds .sh-tlp button:nth-child(2) i{color:#33ff00!important}.ds .sh-tlp button:nth-child(3) i,.ds .sh-tlp button:nth-child(4) i{color:#ffc000!important}.ds .sh-tlp button:nth-child(5) i{color:#ff2b2b!important}
+.ds .sh-parts{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px;margin:12px 0 14px}
+.ds .sh-p{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--border-soft);border-radius:10px;cursor:pointer}.ds .sh-p.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 6%,transparent)}
+.ds .sh-p b{display:block;font-size:calc(13.5px * var(--ts,1));font-weight:600}.ds .sh-p small{color:var(--text-2);font-size:calc(12.5px * var(--ts,1))}
+.ds .sh .swl{margin:6px 0;align-items:flex-start}
+
+/* ---------- v1.30 First-run setup ---------- */
+.ds .su h2{font-size:calc(19px * var(--ts,1));margin:6px 0 6px}.ds .su h3{font-size:calc(14px * var(--ts,1));margin:16px 0 8px}
+.ds .su-dots{display:flex;gap:6px;list-style:none;margin:0 0 16px;padding:0;flex-wrap:wrap}
+.ds .su-dots li{display:flex;align-items:center;gap:6px;font-size:calc(12.5px * var(--ts,1));color:var(--text-3)}
+.ds .su-dots li+li::before{content:"";width:18px;height:1px;background:var(--line)}
+.ds .su-dots i{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;border:1px solid var(--border-soft);font-style:normal;font-weight:600;font-size:calc(11.5px * var(--ts,1))}
+.ds .su-dots li.cur{color:var(--text)}.ds .su-dots li.cur i{background:var(--accent);border-color:var(--accent);color:#fff}
+.ds .su-dots li.done i{background:color-mix(in srgb,var(--green) 18%,transparent);color:var(--green);border-color:transparent}.ds .su-dots li.skip span{text-decoration:line-through}
+.ds .su-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:12px 0}
+.ds .su-card{display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:left;padding:14px;border:1px solid var(--border-soft);border-radius:12px;background:var(--surface);cursor:pointer;color:var(--text)}
+.ds .su-card svg{color:var(--accent)}.ds .su-card b{font-size:calc(14px * var(--ts,1))}.ds .su-card span{color:var(--text-2);font-size:calc(12.5px * var(--ts,1));line-height:1.45}
+.ds .su-card:hover,.ds .su-card[aria-pressed=true]{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 7%,transparent)}
+.ds .su-list{display:flex;flex-direction:column;gap:2px;max-height:46vh;overflow:auto;margin:0 -4px;padding:0 4px}
+.ds .su-row{display:flex;gap:10px;align-items:flex-start;padding:8px 6px;border-radius:8px;cursor:pointer}.ds .su-row:hover{background:var(--surface-2)}
+.ds .su-row input{margin-top:4px}.ds .su-row b{display:block;font-size:calc(13.5px * var(--ts,1));font-weight:580}.ds .su-row small{display:block;color:var(--text-2);font-size:calc(12.5px * var(--ts,1))}
+.ds .su-sum{list-style:none;margin:8px 0 12px;padding:0;display:flex;flex-direction:column;gap:6px}.ds .su-sum li{display:flex;align-items:center;gap:8px}
+.ds .su-ban{margin-bottom:16px;align-items:center}.ds .su-ban>div{flex:1}

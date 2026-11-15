@@ -4,6 +4,54 @@
    Each change has a type: "added" | "changed" | "fixed" | "removed". */
 const CHANGELOG_DATA = [
   {
+    "version": "1.30",
+    "name": "Hardened, faster, shareable, easy to start",
+    "date": "2026-11-15",
+    "summary": "An independent security review of everything added since v1.24 found three medium and several low issues; all are fixed. Large cases are much faster. A share package hands a case to another team in one ZIP, and a two-minute setup gets new users from nothing to a working investigation desk.",
+    "changes": [
+      {
+        "type": "fixed",
+        "text": "Security: an imported backup can no longer change this browser's relay address or token, API keys, lookup sources, online-check schedule or per-case auto-checks. It also cannot override the address of a built-in feed; a crafted file could otherwise have sent watched indicators and the relay token to someone else's server."
+      },
+      {
+        "type": "fixed",
+        "text": "Security: downloading a restore point no longer includes API keys, the relay token or the signing key."
+      },
+      {
+        "type": "fixed",
+        "text": "Security: a crafted STIX file can no longer freeze the tab (pattern parsing is now linear and capped), and report redaction stays fast on long runs of dots."
+      },
+      {
+        "type": "fixed",
+        "text": "Security: scores and history imported from a backup are reduced to plain numbers and text before they are shown. Rule-tuning text is escaped, CVE reference links are checked like every other link, and API keys never follow a redirect."
+      },
+      {
+        "type": "fixed",
+        "text": "Relay hardening: rate-limits before checking the token, refuses encoded paths, passes on only the query parameters each service needs, caps request bodies while reading them, and does not follow upstream redirects."
+      },
+      {
+        "type": "fixed",
+        "text": "Redaction no longer masks dates and times as if they were phone numbers."
+      },
+      {
+        "type": "changed",
+        "text": "Speed on a 10,000-record case: smart search went from 500 ms to about 10 ms, editing on the Overview from 420 ms to under 100 ms, and opening the graph from 640 ms to about 65 ms. On very large cases the copilot reads the case just after the page appears instead of holding it up. Record and entry look-ups use an index, and observations and ATT&CK coverage are remembered until the data changes."
+      },
+      {
+        "type": "added",
+        "text": "Share package (Report → Share): one ZIP with a read-only page, a STIX 2.1 bundle, a MISP event, the case's Sigma and YARA rules, an indicators CSV and the Markdown report. The page is a single HTML file with no scripts that loads nothing; indicators in it are defanged. Every file is marked with the chosen TLP, and MANIFEST.txt holds a SHA-256 for each file. Redaction masks people's details in the page, report and CSV and leaves them out of STIX and MISP."
+      },
+      {
+        "type": "added",
+        "text": "First-run setup in five steps: choose offline, free sources or free sources plus your relay; pick exactly which services may see what you investigate; connect and test the relay; switch on news, known-exploited CVEs, EPSS, CVE records and ATT&CK updates; then set a passphrase and choose where to start. Offered from the welcome screen and the dashboard, and re-runnable from Settings."
+      },
+      {
+        "type": "added",
+        "text": "Tests: a 10,000-record speed test, accessibility checks on every new screen in light and dark, and regression tests for each security fix (60+ end-to-end tests in all)."
+      }
+    ]
+  },
+  {
     "version": "1.29",
     "name": "Detection coverage, rule health and file triage",
     "date": "2026-11-15",

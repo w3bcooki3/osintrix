@@ -21,7 +21,7 @@ function twSplit(d){ d = String(d || '').trim().toLowerCase().replace(/^https?:\
   const tld = p.slice(two ? -2 : -1).join('.'), rest = p.slice(0, two ? -2 : -1); return {sub:rest.slice(0, -1).join('.'), name:rest[rest.length - 1], tld, full:d}; }
 const twPuny = d => { try{ return new URL('http://' + d).hostname; }catch(e){ return null; } };
 function twGen(domain){
-  const S = twSplit(domain); if(!S || !S.name) return [];
+  const S = twSplit(String(domain || '').slice(0, 253)); if(!S || !S.name) return [];
   const {name, tld} = S, out = new Map(), add = (n, t, kind) => { if(!n || n === name && t === tld) return; if(!/^[a-z0-9¡-￿](?:[a-z0-9¡-￿-]{0,61}[a-z0-9¡-￿])?(\.[a-z0-9-]+)*$/.test(n) || n.length > 63) return;
     const uni = n + '.' + t, puny = /[^\x00-\x7f]/.test(uni) ? twPuny(uni) : uni; if(!puny || out.has(puny)) return; out.set(puny, {d:puny, show:uni, kind:/[^\x00-\x7f]/.test(uni) ? 'idn' : kind}); };
   for(let i = 0; i < name.length; i++){
@@ -78,7 +78,7 @@ function labTwist(){
       ${L.length ? `<button class="btn" type="button" data-act="twCheck" ${dnsOn ? '' : 'disabled'}>${ico('radar','sm')}${T.running ? 'Checking ' + done + ' of ' + L.length + '…' : done ? 'Check again' : 'Check which exist'}</button>${T.running ? `<button class="btn ghost" type="button" data-act="twStop">Stop</button>` : ''}` : ''}</form>
     ${L.length && !dnsOn ? `<div class="ti-relay">${ico('wifi-off','sm')}<span>Checking sends each candidate name to Google DNS (<span class="mono">dns.google</span>). Switch on the DNS source to allow it${rdOn ? '' : ' — and RDAP to see how new each one is'}.</span><button class="btn sm" data-act="twDnsOn">Allow Google DNS${rdOn ? '' : ' and RDAP'}</button></div>` : ''}
     ${L.length ? `<p class="t3" style="margin:4px 0 12px">${L.length} candidates — ${kinds.slice(0, 8).map(([k, n]) => esc(TW_NAME[k] || k) + ' ' + n).join(' · ')}</p>` : '<p class="t3">Enter a domain you want to protect — or one from a case — to see how it could be imitated.</p>'}
-    ${T.running || done ? `<div class="lk-prog" role="progressbar" aria-valuenow="${Math.round(done / Math.max(1, L.length) * 100)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${Math.round(done / Math.max(1, L.length) * 100)}%"></i></div>` : ''}
+    ${T.running || done ? `<div class="lk-prog" role="progressbar" aria-label="Checking look-alikes" aria-valuenow="${Math.round(done / Math.max(1, L.length) * 100)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${Math.round(done / Math.max(1, L.length) * 100)}%"></i></div>` : ''}
     ${reg.length ? `<div class="wrap" style="margin:12px 0 8px"><b>${reg.length} exist</b><span class="t3">${reg.filter(x => x.mx.length).length} can receive mail · ${reg.filter(x => x.created && Date.now() - x.created < 90 * 864e5).length} registered in the last 90 days</span><span class="sp"></span>
         <button class="btn sm" data-act="twAdd">${ico('plus','sm')}Add the risky ones to ${esc(theCase().code)}</button><button class="btn sm ghost" data-act="twCsv">${ico('download','sm')}CSV</button></div>
       <table class="tbl tw-tbl"><thead><tr><th>Domain</th><th>How</th><th class="n">Risk</th><th class="hide-m">Why</th><th class="hide-m">Address · mail</th><th></th></tr></thead><tbody>

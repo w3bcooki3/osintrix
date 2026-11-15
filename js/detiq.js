@@ -23,6 +23,10 @@ function seenTechs(){
 }
 function coverage(){
   if(typeof ATTACK === 'undefined') return null;
+  if(DQ.cov && DQ.cov.rev === rev && DQ.cov.n === DB.rules.length && DQ.cov.v === ATTACK.v) return DQ.cov.val;
+  const val = coverage0(); DQ.cov = {rev, n:DB.rules.length, v:ATTACK.v, val}; return val;
+}
+function coverage0(){
   const tech = new Map(ATTACK.tech.map(t => [t[0], t])), byT = new Map();
   for(const r of DB.rules) for(const id of ruleTechs(r)){ if(!byT.has(id)) byT.set(id, new Set()); byT.get(id).add(r); }
   /* a rule for a sub-technique covers it; a rule for the parent technique covers its sub-techniques too */
@@ -115,7 +119,7 @@ function tuneSuggest(row){
 function healthView(){
   const H = DQ.health;
   if(!H) return `<section class="card"><div class="body"><p class="t2">Lint every rule and run it over the evidence of every case, to find rules that are broken, too noisy, never fire, or duplicate another.</p><button class="btn primary" data-act="dqRun">${ico('activity','sm')}Check ${DB.rules.length} rules</button></div></section>`;
-  if(DQ.running) return `<section class="card"><div class="body"><p>Checking ${H.done} of ${H.total} rules…</p><div class="lk-prog"><i style="width:${Math.round(H.done / H.total * 100)}%"></i></div></div></section>`;
+  if(DQ.running) return `<section class="card"><div class="body"><p>Checking ${H.done} of ${H.total} rules…</p><div class="lk-prog" role="progressbar" aria-label="Checking rules" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(H.done / H.total * 100)}"><i style="width:${Math.round(H.done / H.total * 100)}%"></i></div></div></section>`;
   const R = H.rows, err = R.filter(x => x.err || x.lint.some(l => l.sev === 'err')), noisy = R.filter(x => x.noisy), warn = R.filter(x => x.lint.some(l => l.sev === 'warn')), fired = R.filter(x => x.n), mine = R.filter(x => !x.r.builtin);
   const f = UI.dqf || 'problems';
   const list = f === 'noisy' ? noisy : f === 'broken' ? err : f === 'dups' ? R.filter(x => x.dups) : f === 'fired' ? fired.sort((a, b) => b.n - a.n) : f === 'warn' ? warn : f === 'mine' ? mine : [...new Set([...err, ...noisy, ...R.filter(x => x.dups), ...mine.filter(x => x.lint.some(l => l.sev === 'warn'))])];
@@ -129,7 +133,7 @@ function healthView(){
         ${x.err ? `<p class="dq-e">${esc(x.err)}</p>` : ''}${x.unsup ? `<p class="t3" style="margin:6px 0 0">${esc(x.unsup.replace('Not supported in the browser engine', 'Cannot be tested in the browser'))} — your scanner will run it.</p>` : ''}
         ${x.lint.length ? `<ul class="dq-l">${x.lint.slice(0, 6).map(l => `<li class="${l.sev}">${esc(l.t)}</li>`).join('')}</ul>` : ''}
         ${x.dups ? `<p class="t2 dq-d">${ico('copy','sm')}Fires on the same records as ${x.dups.slice(0, 3).map(d => `<button class="lnk" data-act="dqOpen" data-id="${esc(d.id)}">${esc(d.title)}</button>`).join(', ')}</p>` : ''}
-        ${tune ? `<div class="dq-tune"><b>Suggested tuning</b><span class="t3">${tune.top.map(t => t.n + ' of ' + x.n + ' hits share ' + t.f + ' = ' + t.v).join('; ')}</span><pre class="mono">${esc(tune.yaml)}</pre><button class="btn xs" data-act="dqCopy" data-v="${esc(tune.yaml)}">${ico('copy','sm')}Copy</button></div>` : ''}</article>`; }).join('')}</div>`
+        ${tune ? `<div class="dq-tune"><b>Suggested tuning</b><span class="t3">${esc(tune.top.map(t => t.n + ' of ' + x.n + ' hits share ' + t.f + ' = ' + t.v).join('; '))}</span><pre class="mono">${esc(tune.yaml)}</pre><button class="btn xs" data-act="dqCopy" data-v="${esc(tune.yaml)}">${ico('copy','sm')}Copy</button></div>` : ''}</article>`; }).join('')}</div>`
       : `<p class="t3">${f === 'problems' ? 'No rule needs attention.' : 'None.'}</p>`}`;
 }
 /* a starter Sigma rule for a technique seen in a case with no rule */

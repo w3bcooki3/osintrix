@@ -63,7 +63,10 @@ async function snapRestore(at){
     UI.sel = null; mutate('restored restore point'); applyPrefs(); renderAll(); toast('Restored');
   }, true);
 }
-async function snapDownload(at){ let raw = await IDB.get('osintrix-snap:' + at); if(raw && isEnv(raw)){ return downloadEncrypted('osintrix-restore-point.json', JSON.parse(await openStr(raw))); } if(raw) download('osintrix-restore-point-' + new Date(+at).toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.json', raw, 'application/json'); }
+async function snapDownload(at){ const raw = await IDB.get('osintrix-snap:' + at); if(!raw) return; let d; try{ d = JSON.parse(await openStr(raw)); }catch(e){ return toast('That restore point could not be read'); }
+  /* the copy kept in the browser is complete; the downloaded one has no keys, tokens or signing key */
+  const obj = stripSecrets(d), name = 'osintrix-restore-point-' + new Date(+at).toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.json';
+  if(SEC.key) return downloadEncrypted(name, obj); download(name, JSON.stringify(obj), 'application/json'); }
 async function snapNow(){ if(await snapshot('Made by hand')){ renderMain(); toast('Restore point saved'); } else toast('Restore points need IndexedDB, which this browser blocked'); }
 
 function viewTrash(){
@@ -267,3 +270,37 @@ const SAFE_ACTS = {
   attAdd:(id, v, t) => attAct('attAdd', id, v), attOpen:(id, v) => attAct('attOpen', id, v), attDl:(id, v) => attAct('attDl', id, v), attKit:(id, v) => attAct('attKit', id, v), attDel:(id, v) => attAct('attDel', id, v),
   evtxGo:() => evtxGo(), capFiles:() => pickFiles('', fs => attachFiles(fs)), capWeb:() => pickFiles('.mhtml,.mht,.html,.htm,.xhtml', fs => importWebPages(fs)), capLog:() => pickFiles('.evtx,.csv,.tsv,.json,.ndjson,.jsonl,.log,.txt', fs => logImportFile(fs[0]), false), logGo:() => logGo()
 };
+
+/* A backup may come from someone else. Whatever it says, this browser keeps its own lookup
+   sources, API keys, relay and online-check settings — otherwise a crafted file could point
+   the relay (and its token) elsewhere, or switch on automatic lookups. Histories that are
+   drawn on screen are reduced to plain values. */
+const IMP_BANDS = new Set(['malicious', 'suspicious', 'benign', 'clean', 'unknown']);
+const impNum = (x, lo, hi) => { x = +x; return Number.isFinite(x) ? Math.max(lo, Math.min(hi, x)) : 0; };
+const impStr = (x, n) => typeof x === 'string' ? x.slice(0, n) : '';
+function importSafeIntel(prev){
+  const pi = prev.intel || {}, pl = pi.look || {};
+  DB.intel = DB.intel && typeof DB.intel === 'object' ? DB.intel : {};
+  const meta = id => typeof CTI_SOURCES !== 'undefined' && CTI_SOURCES.find(m => m.id === id);
+  DB.intel.sources = (Array.isArray(DB.intel.sources) ? DB.intel.sources : []).filter(s => s && typeof s.id === 'string' && meta(s.id)).map(s => { const o = (pi.sources || []).find(x => x.id === s.id) || {};
+    return {id:s.id, on:!!o.on, key:o.key || '', status:impStr(o.status, 40), err:impStr(o.err, 200), last:impNum(s.last, 0, 9e15), n:impNum(s.n, 0, 1e9)}; });
+  for(const o of pi.sources || []) if(o && meta(o.id) && !DB.intel.sources.some(s => s.id === o.id)) DB.intel.sources.push(o);
+  DB.intel.look = {on:Object.assign({}, pl.on || {}), keys:Object.assign({}, pl.keys || {}), relay:Object.assign({url:'', token:''}, pl.relay || {})};
+  DB.intel.lookHist = (Array.isArray(DB.intel.lookHist) ? DB.intel.lookHist : []).slice(0, 200).map(h => { const n = h && iocNorm(String(h.k === 'asn' ? h.v : h.v || '')) || (h && h.k === 'asn' && /^AS\d{1,10}$/.test(h.v) ? {k:'asn', v:h.v} : null);
+    return n ? {k:n.k, v:n.v, at:impNum(h.at, 0, 9e15), band:IMP_BANDS.has(h.band) ? h.band : 'unknown', score:Math.round(impNum(h.score, 0, 100))} : null; }).filter(Boolean);
+  if(DB.intel.cve && typeof DB.intel.cve === 'object') for(const c of Object.values(DB.intel.cve)){ if(!c || typeof c !== 'object') continue; c.cvss = Number.isFinite(+c.cvss) && c.cvss !== null && c.cvss !== '' ? impNum(c.cvss, 0, 10) : null; c.refs = (Array.isArray(c.refs) ? c.refs : []).map(u => E.safeUrl(String(u))).filter(Boolean).slice(0, 10); }
+  DB.prefs = DB.prefs || {}; DB.prefs.watchEvery = (prev.prefs || {}).watchEvery || 0;
+  for(const c of DB.cases || []){ const p = (prev.cases || []).find(x => x.id === c.id); c.autoLook = !!(p && p.autoLook); }
+  const W = {}; for(const [k, w] of Object.entries(DB.watch && typeof DB.watch === 'object' ? DB.watch : {})){ if(typeof k !== 'string' || k.length > 600 || !w || typeof w !== 'object') continue;
+    const s = w.snap && typeof w.snap === 'object' ? {band:IMP_BANDS.has(w.snap.band) ? w.snap.band : 'unknown', score:Math.round(impNum(w.snap.score, 0, 100)), ports:impStr(w.snap.ports, 2000), ips:impStr(w.snap.ips, 4000), ns:impStr(w.snap.ns, 2000), vt:impNum(w.snap.vt, 0, 999), abuse:impNum(w.snap.abuse, 0, 100), pulses:impNum(w.snap.pulses, 0, 1e6), malware:impStr(w.snap.malware, 1000)} : null;
+    W[k] = {at:impNum(w.at, 0, 9e15), checked:impNum(w.checked, 0, 9e15), snap:s, unseen:!!w.unseen, alerts:(Array.isArray(w.alerts) ? w.alerts : []).slice(0, 20).map(a => ({at:impNum(a && a.at, 0, 9e15), d:(Array.isArray(a && a.d) ? a.d : []).slice(0, 20).map(x => ({hot:!!(x && x.hot), t:impStr(x && x.t, 300)}))}))};
+    if(!W[k].snap) delete W[k].snap; }
+  DB.watch = W;
+}
+/* the secrets a workspace holds, removed for anything that leaves the browser */
+function stripSecrets(o){
+  const x = Object.assign({}, o);
+  if(x.intel) x.intel = Object.assign({}, x.intel, {sources:(x.intel.sources || []).map(s => Object.assign({}, s, {key:''})), look:x.intel.look ? {on:x.intel.look.on || {}, keys:{}, relay:{url:(x.intel.look.relay || {}).url || '', token:''}} : undefined});
+  if(x.security && x.security.sign) x.security = Object.assign({}, x.security, {sign:{pub:x.security.sign.pub, made:x.security.sign.made}});
+  return x;
+}

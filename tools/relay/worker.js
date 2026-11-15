@@ -9,13 +9,13 @@
    Variable (wrangler.toml): ALLOWED_ORIGINS — comma-separated; "null" allows the app opened from a file. */
 
 const P = {
-  vt:              {base:'https://www.virustotal.com/', path:/^api\/v3\/(ip_addresses|domains|urls|files)\/[A-Za-z0-9._:%=-]{1,200}$/, key:'VT_KEY', header:'x-apikey', need:true},
-  abuseipdb:       {base:'https://api.abuseipdb.com/', path:/^api\/v2\/check$/, key:'ABUSEIPDB_KEY', header:'Key', need:true},
-  greynoise:       {base:'https://api.greynoise.io/', path:/^v3\/community\/[0-9.]{7,15}$/, key:'GREYNOISE_KEY', header:'key'},
-  urlscan:         {base:'https://urlscan.io/', path:/^api\/v1\/search\/$/, key:'URLSCAN_KEY', header:'API-Key'},
-  crtsh:           {base:'https://crt.sh/', path:/^$/},
-  nvd:             {base:'https://services.nvd.nist.gov/', path:/^rest\/json\/cves\/2\.0$/, key:'NVD_KEY', header:'apiKey'},
-  shodan:          {base:'https://api.shodan.io/', path:/^shodan\/host\/[0-9a-fA-F.:]{2,45}$/, key:'SHODAN_KEY', query:'key', need:true},
+  vt:              {base:'https://www.virustotal.com/', path:/^api\/v3\/(ip_addresses|domains|urls|files)\/[A-Za-z0-9._:-]{1,200}$/, params:[], key:'VT_KEY', header:'x-apikey', need:true},
+  abuseipdb:       {base:'https://api.abuseipdb.com/', path:/^api\/v2\/check$/, params:['ipAddress', 'maxAgeInDays'], key:'ABUSEIPDB_KEY', header:'Key', need:true},
+  greynoise:       {base:'https://api.greynoise.io/', path:/^v3\/community\/[0-9.]{7,15}$/, params:[], key:'GREYNOISE_KEY', header:'key'},
+  urlscan:         {base:'https://urlscan.io/', path:/^api\/v1\/search\/$/, params:['q', 'size'], key:'URLSCAN_KEY', header:'API-Key'},
+  crtsh:           {base:'https://crt.sh/', path:/^$/, params:['q', 'output']},
+  nvd:             {base:'https://services.nvd.nist.gov/', path:/^rest\/json\/cves\/2\.0$/, params:['cveId'], key:'NVD_KEY', header:'apiKey'},
+  shodan:          {base:'https://api.shodan.io/', path:/^shodan\/host\/[0-9a-fA-F.:]{2,45}$/, params:[], key:'SHODAN_KEY', query:'key', need:true},
   threatfox:       {base:'https://threatfox-api.abuse.ch/', path:/^api\/v1\/$/, key:'ABUSECH_KEY', header:'Auth-Key', post:true},
   urlhaus:         {base:'https://urlhaus-api.abuse.ch/', path:/^v1\/(url|host)\/$/, key:'ABUSECH_KEY', header:'Auth-Key', post:true},
   malwarebazaar:   {base:'https://mb-api.abuse.ch/', path:/^api\/v1\/$/, key:'ABUSECH_KEY', header:'Auth-Key', post:true},
@@ -40,21 +40,27 @@ export default {
     const origin = req.headers.get('Origin'), h = cors(origin, env);
     if(!h) return json({error:'Origin not allowed'}, 403);
     if(req.method === 'OPTIONS') return new Response(null, {status:204, headers:h});
+    if(limited(req.headers.get('CF-Connecting-IP') || 'x')) return json({error:'Slow down'}, 429, h);              /* before the token check, so guessing it is slow too */
     if(!sameToken(req.headers.get('X-Relay-Token') || '', env.RELAY_TOKEN || '')) return json({error:'Bad relay token'}, 401, h);
-    if(limited(req.headers.get('CF-Connecting-IP') || 'x')) return json({error:'Slow down'}, 429, h);
-    const url = new URL(req.url), parts = url.pathname.replace(/^\/+/, '').split('/'), id = decodeURIComponent(parts.shift() || ''), rest = parts.join('/');
+    const url = new URL(req.url), parts = url.pathname.replace(/^\/+/, '').split('/'), id = parts.shift() || '', rest = parts.join('/');
+    if(/%/.test(url.pathname)) return json({error:'Not an allowed path'}, 404, h);                                 /* no encoded characters in paths */
     if(id === 'health') return json({ok:true, providers:Object.keys(P).filter(k => P[k].key && env[P[k].key])}, 200, h);
     const p = Object.prototype.hasOwnProperty.call(P, id) ? P[id] : null;
     if(!p || !p.path.test(rest)) return json({error:'Not an allowed path'}, 404, h);
     if(p.need && !env[p.key]) return json({error:'The relay has no key for ' + id}, 501, h);
     if(req.method === 'POST' && !p.post || req.method !== 'GET' && req.method !== 'POST') return json({error:'Method not allowed'}, 405, h);
-    const target = new URL(p.base + rest + url.search);
+    const target = new URL(p.base + rest);
+    /* only the query parameters each service needs are passed on (exports and POST endpoints take none) */
+    for(const [k, v] of url.searchParams) if((p.params || []).includes(k)) target.searchParams.set(k, v.slice(0, 2048));
     const headers = {'Accept':'application/json', 'User-Agent':'osintrix-relay/1'};
     if(p.key && env[p.key]){ if(p.query) target.searchParams.set(p.query, env[p.key]); else headers[p.header] = env[p.key]; }
     let body;
-    if(req.method === 'POST'){ body = await req.text(); if(body.length > MAX_BODY) return json({error:'Request too large'}, 413, h); const ct = req.headers.get('Content-Type') || ''; headers['Content-Type'] = /x-www-form-urlencoded/.test(ct) ? 'application/x-www-form-urlencoded' : 'application/json'; }
+    if(req.method === 'POST'){ if(+(req.headers.get('content-length') || 0) > MAX_BODY) return json({error:'Request too large'}, 413, h);
+      const rd = req.body ? req.body.getReader() : null, chunks = []; let size = 0;
+      while(rd){ const {done, value} = await rd.read(); if(done) break; size += value.length; if(size > MAX_BODY){ rd.cancel(); return json({error:'Request too large'}, 413, h); } chunks.push(value); }
+      body = new TextDecoder().decode(chunks.length === 1 ? chunks[0] : new Uint8Array(chunks.flatMap(c => [...c]))); const ct = req.headers.get('Content-Type') || ''; headers['Content-Type'] = /x-www-form-urlencoded/.test(ct) ? 'application/x-www-form-urlencoded' : 'application/json'; }
     let r;
-    try{ r = await fetch(target.toString(), {method:req.method, headers, body, redirect:'follow', cf:{cacheTtl:0}}); }
+    try{ r = await fetch(target.toString(), {method:req.method, headers, body, redirect:'manual', cf:{cacheTtl:0}}); }
     catch(e){ return json({error:'Upstream unreachable'}, 502, h); }
     const len = +r.headers.get('content-length') || 0; if(len > MAX_OUT) return json({error:'Upstream answer too large'}, 502, h);
     const out = new Headers(h); out.set('Content-Type', r.headers.get('Content-Type') || 'application/octet-stream'); out.set('Cache-Control', 'no-store'); out.set('X-Content-Type-Options', 'nosniff');

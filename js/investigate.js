@@ -83,7 +83,7 @@ function ctiLookView(){
 function lkHistView(){
   const H = (DB.intel.lookHist || []).slice(0, 60);
   return H.length ? `<section class="card lk-hist"><header><h3>Recent investigations</h3><button class="btn sm ghost" data-act="lookHistClear" style="margin-left:auto">${ico('trash-2','sm')}Clear</button></header>
-    <ul>${H.map((h, i) => `<li><button class="li" data-act="lookHist" data-v="${i}">${kindBadge(h.k, 'sm')}<span class="mono">${esc(h.v)}</span>${vdChip(h)}<span class="t3">${h.score}</span><small>${esc(iAgo(h.at))}</small></button><button class="iconbtn" data-act="lookHistDel" data-v="${i}" aria-label="Remove ${esc(h.v)} from history">${ico('x','sm')}</button></li>`).join('')}</ul></section>`
+    <ul>${H.map((h, i) => `<li><button class="li" data-act="lookHist" data-v="${i}">${kindBadge(h.k, 'sm')}<span class="mono">${esc(h.v)}</span>${vdChip(h)}<span class="t3">${+h.score | 0}</span><small>${esc(iAgo(h.at))}</small></button><button class="iconbtn" data-act="lookHistDel" data-v="${i}" aria-label="Remove ${esc(h.v)} from history">${ico('x','sm')}</button></li>`).join('')}</ul></section>`
     : empty('scan-search', 'Investigate an indicator', 'Paste an IP, domain, URL, file hash or CVE above. Every source you switched on is asked at once, and the answers are weighed into one verdict with the reasons shown — or investigate every indicator in the case and see which belong together.');
 }
 
@@ -107,7 +107,7 @@ function lkBulkView(){
   const C = B.corr, byKey = new Map(B.items.map(x => [x.key, x]));
   return `<div class="lk">
     <section class="card lk-bh"><div><h3>${esc(theCase(B.caseId).code)} — ${B.items.length} indicators</h3><p class="t3">${B.fin ? 'Done.' : B.stop ? 'Stopped.' : 'Checking ' + B.done + ' of ' + B.items.length + '…'} ${['malicious', 'suspicious', 'benign'].map(b => cnt(b) ? `<span class="lk-band" style="--c:${VD_COL[b]}">${cnt(b)} ${b}</span>` : '').join(' ')}</p></div>
-      <div class="lk-prog" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
+      <div class="lk-prog" role="progressbar" aria-label="Investigating the case" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
       <div class="lk-acts">${B.fin || B.stop ? '' : `<button class="btn sm" data-act="lookStop">${ico('square','sm')}Stop</button>`}
         ${L.some(x => /malicious|suspicious/.test(x.V.band) && !verdictOf(x.key)) ? `<button class="btn sm primary" data-act="lookBulkVerdict">${ico('check','sm')}Mark the ${L.filter(x => /malicious|suspicious/.test(x.V.band) && !verdictOf(x.key)).length} flagged</button>` : ''}
         <button class="btn sm ghost" data-act="lookBulkClose">${ico('x','sm')}Close</button></div></section>
@@ -127,7 +127,7 @@ function lkSummary(){
 function lkInspSection(k, v){
   if(!lkFor(k).length) return '';
   const h = (DB.intel && DB.intel.lookHist || []).find(x => x.k === k && x.v === v);
-  return `<div class="isec"><h4>Live lookups ${h ? `<span class="t3">${esc(iAgo(h.at))}</span>` : ''}</h4>${h ? `<p class="lk-ih">${vdChip(h)}<b>${h.score}</b><span class="t3">/ 100</span></p>` : ''}
+  return `<div class="isec"><h4>Live lookups ${h ? `<span class="t3">${esc(iAgo(h.at))}</span>` : ''}</h4>${h ? `<p class="lk-ih">${vdChip(h)}<b>${+h.score | 0}</b><span class="t3">/ 100</span></p>` : ''}
     <button class="btn sm" data-act="lookEnt" data-id="${esc(k + ':' + v)}">${ico('radar','sm')}${h ? 'Open the investigation' : 'Investigate'}</button></div>`;
 }
 

@@ -50,7 +50,9 @@ function ctiEnsure(){
   if(!I.newsAdded){ I.newsAdded = true; for(const [name, url] of MORE_NEWS) if(!DB.feedSources.some(s => s.url === url)) DB.feedSources.push({id:uid('s'), name, url, on:false, status:'', last:0}); }
   return I;
 }
-const ctiSrc = id => { const meta = CTI_SOURCES.find(s => s.id === id), st = (DB.intel.sources || []).find(s => s.id === id); return meta ? {...meta, ...(st || {})} : st && st.custom ? {...st} : null; };
+/* a built-in source's address and host are fixed: stored state can only carry on/off, status and key */
+const ctiSrc = id => { const meta = CTI_SOURCES.find(s => s.id === id), st = (DB.intel.sources || []).find(s => s.id === id) || {}; if(!meta) return st.custom ? {...st} : null;
+  return {...meta, on:!!st.on, status:st.status || '', err:st.err || '', last:+st.last || 0, n:+st.n || 0, key:st.key || '', id:meta.id}; };
 async function ctiFetch(url, opts = {}){
   const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), opts.timeout || 20000);
   try{
@@ -246,8 +248,8 @@ const iocLive = x => !(x.exp && x.exp < Date.now());
 /* ---------- import: STIX 2.1, MISP, ThreatFox, Feodo, CSV, plain text ---------- */
 const STIX_OBJ = {'ipv4-addr':'ip', 'ipv6-addr':'ip', 'domain-name':'domain', 'url':'url', 'email-addr':'email', 'autonomous-system':'asn'};
 function stixPatternValues(p){
-  const out = []; const re = /\[?\s*([a-z0-9-]+):([a-z0-9_.'\- ]+?)\s*=\s*'((?:\\.|[^'\\]){1,2048})'/gi; let m, n = 0;
-  while((m = re.exec(String(p).slice(0, 20000))) && n++ < 50){ const obj = m[1].toLowerCase(), path = m[2].toLowerCase(), val = m[3].replace(/\\(.)/g, '$1');
+  const out = []; const re = /([a-z0-9-]+):([a-z0-9_.'-]+)\s*=\s*'((?:\\.|[^'\\]){1,2048})'/gi; let m, n = 0;
+  while((m = re.exec(String(p).slice(0, 4000))) && n++ < 50){ const obj = m[1].toLowerCase(), path = m[2].toLowerCase(), val = m[3].replace(/\\(.)/g, '$1');
     if(obj === 'file' && !/hashes/.test(path)) continue; if(obj === 'autonomous-system'){ out.push({v:'AS' + val.replace(/^as/i, ''), type:'asn'}); continue; }
     out.push({v:val, type:STIX_OBJ[obj] || obj}); }
   return out;

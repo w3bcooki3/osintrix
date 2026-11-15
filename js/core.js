@@ -110,8 +110,12 @@ function mutate(what){ rev++; cache = {}; auditAdd(what); DB.log.unshift({at:Dat
 /* ---------- lookups ---------- */
 const tz = () => DB.prefs.tz || 'UTC';
 const theCase = id => DB.cases.find(c => c.id === (id || DB.active)) || null;
-const recById = id => DB.records.find(r => r.id === id) || null;
-const entryById = id => DB.entries.find(e => e.id === id) || null;
+/* id → object indexes, rebuilt when the workspace changes (rev) or the array is swapped/grown; a miss falls back to a scan */
+const IX = {r:null, rr:-1, rn:0, ra:null, e:null, er:-1, en:0, ea:null};
+function recById(id){ if(!id) return null; if(IX.rr !== rev || IX.ra !== DB.records || IX.rn !== DB.records.length){ IX.r = new Map(); for(const r of DB.records) IX.r.set(r.id, r); IX.rr = rev; IX.ra = DB.records; IX.rn = DB.records.length; }
+  const x = IX.r.get(id); if(x && x.id === id) return x; return DB.records.find(r => r.id === id) || null; }
+function entryById(id){ if(!id) return null; if(IX.er !== rev || IX.ea !== DB.entries || IX.en !== DB.entries.length){ IX.e = new Map(); for(const e of DB.entries) IX.e.set(e.id, e); IX.er = rev; IX.ea = DB.entries; IX.en = DB.entries.length; }
+  const x = IX.e.get(id); if(x && x.id === id) return x; return DB.entries.find(e => e.id === id) || null; }
 const entKey = e => e.k + ':' + e.v;
 const entSplit = id => { const i = id.indexOf(':'); return {k:id.slice(0, i), v:id.slice(i + 1)}; };
 const verdictOf = id => DB.verdicts[id] || '';
