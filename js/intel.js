@@ -501,7 +501,7 @@ const CTI_ACTS = {
     showMenu(r.right - 240, r.bottom + 4, [...(u ? [{label:'Read the original', icon:'external-link', fn:() => window.open(u, '_blank', 'noopener,noreferrer')}] : []),
       {label:'Add to ' + theCase().code, icon:'plus', fn:() => clickAct('feedToCase', id)}, {label:'Mark actioned', icon:'check-check', fn:() => { L.forEach(x => { x.st = 'actioned'; x.read = true; }); mutate('actioned a story'); renderMain(); }},
       {label:L.every(x => x.read) ? 'Mark unread' : 'Mark read', icon:'mail', fn:() => { const r2 = !L.every(x => x.read); L.forEach(x => x.read = r2); mutate('read state'); renderMain(); }},
-      ...(L.length > 1 ? [{sep:true}, ...L.map(x => ({label:x.source + ': ' + x.title.slice(0, 50), icon:'newspaper', fn:() => select('feed', x.id)}))] : [])]); },
+      ...(L.length > 1 ? [{sep:true}, ...L.map(x => ({label:x.source + ': ' + x.title, icon:'newspaper', fn:() => select('feed', x.id)}))] : [])]); },
   ctiOpenFeed:id => { closeDlg(); UI.itab = 'feed'; select('feed', id); },
   ctiCveToCase:(id, v) => { ctiAddEntry('cve', v, kevOf(v) ? 'CISA KEV: ' + kevOf(v).name : ''); mutate('added ' + v); closeDlg(); toast(v + ' added to ' + theCase().code); },
   ctiEpssOne:async (id, v) => { try{ await ctiEpss([v]); save(); ctiCveDlg(v); }catch(e){ ctiSrcErr('epss', e); toast(e.message); } },

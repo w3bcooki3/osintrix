@@ -920,7 +920,7 @@ test('nothing is lost on refresh: certificates, decoder, cloud and Lab files com
   // Settings → Storage lists every recent input; delete the Lab file from there
   await page.evaluate(() => recentDlg('*')); await expect(page.locator('.rc-r')).toHaveCount(2);
   await page.click('.rc-r:has-text("note.txt") .rc-d'); await expect(page.locator('.rc-r')).toHaveCount(1);
-  expect(await page.evaluate(async () => (await IDB.keys()).filter(k => String(k).startsWith('wk:')).length)).toBe(0);  // its stored copy is gone too
+  await expect.poll(() => page.evaluate(async () => (await IDB.keys()).filter(k => String(k).startsWith('wk:')).length)).toBe(0);  // its stored copy is gone too (no restore point needs it)
   // restore points and recent searches can be removed one by one
   await page.keyboard.press('Escape'); await page.evaluate(() => { DB.prefs.recentQ = ['alpha', 'beta']; });
   await page.keyboard.press('Control+k'); await page.click('[data-act=srForget][data-v=alpha]');
@@ -1483,5 +1483,134 @@ test('first-run setup: offline mode switches nothing on; free mode turns on only
   // relay mode shows the relay step
   await page.goto(page.url().replace(/#.*/, '#/settings')); await page.click('[data-act=setupOpen]'); await page.click('[data-act=suMode][data-v=relay]'); await page.click('[data-act=suNext]'); await page.click('[data-act=suNext]');
   await expect(page.locator('#dlg')).toContainText('Connect your relay'); await expect(page.locator('[data-act=suNext]')).toContainText('Skip for now');
+  noErrors(errors);
+});
+
+test('big lists: a 10,000-record timeline and 11,000-entity table draw only what is on screen, yet every row is reachable; keyboard and "open record" still work', async ({ page }) => {
+  test.setTimeout(120000);
+  const errors = await open(page, '#/home');
+  await page.evaluate(() => (() => { const N = 10000;
+    const c = { id: 'c-big', name: 'Big case — load test', code: 'BIG-1', status: 'active', owner: 'You', created: Date.now(), updated: Date.now(), scope: 'Load', color: CASE_COLORS[1], icon: 'briefcase' }; DB.cases.push(c);
+    const hosts = Array.from({ length: 60 }, (_, i) => 'WS-' + i), t0 = Date.parse('2026-09-01T00:00:00Z');
+    for (let i = 0; i < N; i++) { const ip = '45.' + (i % 200) + '.' + ((i * 7) % 250) + '.' + ((i * 13) % 250), dom = 'host' + (i % 900) + '.evil' + (i % 37) + '.top';
+      const body = `EventID=${[4624, 4625, 1, 3, 11, 7045][i % 6]} Image=C:\\Windows\\System32\\cmd.exe CommandLine="cmd /c ping ${dom}" DestinationIp=${ip} DestinationPort=${[443, 80, 4444, 8080][i % 4]} User=CORP\\u${i % 300}`;
+      DB.records.push({ id: 'rb' + i, caseId: c.id, type: 'evidence', title: 'Event ' + i + ' on ' + hosts[i % 60], body, tsRaw: '', tsZone: 'explicit', ts: t0 + i * 61000, source: ['sysmon', 'security', 'proxy'][i % 3], host: hosts[i % 60], tags: [], ents: E.extract(body), answer: '', addedBy: 'You', addedAt: Date.now(), hash: '' }); }
+    for (let i = 0; i < 300; i++) { const e = { id: 'vb' + i, caseId: c.id, type: 'domain', fields: { domain: 'host' + i + '.evil' + (i % 37) + '.top' }, priority: 'medium', starred: false, tags: [], notes: '', src: '', created: Date.now(), pos: { x: (i % 20) * 80, y: Math.floor(i / 20) * 80 } }; DB.entries.push(e); if (i % 5 === 0) DB.verdicts['domain:' + e.fields.domain] = 'malicious'; }
+    for (let i = 1; i < 300; i++) DB.links.push({ id: 'lb' + i, caseId: c.id, a: 'vb' + i, b: 'vb' + Math.floor(i / 3), label: 'resolves to', conf: 2, src: '' });
+    DB.active = c.id; mutate("gen");
+  })());
+  const t0 = Date.now(); await page.evaluate(() => go(caseHash(DB.active, 'timeline'))); await page.waitForSelector('#tlV .ev'); const ms = Date.now() - t0;
+  expect(ms).toBeLessThan(2500);
+  expect(await page.locator('#tlV .ev').count()).toBeLessThan(60);                           // not 10,000
+  await page.evaluate(() => { const s = document.querySelector('#main .scroll'); s.scrollTop = s.scrollHeight; }); await page.waitForTimeout(300);
+  await page.evaluate(() => { const s = document.querySelector('#main .scroll'); s.scrollTop = s.scrollHeight; }); await page.waitForTimeout(300);
+  await expect(page.locator('#tlV .ev .ttl').last()).toHaveText('Event 9999 on WS-39');
+  await page.evaluate(() => { document.querySelector('#main .scroll').scrollTop = 0; }); await page.waitForTimeout(200);
+  await page.keyboard.press('j'); await page.keyboard.press('j');
+  expect(await page.evaluate(() => recById(UI.sel.id).title)).toBe('Event 1 on WS-1');
+  await page.evaluate(() => { go('#/home'); }); await page.evaluate(() => { UI.sel = { kind: 'rec', id: 'rb6543' }; UI.inspOpen = true; go(caseHash(DB.active, 'timeline')); });
+  await expect(page.locator('#tlV .ev[data-id="rb6543"]')).toBeInViewport();
+  // entities: all of them, not the first 400
+  await page.evaluate(() => go(caseHash(DB.active, 'entities'))); await page.waitForSelector('#ceV tr[data-act=selEnt]');
+  const n = await page.evaluate(() => UI.ceList.length); expect(n).toBeGreaterThan(5000); expect(await page.locator('#ceV tr[data-act=selEnt]').count()).toBeLessThan(80);
+  await page.evaluate(() => { const s = document.querySelector('#main .scroll'); s.scrollTop = s.scrollHeight; }); await page.waitForTimeout(300);
+  await page.evaluate(() => { const s = document.querySelector('#main .scroll'); s.scrollTop = s.scrollHeight; }); await page.waitForTimeout(300);
+  expect(await page.evaluate(() => [...document.querySelectorAll('#ceV tr[data-act=selEnt]')].pop().dataset.id)).toBe(await page.evaluate(() => UI.ceList[UI.ceList.length - 1]));
+  noErrors(errors);
+});
+
+test('audit fixes: imported case labels cannot inject markup; backup keeps this browser\'s trusted keys; CSV formulas behind spaces are neutralised; huge key strength refused; Office metadata traps stay fast; long menu labels stay on one line', async ({ page }) => {
+  const errors = await open(page, '#/cases');
+  // a shared case file with markup in status, priority and link confidence
+  const evil = { format: 'osintrix-case', case: { id: 'x', name: 'Shared', code: 'SH-1', status: "<meta http-equiv=refresh content='0;url=https://evil.example'>", owner: 'x', created: 1, updated: 1, scope: '', color: 'red;background:url(x)', icon: 'x" onmouseover="1' },
+    entries: [{ id: 'e1', caseId: 'x', type: 'domain', fields: { domain: 'a.example' }, priority: '<b>hi</b>', tags: [], notes: '' }], records: [], links: [{ id: 'l1', caseId: 'x', a: 'e1', b: 'e1', label: 'x', conf: '<img src=x>' }] };
+  page.once('filechooser', fc => fc.setFiles({ name: 'case.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(evil)) }));
+  await page.evaluate(() => clickAct('importCase'));
+  await expect.poll(() => page.evaluate(() => DB.cases.some(c => c.code === 'SH-1'))).toBe(true);
+  const c = await page.evaluate(() => { const c = DB.cases.find(c => c.code === 'SH-1'); const e = DB.entries.find(e => e.caseId === c.id); const l = DB.links.find(l => l.caseId === c.id); return { s: c.status, col: c.color, icon: c.icon, p: e.priority, conf: l ? l.conf : 1 }; });
+  expect(c).toEqual({ s: 'active', col: '#5468ff', icon: 'briefcase', p: 'medium', conf: 1 });
+  expect(await page.evaluate(() => statusTag('<b>x</b>') + prioLabel('<i>') + vdLabel('<u>') + conf('<s>'))).not.toMatch(/<b>|<u>|<s>|data-p="<i>/);
+  await page.evaluate(() => go('#/cases')); await expect(page.locator('meta[http-equiv=refresh]')).toHaveCount(0);
+  // backup import keeps this browser's security settings (trusted keys, auto-lock)
+  await page.evaluate(() => { DB.security = DB.security || {}; DB.security.trusted = { mine: { name: 'Me' } }; DB.security.autolock = 15; mutate('t'); });
+  const bk = await page.evaluate(async () => { const o = JSON.parse(JSON.stringify(await backupObject())); o.security = { trusted: { attacker: { name: 'Evil' } }, autolock: 0, sign: { pub: {}, priv: { kty: 'EC' } } }; return JSON.stringify(o); });
+  page.once('filechooser', fc => fc.setFiles({ name: 'b.json', mimeType: 'application/json', buffer: Buffer.from(bk) }));
+  await page.evaluate(() => clickAct('importAll')); await page.click('#dlg button:has-text("Import backup")');
+  await expect.poll(() => page.evaluate(() => JSON.stringify(DB.security.trusted))).toContain('mine');
+  expect(await page.evaluate(() => [JSON.stringify(DB.security.trusted).includes('attacker'), DB.security.autolock])).toEqual([false, 15]);
+  // CSV
+  expect(await page.evaluate(() => [' =cmd|x', '　=1+1', '|calc', '＝SUM(A1)', 'plain', '-5'].map(csvFormula))).toEqual(["' =cmd|x", "'　=1+1", "'|calc", "'＝SUM(A1)", 'plain', "'-5"]);
+  // key strength from a file
+  expect(await page.evaluate(async () => { try { await deriveKey('p', new Uint8Array(16), 1e10); return 'ran'; } catch (e) { return e.message; } })).toMatch(/Unsupported key strength/);
+  // Office metadata and relationships built to make regexes crawl
+  const ms = await page.evaluate(async () => { const t = performance.now();
+    const z = nbZip([{ name: '[Content_Types].xml', data: '<Types/>' }, { name: 'docProps/core.xml', data: '<title'.repeat(40000) }, { name: 'word/_rels/document.xml.rels', data: 'Target="a" '.repeat(20000) }]);
+    await zipInfo(new Uint8Array(await z.arrayBuffer())); return performance.now() - t; });
+  expect(ms).toBeLessThan(1500);
+  // menus: one line per item however long the label
+  await page.evaluate(() => showMenu(300, 200, [{ label: 'CISA advisories: CISA Adds Two Known Exploited Vulnerabilities to Catalog — and a much longer tail', icon: 'newspaper', fn: () => {} }, { label: 'Short', icon: 'plus', fn: () => {} }]));
+  const hs = await page.evaluate(() => [...document.querySelectorAll('#ctx .ctx-it')].map(b => Math.round(b.getBoundingClientRect().height)));
+  expect(hs[0]).toBe(hs[1]); expect(await page.evaluate(() => { const s = document.querySelector('#ctx .ctx-it span'); return s.scrollHeight <= s.clientHeight + 1; })).toBe(true);
+  noErrors(errors);
+});
+
+test('data safety: restore points keep their files; a damaged restore-point list is rebuilt; passphrase changes can be finished; undoing a backup brings indicators back; case files carry notes, verdicts and hypotheses; trashed links come back; no-case screens draw; rules round-trip without duplicates', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  // 1. a file only a restore point still needs is not a leftover and is not deleted
+  const st = await page.evaluate(async () => {
+    const r = DB.records.find(x => x.caseId === 'c-lantern'); await IDB.set('file:keepme', new Blob(['x'])); await IDB.set('file:stray', new Blob(['y']));
+    r.att = (r.att || []).concat([{ id: 'keepme', name: 'k.txt', size: 1, type: 'text/plain' }]); mutate('att'); await snapshot('test');
+    r.att = r.att.filter(a => a.id !== 'keepme'); mutate('drop att');
+    const I = await storageBreakdown(); const del = await blobDel('file:keepme');
+    return [I.orphans.includes('file:keepme'), I.orphans.includes('file:stray'), del, !!(await IDB.get('file:keepme'))];
+  });
+  expect(st).toEqual([false, true, false, true]);
+  // 2. an unreadable restore-point list is rebuilt from the restore points, not wiped
+  const sn = await page.evaluate(async () => { const n = (await snapsLoad()).length; await IDB.set('osintrix-snaps', '{not json'); SNAPS = null; const m = (await snapsLoad()).length; await snapshot('after damage'); SNAPS = null; return [n, m, (await snapsLoad()).length]; });
+  expect(sn[1]).toBeGreaterThanOrEqual(sn[0]); expect(sn[2]).toBe(sn[1] + 1);
+  // 3. the workspace is written before everything beside it, and a cut-short change can be run again
+  const enc = await page.evaluate(async () => {
+    await encEnable('first passphrase'); const after1 = localStorage.getItem('osintrix:reseal');
+    await encChange('first passphrase', 'second passphrase'); await resealAll(null);   // a second run changes nothing and breaks nothing
+    SNAPS = null; const L = await snapsLoad(); let ok = true; for(const s of L.slice(0, 2)){ try{ JSON.parse(await openStr(await IDB.get('osintrix-snap:' + s.at))); }catch(e){ ok = false; } }
+    const iocs = await IDB.get('cti:iocs'); let iocOk = true; if(iocs){ try{ JSON.parse(await openStr(iocs)); }catch(e){ iocOk = false; } }
+    await encDisable('second passphrase'); return [after1, ok, iocOk, localStorage.getItem('osintrix:reseal'), !!SEC.key];
+  });
+  expect(enc).toEqual([null, true, true, null, false]);
+  // 4. undoing a backup import brings the indicator store back
+  await page.evaluate(async () => { await ctiLoad(); ctiAddIocs([{ v: '198.51.100.77', type: 'ipv4', tags: ['mine'] }], 'Test'); await ctiSaveIocs(); });
+  const bk = await page.evaluate(async () => { const o = JSON.parse(JSON.stringify(await backupObject())); o.ctiIocs = [{ v: 'evil.example', k: 'domain' }]; return JSON.stringify(o); });
+  page.once('filechooser', fc => fc.setFiles({ name: 'b.json', mimeType: 'application/json', buffer: Buffer.from(bk) }));
+  await page.evaluate(() => clickAct('importAll')); await page.click('#dlg button:has-text("Import backup")');
+  await expect.poll(() => page.evaluate(() => CTI.iocs.some(x => x.v === 'evil.example'))).toBe(true);
+  await page.click('#toastBtn');
+  await expect.poll(() => page.evaluate(() => CTI.iocs.some(x => x.v === '198.51.100.77') && !CTI.iocs.some(x => x.v === 'evil.example'))).toBe(true);
+  // 5. a case file carries its notes, verdicts and hypotheses; an imported demo case is the user's own
+  const dl = page.waitForEvent('download'); await page.evaluate(() => { DB.verdicts['ipv4:203.0.113.47'] = 'malicious'; ensureAchDemo(); clickAct('exportCase', 'c-lantern'); });
+  const file = await (await dl).path(); const txt = require('fs').readFileSync(file, 'utf8'); const o = JSON.parse(txt);
+  expect(o.notes.length).toBeGreaterThan(0); expect(Object.keys(o.verdicts).length).toBeGreaterThan(0);
+  await page.evaluate(() => { delete DB.verdicts['ipv4:203.0.113.47']; mutate('v'); });
+  page.once('filechooser', fc => fc.setFiles({ name: 'c.json', mimeType: 'application/json', buffer: Buffer.from(txt) }));
+  await page.evaluate(() => clickAct('importCase'));
+  await expect.poll(() => page.evaluate(() => DB.cases.length)).toBeGreaterThan(3);
+  const ic = await page.evaluate(() => { const c = DB.cases[DB.cases.length - 1], recs = new Set(DB.records.filter(r => r.caseId === c.id).map(r => r.id));
+    return { sample: c.sample, notes: DB.notes.filter(n => n.caseId === c.id).length, v: DB.verdicts['ipv4:203.0.113.47'], ach: !c.ach || c.ach.ev.every(e => !e.rec || recs.has(e.rec)), achN: c.ach ? c.ach.ev.length : 0 }; });
+  expect(ic).toEqual({ sample: undefined, notes: o.notes.length, v: 'malicious', ach: true, achN: o.case.ach ? o.case.ach.ev.length : 0 });
+  // 6. a relationship between two trashed entries comes back when both are restored, in either order
+  const lk = await page.evaluate(() => { const L = DB.links.find(l => entryById(l.a) && entryById(l.b)); clickAct('delEntry', L.a); clickAct('delEntry', L.b);
+    const t = DB.trash.filter(x => x.kind === 'entry').slice(0, 2); trashRestore(t[0].id); trashRestore(t[1].id); return DB.links.some(l => l.id === L.id); });
+  expect(lk).toBe(true);
+  // 7. with no cases at all, every screen draws and "add to a case" offers to make one
+  await page.evaluate(() => { DB.cases = []; DB.records = []; DB.entries = []; DB.active = null; mutate('none'); });
+  for (const h of ['#/playbooks', '#/decoder', '#/cases', '#/home']) { await page.evaluate(h => go(h), h); await expect(page.locator('#main')).not.toContainText('failed to draw'); }
+  await page.evaluate(() => openCapture()); await expect(page.locator('#toastMsg')).toContainText('Make a case first');
+  await page.evaluate(() => closeDlg());
+  // 8. exported rules come back as the same rules, not copies, and keep stars and references
+  const rd = page.waitForEvent('download'); await page.evaluate(() => { DB.rules[0].starred = true; clickAct('rExportAll'); });
+  const rtxt = require('fs').readFileSync(await (await rd).path(), 'utf8'); const n0 = await page.evaluate(() => DB.rules.length);
+  page.once('filechooser', fc => fc.setFiles({ name: 'r.json', mimeType: 'application/json', buffer: Buffer.from(rtxt) }));
+  await page.evaluate(() => importRules()); await page.waitForTimeout(600);
+  expect(await page.evaluate(() => DB.rules.length)).toBe(n0);
+  const one = JSON.parse(rtxt)[0]; expect(one.starred).toBe(true); expect(Array.isArray(one.refs)).toBe(true);
   noErrors(errors);
 });

@@ -110,6 +110,8 @@ function mutate(what){ rev++; cache = {}; auditAdd(what); DB.log.unshift({at:Dat
 /* ---------- lookups ---------- */
 const tz = () => DB.prefs.tz || 'UTC';
 const theCase = id => DB.cases.find(c => c.id === (id || DB.active)) || null;
+/* actions that put something into a case, when there is no case at all: offer to make one */
+function needCase(){ toast('Make a case first — everything you collect goes into one'); if(typeof caseDlg === 'function') setTimeout(() => caseDlg(), 60); return null; }
 /* id → object indexes, rebuilt when the workspace changes (rev) or the array is swapped/grown; a miss falls back to a scan */
 const IX = {r:null, rr:-1, rn:0, ra:null, e:null, er:-1, en:0, ea:null};
 function recById(id){ if(!id) return null; if(IX.rr !== rev || IX.ra !== DB.records || IX.rn !== DB.records.length){ IX.r = new Map(); for(const r of DB.records) IX.r.set(r.id, r); IX.rr = rev; IX.ra = DB.records; IX.rn = DB.records.length; }
@@ -227,16 +229,16 @@ function entPill(id, opts = {}){
 function entryPill(e){
   return `<button class="ent" data-v="${entryVerdict(e)}" data-act="selEntry" data-id="${e.id}">${tbadge(e.type)}<span class="v"${MONO_TYPES.has(e.type) ? '' : ' style="font-family:var(--font);font-size:calc(13px * var(--ts,1))"'}>${esc(primary(e))}</span></button>`;
 }
-const vdLabel = v => v ? `<span class="vd" data-v="${v}">${v[0].toUpperCase() + v.slice(1)}</span>` : '';
-const prioLabel = p => `<span class="prio" data-p="${p}">${p[0].toUpperCase() + p.slice(1)}</span>`;
-const statusTag = s => `<span class="status" data-s="${s}">${{active:'Active', review:'In review', closed:'Closed'}[s] || s}</span>`;
-const conf = n => `<span class="conf" data-c="${n}" title="Confidence: ${['','low','medium','high'][n]}"><i></i><i></i><i></i></span>`;
+const vdLabel = v => { v = String(v || ''); return v ? `<span class="vd" data-v="${esc(v)}">${esc(v[0].toUpperCase() + v.slice(1))}</span>` : ''; };
+const prioLabel = p => { p = String(p || 'medium'); return `<span class="prio" data-p="${esc(p)}">${esc(p[0].toUpperCase() + p.slice(1))}</span>`; };
+const statusTag = s => `<span class="status" data-s="${esc(s)}">${esc({active:'Active', review:'In review', closed:'Closed'}[s] || s)}</span>`;
+const conf = n => { n = [1, 2, 3].includes(+n) ? +n : 1; return `<span class="conf" data-c="${n}" title="Confidence: ${['','low','medium','high'][n]}"><i></i><i></i><i></i></span>`; };
 const impl = i => `<span class="impl" data-i="${i}">${{real:'Working', mock:'Sample data', planned:'Planned'}[i]}</span>`;
 const typeLabel = t => ({evidence:'Evidence', note:'Note', finding:'Finding', lead:'Question'}[t] || t);
 const ILL_FOR = {waypoints:'graph', layers:'vault', 'folder-open':'vault', clock:'time', 'book-open':'time', filter:'search', search:'search', wrench:'tools', 'list-checks':'time'};
 function empty(icon, title, body, acts){ const il = ILLUS[ILL_FOR[icon]]; return `<div class="empty" role="status">${il ? `<div class="illus">${il}</div>` : `<div class="art">${ico(icon)}</div>`}<h3>${title}</h3><div>${body}</div>${acts ? `<div class="acts">${acts}</div>` : ''}</div>`; }
 /* spreadsheet formula injection: a text cell starting with = + - @ (or a tab/CR) is run as a formula by Excel and Sheets — prefix it with ' */
-const csvFormula = v => typeof v === 'string' && /^[=+\-@\t\r]/.test(v) ? "'" + v : v;
+const csvFormula = v => typeof v === 'string' && /^[\s\u3000]*[=+\-@\t\r|\uFF1D\uFF0B\uFF0D\uFF20]/.test(v) ? "'" + v : v;
 /* a file name that is safe on every system: no path parts, control or reserved characters, not too long */
 function safeName(n, fb = 'download'){
   let s = String(n || '').normalize('NFC').replace(/[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]/g, '').replace(/[\\/:*?"<>|]+/g, '_').replace(/^[\s.]+|[\s.]+$/g, '');

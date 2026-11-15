@@ -13,7 +13,12 @@ const SH_PARTS = [['page', 'Read-only page', 'One HTML file anyone can open — 
   ['rules', 'Detection rules', 'This case\'s Sigma (.yml) and YARA (.yar) rules'], ['csv', 'Indicators (CSV)', 'Every indicator with its verdict'], ['md', 'Report (Markdown)', 'The report as text']];
 const SH_PEOPLE = new Set(['email', 'phone', 'handle', 'social']);
 function shareDlg(){
-  const c = theCase(), S = UI.share = UI.share || {tlp:'amber', red:true, all:false, parts:{page:true, stix:true, misp:true, rules:true, csv:true, md:false}};
+  const c = theCase(); if(!c) return needCase();
+  /* the last choices are remembered for next time (only these on/off settings, never the case content) */
+  if(!UI.share){ const P = DB.prefs.share && typeof DB.prefs.share === 'object' ? DB.prefs.share : {}, parts = {page:true, stix:true, misp:true, rules:true, csv:true, md:false};
+    for(const k of Object.keys(parts)) if(P.parts && typeof P.parts[k] === 'boolean') parts[k] = P.parts[k];
+    UI.share = {tlp:SH_TLP.some(x => x[0] === P.tlp) ? P.tlp : 'amber', red:P.red !== false, all:P.all === true, parts}; }
+  const S = UI.share; DB.prefs.share = {tlp:S.tlp, red:S.red, all:S.all, parts:Object.assign({}, S.parts)};
   const items = shareItems(c, S), rules = (DB.rules || []).filter(r => r.caseId === c.id);
   openDlg(dhead('Share ' + c.code) + `<div class="in sh">
     <p class="t2" style="margin:0 0 12px">One ZIP with everything another analyst or team needs. Pick what goes in; a manifest with a SHA-256 for every file lets them check nothing changed.</p>
@@ -78,8 +83,8 @@ async function shareGo(){
 }
 const SH_ACTS = {
   shareDlg:() => shareDlg(), shGo:() => shareGo(),
-  shTlp:(id, v) => { UI.share.tlp = v; shareDlg(); },
-  shPart:(id, v, t) => { UI.share.parts[v] = t.checked; shareDlg(); },
-  shRed:(id, v, t) => { UI.share.red = t.checked; shareDlg(); },
-  shAll:(id, v, t) => { UI.share.all = t.checked; shareDlg(); },
+  shTlp:(id, v) => { UI.share.tlp = v; shareDlg(); save(); },
+  shPart:(id, v, t) => { UI.share.parts[v] = t.checked; shareDlg(); save(); },
+  shRed:(id, v, t) => { UI.share.red = t.checked; shareDlg(); save(); },
+  shAll:(id, v, t) => { UI.share.all = t.checked; shareDlg(); save(); },
 };

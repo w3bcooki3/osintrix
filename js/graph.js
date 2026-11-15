@@ -193,7 +193,7 @@ function showMenu(x, y, items, title){
   m.innerHTML = (title ? `<div class="ctx-title">${cleanTitle(title)}</div>` : '') + items.map((it, i) => {
     if(it.sep) return '<div class="ctx-sep" role="separator"></div>';
     if(it.seg) return `<div class="ctx-seg"><span>${esc(it.label)}</span><div>${it.seg.map((s, j) => `<button role="menuitemradio" aria-checked="${!!s.on}" data-i="${i}" data-j="${j}" class="${s.cls || ''}">${esc(s.label)}</button>`).join('')}</div></div>`;
-    return `<button role="menuitem" class="ctx-it${it.danger ? ' danger' : ''}" data-i="${i}" ${it.disabled ? 'disabled' : ''}>${ico(it.icon || 'circle-dot','sm')}<span>${esc(it.label)}</span>${it.kbd ? `<kbd>${esc(it.kbd)}</kbd>` : ''}</button>`;
+    return `<button role="menuitem" class="ctx-it${it.danger ? ' danger' : ''}" data-i="${i}" ${it.disabled ? 'disabled' : ''} title="${esc(it.label)}">${ico(it.icon || 'circle-dot','sm')}<span>${esc(it.label)}</span>${it.kbd ? `<kbd>${esc(it.kbd)}</kbd>` : ''}</button>`;
   }).join('');
   document.body.appendChild(m);
   const r = m.getBoundingClientRect(), W = window.innerWidth, H = window.innerHeight;

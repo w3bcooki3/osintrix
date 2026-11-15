@@ -160,7 +160,7 @@ async function nbAddFile(file){ if(file.size > NB_MAX_FILE) throw new Error('fil
 function nbUsed(){ const used = new Set(); for(const p of DB.nb.pages){ (p.att || []).forEach(m => used.add(m)); (p.html.match(/data-m="([^"]+)"/g) || []).forEach(s => used.add(s.slice(8, -1))); } return used; }
 function nbGC(now){ const used = nbUsed(), cut = Date.now() - NB_KEEP_DAYS * NB_DAY; let n = 0;
   for(const [k, m] of Object.entries(DB.nb.media)){ if(used.has(k)){ if(m.gone){ delete m.gone; n++; } continue; } if(!m.gone){ m.gone = Date.now(); n++; }
-    if(now || m.gone < cut){ delete DB.nb.media[k]; if(STORE.idb) IDB.del('nbm:' + k); NB_URLS.delete(k); NB_DATA.delete(k); n++; } } return n; }
+    if(now || m.gone < cut){ delete DB.nb.media[k]; if(STORE.idb) blobDel('nbm:' + k); NB_URLS.delete(k); NB_DATA.delete(k); n++; } } return n; }
 async function nbMediaDl(id){ const m = nbM(id), b = await nbBlob(id); if(!m || !b) return toast('That file is missing from this browser');
   const u = URL.createObjectURL(b), a = document.createElement('a'); a.href = u; a.download = safeName(m.name, 'file'); document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(u); a.remove(); }, 200); toast('Saved ' + (m.name || 'file')); }
 /* pictures in the page get their bytes after drawing */

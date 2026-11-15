@@ -14,6 +14,7 @@ function renderMain(){
   try{ el.innerHTML = r.area === 'case' ? viewCase(r.tab) : (V[r.area] || viewHome)(); }
   catch(err){ console.error(err); el.innerHTML = `<div class="page"><div class="note red"><span class="ic">${ico('triangle-alert','sm')}</span><div><b>This screen failed to draw.</b> Your data is safe. <code class="mono">${esc(err.message)}</code></div></div></div>`; }
   if(keepY){ const s2 = el.querySelector('.scroll'); if(s2) s2.scrollTop = keepY; }
+  if(typeof vlMount === 'function') vlMount();
   if(r.area === 'case' && r.tab === 'graph') requestAnimationFrame(mountGraph);
   if(r.area === 'case' && r.tab === 'map') requestAnimationFrame(mountMap);
   requestAnimationFrame(() => scrollHints($('main')));
@@ -53,6 +54,8 @@ function onRoute(){
   { const where = UI.route.area === 'case' ? 'case:' + DB.active : UI.route.area;   // a new page closes the details panel
     if(onRoute.where && onRoute.where !== where && UI.sel === UI.shownSel){ UI.sel = null; UI.inspOpen = false; } onRoute.where = where; }   // a selection made just before navigating (Open in timeline…) is kept
   renderAll(); const s = $('main').querySelector('.scroll'); if(s) s.scrollTop = 0;
+  /* opening a record from elsewhere brings it into view in the timeline */
+  if(UI.route.area === 'case' && UI.route.tab === 'timeline' && UI.sel && UI.sel.kind === 'rec' && typeof vlScrollTo === 'function') vlScrollTo('tlV', UI.sel.id);
 }
 function animInsp(){ const i = $('insp'); i.classList.add('enter'); setTimeout(() => i.classList.remove('enter'), 260); }
 function selectEntry(id, fromGraph){
@@ -259,9 +262,10 @@ document.addEventListener('click', ev => {
       { const errs = checkImport(d, 'backup'); if(errs.length) return importRefused('The backup', errs); }
       confirmDlg('Replace everything with this backup?', 'Your current cases, notes, tools and rules in this browser are replaced by the ' + d.cases.length + ' case' + (d.cases.length === 1 ? '' : 's') + ' in the file. You can undo right after.', 'Import backup', async () => {
         await snapshot('Before importing a backup'); if(d.files){ await rekeyFiles(d.files, d.records, d.trash); delete d.files; } const nbfiles = d.nbfiles; delete d.nbfiles;
-        d.records.forEach(normRecord); d.entries.forEach(normEntry);
-        const prev = DB, inIocs = Array.isArray(d.ctiIocs) ? d.ctiIocs.slice(0, CTI_IOC_MAX) : null; delete d.ctiIocs; DB = d; DB.recent = prev.recent; DB.work = prev.work; if(DB.intel && prev.intel) (DB.intel.sources || []).forEach(s => { const o = (prev.intel.sources || []).find(x => x.id === s.id); s.key = o ? o.key || '' : ''; }); importSafeIntel(prev); if(inIocs){ await ctiLoad(); CTI.iocs = []; ctiIocIndex(); const iso = t => { const z = new Date(t); return t && !isNaN(z) ? z.toISOString() : ''; }; ctiAddIocs(inIocs.filter(x => x && typeof x === 'object').map(x => ({v:x.v, type:x.k, tags:x.tags, threat:x.threat, desc:x.desc, ref:x.ref, tlp:x.tlp, conf:x.conf, srcs:x.srcs, first:iso(x.first), last:iso(x.last), exp:iso(x.exp)})), 'Backup'); await ctiSaveIocs(); } DB.prefs = Object.assign({}, prev.prefs, d.prefs || {}); ensureTools(); ensurePlaybooks(); ensureIntel(); ensureQueries(); ensureRules(); ensureNotes(); if(DB.nb){ nbSanitize(); await nbRestoreFiles(nbfiles); } else ensureNB(); UI.nbView = 'lib'; UI.nbRev = null; if(!DB.cases.some(c => c.id === DB.active)) DB.active = DB.cases[0] && DB.cases[0].id;
-        await hashRecords(); ensurePositions(); mutate('imported backup'); UI.sel = null; applyPrefs(); renderAll(); toast('Backup imported', 'Undo', () => { DB = prev; mutate('undo import'); applyPrefs(); renderAll(); }); }); }));
+        d.records.forEach(normRecord); d.entries.forEach(normEntry); d.cases.forEach(normCase); (d.links || []).forEach(normLink); d.verdicts = normVerdicts(d.verdicts);
+        if(typeof ctiLoad === 'function') await ctiLoad(); const prevIocs = typeof CTI !== 'undefined' && CTI.iocs ? CTI.iocs.slice() : null;
+        const prev = DB, inIocs = Array.isArray(d.ctiIocs) ? d.ctiIocs.slice(0, CTI_IOC_MAX) : null; delete d.ctiIocs; DB = d; DB.recent = prev.recent; DB.work = prev.work; if(DB.intel && prev.intel) (DB.intel.sources || []).forEach(s => { const o = (prev.intel.sources || []).find(x => x.id === s.id); s.key = o ? o.key || '' : ''; }); importSafeIntel(prev); DB.security = prev.security;          /* trusted keys, signing key and auto-lock stay this browser's own */ if(inIocs){ await ctiLoad(); CTI.iocs = []; ctiIocIndex(); const iso = t => { const z = new Date(t); return t && !isNaN(z) ? z.toISOString() : ''; }; ctiAddIocs(inIocs.filter(x => x && typeof x === 'object').map(x => ({v:x.v, type:x.k, tags:x.tags, threat:x.threat, desc:x.desc, ref:x.ref, tlp:x.tlp, conf:x.conf, srcs:x.srcs, first:iso(x.first), last:iso(x.last), exp:iso(x.exp)})), 'Backup'); await ctiSaveIocs(); } DB.prefs = Object.assign({}, prev.prefs, d.prefs || {}); ensureTools(); ensurePlaybooks(); ensureIntel(); ensureQueries(); ensureRules(); ensureNotes(); if(DB.nb){ nbSanitize(); await nbRestoreFiles(nbfiles); } else ensureNB(); UI.nbView = 'lib'; UI.nbRev = null; if(!DB.cases.some(c => c.id === DB.active)) DB.active = DB.cases[0] && DB.cases[0].id;
+        await hashRecords(); ensurePositions(); mutate('imported backup'); UI.sel = null; applyPrefs(); renderAll(); toast('Backup imported', 'Undo', async () => { DB = prev; if(inIocs && prevIocs){ CTI.iocs = prevIocs; ctiIocIndex(); await ctiSaveIocs(); } mutate('undo import'); applyPrefs(); renderAll(); }); }); }));
     case 'freshStart': return confirmDlg('Start fresh?', 'Deletes every case, vault entry, evidence record and note in this browser. Tools, queries, rules and settings stay. Export first if you might need them. You can undo right after.', 'Delete my cases', async () => {
       await snapshot('Before starting fresh'); const prev = JSON.parse(JSON.stringify(DB)); const c = {id:uid('c'), name:'My first case', code:'TN-2026-001', status:'active', owner:'You', created:Date.now(), updated:Date.now(), scope:'', color:CASE_COLORS[0], icon:'briefcase'};
       Object.assign(DB, {cases:[c], entries:[], links:[], records:[], notes:[], verdicts:{}, active:c.id}); UI.sel = null; mutate('started fresh'); go('#/home'); renderAll();
@@ -328,7 +332,7 @@ document.addEventListener('click', ev => {
     case 'rDup': { const r = DB.rules.find(z => z.id === id); const c2 = {...r, builtin:false, id:uid('r'), title:copyName(r.title, DB.rules.map(x => x.title)), created:Date.now(), modified:Date.now(), starred:false}; DB.rules.unshift(c2); UI.rule = c2.id; mutate('duplicated rule'); return renderMain(); }
     case 'rCopy': { const r = DB.rules.find(z => z.id === id); return copyText(ruleText(r, $('rCode') ? $('rCode').value : r.code)); }
     case 'rExport': { const r = DB.rules.find(z => z.id === id); return download(slug(r.title) + (r.type === 'sigma' ? '.yml' : '.yar'), ruleText(r, $('rCode') ? $('rCode').value : r.code), 'text/plain'); }
-    case 'rExportAll': return download('osintrix-detections.json', JSON.stringify(DB.rules.map(r => ({type:r.type, title:r.title, description:r.desc, code:ruleText(r), severity:r.severity, category:r.category, technique:r.technique, author:r.author, platform:r.platform, tags:r.tags})), null, 2), 'application/json');
+    case 'rExportAll': return download('osintrix-detections.json', JSON.stringify(DB.rules.map(r => ({type:r.type, title:r.title, description:r.desc, code:ruleText(r), severity:r.severity, category:r.category, technique:r.technique, author:r.author, platform:r.platform, tags:r.tags, refs:r.refs || [], starred:!!r.starred, caseId:r.caseId || null, created:r.created})), null, 2), 'application/json');
     case 'rImport': return importRules();
     case 'rFromCase': return ruleFromCase();
     /* notes */
@@ -435,8 +439,8 @@ document.addEventListener('click', ev => {
     case 'pbCat': UI.pbf = v; return renderMain();
     case 'pbLevel': UI.pbl = v; return renderMain();
     case 'pbView': UI.pbView = v; DB.prefs.pbView = v; save(); return renderMain();
-    case 'pbRun': return runPlaybook(id, DB.active);
-    case 'pbRunSel': return runPlaybook(id, $('pbCase').value);
+    case 'pbRun': return theCase() ? runPlaybook(id, DB.active) : needCase();
+    case 'pbRunSel': return $('pbCase') && theCase($('pbCase').value) ? runPlaybook(id, $('pbCase').value) : needCase();
     case 'pbNew': return pbDlg();
     case 'pbEdit': return pbDlg(id);
     case 'pbIcon': window.__pbIcon = v; document.querySelectorAll('#pbI button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === v))); return;
@@ -449,7 +453,9 @@ document.addEventListener('click', ev => {
     case 'pbMenu': { ensurePlaybooks(); const r0 = t.getBoundingClientRect(); return showMenu(Math.max(8, Math.min(r0.left, innerWidth - 300)), r0.bottom + 6, DB.playbooks.slice(0, 12).map(p => ({label:p.name, icon:p.icon || 'list-checks', fn:() => runPlaybook(p.id, DB.active)})).concat([{sep:true}, {label:'Browse all playbooks…', icon:'arrow-right', fn:() => { UI.pb = null; go('#/playbooks'); }}]), 'Run on ' + theCase().code); }
     case 'pref': DB.prefs[t.dataset.k] = v; applyPrefs(); save(); return renderMain();
     case 'exportMd': return download(slug(theCase().name) + '-report.md', reportMd(), 'text/markdown');
-    case 'exportCase': { const c = theCase(id), recs = DB.records.filter(r => r.caseId === c.id); return filesForExport(recs).then(files => { const o = {format:'osintrix-case', v:2, case:c, entries:DB.entries.filter(e => e.caseId === c.id), links:DB.links.filter(l => l.caseId === c.id), records:recs, files};
+    case 'exportCase': { const c = theCase(id), recs = DB.records.filter(r => r.caseId === c.id); return filesForExport(recs).then(files => { const D = derive(c.id), keys = new Set([...D.ents.keys(), ...DB.entries.filter(e => e.caseId === c.id).map(e => typeof entryKey === 'function' ? entryKey(e) : '').filter(Boolean)]);
+        const verdicts = Object.fromEntries(Object.entries(DB.verdicts || {}).filter(([k]) => keys.has(k)));   // the verdicts on this case's indicators go with it
+        const o = {format:'osintrix-case', v:3, case:c, entries:DB.entries.filter(e => e.caseId === c.id), links:DB.links.filter(l => l.caseId === c.id), records:recs, notes:(DB.notes || []).filter(n => n.caseId === c.id), verdicts, files};
       if(SEC.key || v === 'enc') return downloadEncrypted(slug(c.name) + '.json', o); download(slug(c.name) + '.json', JSON.stringify(o, null, 2), 'application/json'); }); }
     case 'exportAll': return exportEverything();
     case 'resetDemo': { snapshot('Before resetting to the demo'); const prev = DB; DB = seedDB(); DB.prefs = prev.prefs; DB.recent = prev.recent; DB.work = prev.work; mutate('reset demo'); hashRecords(); UI.sel = null; renderAll(); return toast('Demo data reset', 'Undo', () => { DB = prev; mutate('undo reset'); renderAll(); }); }
@@ -610,8 +616,9 @@ document.addEventListener('keydown', ev => {
   if(ev.key === '/'){ ev.preventDefault(); const lq = $('tq') || $('hxq') || $('refQ'); if(lq){ lq.focus(); lq.select(); return; } return srchOpen(); }
   if((ev.key === 'Delete' || ev.key === 'Backspace') && UI.route.tab === 'graph' && UI.sel){ ev.preventDefault(); document.querySelector('[data-act=gDelete]').click(); }
   if(/^[1-8]$/.test(ev.key) && UI.route.area === 'case') return go(caseHash(DB.active, caseTabs()[+ev.key - 1][0]));
-  if((ev.key === 'j' || ev.key === 'k') && UI.route.area === 'case' && UI.route.tab === 'timeline'){ const evs = [...document.querySelectorAll('#main .ev')]; if(!evs.length) return;
-    const i = evs.findIndex(x => x.getAttribute('aria-current') === 'true'), n = evs[i < 0 ? 0 : Math.max(0, Math.min(evs.length - 1, i + (ev.key === 'j' ? 1 : -1)))]; ev.preventDefault(); n.click(); n.scrollIntoView({block:'nearest'}); }
+  if((ev.key === 'j' || ev.key === 'k') && UI.route.area === 'case' && UI.route.tab === 'timeline'){ const ids = vlKeys('tlV').filter(k => !/^[dg]:/.test(k)); if(!ids.length) return;
+    const i = UI.sel && UI.sel.kind === 'rec' ? ids.indexOf(UI.sel.id) : -1, id = ids[i < 0 ? 0 : Math.max(0, Math.min(ids.length - 1, i + (ev.key === 'j' ? 1 : -1)))]; ev.preventDefault();
+    select('rec', id); vlScrollTo('tlV', id); const b = document.querySelector('#tlV [data-act=selRec][data-id="' + CSS.escape(id) + '"]'); if(b) b.focus({preventScroll:true}); }
 });
 function refocus(id){ const x = $(id); if(x){ x.focus(); x.setSelectionRange(x.value.length, x.value.length); } }
 /* Reference: arrow keys move through the results, even while typing in the search box. */
@@ -680,7 +687,7 @@ async function bootRest(unlocked){
   ensureTools(); ensureToolTpl(); ensurePlaybooks(); ensureIntel(); if(typeof ctiLoad === 'function') ctiLoad(); if(typeof watchMonitor === 'function'){ lkLoad(); watchMonitor(); } ensureQueries(); ensureRules(); ensureNotes(); ensureSample(); ensureCTF(); ensureNB(); ensureAchDemo(); applyPrefs(); storageCheck(); await hashRecords(); migrateFieldEnts(); ensurePositions(); flush(); onRoute(); nbFlushMedia(); fbInit();
   let seen = false; try{ seen = !!localStorage.getItem('osintrix:welcomed'); }catch(e){}
   if(!unlocked) setTimeout(() => { $('splash').classList.add('out'); setTimeout(() => $('splash').remove(), 320); if(!seen) showWelcome(); }, 350);
-  armAutolock();
+  armAutolock(); if(typeof resealResume === 'function') setTimeout(() => resealResume().catch(() => {}), 700);   // finish a passphrase change that was cut short
   if(DB.security && DB.security.sign && DB.security.sign.priv) signingKey().catch(() => {});   // move an older in-JSON private key into this browser's key store
 }
 

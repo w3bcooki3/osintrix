@@ -47,7 +47,9 @@ async function storageBreakdown(){
   // files in IndexedDB that nothing points at any more (left behind by crashes or older versions)
   const keys = await IDB.keys(), fids = new Set(recs.flatMap(r => (r && r.att || []).map(a => 'file:' + a.id))), nbk = new Set(media.map(m => 'nbm:' + m.id));
   const wk = new Set((DB.recent || []).filter(x => x.kind === 'file').map(x => 'wk:' + x.id));
-  const orphans = keys.filter(k => typeof k === 'string' && ((k.startsWith('file:') && !fids.has(k)) || (k.startsWith('nbm:') && !nbk.has(k)) || (k.startsWith('wk:') && !wk.has(k))));
+  /* files a restore point still needs are not leftovers; if a restore point cannot be read, nothing is called a leftover */
+  const R = await snapRefs();
+  const orphans = !R ? [] : keys.filter(k => typeof k === 'string' && !R.has(k) && ((k.startsWith('file:') && !fids.has(k)) || (k.startsWith('nbm:') && !nbk.has(k)) || (k.startsWith('wk:') && !wk.has(k))));
   stoInfo = {quota:STO_QUOTA(), usage:STORE.usage || 0, json:STORE.bytes || 0, att, nbLive, nbGone, nbGoneN:media.filter(m => m.gone).length, snaps, snapN:(SNAPS || []).length, trashN:(DB.trash || []).length, orphans};
   return stoInfo;
 }
@@ -79,7 +81,7 @@ async function storageRefresh(){ await storageBreakdown(); storagePaint(); }
 const STO_ACTS = {
   stoRefresh:() => storageRefresh(),
   stoPersist:async () => { let ok = false; try{ ok = await navigator.storage.persist(); }catch(e){} STORE.persisted = ok; storagePaint(); toast(ok ? 'The browser will keep this data' : 'The browser said no — it usually agrees once the site is bookmarked or used often. Keep backups.'); },
-  stoNbFree:() => confirmDlg('Free deleted notebook pictures now?', 'Pictures and files from deleted pages are removed for good. Undo and older restore points can no longer bring them back.', 'Free space', async () => { const n = nbGC(true); mutate('freed notebook space'); await storageRefresh(); toast('Freed ' + n + ' item' + (n === 1 ? '' : 's')); }),
+  stoNbFree:() => confirmDlg('Free deleted notebook pictures now?', 'Pictures and files from deleted pages are removed for good, except those a restore point still needs. Undo can no longer bring them back.', 'Free space', async () => { const n = nbGC(true); mutate('freed notebook space'); await storageRefresh(); toast('Freed ' + n + ' item' + (n === 1 ? '' : 's')); }),
   stoSnapTrim:() => confirmDlg('Delete older restore points?', 'The two newest restore points stay. Older ones are deleted and cannot be restored.', 'Delete older', async () => { await snapsLoad(); const drop = SNAPS.splice(2); for(const s of drop) await IDB.del('osintrix-snap:' + s.at); await IDB.set('osintrix-snaps', await sealStr(JSON.stringify(SNAPS))); await storageRefresh(); toast(drop.length + ' restore point' + (drop.length === 1 ? '' : 's') + ' deleted'); }),
-  stoOrphans:() => confirmDlg('Remove leftover files?', 'These files are not attached to any record, trash item or notebook page. They are deleted for good.', 'Remove', async () => { const I = await storageBreakdown(); for(const k of I.orphans) await IDB.del(k); await storageRefresh(); toast(I.orphans.length + ' leftover file' + (I.orphans.length === 1 ? '' : 's') + ' removed'); })
+  stoOrphans:() => confirmDlg('Remove leftover files?', 'These files are not attached to any record, trash item, notebook page or restore point. They are deleted for good.', 'Remove', async () => { const I = await storageBreakdown(); for(const k of I.orphans) await IDB.del(k); await storageRefresh(); toast(I.orphans.length + ' leftover file' + (I.orphans.length === 1 ? '' : 's') + ' removed'); })
 };

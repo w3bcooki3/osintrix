@@ -198,6 +198,7 @@ const capCase = () => { const s = $('capCase'); const id = (s && s.value) || dra
 function openCapture(prefill){
   if(prefill != null) draft.body = prefill;
   if(!draft.caseId || !DB.cases.some(c => c.id === draft.caseId)) draft.caseId = DB.active;
+  if(!theCase(draft.caseId)) return needCase();
   const cur = theCase(draft.caseId), open = DB.cases.filter(c => c.status !== 'closed' || c.id === cur.id);
   openDlg(dhead('Capture evidence') + `<div class="in"><div class="capto"><label for="capCase">Save to</label><span class="capdot" style="background:${esc(cur.color)}"></span><select id="capCase" class="gsel bord">${open.map(c => `<option value="${c.id}"${c.id === cur.id ? ' selected' : ''}>${esc(c.code + ' · ' + c.name)}</option>`).join('')}<option value="__new">+ New case…</option></select>
       <label class="chk capg" title="Add what this evidence mentions to the case graph, and link relations it states"><span class="sw"><input type="checkbox" id="capGraph"${cur.autoGraph ? ' checked' : ''}><span></span></span>Add to graph</label></div>

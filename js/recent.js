@@ -39,7 +39,7 @@ async function recentData(it){
   const b = await openBlob(await IDB.get('wk:' + it.id)); return b ? new File([b], it.name, {type:it.type || b.type || ''}) : null;
 }
 function recentDrop(id){ const A = recentAll(), i = A.findIndex(x => x.id === id); if(i < 0) return null; const [x] = A.splice(i, 1);
-  if(x.kind === 'file') IDB.del('wk:' + x.id); x.wasOpen = recentIsOpen(x); for(const [k, v] of Object.entries(recentLastMap())) if(v === x.id) recentSetLast(k, null); return x; }
+  if(x.kind === 'file') blobDel('wk:' + x.id); x.wasOpen = recentIsOpen(x); for(const [k, v] of Object.entries(recentLastMap())) if(v === x.id) recentSetLast(k, null); return x; }
 function recentClear(tool){ for(const x of tool ? recentOf(tool) : recentAll().slice()) recentDrop(x.id); save(); }
 /* sizes, for Settings → Storage */
 const recentBytes = () => recentAll().reduce((s, x) => s + (x.size || 0), 0);

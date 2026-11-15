@@ -178,7 +178,7 @@ function viewPlaybooks(){
   const q = (UI.pbq || '').toLowerCase(), f = UI.pbf || 'all', view = UI.pbView || DB.prefs.pbView || 'grid';
   const lv = UI.pbl || 'all', words = q.split(/\s+/).filter(Boolean);
   const list = DB.playbooks.filter(p => (f === 'all' || p.cat === f) && (lv === 'all' || (p.level || 'core') === lv) && (!words.length || ((t) => words.every(w => t.includes(w)))((p.name + ' ' + p.desc + ' ' + p.steps.map(s => s.t + ' ' + (s.h || '')).join(' ')).toLowerCase())));
-  const cats = countBy(DB.playbooks, p => p.cat), code = esc(theCase().code);
+  const cats = countBy(DB.playbooks, p => p.cat), code = theCase() ? esc(theCase().code) : 'a case';
   const num = p => 'PB-' + String(DB.playbooks.indexOf(p) + 1).padStart(2, '0');
   const card = p => { const [cn, col] = PB_CATS[p.cat] || PB_CATS.custom, a = pbProgress(p, DB.active), used = pbCases(p);
     return `<article class="pbk" style="--cc:${col}"><button class="gcard-hit" data-act="pbOpen" data-id="${p.id}" aria-label="Open ${esc(p.name)}"></button>

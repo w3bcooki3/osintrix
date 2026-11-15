@@ -14,7 +14,7 @@ function trashPurge(){
   if(!old.length) return; DB.trash = DB.trash.filter(x => x.at >= cut); for(const x of old) dropFilesOf(x); if(typeof TABS === 'undefined' || TABS.writer) save();
 }
 function filesOfItem(x){ const d = x.data || {}; const recs = x.kind === 'record' ? [d.r] : x.kind === 'case' ? d.records || [] : []; return recs.flatMap(r => (r && r.att) || []).map(a => a.id); }
-function dropFilesOf(x){ for(const fid of filesOfItem(x)) if(!fileInUse(fid)) IDB.del('file:' + fid); }
+function dropFilesOf(x){ for(const fid of filesOfItem(x)) if(!fileInUse(fid)) blobDel('file:' + fid); }
 function fileInUse(fid){ return DB.records.some(r => (r.att || []).some(a => a.id === fid)); }
 function trashRestore(id){
   const x = (DB.trash || []).find(z => z.id === id); if(!x) return; const d = x.data;
@@ -22,13 +22,17 @@ function trashRestore(id){
   switch(x.kind){
     case 'case': if(caseOk(d.c.id)) return toast('That case already exists');
       DB.cases.push(d.c); DB.entries.push(...d.entries); DB.links.push(...d.links); DB.records.push(...d.records); DB.notes = (DB.notes || []).concat(d.notes || []); break;
-    case 'entry': { const e = d.e; if(!caseOk(e.caseId)) e.caseId = DB.active; DB.entries.push(e); DB.links.push(...(d.links || []).filter(l => entryById(l.a) && entryById(l.b))); break; }
+    case 'entry': { const e = d.e; if(!caseOk(e.caseId)) e.caseId = DB.active; DB.entries.push(e);
+      /* a relationship whose other end is also in the trash waits with that entry, so restoring it later brings the link back */
+      for(const l of d.links || []){ if(entryById(l.a) && entryById(l.b)){ if(!DB.links.some(z => z.id === l.id)) DB.links.push(l); continue; } trashKeepLink(l, x); } break; }
     case 'record': { const r = d.r; if(!caseOk(r.caseId)) r.caseId = DB.active; DB.records.push(r); break; }
     case 'note': DB.notes = DB.notes || []; DB.notes.push(d.n); break;
-    case 'link': if(entryById(d.l.a) && entryById(d.l.b)) DB.links.push(d.l); else return toast('Both ends of that relationship are gone'); break;
+    case 'link': if(entryById(d.l.a) && entryById(d.l.b)) DB.links.push(d.l); else if(!trashKeepLink(d.l, x)) return toast('Both ends of that relationship are gone'); else { DB.trash = DB.trash.filter(z => z !== x); mutate('restored ' + x.label); renderAll(); return toast('That relationship comes back when its entry is restored from the trash'); } break;
   }
   DB.trash = DB.trash.filter(z => z !== x); mutate('restored ' + x.label); renderAll(); toast('Restored ' + x.label);
 }
+function trashKeepLink(l, except){ const ends = [l.a, l.b].filter(id => !entryById(id)); const t = (DB.trash || []).find(z => z !== except && z.kind === 'entry' && z.data && z.data.e && ends.includes(z.data.e.id));
+  if(!t) return false; t.data.links = t.data.links || []; if(!t.data.links.some(z => z.id === l.id)) t.data.links.push(l); return true; }
 function trashDelete(id){ const x = (DB.trash || []).find(z => z.id === id); if(!x) return; DB.trash = DB.trash.filter(z => z !== x); dropFilesOf(x); mutate('deleted forever: ' + x.label); renderMain(); }
 function trashEmpty(){ const n = (DB.trash || []).length; if(!n) return;
   confirmDlg('Empty the trash?', `${n} item${n > 1 ? 's are' : ' is'} deleted for good, with any attached files. This cannot be undone.`, 'Empty trash', () => { const xs = DB.trash; DB.trash = []; for(const x of xs) dropFilesOf(x); mutate('emptied trash'); renderAll(); toast('Trash emptied'); }); }
@@ -45,12 +49,36 @@ function delRecord(ids){
 
 /* ---------- restore points (full snapshots in IndexedDB, outside the main state) ---------- */
 let SNAPS = null; const SNAP_MAX = 8;
-async function snapsLoad(){ if(SNAPS) return SNAPS; const raw = await IDB.get('osintrix-snaps'); try{ SNAPS = raw ? JSON.parse(await openStr(raw)) : []; }catch(e){ SNAPS = []; } return SNAPS; }
-async function snapshot(why){
-  if(!STORE.idb) return false; await snapsLoad(); const at = Date.now(), json = JSON.stringify(DB);
+let SNAPS_BAD = false;
+/* the list of restore points; if it cannot be read (wrong key, damaged), it is rebuilt from the
+   restore points themselves and nothing is pruned, so no restore point is lost to a bad index */
+async function snapsLoad(){ if(SNAPS) return SNAPS; const raw = await IDB.get('osintrix-snaps'); let L = null;
+  try{ L = raw ? JSON.parse(await openStr(raw)) : []; if(!Array.isArray(L)) throw 0; SNAPS_BAD = false; }catch(e){ L = null; }
+  if(!L){ SNAPS_BAD = true; const keys = await IDB.keys(); L = keys.filter(k => typeof k === 'string' && /^osintrix-snap:\d+$/.test(k)).map(k => ({at:+k.slice(14), why:'Details could not be read', size:0})).sort((a, b) => b.at - a.at); }
+  SNAPS = L; return SNAPS; }
+/* everything a restore point needs that lives outside it: evidence files, notebook pictures, kept work files */
+function refsOf(D){ const out = [], recs = (D.records || []).concat((D.trash || []).flatMap(x => x && x.kind === 'record' ? [x.data && x.data.r] : x && x.kind === 'case' ? (x.data && x.data.records) || [] : []));
+  for(const r of recs) for(const a of (r && r.att) || []) if(a && a.id) out.push('file:' + a.id);
+  for(const k of Object.keys((D.nb && D.nb.media) || {})) out.push('nbm:' + k);
+  for(const x of D.recent || []) if(x && x.kind === 'file') out.push('wk:' + x.id);
+  return out; }
+let SNAP_REFS = null;
+async function snapRefs(){ await snapsLoad(); const sig = SNAPS.map(s => s.at).join(',');
+  if(SNAP_REFS && SNAP_REFS.sig === sig) return SNAP_REFS.set; const set = new Set();
+  for(const s of SNAPS){ if(Array.isArray(s.refs)){ s.refs.forEach(k => set.add(k)); continue; }
+    try{ const d = JSON.parse(await openStr(await IDB.get('osintrix-snap:' + s.at))); refsOf(d).forEach(k => set.add(k)); }catch(e){ SNAP_REFS = null; return null; } }   // unreadable: say so, so nothing is deleted
+  SNAP_REFS = {sig, set}; return set; }
+/* delete a stored file only if no restore point still needs it */
+async function blobDel(k){ const R = await snapRefs(); if(!R || R.has(k)) return false; return IDB.del(k); }
+/* restore points are made one at a time, so two at once cannot overwrite each other's list */
+let SNAP_Q = Promise.resolve();
+function snapshot(why){ const run = SNAP_Q.then(() => snapshot0(why)); SNAP_Q = run.catch(() => false); return run; }
+async function snapshot0(why){
+  if(!STORE.idb) return false; await snapsLoad(); if(typeof ctiLoad === 'function') await ctiLoad();
+  const at = Date.now(), json = JSON.stringify(Object.assign({}, DB, typeof CTI !== 'undefined' && CTI.iocs ? {ctiIocs:CTI.iocs} : {}));   // the indicator store goes back with it
   if(!await IDB.set('osintrix-snap:' + at, await sealStr(json))) return false;
-  SNAPS.unshift({at, why, size:json.length, cases:DB.cases.length, records:DB.records.length});
-  while(SNAPS.length > SNAP_MAX){ const o = SNAPS.pop(); IDB.del('osintrix-snap:' + o.at); }
+  SNAPS.unshift({at, why, size:json.length, cases:DB.cases.length, records:DB.records.length, refs:refsOf(DB)});
+  if(!SNAPS_BAD) while(SNAPS.length > SNAP_MAX){ const o = SNAPS.pop(); IDB.del('osintrix-snap:' + o.at); }
   await IDB.set('osintrix-snaps', await sealStr(JSON.stringify(SNAPS))); return true;
 }
 async function snapRestore(at){
@@ -58,7 +86,9 @@ async function snapRestore(at){
   confirmDlg('Go back to this restore point?', `Everything in this browser returns to how it was ${E.fmtFull(s.at, tz()).slice(0, 16)} (${s.why}). A restore point of the current state is made first, so you can come back.`, 'Restore', async () => {
     const raw = await IDB.get('osintrix-snap:' + s.at); let d = null; try{ d = JSON.parse(await openStr(raw)); }catch(e){}
     if(!d || !Array.isArray(d.cases)) return toast('That restore point could not be read');
-    await snapshot('Before restoring a restore point'); const prefs = DB.prefs; DB = d; DB.prefs = Object.assign({}, d.prefs, {lastExport:prefs.lastExport, remindAt:prefs.remindAt});
+    await snapshot('Before restoring a restore point'); const iocs = Array.isArray(d.ctiIocs) ? d.ctiIocs : null; delete d.ctiIocs;
+    if(iocs && typeof CTI !== 'undefined'){ await ctiLoad(); CTI.iocs = iocs; ctiIocIndex(); await ctiSaveIocs(); }
+    const prefs = DB.prefs; DB = d; DB.prefs = Object.assign({}, d.prefs, {lastExport:prefs.lastExport, remindAt:prefs.remindAt});
     ensureTools(); ensurePlaybooks(); ensureIntel(); ensureQueries(); ensureRules(); ensureNotes(); if(!DB.cases.some(c => c.id === DB.active)) DB.active = DB.cases[0].id;
     UI.sel = null; mutate('restored restore point'); applyPrefs(); renderAll(); toast('Restored');
   }, true);
@@ -155,7 +185,7 @@ async function attAct(a, rid, fid){
     const u = URL.createObjectURL(new Blob([b], {type:kind === 'pdf' ? 'application/pdf' : 'text/plain;charset=utf-8'})); window.open(u, '_blank', 'noopener'); setTimeout(() => URL.revokeObjectURL(u), 60000); return; }
   if(a === 'attDl'){ const b = await fileBlob(fid); if(!b) return toast('That file is missing from this browser'); const u = URL.createObjectURL(b), l = document.createElement('a'); l.href = u; l.download = safeName(m.name, 'file'); document.body.appendChild(l); l.click(); setTimeout(() => { URL.revokeObjectURL(u); l.remove(); }, 200); return; }
   if(a === 'attKit'){ const b = await fileBlob(fid); if(!b) return toast('That file is missing from this browser'); go('#/lab'); UI.labTab = 'file'; return labLoad(new File([b], m.name, {type:m.type, lastModified:m.modified}), false); }
-  if(a === 'attDel') return confirmDlg('Remove ' + m.name + '?', 'The file is removed from this record and deleted from the browser. The record stays.', 'Remove file', () => { r.att = r.att.filter(x => x !== m); if(!fileInUse(fid) && !(DB.trash || []).some(x => filesOfItem(x).includes(fid))) IDB.del('file:' + fid); mutate('removed file ' + m.name); renderAll(); });
+  if(a === 'attDel') return confirmDlg('Remove ' + m.name + '?', 'The file is removed from this record and deleted from the browser once no restore point needs it. The record stays.', 'Remove file', () => { r.att = r.att.filter(x => x !== m); if(!fileInUse(fid) && !(DB.trash || []).some(x => filesOfItem(x).includes(fid))) blobDel('file:' + fid); mutate('removed file ' + m.name); renderAll(); });
 }
 /* backups carry files as data URLs */
 async function filesForExport(recs){

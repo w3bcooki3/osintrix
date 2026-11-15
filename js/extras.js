@@ -89,7 +89,7 @@ const STIX_PAT = {ipv4:v => `[ipv4-addr:value = '${v}']`, hostport:v => `[ipv4-a
   email:v => `[email-addr:value = '${v}']`, sha256:v => `[file:hashes.'SHA-256' = '${v}']`, md5:v => `[file:hashes.MD5 = '${v}']`, sha1:v => `[file:hashes.'SHA-1' = '${v}']`};
 const uuid4 = () => crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx'.replace(/x/g, () => (Math.random() * 16 | 0).toString(16));
 function exportIOCs(fmt){
-  const c = theCase(), list = caseIOCs(c.id), name = slug(c.name) + '-iocs';
+  const c = theCase(); if(!c) return needCase(); const list = caseIOCs(c.id), name = slug(c.name) + '-iocs';
   if(!list.length) return toast('No indicators in this case yet');
   if(fmt === 'csv'){ const q = s => '"' + String(csvFormula(s)).replace(/"/g, '""') + '"';
     return download(name + '.csv', ['type,value,verdict,in_vault,records,case'].concat(list.map(x => [E.LABEL[x.k] || x.k, x.v, x.verdict || 'unknown', x.vault ? 'yes' : 'no', x.recs, c.code].map(q).join(','))).join('\n'), 'text/csv'); }
@@ -120,16 +120,22 @@ function importCase(){
     if(!d || d.format !== 'osintrix-case' || !d.case || !Array.isArray(d.entries)) return toast('Not an OSINTrix case — export one from a case menu');
     { const errs = checkImport(d, 'case'); if(errs.length) return importRefused('The case', errs); }
     const map = new Map(), nid = (old, p) => { const n = uid(p); map.set(old, n); return n; };
-    const c = {...d.case, id:uid('c'), updated:Date.now()}; if(DB.cases.some(x => x.code === c.code)) c.code = nextCaseCode(); if(clash(DB.cases, c.name)) c.name = nextName(String(c.name || 'Imported case').trim() + ' (imported)', DB.cases.map(x => x.name));
+    const c = normCase({...d.case, id:uid('c'), updated:Date.now()}); if(DB.cases.some(x => x.code === c.code)) c.code = nextCaseCode(); if(clash(DB.cases, c.name)) c.name = nextName(String(c.name || 'Imported case').trim() + ' (imported)', DB.cases.map(x => x.name));
     const entries = d.entries.map(e => normEntry({...e, id:nid(e.id, 'v'), caseId:c.id}));
     const records = (d.records || []).map(r => normRecord({...r, id:nid(r.id, 'r'), caseId:c.id}));
-    const links = (d.links || []).map(l => ({...l, id:uid('l'), caseId:c.id, a:map.get(l.a) || l.a, b:map.get(l.b) || l.b, src:map.get(l.src) || l.src}));
+    const links = (d.links || []).map(l => normLink({...l, id:uid('l'), caseId:c.id, a:map.get(l.a) || l.a, b:map.get(l.b) || l.b, src:map.get(l.src) || l.src}));
     for(const e of entries) if(e.src) e.src = map.get(e.src) || '';
     if(c.t0) c.t0 = map.get(c.t0) || null;
-    DB.cases.push(c); DB.entries.push(...entries); DB.records.push(...records); DB.links.push(...links.filter(l => entries.some(e => e.id === l.a) && entries.some(e => e.id === l.b)));
+    delete c.sample;   // an imported copy of the demo case is the user's own, and "remove sample data" must not delete it
+    if(c.ach) c.ach.ev.forEach(x => { x.rec = x.rec ? map.get(x.rec) || null : null; });   // evidence points at the new record ids
+    const NC = typeof NOTE_COLORS !== 'undefined' ? NOTE_COLORS.map(x => x[0]) : [];
+    const notes = (Array.isArray(d.notes) ? d.notes : []).filter(n => n && typeof n === 'object' && typeof n.text === 'string').slice(0, 2000).map(n => ({id:uid('n'), caseId:c.id, color:NC.includes(n.color) ? n.color : 'yellow', pinned:!!n.pinned, text:n.text.slice(0, 50000), due:/^\d{4}-\d\d-\d\d$/.test(n.due || '') ? n.due : '', created:+n.created || Date.now(), updated:+n.updated || Date.now()}));
+    /* verdicts from the file fill gaps only; a verdict already given in this browser is kept */
+    const vin = normVerdicts(d.verdicts); let vn = 0; DB.verdicts = DB.verdicts || {}; for(const [k, x] of Object.entries(vin)) if(!DB.verdicts[k]){ DB.verdicts[k] = x; vn++; }
+    DB.cases.push(c); DB.entries.push(...entries); DB.records.push(...records); if(notes.length){ ensureNotes(); DB.notes.push(...notes); } DB.links.push(...links.filter(l => entries.some(e => e.id === l.a) && entries.some(e => e.id === l.b)));
     if(d.files) rekeyFiles(d.files, records).then(() => renderAll());
     mutate('imported case ' + c.code); hashRecords(); ensurePositions(); DB.active = c.id; go(caseHash(c.id));
-    toast(`Imported ${c.code} — ${entries.length} entries, ${records.length} records`); }));
+    toast(`Imported ${c.code} — ${entries.length} entries, ${records.length} records${notes.length ? ', ' + notes.length + ' note' + (notes.length > 1 ? 's' : '') : ''}${vn ? ', ' + vn + ' verdict' + (vn > 1 ? 's' : '') : ''}`); }));
 }
 
 /* ---------- transform workbench (Decoder) ---------- */
@@ -230,7 +236,7 @@ function viewDecoder(){
         <button class="btn xs ghost" data-act="txCopy">${ico('copy','sm')}Copy</button><button class="btn xs ghost" data-act="txChain" title="Use the output as the next input">${ico('arrow-left','sm')}Use as input</button></header>
         <pre id="txOut" class="txout" tabindex="0"></pre><div id="txSteps" class="txsteps"></div></section>
     </div>
-    <section class="card txents"><header><h3>${ico('fingerprint','sm')}Indicators in the result</h3><span style="flex:1"></span><button class="btn sm primary" data-act="decSave">${ico('plus','sm')}Save to ${esc(theCase().code)} as evidence</button></header><div class="body"><div class="wrap" id="txEnts"></div></div></section>
+    <section class="card txents"><header><h3>${ico('fingerprint','sm')}Indicators in the result</h3><span style="flex:1"></span><button class="btn sm primary" data-act="decSave">${ico('plus','sm')}${theCase() ? 'Save to ' + esc(theCase().code) + ' as evidence' : 'Save as evidence'}</button></header><div class="body"><div class="wrap" id="txEnts"></div></div></section>
   </div></div>`;
 }
 let txT = null;

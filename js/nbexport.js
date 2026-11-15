@@ -89,7 +89,7 @@ function nbZip(files, type){
 }
 async function nbUnzip(u8){
   const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength); let e = u8.length - 22; while(e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--; if(e < 0) throw new Error('not a zip file');
-  const n = dv.getUint16(e + 10, true), files = {}; let p = dv.getUint32(e + 16, true), total = 0;
+  const n = dv.getUint16(e + 10, true), files = Object.create(null); let p = dv.getUint32(e + 16, true), total = 0;
   for(let i = 0; i < n && p + 46 <= u8.length; i++){ if(dv.getUint32(p, true) !== 0x02014b50) break;
     const method = dv.getUint16(p + 10, true), cs = dv.getUint32(p + 20, true), nl = dv.getUint16(p + 28, true), xl = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), lo = dv.getUint32(p + 42, true);
     const name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nl)), st = lo + 30 + dv.getUint16(lo + 26, true) + dv.getUint16(lo + 28, true);
@@ -305,9 +305,10 @@ async function nbFromDocx(u8){
   const ch = (n, name) => [...n.childNodes].filter(c => c.nodeType === 1 && c.localName === name);
   const att = (n, a) => n && (n.getAttribute('w:' + a) || n.getAttribute(a));
   const on = n => !!n && !/^(0|false|none)$/.test(att(n, 'val') || '');
-  const imgs = async r => { let o = ''; for(const b of r.getElementsByTagNameNS('*', 'blip')){ const id = b.getAttribute('r:embed'), tg = rels[id]; if(!tg) continue; const path = tg.startsWith('/') ? tg.slice(1) : 'word/' + tg.replace(/^\.\//, ''), bytes = await z.get(path); if(!bytes) continue;
+  const seenImg = new Map(); let imgBytes = 0;          /* a picture used many times is stored once; one import adds at most 300 MB of pictures */
+  const imgs = async r => { let o = ''; for(const b of r.getElementsByTagNameNS('*', 'blip')){ const id = b.getAttribute('r:embed'), tg = rels[id]; if(!tg) continue; const path = tg.startsWith('/') ? tg.slice(1) : 'word/' + tg.replace(/^\.\//, ''); if(seenImg.has(path)){ o += `<img data-m="${seenImg.get(path)}" alt="">`; continue; } const bytes = await z.get(path); if(!bytes || (imgBytes += bytes.length) > 300 * 1048576) continue;
       const ext = (path.match(/\.(\w+)$/) || [])[1] || 'png', type = 'image/' + (ext === 'jpg' ? 'jpeg' : ext.toLowerCase()); if(!/^image\/(png|jpeg|gif|webp)$/.test(type)) continue;
-      const mid = uid('m'), m = {id:mid, type, name:path.split('/').pop().slice(0, 120), size:bytes.length, at:Date.now()}; if(!await nbPut(mid, new Blob([bytes], {type}))) m.data = 'data:' + type + ';base64,' + nbB64(bytes); DB.nb.media[mid] = m; o += `<img data-m="${mid}" alt="">`; } return o; };
+      const mid = uid('m'), m = {id:mid, type, name:path.split('/').pop().slice(0, 120), size:bytes.length, at:Date.now()}; if(!await nbPut(mid, new Blob([bytes], {type}))) m.data = 'data:' + type + ';base64,' + nbB64(bytes); DB.nb.media[mid] = m; seenImg.set(path, mid); o += `<img data-m="${mid}" alt="">`; } return o; };
   const runs = async n => { let o = ''; for(const c of [...n.childNodes].filter(x => x.nodeType === 1)){
       if(c.localName === 'hyperlink'){ const u = nbSafeUrl(rels[c.getAttribute('r:id')] || ''); const x = (await runs(c)).replace(/<\/?u>/g, ''); o += u ? `<a href="${esc(u)}">${x}</a>` : x; continue; }
       if(c.localName === 'ins' || c.localName === 'smartTag' || c.localName === 'sdt' || c.localName === 'sdtContent' || c.localName === 'fldSimple'){ o += await runs(c); continue; }

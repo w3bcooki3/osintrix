@@ -2454,3 +2454,8 @@ html.ds[data-theme=light] select,html.ds[data-theme=light] input{color-scheme:li
 .ds .su-row input{margin-top:4px}.ds .su-row b{display:block;font-size:calc(13.5px * var(--ts,1));font-weight:580}.ds .su-row small{display:block;color:var(--text-2);font-size:calc(12.5px * var(--ts,1))}
 .ds .su-sum{list-style:none;margin:8px 0 12px;padding:0;display:flex;flex-direction:column;gap:6px}.ds .su-sum li{display:flex;align-items:center;gap:8px}
 .ds .su-ban{margin-bottom:16px;align-items:center}.ds .su-ban>div{flex:1}
+/* ---------- v1.31 virtual lists ---------- */
+.vl-sp{pointer-events:none}tbody.vl .vl-sp td{padding:0!important;border:0!important}
+.ds .egrid>.ecard,.ds .kel>.kel-r{content-visibility:auto;contain-intrinsic-size:auto 140px}
+/* menu items are one line: long labels (story titles, file names) end in … and show in full on hover */
+.ctx-it{min-width:0}.ctx-it span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ctx-it svg,.ctx-it kbd{flex:none}

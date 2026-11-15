@@ -56,14 +56,14 @@ async function zipInfo(b){
   const out = {files, comment, encrypted:files.some(f => f.enc)};
   const isOffice = files.some(f => f.name === '[Content_Types].xml');
   if(isOffice){
-    const core = await read('docProps/core.xml') || '', app = await read('docProps/app.xml') || '';
-    const tag = (x, t) => { const m = x.match(new RegExp('<(?:\\w+:)?' + t + '[^>]*>([^<]*)<')); return m ? m[1] : ''; };
+    const core = (await read('docProps/core.xml') || '').slice(0, 1048576), app = (await read('docProps/app.xml') || '').slice(0, 1048576);        /* metadata is small; a huge one is a trap */
+    const tag = (x, t) => { const m = x.match(new RegExp('<(?:\\w+:)?' + t + '\\b[^<>]*>([^<]*)<')); return m ? m[1] : ''; };
     out.office = {Title:tag(core, 'title'), Subject:tag(core, 'subject'), Author:tag(core, 'creator'), 'Last modified by':tag(core, 'lastModifiedBy'), Created:tag(core, 'created'), Modified:tag(core, 'modified'),
       Printed:tag(core, 'lastPrinted'), Revision:tag(core, 'revision'), Application:tag(app, 'Application') + (tag(app, 'AppVersion') ? ' ' + tag(app, 'AppVersion') : ''), Company:tag(app, 'Company'), Template:tag(app, 'Template'), 'Edit minutes':tag(app, 'TotalTime')};
     out.macros = files.filter(f => /vbaProject\.bin$|\.bas$|macrosheets\//i.test(f.name)).map(f => f.name);
     out.ole = files.filter(f => /oleObject|activeX|embeddings\//i.test(f.name)).map(f => f.name);
     const ext = [];
-    for(const f of files.filter(x => /_rels\/.*\.rels$/.test(x.name)).slice(0, 40)){ const x = await read(f.name) || ''; for(const m of x.matchAll(/Target="([^"]+)"[^>]*TargetMode="External"/g)) ext.push([f.name, m[1].replace(/&amp;/g, '&')]); }
+    for(const f of files.filter(x => /_rels\/.*\.rels$/.test(x.name)).slice(0, 40)){ const x = (await read(f.name) || '').slice(0, 1048576); for(const part of x.split(/<Relationship\b/).slice(1, 5000)){ const el = part.slice(0, Math.min(4000, (part.indexOf('>') + 1) || 4000)); if(!/TargetMode="External"/.test(el)) continue; const m = /\bTarget="([^"]*)"/.exec(el); if(m) ext.push([f.name, m[1].replace(/&amp;/g, '&')]); } }
     out.external = ext;
   }
   return out;

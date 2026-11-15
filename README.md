@@ -260,7 +260,7 @@ Press `Ctrl K` or `/`, or click the search bar, to search the whole app at once:
 | **One browser, one address** | Data belongs to one browser profile *and* one address. A copy opened from disk (`file://`) and the GitHub Pages copy each keep their own data, and so do Chrome and Firefox. Private windows and embedded previews keep nothing; a red banner warns you when saving is blocked. |
 | **Backups** | Clearing site data erases everything. Export regularly from **Help → Export everything** (attached files are included); the same page imports a backup. The Dashboard reminds you when your last backup is more than two weeks old. |
 | **Encryption** | Optional. Everything the browser stores is sealed with AES-256-GCM, and the app opens locked. |
-| **Undo, trash and restore points** | Deleted cases, entries, records, relationships and notes stay in the trash for 30 days. A full restore point is saved before every import, reset, sample-data removal or log import. |
+| **Undo, trash and restore points** | Deleted cases, entries, records, relationships and notes stay in the trash for 30 days. A full restore point (including the indicator store) is saved before every import, reset, sample-data removal or log import, and files a restore point needs are kept until it is gone. Changing the passphrase saves the workspace first, so an interrupted change is finished on the next start. |
 | **Sample data** | The app starts with three example investigations, notes, news items and CTF challenges. **Remove sample data** (on the Dashboard banner, Settings or Help) deletes only those and keeps your own work. |
 
 ## Run it locally
@@ -314,6 +314,7 @@ osintrix/
 │   ├── evtx.js             ← Windows event log (.evtx) reader and import with Sigma matching
 │   ├── tl.js · report.js   ← timeline heatmap and multi-select, report templates
 │   ├── caseents.js         ← the Entities tab inside each case
+│   ├── vlist.js            ← virtual lists: long timelines and tables draw only what is on screen
 │   ├── map.js · ach.js     ← case places, hypothesis board
 │   ├── pcap.js · sqlite.js ← packet capture reader, SQLite viewer
 │   ├── validate.js         ← form checks, duplicate names

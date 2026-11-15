@@ -2,6 +2,26 @@
 
 All notable changes to OSINTrix, newest first. The format is based on [Keep a Changelog](https://keepachangelog.com); this file is generated from `js/data/changelog.js` by `tools/changelog.py`.
 
+## [1.31] — Big lists and nothing lost (2026-11-15)
+
+_The timeline and the entity table now show every row of a large case, drawing only what is on screen. A data-safety review of saving, restoring, exporting and importing found eight bugs, three of which could lose data; all are fixed and covered by tests._
+
+### Changed
+- Big lists: the case timeline and the entity table draw only the rows near the screen, so a 10,000-event timeline opens in about 75 ms instead of 600 ms, and the table shows all entities instead of stopping at 400. Day headings stay pinned, the keyboard (j / k) walks every event, and opening a record scrolls straight to it.
+- The share dialog remembers your last TLP, redaction and file choices.
+
+### Fixed
+- Data safety: “Remove leftover files”, freeing notebook space, emptying the trash and forgetting a recent file no longer delete files that a restore point still needs. Going back to that restore point now brings its attachments and pictures back too.
+- Data safety: turning on encryption or changing the passphrase now saves the workspace first and then re-encrypts restore points and files. If the tab closes part way, OSINTrix finishes the job on the next start (asking for the previous passphrase if needed) instead of leaving files that no passphrase opens.
+- Data safety: a damaged or unreadable restore-point list is rebuilt from the restore points themselves instead of being replaced by an empty one, and two restore points made at the same moment can no longer overwrite each other’s list.
+- Undoing a backup import, or going back to a restore point, now also brings back the indicator store.
+- Case files now carry the case’s notes and the verdicts on its indicators; competing-hypothesis evidence keeps pointing at the right records after import. An imported copy of the demo case is no longer removed by “Remove sample data”.
+- Restoring an entry from the trash keeps relationships whose other end is still in the trash; they come back when that entry is restored.
+- With no cases at all, Playbooks, the Decoder and New evidence no longer fail; they offer to make a case.
+- Exported detection rules import back as the same rules instead of duplicates, and keep their stars, references and linked case.
+- Long labels in menus (for example on a news story) stay on one line instead of overlapping.
+- Hardening from the same review: imported cases, links and verdicts are checked field by field; spreadsheet formulas hidden behind spaces or full-width signs are neutralised in CSV; key strengths outside the safe range are refused; crafted Office metadata, Windows event logs and Word pictures can no longer stall the tab or fill memory.
+
 ## [1.30] — Hardened, faster, shareable, easy to start (2026-11-15)
 
 _An independent security review of everything added since v1.24 found three medium and several low issues; all are fixed. Large cases are much faster. A share package hands a case to another team in one ZIP, and a two-minute setup gets new users from nothing to a working investigation desk._

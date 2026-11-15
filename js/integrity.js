@@ -22,7 +22,7 @@ function checkTree(root, errs, max = 3e6){
       if(++n > max){ errs.push('too many items'); return; }
       const v = o[k], p = path + (Array.isArray(o) ? '[' + k + ']' : '.' + k);
       if(BAD_KEYS.has(k)){ errs.push('forbidden key ' + p); continue; }
-      if((k === 'id' || /Id$/.test(k)) && v != null && v !== ''){
+      if((k === 'id' || /Id$/.test(k) || (/\.links\[\d+\]$/.test(path) && (k === 'a' || k === 'b' || k === 'src'))) && v != null && v !== ''){
         if(!(typeof v === 'string' || typeof v === 'number') || !SAFE_ID.test(String(v))) errs.push('invalid ID at ' + p);
       }
       if(v && typeof v === 'object') walk(v, p, depth + 1);
@@ -96,7 +96,18 @@ function normRecord(r){
   r.host = String(r.host || ''); r.source = String(r.source || ''); if(typeof r.ts !== 'number') r.ts = null; r.answer = String(r.answer || '');
   return r;
 }
-function normEntry(e){ e.fields = isObj(e.fields) ? Object.fromEntries(Object.entries(e.fields).map(([k, v]) => [k, String(v == null ? '' : v)])) : {}; e.tags = Array.isArray(e.tags) ? e.tags.map(String) : []; e.notes = String(e.notes || ''); e.priority = e.priority || 'medium'; return e; }
+function normEntry(e){ e.fields = isObj(e.fields) ? Object.fromEntries(Object.entries(e.fields).map(([k, v]) => [k, String(v == null ? '' : v)])) : {}; e.tags = Array.isArray(e.tags) ? e.tags.map(String) : []; e.notes = String(e.notes || ''); e.priority = ['low', 'medium', 'high', 'critical'].includes(e.priority) ? e.priority : 'medium'; e.starred = !!e.starred; return e; }
+/* values that are drawn as labels or classes must be one of the known ones */
+function normCase(c){ c.status = ['active', 'review', 'closed'].includes(c.status) ? c.status : 'active'; c.name = String(c.name || 'Untitled case'); c.code = String(c.code || 'CASE').slice(0, 40); c.scope = String(c.scope || ''); c.color = /^#[0-9a-f]{3,8}$/i.test(c.color) ? c.color : '#5468ff'; c.icon = /^[a-z0-9-]{1,40}$/.test(c.icon) ? c.icon : 'briefcase'; c.autoLook = false; if(c.ach != null) c.ach = normAch(c.ach); if(c.ach === null) delete c.ach; return c; }
+/* competing-hypotheses data: ids are plain, marks are known codes, text is capped */
+function normAch(A){ if(!A || typeof A !== 'object') return null; const sid = v => typeof v === 'string' && /^[\w-]{1,60}$/.test(v) ? v : null, arr = v => Array.isArray(v) ? v.filter(x => x && typeof x === 'object') : [];
+  const hyps = arr(A.hyps).slice(0, 50).map(h => ({id:sid(h.id) || uid('h'), t:String(h.t || '').slice(0, 400), status:['open', 'rejected', 'likely'].includes(h.status) ? h.status : 'open', note:String(h.note || '').slice(0, 4000)}));
+  const ev = arr(A.ev).slice(0, 500).map(x => ({id:sid(x.id) || uid('e'), t:String(x.t || '').slice(0, 400), rec:sid(x.rec), cred:[1, 2, 3].includes(+x.cred) ? +x.cred : 2, rel:[1, 2, 3].includes(+x.rel) ? +x.rel : 2}));
+  const H = new Set(hyps.map(h => h.id)), m = {}, codes = ['CC', 'C', 'N', 'I', 'II', 'NA'];
+  for(const e of ev){ const row = A.m && typeof A.m === 'object' && A.m[e.id]; if(!row || typeof row !== 'object') continue; m[e.id] = {}; for(const [h, v] of Object.entries(row)) if(H.has(h) && codes.includes(v)) m[e.id][h] = v; }
+  return {hyps, ev, m}; }
+function normLink(l){ l.conf = [1, 2, 3].includes(+l.conf) ? +l.conf : 1; l.label = String(l.label || 'related to').slice(0, 120); return l; }
+function normVerdicts(v){ const o = {}; if(v && typeof v === 'object') for(const [k, x] of Object.entries(v)) if(typeof k === 'string' && k.length < 2100 && ['malicious', 'suspicious', 'benign'].includes(x)) o[k] = x; return o; }
 function importRefused(what, errs){
   console.warn('Import refused:', errs);
   toast(what + ' was not imported: ' + errs[0] + (errs.length > 1 ? ' (+' + (errs.length - 1) + ' more)' : ''));

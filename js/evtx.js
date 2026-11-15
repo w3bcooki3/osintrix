@@ -95,10 +95,11 @@ const EVTX = (() => {
         }
         return {parts, p};
       }
+      let depth = 0;
       function template(off){
-        let T = tmpls.get(off); if(T) return T;
+        let T = tmpls.get(off); if(T) return T; if(++depth > 64){ depth = 0; throw new Error('templates nested too deeply'); }
         const o = cb + off, len = dv.getUint32(o + 0x14, true), body = o + 0x18;
-        const r = content(body, false, true); T = {tree:r.parts, len:0x18 + len}; tmpls.set(off, T); return T;
+        const r = content(body, false, true); depth--; T = {tree:r.parts, len:0x18 + len}; tmpls.set(off, T); return T;
       }
       /* template instance: header, the template itself when it is defined here, then the substitution values */
       function instance(p){
@@ -109,8 +110,10 @@ const EVTX = (() => {
         const vals = decl.map(([size, t]) => { const v = size ? value(t, q, size) : (t === 0 ? null : ''); q += size; return t === 0 ? null : v; });
         return {node:fill(T.tree, vals), p:q};
       }
+      /* a crafted log can nest templates so each level doubles the tree; a chunk never needs this many nodes */
+      let made = 0;
       function fill(parts, vals){
-        const out = [];
+        const out = []; if((made += parts.length) > 200000) throw new Error('record expands too far');
         for(const x of parts){
           if(typeof x === 'string'){ out.push(x); continue; }
           if(x.s != null){ const v = vals[x.s]; if(v == null && x.o) continue; if(v != null) out.push(v); continue; }
@@ -121,6 +124,7 @@ const EVTX = (() => {
         return out;
       }
       function fragment(p, end){
+        made = 0; depth = 0;
         if((u8[p] & 0x0f) === 0x0f) p += 4;
         const r = content(p, false, false); return {node:r.parts, p:r.p};
       }

@@ -273,6 +273,9 @@ function caseVault(c, D){
 }
 
 /* ---------- timeline ---------- */
+/* day headings, read once per quarter hour (every real time zone offset is a multiple of 15 minutes) */
+const DAY_C = new Map();
+function dayOf(ts){ const z = tz(), k = z + '|' + Math.floor(ts / 9e5); let v = DAY_C.get(k); if(v === undefined){ if(DAY_C.size > 60000) DAY_C.clear(); v = E.fmtDay(Math.floor(ts / 9e5) * 9e5, z); DAY_C.set(k, v); } return v; }
 function caseTimeline(c, D){
   const list = D.recs.filter(passes);
   const hosts = countBy(D.recs, r => r.host);
@@ -285,18 +288,18 @@ function caseTimeline(c, D){
     ${UI.facet.host || UI.pivot || UI.q || UI.facet.slot || UI.facet.win ? `<button class="btn xs ghost" data-act="clearFilters">Clear</button>` : ''}
     <span class="sp"></span><button class="btn xs${UI.tlSel ? ' on' : ''}" data-act="tlSel" aria-pressed="${!!UI.tlSel}">${ico('square-check','sm')}Select</button><button class="btn xs${UI.tlHeat ? ' on' : ''}" data-act="tlHeat" aria-pressed="${!!UI.tlHeat}">${ico('grid-3x3','sm')}Heatmap</button>` : ''}</div>`;
   if(UI.tlMode === 'story') return `<div class="scroll">${bar}${storyHTML(D)}</div>`;
-  let h = '', lastDay = null, prev = null;
-  const lim = UI.tlLim && UI.tlLim.k === c.id + '|' + (UI.q || '') ? UI.tlLim.n : 300, shown = list.slice(0, lim), dayN = new Map();
-  for(const r of list) if(r.ts){ const d = E.fmtDay(r.ts, tz()); dayN.set(d, (dayN.get(d) || 0) + 1); }
-  for(const r of shown){
-    if(r.ts){ const d = E.fmtDay(r.ts, tz());
-      if(d !== lastDay){ const n = dayN.get(d) || 0; h += `<div class="day"><b>${esc(d)}</b><span>${n} event${n > 1 ? 's' : ''} · ${esc(tz())}</span></div>`; lastDay = d; prev = null; }
-      if(prev !== null){ const g = r.ts - prev; if(g > 1000){ const px = Math.max(10, Math.min(56, Math.round(5 * Math.log2(g / 1000)))); h += `<div class="gap${g > 36e5 ? ' wide' : ''}" style="--h:${px}px" aria-hidden="true"><em>${g > 36e5 ? ico('clock','sm') : ''}${esc(E.fmtGap(g))}${g > 36e5 ? ' gap' : ''}</em></div>`; } }
+  /* every matching event is in the list; only the ones near the screen are drawn (vlist.js) */
+  const items = [], dayN = new Map(); let lastDay = null, prev = null;
+  for(const r of list) if(r.ts){ const d = dayOf(r.ts); dayN.set(d, (dayN.get(d) || 0) + 1); }
+  for(const r of list){
+    if(r.ts){ const d = dayOf(r.ts);
+      if(d !== lastDay){ const n = dayN.get(d) || 0; items.push({k:'d:' + d, h:58, sticky:true, r:() => `<div class="day"><b>${esc(d)}</b><span>${n} event${n > 1 ? 's' : ''} · ${esc(tz())}</span></div>`}); lastDay = d; prev = null; }
+      if(prev !== null){ const g = r.ts - prev; if(g > 1000){ const px = Math.max(10, Math.min(56, Math.round(5 * Math.log2(g / 1000)))); items.push({k:'g:' + r.id, h:px, r:() => `<div class="gap${g > 36e5 ? ' wide' : ''}" style="--h:${px}px" aria-hidden="true"><em>${g > 36e5 ? ico('clock','sm') : ''}${esc(E.fmtGap(g))}${g > 36e5 ? ' gap' : ''}</em></div>`}); } }
       prev = r.ts;
-    } else if(lastDay !== '-'){ h += `<div class="day">No timestamp</div>`; lastDay = '-'; prev = null; }
-    h += evWrap(r, evHTML(r, D, c));
+    } else if(lastDay !== '-'){ items.push({k:'d:-', h:58, sticky:true, r:() => `<div class="day">No timestamp</div>`}); lastDay = '-'; prev = null; }
+    items.push({k:r.id, h:r.body && r.body !== r.title ? 112 : 70, r:() => evWrap(r, evHTML(r, D, c))});
   }
-  if(list.length > lim) h += `<div class="tlmore" id="tlMore"><span class="t3">Showing ${lim.toLocaleString()} of ${list.length.toLocaleString()} events</span><button class="btn sm" data-act="tlMore" data-v="${c.id + '|' + (UI.q || '')}">Show ${Math.min(500, list.length - lim).toLocaleString()} more</button><button class="btn sm ghost" data-act="tlMore" data-v="${c.id + '|' + (UI.q || '')}" data-id="all">Show all</button></div>`;
+  const h = vlist('tlV', items, {focus:UI.sel && UI.sel.kind === 'rec' ? UI.sel.id : null});
   if(UI.evPick){ const have = new Set(D.recs.map(r => r.id)); for(const i of [...UI.evPick]) if(!have.has(i)) UI.evPick.delete(i); }
   return `<div class="scroll">${bar}${UI.tlHeat ? heatHTML(D) : ''}<div class="tl${UI.tlSel || (UI.evPick && UI.evPick.size) ? ' picking' : ''}">${evBulkHTML(list)}${list.length ? h : empty('filter','Nothing matches','Clear the filters or change the search.', `<button class="btn" data-act="clearFilters">Clear filters</button>`)}</div></div>`;
 }

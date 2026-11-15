@@ -16,7 +16,9 @@ const SEC = {key:null, salt:null, iter:310000, locked:false, env:null};
 const ENV_TAG = 'osintrix-aes-gcm';
 const b64e8 = u => { let s = ''; const b = new Uint8Array(u); for(let i = 0; i < b.length; i += 32768) s += String.fromCharCode(...b.subarray(i, i + 32768)); return btoa(s); };
 const b64d8 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+/* the iteration count comes from the file being opened: a huge one would hang the tab */
 async function deriveKey(pass, salt, iter){
+  iter = +iter; if(!Number.isInteger(iter) || iter < 100000 || iter > 5000000) throw new Error('Unsupported key strength in this file');
   const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass.normalize('NFC')), 'PBKDF2', false, ['deriveKey']);
   return crypto.subtle.deriveKey({name:'PBKDF2', hash:'SHA-256', salt, iterations:iter}, base, {name:'AES-GCM', length:256}, false, ['encrypt', 'decrypt']);
 }
@@ -40,34 +42,63 @@ function flushSealed(json){
       if(STORE.idb){ ok = (await IDB.set(STORE_KEY, env)) || ok; } storageOK = ok; }catch(e){ storageOK = false; } STORE.lastSaved = Date.now(); paintSaved(); };
   sealing = (sealing || Promise.resolve()).then(run); return sealing;
 }
-/* re-seal everything stored beside the workspace (restore points, their index, attached files) with the current key state */
+/* re-seal everything stored beside the workspace (restore points, their index, attached files) with the current key state.
+   It can be run again safely: an item already sealed with the current key is left alone, so an interrupted run is finished
+   by running it again (see resealResume). */
 async function resealAll(fromKey){
-  const conv = async s => { let plain = s; if(isEnv(s)){ if(!fromKey) return s; plain = await openWith(fromKey, s); } return SEC.key ? sealWith(SEC.key, SEC.salt, SEC.iter, plain) : plain; };
-  const idx = await IDB.get('osintrix-snaps'); if(idx) await IDB.set('osintrix-snaps', await conv(idx));
-  let list = []; try{ list = JSON.parse(isEnv(idx) && fromKey ? await openWith(fromKey, idx) : idx || '[]'); }catch(e){}
-  for(const s of list){ const v = await IDB.get('osintrix-snap:' + s.at); if(v) await IDB.set('osintrix-snap:' + s.at, await conv(v)); }
-  const fids = new Set(DB.records.concat((DB.trash || []).flatMap(x => x.kind === 'record' ? [x.data.r] : x.kind === 'case' ? x.data.records : [])).flatMap(r => (r.att || []).map(a => a.id)));
-  for(const fid of fids){ let v = await IDB.get('file:' + fid); if(!v) continue; if(v.enc){ if(!fromKey) continue; const pt = await crypto.subtle.decrypt({name:'AES-GCM', iv:b64d8(v.iv)}, fromKey, v.ct); v = new Blob([pt], {type:v.type}); } await IDB.set('file:' + fid, await sealBlob(v)); }
-  for(const key of ['cti:iocs', 'cti:look']){ const raw = await IDB.get(key); if(raw){ let plain = raw; if(isEnv(raw)){ if(fromKey) plain = await openWith(fromKey, raw); else plain = null; } if(plain != null) await IDB.set(key, await sealStr(plain)); } }
-  for(const x of (DB.recent || []).filter(x => x.kind === 'file')){ let v = await IDB.get('wk:' + x.id); if(!v) continue; if(v.enc){ if(!fromKey) continue; const pt = await crypto.subtle.decrypt({name:'AES-GCM', iv:b64d8(v.iv)}, fromKey, v.ct); v = new Blob([pt], {type:v.type}); } await IDB.set('wk:' + x.id, await sealBlob(v)); }
-  if(typeof nbReseal === 'function') await nbReseal(fromKey);
-  FILE_URLS.clear(); SNAPS = null;
+  const plain = async s => { if(!isEnv(s)) return s; if(fromKey){ try{ return await openWith(fromKey, s); }catch(e){} } return null; };
+  const done = async s => { if(!SEC.key || !isEnv(s)) return !SEC.key && !isEnv(s); try{ await openWith(SEC.key, s); return true; }catch(e){ return false; } };
+  const conv = async s => { if(await done(s)) return s; const p = await plain(s); if(p == null) return s; return SEC.key ? sealWith(SEC.key, SEC.salt, SEC.iter, p) : p; };
+  const blobPlain = async v => { if(!v || !v.enc) return v; for(const k of [fromKey, SEC.key]){ if(!k) continue; try{ const pt = await crypto.subtle.decrypt({name:'AES-GCM', iv:b64d8(v.iv)}, k, v.ct); return {b:new Blob([pt], {type:v.type}), k}; }catch(e){} } return null; };
+  const convBlob = async key => { const v = await IDB.get(key); if(!v) return; const p = await blobPlain(v); if(p == null) return;
+    if(v.enc && p.k === SEC.key) return;   // already done
+    await IDB.set(key, await sealBlob(p.b || p)); };
+  const idx = await IDB.get('osintrix-snaps'); let list = [];
+  if(idx){ const p = await plain(idx); const cur = await done(idx) ? (SEC.key ? await openWith(SEC.key, idx) : idx) : p; try{ list = JSON.parse(cur || '[]'); }catch(e){} await IDB.set('osintrix-snaps', await conv(idx)); }
+  const keys = await IDB.keys();
+  /* every restore point in the browser, listed or not */
+  const snapKeys = new Set(keys.filter(k => typeof k === 'string' && /^osintrix-snap:\d+$/.test(k))); (Array.isArray(list) ? list : []).forEach(x => snapKeys.add('osintrix-snap:' + x.at));
+  for(const k of snapKeys){ const v = await IDB.get(k); if(v) await IDB.set(k, await conv(v)); }
+  for(const k of keys) if(typeof k === 'string' && (k.startsWith('file:') || k.startsWith('wk:') || k.startsWith('nbm:'))) await convBlob(k);
+  for(const key of ['cti:iocs', 'cti:look']){ const raw = await IDB.get(key); if(raw) await IDB.set(key, await conv(raw)); }
+  if(typeof NB_URLS !== 'undefined'){ NB_URLS.clear(); NB_DATA.clear(); }
+  FILE_URLS.clear(); SNAPS = null; if(typeof SNAP_REFS !== 'undefined') SNAP_REFS = null;
 }
+/* a passphrase change is written in this order: a note that it started, the workspace itself, then everything beside it,
+   then the note is removed. If the tab closes part way, the note says how to finish. */
+const RESEAL_NOTE = 'osintrix:reseal';
+function resealMark(from){ try{ localStorage.setItem(RESEAL_NOTE, JSON.stringify({from, at:Date.now()})); }catch(e){} }
+function resealClear(){ try{ localStorage.removeItem(RESEAL_NOTE); }catch(e){} }
+async function resealRun(fromKey){ const t = setTimeout(() => toast('Re-encrypting restore points and files — keep this tab open'), 400); try{ await resealAll(fromKey); resealClear(); } finally { clearTimeout(t); } }
 async function encEnable(pass){
   const salt = crypto.getRandomValues(new Uint8Array(16)), key = await deriveKey(pass, salt, SEC.iter);
-  Object.assign(SEC, {key, salt}); DB.security = Object.assign(DB.security || {}, {encrypted:true, since:Date.now()});
-  await resealAll(null); await flushSealed(JSON.stringify(DB)); mutate('turned on encryption');
+  resealMark('none'); Object.assign(SEC, {key, salt}); DB.security = Object.assign(DB.security || {}, {encrypted:true, since:Date.now()});
+  await flushSealed(JSON.stringify(DB)); await resealRun(null); mutate('turned on encryption');
 }
 async function encChange(oldPass, newPass){
   const env = JSON.parse(localStorage.getItem(STORE_KEY) || (await IDB.get(STORE_KEY)) || 'null'); if(!isEnv(env)) throw new Error('not encrypted');
   const oldKey = await deriveKey(oldPass, b64d8(env.kdf.salt), env.kdf.iter); await openWith(oldKey, env);
   const salt = crypto.getRandomValues(new Uint8Array(16)), key = await deriveKey(newPass, salt, SEC.iter);
-  Object.assign(SEC, {key, salt}); await resealAll(oldKey); await flushSealed(JSON.stringify(DB)); mutate('changed passphrase');
+  resealMark({salt:env.kdf.salt, iter:env.kdf.iter}); Object.assign(SEC, {key, salt}); await flushSealed(JSON.stringify(DB)); await resealRun(oldKey); mutate('changed passphrase');
 }
 async function encDisable(pass){
   const env = JSON.parse(localStorage.getItem(STORE_KEY) || (await IDB.get(STORE_KEY)) || 'null'); if(!isEnv(env)) return;
   const k = await deriveKey(pass, b64d8(env.kdf.salt), env.kdf.iter); await openWith(k, env);
-  SEC.key = null; SEC.salt = null; DB.security = Object.assign(DB.security || {}, {encrypted:false}); await resealAll(k); mutate('turned off encryption'); flush();
+  resealMark({salt:env.kdf.salt, iter:env.kdf.iter}); SEC.key = null; SEC.salt = null; DB.security = Object.assign(DB.security || {}, {encrypted:false});
+  await flush(); await resealRun(k); mutate('turned off encryption');
+}
+/* finish a change that was cut short (called once the workspace is open) */
+async function resealResume(){
+  let n = null; try{ n = JSON.parse(localStorage.getItem(RESEAL_NOTE) || 'null'); }catch(e){} if(!n) return;
+  if(n.from === 'none'){ await resealRun(null); return toast('Finished encrypting restore points and files'); }
+  if(!n.from || !n.from.salt) return resealClear();
+  passDlg('Finish the passphrase change', 'The last passphrase change was interrupted before every restore point and file was moved over. Enter the <b>previous</b> passphrase to finish.', 'Finish', async p => {
+    const k = await deriveKey(p, b64d8(n.from.salt), n.from.iter);
+    /* items the current key cannot open must open with the old passphrase */
+    const left = []; for(const key of await IDB.keys()){ if(typeof key !== 'string' || key === STORE_KEY) continue; const v = await IDB.get(key); if(typeof v !== 'string' || !isEnv(v)) continue;
+      if(SEC.key){ try{ await openWith(SEC.key, v); continue; }catch(e){} } left.push(v); }
+    if(left.length){ let ok = false; for(const v of left.slice(0, 3)){ try{ await openWith(k, v); ok = true; break; }catch(e){} } if(!ok) throw new Error('bad'); }
+    await resealRun(k); closeDlg(); renderAll(); toast('Passphrase change finished'); }, false);
 }
 
 /* ---------- lock screen ---------- */
