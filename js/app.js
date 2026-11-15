@@ -127,6 +127,8 @@ document.addEventListener('click', ev => {
   if(typeof TD_ACTS !== 'undefined' && TD_ACTS[a]) return TD_ACTS[a](id, v, t, ev);
   if(typeof DUP_ACTS !== 'undefined' && DUP_ACTS[a]) return DUP_ACTS[a](id, v, t, ev);
   if(typeof RB_ACTS !== 'undefined' && RB_ACTS[a]) return RB_ACTS[a](id, v, t, ev);
+  if(typeof CR_ACTS !== 'undefined' && CR_ACTS[a]) return CR_ACTS[a](id, v, t, ev);
+  if(typeof TX2_ACTS !== 'undefined' && TX2_ACTS[a]) return TX2_ACTS[a](id, v, t, ev);
   if(NBX_ACTS[a]) return NBX_ACTS[a](id, v, t, ev);
   if(a === 'toolRun') return toolRunDlg(id);
   if(a === 'trPick'){ $('trV').value = v; return $('trV').focus(); }
@@ -468,6 +470,10 @@ document.addEventListener('click', ev => {
     case 'pbImport': return pbImport();
     case 'pbExport': return download('osintrix-playbooks.json', JSON.stringify(DB.playbooks.map(({id, custom, created, ...p}) => p), null, 2), 'application/json');
     case 'pbMenu': { ensurePlaybooks(); const r0 = t.getBoundingClientRect(); return showMenu(Math.max(8, Math.min(r0.left, innerWidth - 300)), r0.bottom + 6, DB.playbooks.slice(0, 12).map(p => ({label:p.name, icon:p.icon || 'list-checks', fn:() => runPlaybook(p.id, DB.active)})).concat([{sep:true}, {label:'Browse all playbooks…', icon:'arrow-right', fn:() => { UI.pb = null; go('#/playbooks'); }}]), 'Run on ' + theCase().code); }
+    case 'offlineSet': { DB.prefs.noOffline = v === 'off'; save(); const sw = navigator.serviceWorker;
+      if(sw && v === 'off') sw.getRegistrations().then(R => Promise.all(R.map(r => r.unregister()))).then(() => caches.keys()).then(K => Promise.all(K.filter(k => k.startsWith('osintrix-')).map(k => caches.delete(k)))).then(() => toast('Offline copy removed'));
+      else if(sw) sw.register('sw.js').then(() => toast('The app will work offline after this page has loaded once'), () => toast('The browser would not install the offline helper'));
+      return renderMain(); }
     case 'pref': DB.prefs[t.dataset.k] = v; applyPrefs(); save(); return renderMain();
     case 'exportMd': return download(slug(theCase().name) + '-report.md', reportMd(), 'text/markdown');
     case 'exportCase': { const c = theCase(id), recs = DB.records.filter(r => r.caseId === c.id); return filesForExport(recs).then(files => { const D = derive(c.id), keys = new Set([...D.ents.keys(), ...DB.entries.filter(e => e.caseId === c.id).map(e => typeof entryKey === 'function' ? entryKey(e) : '').filter(Boolean)]);
@@ -715,6 +721,8 @@ async function bootRest(unlocked){
   ensureTools(); ensureToolTpl(); ensurePlaybooks(); ensureIntel(); if(typeof ctiLoad === 'function') ctiLoad(); if(typeof watchMonitor === 'function'){ lkLoad(); watchMonitor(); } ensureQueries(); ensureRules(); ensureNotes(); ensureSample(); ensureCTF(); ensureNB(); ensureAchDemo(); applyPrefs(); storageCheck(); await hashRecords(); migrateFieldEnts(); ensurePositions(); flush(); onRoute(); nbFlushMedia(); fbInit();
   let seen = false; try{ seen = !!localStorage.getItem('osintrix:welcomed'); }catch(e){}
   if(!unlocked) setTimeout(() => { $('splash').classList.add('out'); setTimeout(() => $('splash').remove(), 320); if(!seen) showWelcome(); }, 350);
+  /* offline helper: caches the app's own files (never your data) so repeat visits open instantly and work without a connection. Not possible when opened as a file. */
+  if('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !DB.prefs.noOffline) setTimeout(() => navigator.serviceWorker.register('sw.js').catch(e => console.warn('offline helper not installed', e)), 1500);
   armAutolock(); if(typeof resealResume === 'function') setTimeout(() => resealResume().catch(() => {}), 700);   // finish a passphrase change that was cut short
   if(DB.security && DB.security.sign && DB.security.sign.priv) signingKey().catch(() => {});   // move an older in-JSON private key into this browser's key store
 }

@@ -93,7 +93,7 @@ function save(){ markChanged(); clearTimeout(saveT); saveT = setTimeout(flush, 2
 /* editors with typing still waiting to be committed (the notebook) register here, so every save — including the one on closing the tab — includes it */
 const BEFORE_SAVE = [];
 function flush(){ clearTimeout(saveT); if(!DB || SEC.locked) return; for(const f of BEFORE_SAVE) try{ f(); }catch(e){ console.error(e); } clearTimeout(saveT); if(!TABS.writer){ paintSaved(); return; } DB.savedAt = Math.max(Date.now(), (DB.savedAt || 0) + 1);   // never a tie between two copies
-  const at = DB.savedAt, g = STORE.gen, done = r => { if(r){ STORE.idbAt = Math.max(STORE.idbAt || 0, at); markSafe(g); try{ localStorage.removeItem(STORE_KEY + ':nbj'); }catch(e){} } };   // IndexedDB has everything up to 'at'
+  const at = DB.savedAt, g = STORE.gen, done = r => { if(r){ STORE.idbAt = Math.max(STORE.idbAt || 0, at); markSafe(g); try{ /* only drop the closing-tab journal if this save already holds every page in it: an older save finishing late must not remove newer typing */ const j = JSON.parse(localStorage.getItem(STORE_KEY + ':nbj') || 'null'); if(j && Array.isArray(j.pages) && j.pages.every(q => (+(q && q.updated) || 0) <= at)) localStorage.removeItem(STORE_KEY + ':nbj'); }catch(e){} } };   // IndexedDB has everything up to 'at'
   if(!SEC.key && STORE.idb && DB.records.length >= CHUNKED_FROM){ storageOK = true; flushChunked().then(done); STORE.lastSaved = Date.now(); paintSaved(); tabSaved(); return; }
   if(LAST.n){ IDB.setMany([], Array.from({length:LAST.n}, (_, i) => STORE_KEY + ':r:' + i)); LAST.n = 0; LAST.chunks = []; }   // back to one piece
   const json = JSON.stringify(DB);

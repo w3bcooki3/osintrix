@@ -83,6 +83,13 @@ function ruleLint(r){
 }
 
 /* ---------- health: run every rule over every case ---------- */
+/* the words of a rule's detection logic (Sigma: the detection block; YARA: strings and condition), without YAML and operator words */
+const RT_STOP = new Set(['condition', 'selection', 'filter', 'contains', 'endswith', 'startswith', 'all', 'and', 'not', 'them', 'any', 'one', 'windash', 'base64', 'base64offset', 'cidr', 'detection', 'strings', 'ascii', 'wide', 'nocase', 'fullword', 'true', 'false', 'null', 'sel', 'selection_img', 'selection_cli']);
+const RT_C = new Map();
+function ruleTokens(r){ const code = String(r.code || ''), k = r.id + ':' + code.length + ':' + (r.updated || 0); if(RT_C.has(k)) return RT_C.get(k);
+  const part = r.type === 'yara' ? (code.match(/strings:([\s\S]*)/) || [, code])[1] : (code.match(/detection:([\s\S]*?)(?:\n(?:falsepositives|level|fields|tags|status|references):|$)/) || [, ''])[1];
+  const t = new Set(part.toLowerCase().split(/[^a-z0-9_.\\-]+/).map(x => x.replace(/^[\\.-]+|[\\.-]+$/g, '')).filter(x => x.length >= 3 && !RT_STOP.has(x) && !/^(selection|filter)_?\w*$/.test(x)));
+  if(RT_C.size > 3000) RT_C.clear(); RT_C.set(k, t); return t; }
 async function ruleHealth(){
   if(DQ.running) return; DQ.running = true; DQ.health = {done:0, total:DB.rules.length, rows:[]}; renderMain();
   const recs = DB.records.filter(r => r.type !== 'lead').slice(-5000), F = new Map(), id2 = new Map(recs.map((r, i) => [r.id, i]));
@@ -96,13 +103,24 @@ async function ruleHealth(){
     let unsup = ''; if(/Not supported in the browser engine/.test(err)){ unsup = err; err = ''; }
     const lint = ruleLint(r), cases = new Set(hits.map(h => h.caseId)), ratio = recs.length ? hits.length / recs.length : 0, ben = hits.filter(benign).length;
     const noisy = hits.length >= 5 && (ratio > 0.2 || ben / hits.length > 0.5);
-    rows.push({r, hits:hits.map(h => id2.get(h.id)), n:hits.length, cases, err, unsup, lint, noisy, ben, ratio});
+    const TR = r.tests && r.tests.length && typeof dlRunTests === 'function' ? dlRunTests(r) : [], tfail = TR.filter(x => !x.ok).length, trend = typeof dlTrend === 'function' ? dlTrend(r) : null;
+    rows.push({r, hits:hits.map(h => id2.get(h.id)), n:hits.length, cases, err, unsup, lint, noisy, ben, ratio, tests:TR.length, tfail, regressed:!!(tfail && trend && (trend.regressed || trend.now))});
     if(i % 25 === 24){ DQ.health.done = i + 1; if(UI.dview === 'health') renderMain(); await new Promise(res => setTimeout(res, 0)); } }
   /* duplicates: rules that fire on (nearly) the same records */
   const fired = rows.filter(x => x.n >= 3), dup = [];
   for(let a = 0; a < fired.length; a++){ const A = new Set(fired[a].hits); for(let b = a + 1; b < fired.length; b++){ const B = fired[b].hits; let inter = 0; for(const h of B) if(A.has(h)) inter++; const j = inter / (A.size + B.length - inter); if(j >= 0.8) dup.push({a:fired[a], b:fired[b], j}); } }
   for(const d of dup){ (d.a.dups = d.a.dups || []).push(d.b.r); (d.b.dups = d.b.dups || []).push(d.a.r); }
-  DQ.health = {done:DB.rules.length, total:DB.rules.length, rows, recs, dup, at:Date.now(), yaraSkipped:!yaraOk};
+  /* look-alikes: rules whose detection logic is nearly the same text, found even with no evidence to fire on */
+  const tok = rows.map(x => ({x, t:ruleTokens(x.r)})).filter(o => o.t.size >= 2);
+  for(let a = 0; a < tok.length; a++) for(let b = a + 1; b < tok.length; b++){ const A = tok[a], B = tok[b]; if(A.x.r.type !== B.x.r.type) continue;
+    const small = Math.min(A.t.size, B.t.size), big = Math.max(A.t.size, B.t.size); if(small / big < 0.8) continue;
+    let inter = 0; for(const t of A.t) if(B.t.has(t)) inter++; if(inter / (A.t.size + B.t.size - inter) >= 0.85){ (A.x.alike = A.x.alike || []).push(B.x.r); (B.x.alike = B.x.alike || []).push(A.x.r); } }
+  /* this check against the last one */
+  const sum = {at:Date.now(), rules:rows.length, fired:rows.filter(x => x.n).length, noisy:rows.filter(x => x.noisy).length, broken:rows.filter(x => x.err || x.lint.some(l => l.sev === 'err')).length,
+    tfail:rows.filter(x => x.tfail).length, untested:rows.filter(x => !x.r.builtin && !x.tests).length, alike:rows.filter(x => x.alike).length};
+  const hist = Array.isArray(DB.prefs.dqHist) ? DB.prefs.dqHist.filter(h => h && +h.at) : [], prev = hist[hist.length - 1] || null;
+  DB.prefs.dqHist = [...hist, sum].slice(-30); save();
+  DQ.health = {prev, sum, done:DB.rules.length, total:DB.rules.length, rows, recs, dup, at:Date.now(), yaraSkipped:!yaraOk};
   DQ.running = false; if(UI.dview === 'health') renderMain();
 }
 /* field values the hits of a noisy rule share → a filter to exclude them */
@@ -116,22 +134,29 @@ function tuneSuggest(row){
   const cap1 = s => s.replace(/^./, c => c.toUpperCase());
   return {top, yaml:`    filter_common:\n${top.map(x => `        ${cap1(x.f)}: '${x.v.replace(/'/g, "''")}'`).join('\n')}\n    condition: (${sigmaParse(row.r.code).cond || 'selection'}) and not filter_common`};
 }
+/* the summary of this check against the previous one: only what moved */
+function dqDelta(H){ const P = H.prev, S = H.sum; if(!P || !S) return '';
+  const L = [['noisy', 'noisy', 1], ['broken', 'broken', 1], ['tfail', 'with failing tests', 1], ['alike', 'look-alike', 1], ['untested', 'of yours untested', 1], ['fired', 'firing on your evidence', -1], ['rules', 'rules in all', 0]]
+    .filter(([k]) => +P[k] !== +S[k] && P[k] != null).map(([k, l, bad]) => { const up = S[k] > P[k], tone = !bad ? '' : (up === (bad > 0)) ? 'r' : 'g'; return `<span class="dq-dl ${tone}">${esc(l)} ${P[k]} → <b>${S[k]}</b></span>`; });
+  return `<p class="t3 dq-delta">${L.length ? 'Since the check ' + esc(iAgo(P.at)) + ': ' + L.join('') : 'Nothing changed since the check ' + esc(iAgo(P.at)) + '.'}</p>`; }
 function healthView(){
   const H = DQ.health;
   if(!H) return `<section class="card"><div class="body"><p class="t2">Lint every rule and run it over the evidence of every case, to find rules that are broken, too noisy, never fire, or duplicate another.</p><button class="btn primary" data-act="dqRun">${ico('activity','sm')}Check ${DB.rules.length} rules</button></div></section>`;
   if(DQ.running) return `<section class="card"><div class="body"><p>Checking ${H.done} of ${H.total} rules…</p><div class="lk-prog" role="progressbar" aria-label="Checking rules" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(H.done / H.total * 100)}"><i style="width:${Math.round(H.done / H.total * 100)}%"></i></div></div></section>`;
   const R = H.rows, err = R.filter(x => x.err || x.lint.some(l => l.sev === 'err')), noisy = R.filter(x => x.noisy), warn = R.filter(x => x.lint.some(l => l.sev === 'warn')), fired = R.filter(x => x.n), mine = R.filter(x => !x.r.builtin);
-  const f = UI.dqf || 'problems';
-  const list = f === 'noisy' ? noisy : f === 'broken' ? err : f === 'dups' ? R.filter(x => x.dups) : f === 'fired' ? fired.sort((a, b) => b.n - a.n) : f === 'warn' ? warn : f === 'mine' ? mine : [...new Set([...err, ...noisy, ...R.filter(x => x.dups), ...mine.filter(x => x.lint.some(l => l.sev === 'warn'))])];
+  const f = UI.dqf || 'problems', tfail = R.filter(x => x.tfail), untested = mine.filter(x => !x.tests), alike = R.filter(x => x.alike);
+  const list = f === 'tests' ? tfail.sort((a, b) => b.regressed - a.regressed) : f === 'untested' ? untested : f === 'alike' ? alike : f === 'noisy' ? noisy : f === 'broken' ? err : f === 'dups' ? R.filter(x => x.dups) : f === 'fired' ? fired.sort((a, b) => b.n - a.n) : f === 'warn' ? warn : f === 'mine' ? mine : [...new Set([...tfail, ...err, ...noisy, ...R.filter(x => x.dups), ...alike, ...mine.filter(x => x.lint.some(l => l.sev === 'warn'))])];
   const tab = (k, l, n) => `<button data-act="dqf" data-v="${k}" aria-pressed="${f === k}">${l} <b>${n}</b></button>`;
   return `<div class="cv-sum"><div><b>${fired.length}</b><span>rules fired on your evidence</span></div><div class="${noisy.length ? 'a' : ''}"><b>${noisy.length}</b><span>noisy</span></div><div class="${err.length ? 'r' : ''}"><b>${err.length}</b><span>broken</span></div><div><b>${H.dup.length}</b><span>duplicate pairs</span></div><div><b>${H.recs.length.toLocaleString()}</b><span>records tested</span></div></div>
-    <div class="toolbar"><div class="seg">${tab('problems', 'Needs attention', [...new Set([...err, ...noisy, ...R.filter(x => x.dups)])].length)}${tab('fired', 'Fired', fired.length)}${tab('noisy', 'Noisy', noisy.length)}${tab('broken', 'Broken', err.length)}${tab('dups', 'Duplicates', R.filter(x => x.dups).length)}${tab('warn', 'Warnings', warn.length)}${tab('mine', 'Yours', mine.length)}</div>
+    ${dqDelta(H)}
+    <div class="toolbar"><div class="seg">${tab('problems', 'Needs attention', [...new Set([...tfail, ...err, ...noisy, ...R.filter(x => x.dups), ...alike])].length)}${tab('tests', 'Tests failing', tfail.length)}${tab('untested', 'Your rules without tests', untested.length)}${tab('alike', 'Look alike', alike.length)}${tab('fired', 'Fired', fired.length)}${tab('noisy', 'Noisy', noisy.length)}${tab('broken', 'Broken', err.length)}${tab('dups', 'Duplicates', R.filter(x => x.dups).length)}${tab('warn', 'Warnings', warn.length)}${tab('mine', 'Yours', mine.length)}</div>
       <span class="sp"></span><span class="t3">${esc(iAgo(H.at))}${H.yaraSkipped ? ' · YARA skipped (over 2,000 records)' : ''}</span><button class="btn sm" data-act="dqRun">${ico('refresh-cw','sm')}Check again</button></div>
     ${list.length ? `<div class="dq-list">${list.slice(0, 150).map(x => { const tune = x.noisy ? tuneSuggest(x) : null;
       return `<article class="dq-r"><header><button class="dq-t" data-act="dqOpen" data-id="${esc(x.r.id)}"><b>${esc(x.r.title)}</b></button><span class="pill" style="--c:${RTYPE[x.r.type][2]}">${RTYPE[x.r.type][0]}</span>
-        ${x.noisy ? '<span class="chip amber sq">noisy</span>' : ''}${x.err ? '<span class="chip red sq">error</span>' : ''}<span class="t3">${x.n ? x.n + ' hit' + (x.n > 1 ? 's' : '') + ' in ' + x.cases.size + ' case' + (x.cases.size > 1 ? 's' : '') + (x.ben ? ' · ' + x.ben + ' on benign-only evidence' : '') : 'never fired'}</span></header>
+        ${x.noisy ? '<span class="chip amber sq">noisy</span>' : ''}${x.tfail ? `<span class="chip red sq">${x.regressed ? 'was passing — ' : ''}${x.tfail} of ${x.tests} test${x.tests > 1 ? 's' : ''} fail</span>` : ''}${!x.r.builtin && !x.tests ? '<span class="chip sq">no tests</span>' : ''}${x.err ? '<span class="chip red sq">error</span>' : ''}<span class="t3">${x.n ? x.n + ' hit' + (x.n > 1 ? 's' : '') + ' in ' + x.cases.size + ' case' + (x.cases.size > 1 ? 's' : '') + (x.ben ? ' · ' + x.ben + ' on benign-only evidence' : '') : 'never fired'}</span></header>
         ${x.err ? `<p class="dq-e">${esc(x.err)}</p>` : ''}${x.unsup ? `<p class="t3" style="margin:6px 0 0">${esc(x.unsup.replace('Not supported in the browser engine', 'Cannot be tested in the browser'))} — your scanner will run it.</p>` : ''}
         ${x.lint.length ? `<ul class="dq-l">${x.lint.slice(0, 6).map(l => `<li class="${l.sev}">${esc(l.t)}</li>`).join('')}</ul>` : ''}
+        ${x.alike ? `<p class="t2 dq-d">${ico('copy','sm')}Nearly the same logic as ${x.alike.slice(0, 3).map(d => `<button class="lnk" data-act="dqOpen" data-id="${esc(d.id)}">${esc(d.title)}</button>`).join(', ')} — keep one, or make them differ</p>` : ''}
         ${x.dups ? `<p class="t2 dq-d">${ico('copy','sm')}Fires on the same records as ${x.dups.slice(0, 3).map(d => `<button class="lnk" data-act="dqOpen" data-id="${esc(d.id)}">${esc(d.title)}</button>`).join(', ')}</p>` : ''}
         ${tune ? `<div class="dq-tune"><b>Suggested tuning</b><span class="t3">${esc(tune.top.map(t => t.n + ' of ' + x.n + ' hits share ' + t.f + ' = ' + t.v).join('; '))}</span><pre class="mono">${esc(tune.yaml)}</pre><button class="btn xs" data-act="dqCopy" data-v="${esc(tune.yaml)}">${ico('copy','sm')}Copy</button></div>` : ''}</article>`; }).join('')}</div>`
       : `<p class="t3">${f === 'problems' ? 'No rule needs attention.' : 'None.'}</p>`}`;

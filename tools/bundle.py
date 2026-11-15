@@ -24,7 +24,7 @@ def js(src):
     return '<script>' + code + '</script>'
 
 html = re.sub(r'<link rel="stylesheet" href="([^"]+)">', lambda m: css(m.group(1).split('?')[0]), html)
-html = re.sub(r'<link rel="prefetch" as="script" href="([^"]+)" data-lazy>', r'<script src="\1"></script>', html)   # in the single file everything is inline
+html = re.sub(r'<link rel="(?:prefetch" as="script|x-on-demand)" href="([^"]+)" data-lazy>', r'<script src="\1"></script>', html)   # in the single file everything is inline
 html = re.sub(r'<script src="([^"]+)"></script>', lambda m: js(m.group(1).split('?')[0]), html)
 # welcome-screen pictures become data: URIs so the one-file copy has no loose files
 for n in ('dashboard-dark', 'dashboard-light', 'graph-dark', 'graph-light', 'phone-dark', 'phone-light', 'timeline-dark', 'timeline-light'):

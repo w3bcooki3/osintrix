@@ -2,6 +2,24 @@
 
 All notable changes to OSINTrix, newest first. The format is based on [Keep a Changelog](https://keepachangelog.com); this file is generated from `js/data/changelog.js` by `tools/changelog.py`.
 
+## [1.40] — Rules against cases, works offline (2026-11-15)
+
+_See what your rules catch in a case and what they miss, follow rule health over time, spot clocks that disagree and sessions of activity, and use the app with no connection._
+
+### Added
+- Timeline → Rules: every rule run over the case. Caught: which rules fired and on which events. Not caught: events that look suspicious (what the evidence reader recognises, technique IDs, attack-stage tags, malicious verdicts) but no rule fires on, each with Draft a rule. Noisy here: rules that fire on more than a fifth of the case. It runs again by itself when the evidence or the rules change.
+- Rule health over time. Every save of a rule with tests is recorded; the Tests tab shows the last 30 as a strip and says “Was passing — failing since …” when a rule regresses. Detections → Health gains Tests failing, Your rules without tests and Look alike (rules whose detection logic is nearly the same text, found even with no evidence), and a line saying what changed since the previous check.
+- Timeline → Patterns: Clocks that disagree — the same IP, domain, URL, hash or email seen by two sources at a steady offset means one clock is off (exactly whole hours: most likely a time zone read wrongly). The odd source is named once, and its times in this case can be corrected and undone. Normal seconds of jitter are not flagged.
+- Timeline → Patterns: Sessions — each host's events split where it goes quiet, with the attack stages each one passes through in order (Logon → Discovery → Collection → Exfiltration in 12 minutes), most suspicious first, and Show this session.
+- Works offline. When served from a website, the app keeps a copy of its own files (never your data) so repeat visits open without downloading anything and it works with no connection; a new version replaces the copy. On or off in Settings → Data.
+
+### Changed
+- The MAC vendor list, world map, enrichment data and QR reader (1.25 MB) are now fetched only when a tool needs them, not on every visit.
+
+### Fixed
+- Closing a tab right after typing in a large notebook could lose the last words: an older save finishing late removed the closing-tab backup. It now removes it only if it already holds those words.
+- Preparing a very long log line for the rule engine took seconds (3.5 s for 200 KB); it is now instant. New tests feed broken versions of real log formats — cut off, unbalanced quotes, huge fields, deep nesting, mixed formats — through the importer.
+
 ## [1.39] — Starts much faster (2026-11-15)
 
 _The app opens in a fraction of the time it took, especially on a real internet connection._

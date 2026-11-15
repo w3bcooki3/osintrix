@@ -316,7 +316,7 @@ function dayOf(ts){ const z = tz(), k = z + '|' + Math.floor(ts / 9e5); let v = 
 function caseTimeline(c, D){
   const list = D.recs.filter(passes);
   const hosts = countBy(D.recs, r => r.host);
-  const bar = `<div class="tlbar"><div class="seg" role="group" aria-label="View"><button data-act="tlMode" data-v="events" aria-pressed="${UI.tlMode === 'events'}">${ico('clock','sm')}Events</button><button data-act="tlMode" data-v="story" aria-pressed="${UI.tlMode === 'story'}">${ico('book-open','sm')}Story</button><button data-act="tlMode" data-v="patterns" aria-pressed="${UI.tlMode === 'patterns'}">${ico('activity','sm')}Patterns</button><button data-act="tlMode" data-v="chain" aria-pressed="${UI.tlMode === 'chain'}">${ico('route','sm')}Attack chain</button></div>
+  const bar = `<div class="tlbar"><div class="seg" role="group" aria-label="View"><button data-act="tlMode" data-v="events" aria-pressed="${UI.tlMode === 'events'}">${ico('clock','sm')}Events</button><button data-act="tlMode" data-v="story" aria-pressed="${UI.tlMode === 'story'}">${ico('book-open','sm')}Story</button><button data-act="tlMode" data-v="patterns" aria-pressed="${UI.tlMode === 'patterns'}">${ico('activity','sm')}Patterns</button><button data-act="tlMode" data-v="chain" aria-pressed="${UI.tlMode === 'chain'}">${ico('route','sm')}Attack chain</button><button data-act="tlMode" data-v="rules" aria-pressed="${UI.tlMode === 'rules'}">${ico('shield-check','sm')}Rules</button></div>
     ${UI.tlMode === 'events' ? `<div class="search-in tlq">${ico('filter')}<label class="sr" for="tlq">Filter the timeline</label><input id="tlq" class="inp" placeholder="Filter — host:DC01 verdict:malicious 4624" value="${esc(UI.q || '')}" autocomplete="off" spellcheck="false"></div><span class="t3" style="font-size:calc(13.5px * var(--ts,1))">${list.length} of ${D.recs.length}</span>
     ${hosts.slice(0, 5).map(([h, n]) => `<button class="chip" data-act="facet" data-f="host" data-v="${esc(h)}" aria-pressed="${UI.facet.host === h}">${esc(h)}<span class="n">${n}</span></button>`).join('')}
     ${UI.pivot ? `<span class="chip accent">Pivot: ${esc(entSplit(UI.pivot).v)} <button data-act="pivotOff" aria-label="Exit pivot">${ico('x','sm')}</button></span>` : ''}
@@ -327,6 +327,7 @@ function caseTimeline(c, D){
   if(UI.tlMode === 'story') return `<div class="scroll">${bar}${storyHTML(D)}</div>`;
   if(UI.tlMode === 'patterns') return `<div class="scroll">${bar}${tlxView(D)}</div>`;
   if(UI.tlMode === 'chain') return `<div class="scroll">${bar}${chainView(c, D)}</div>`;
+  if(UI.tlMode === 'rules') return `<div class="scroll">${bar}${caseRulesView(c)}</div>`;
   /* every matching event is in the list; only the ones near the screen are drawn (vlist.js) */
   const items = [], dayN = new Map(); let lastDay = null, prev = null;
   for(const r of list) if(r.ts){ const d = dayOf(r.ts); dayN.set(d, (dayN.get(d) || 0) + 1); }

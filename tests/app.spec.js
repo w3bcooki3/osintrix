@@ -1376,6 +1376,9 @@ test('no serious accessibility problems on the newer screens (copilot, investiga
     media: () => { const r = DB.records.find(x => x.caseId === 'c-lantern'); r.att = [{ id: 'fx1', name: 'shot.png', type: 'image/png', size: 2048, sha256: 'a'.repeat(64), added: Date.now(), w: 10, h: 10 }, { id: 'fx2', name: 'clip.webm', type: 'video/webm', size: 4096, sha256: 'b'.repeat(64), added: Date.now(), dur: 12 }]; DB.records.push({ ...r, id: 'rbig', att: [], big: { name: 'huge.mp4', type: 'video/mp4', size: 6e7, sha256: '' } }); mutate('m'); location.hash = '#/case/c-lantern/media'; },
     mediaEmpty: () => { location.hash = '#/case/c-portal/media'; },
     patterns: () => { UI.tlMode = 'patterns'; location.hash = '#/case/c-lantern/timeline'; },
+    caseRules: () => { UI.tlMode = 'rules'; UI.crf = 'blind'; location.hash = '#/case/c-lantern/timeline'; },
+    caseRulesCaught: () => { UI.tlMode = 'rules'; UI.crf = 'caught'; location.hash = '#/case/c-lantern/timeline'; },
+    healthTests: () => { UI.dview = 'health'; UI.dqf = 'alike'; location.hash = '#/detections'; },
     ruleEvasion: () => { ensureRules(); const r = DB.rules.find(x => x.title === 'PowerShell Encoded Command Execution'); UI.rule = r.id; UI.ropen = true; UI.rtab = 'evasion'; location.hash = '#/detections'; },
     ruleQueries: () => { UI.rtab = 'queries'; location.hash = '#/detections'; },
     ruleTests: () => { const r = DB.rules.find(x => x.id === UI.rule); r.tests = [{ id: 't1', kind: 'hit', text: 'CommandLine="powershell -enc AAA" Image="C:\\x\\powershell.exe"' }, { id: 't2', kind: 'miss', text: 'CommandLine="cmd"' }]; UI.rtab = 'tests'; location.hash = '#/detections'; },
@@ -1407,6 +1410,8 @@ test('no serious accessibility problems on the newer screens (copilot, investiga
     await page.evaluate(t => { DB.prefs.theme = t; applyPrefs(); renderAll(); }, theme);
     for (const name of Object.keys(setups)) {
       if (name === 'health') await page.evaluate(() => ruleHealth());
+      if (name === 'healthTests') await page.evaluate(() => ruleHealth());
+      if (name.startsWith('caseRules')) { await page.evaluate(() => { location.hash = '#/case/c-lantern/timeline'; UI.tlMode = 'rules'; renderMain(); }); await page.waitForFunction(() => !!document.querySelector('.cr-sum'), null, { timeout: 20000 }); }
       await page.evaluate(src => { closeDlg(); (0, eval)('(' + src + ')')(); setTimeout(renderMain, 20); }, setups[name].toString());
       await page.waitForTimeout(500);
       const res = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
@@ -2085,7 +2090,7 @@ test('fast start: every script is fetched in parallel, the big data files arrive
   // hold the big files back: the app starts without them
   const held = /(detections-pack|cytoscape\.min|kev-snapshot|playbooks-pack)\.js/; let release; const gate = new Promise(r => release = r);
   await page.route(held, async route => { await gate; await route.continue(); });
-  const errors = [];
+  const errors = [], fetched = []; page.on('request', r => fetched.push(r.url()));
   page.on('pageerror', e => errors.push(e.message)); page.on('console', m => { if (m.type() === 'error' && !/localStorage.*sandboxed/.test(m.text())) errors.push(m.text()); });
   await page.goto('file://' + require('path').resolve(__dirname, '..', 'index.html') + '#/detections');
   await expect.poll(() => page.evaluate(() => !!document.querySelector('#sidenav .nv'))).toBe(true);
@@ -2102,5 +2107,9 @@ test('fast start: every script is fetched in parallel, the big data files arrive
   await expect(page.locator('.page').first()).not.toContainText('loading the built-in rules');
   expect(await page.evaluate(() => new Set(DB.rules.map(r => r.id)).size === DB.rules.length && new Set(DB.playbooks.map(p => p.id)).size === DB.playbooks.length)).toBe(true);   // nothing merged twice
   expect(await page.evaluate(() => CTI.kevMeta.n)).toBeGreaterThan(1000);
+  // tools-only files are not fetched until the tool needs them
+  expect(fetched.filter(u => /oui-vendors|world-map|enrich-data|jsqr/.test(u))).toEqual([]);
+  expect(await page.evaluate(async () => { await ouiLoad(); return lzHas('oui'); })).toBe(true);
+  expect(fetched.some(u => /oui-vendors/.test(u))).toBe(true);
   expect(errors).toEqual([]);
 });

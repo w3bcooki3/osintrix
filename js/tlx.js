@@ -84,14 +84,16 @@ function tlxView(D){
   const recBtn = r => `<button class="linkbtn" data-act="tlxRec" data-id="${r.id}">${esc(r.title.slice(0, 90))}</button>`;
   const card = (icon, tone, title, body) => `<section class="card tlx-c ${tone}"><div class="tlx-h"><span class="tb sm">${ico(icon,'sm')}</span><h3>${title}</h3></div><div class="tlx-b">${body}</div></section>`;
   if(A.empty) return `<div class="page wide">${empty('activity', 'Not enough timed events yet', 'Patterns need at least two events with a time. Capture or import evidence with timestamps and they appear here.')}${tlxTime(A, card, recBtn)}</div>`;
-  const parts = [];
+  const parts = [], more = typeof tlxMore === 'function' ? tlxMore(D, card, f, g) : {};
   parts.push(`<section class="card tlx-sum"><div class="tlx-kpi"><div><b>${A.timed.toLocaleString()}</b><span>timed events</span></div><div><b>${g(A.span)}</b><span>from first to last</span></div><div><b>${A.hosts.length}</b><span>host${A.hosts.length === 1 ? '' : 's'}</span></div>${A.first ? `<div class="r"><b>${g(A.first.dwell)}</b><span>between the first and last suspicious event</span></div>` : ''}</div>${tlxSpark(A)}</section>`);
+  if(more.skew) parts.push(more.skew);                                  // clocks first: they decide whether the order below can be trusted
   if(A.first){ const F = A.first;
     parts.push(card('flag', 'red', 'Likely first sign of compromise', `<p><b>${f(F.r.ts)}</b>${F.host ? ' on <b class="mono">' + esc(F.host) + '</b>' : ''} — ${recBtn(F.r)}</p>
       <ul class="tlx-why">${F.why.map(w => `<li>${esc(w)}</li>`).join('')}</ul>
       <p class="t2">${F.nBad} suspicious event${F.nBad === 1 ? '' : 's'} in all. ${F.before.length ? `${F.before.length} event${F.before.length === 1 ? '' : 's'} happened${F.host ? ' on the same host' : ''} in the hour before it — that is where the way in usually shows.` : 'Nothing was recorded in the hour before it' + (F.host ? ' on that host' : '') + ' — the way in may be in logs you do not have yet.'}</p>
       <div class="wrap">${F.before.length ? show(F.r.ts - 36e5, F.r.ts, 'hour before the first sign') : ''}${show(F.r.ts, F.r.ts + 36e5, 'hour after the first sign')}</div>
       <p class="t3 small">Chosen as the earliest event carrying a malicious indicator, an initial-access technique or a delivery tag. Change a verdict and this updates.</p>`)); }
+  if(more.sess) parts.push(more.sess);
   if(A.cleared.length) parts.push(card('eraser', 'red', 'Logs were cleared', `<ul class="tlx-l">${A.cleared.slice(0, 6).map(r => `<li><div><span class="mono">${r.ts ? f(r.ts) : 'no time'}</span>${r.host ? ' · <b class="mono">' + esc(r.host) + '</b>' : ''} — ${recBtn(r)}</div></li>`).join('')}</ul>
     <p class="t2">Clearing logs hides what came before. Treat the time just before each as missing evidence and look for other sources (EDR, network, backups).</p>`));
   if(A.bursts.length) parts.push(card('zap', 'amber', 'Bursts of activity', `<ul class="tlx-l">${A.bursts.map(b => `<li><div><b>${b.n} events</b> in ${g(b.to - b.from)}${b.x && b.x > 1 ? ` <span class="chip sq amber">${b.x}× the usual rate</span>` : ''}${b.bad ? ` <span class="chip sq red">${b.bad} suspicious</span>` : ''}</div>

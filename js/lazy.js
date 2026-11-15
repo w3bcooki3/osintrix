@@ -19,10 +19,10 @@ const LZ = {
   cloud:{f:'cloudguide-pack.js', has:() => typeof CLOUDGUIDE_PACK !== 'undefined', then:() => { if(typeof CG_ALL !== 'undefined') CG_ALL = null; }, shows:r => r.area === 'cloud'},
   certs:{f:'cert-samples.js', has:() => typeof CERT_SAMPLES !== 'undefined', shows:r => r.area === 'certs'},
   nbdemo:{f:'notebook-demo.js', has:() => typeof NB_DEMO_SHOT !== 'undefined', shows:r => r.area === 'notebook'},
-  world:{f:'world-map.js', has:() => typeof WORLD_B64 !== 'undefined'},
-  oui:{f:'oui-vendors.js', has:() => typeof OUI_B64 !== 'undefined'},
-  enrich:{f:'enrich-data.js', has:() => typeof ENRICH_B64 !== 'undefined'},
-  qr:{f:'jsqr.min.js', has:() => typeof jsQR === 'function'},
+  world:{f:'world-map.js', has:() => typeof WORLD_B64 !== 'undefined', only:true},
+  oui:{f:'oui-vendors.js', has:() => typeof OUI_B64 !== 'undefined', only:true},
+  enrich:{f:'enrich-data.js', has:() => typeof ENRICH_B64 !== 'undefined', only:true},
+  qr:{f:'jsqr.min.js', has:() => typeof jsQR === 'function', only:true},
 };
 const lzHas = k => { try{ return !!(LZ[k] && LZ[k].has()); }catch(e){ return false; } };
 /* add the file's script (once); resolves when it has run, or failed to load — callers then fall back as before */
@@ -38,7 +38,7 @@ function lazyNeed(k){
     if(lzHas(k)) res(true);                                   // it ran between the check above and here
   }));
 }
-const lazyPending = () => Object.keys(LZ).filter(k => !lzHas(k) && !LZ[k].failed).length;
+const lazyPending = () => Object.keys(LZ).filter(k => !lzHas(k) && !LZ[k].failed && !LZ[k].only).length;
 let LZ_REDRAW = false;
 const lzBusy = () => { const a = document.activeElement; return !!(a && a.closest && a.closest('#main') && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) && !(a.type === 'checkbox' || a.type === 'radio')); };
 function lzRedraw(){
@@ -46,9 +46,10 @@ function lzRedraw(){
   const go = () => { LZ_REDRAW = false; if(lzBusy()){ document.addEventListener('focusout', () => setTimeout(lzRedraw, 0), {once:true}); return; } if(typeof renderMain === 'function') renderMain(); if(typeof renderNav === 'function') renderNav(); };
   requestAnimationFrame(go);
 }
-/* called once the app has started: after the first screen is drawn, add every file in the background, with its follow-up */
+/* called once the app has started: after the first screen is drawn, add every file in the background, with its follow-up.
+   Files marked "only" (the MAC vendor list, the world map, enrichment data, the QR reader) are fetched only by the tool that needs them. */
 function lazyWatch(){
-  const start = () => { for(const [k, L] of Object.entries(LZ)){ if(lzHas(k)) continue;
+  const start = () => { for(const [k, L] of Object.entries(LZ)){ if(lzHas(k) || L.only) continue;
     lazyNeed(k).then(ok => { if(!ok) return; try{ L.then && L.then(); }catch(e){ console.warn('after loading ' + L.f, e); }
       if(L.shows && UI && UI.route && L.shows(UI.route)) lzRedraw(); }); } };
   /* two frames: the first screen paints before anything else is fetched or parsed */

@@ -31,5 +31,19 @@ html = re.sub(r'(<link rel="stylesheet"[^>]*>\n)(?!<link rel="stylesheet")', lam
 new = re.sub(r'(src|href)="((?:js|css)/[^"?]+\.(?:js|css))(?:\?v=[^"]*)?"', stamp, html)
 if new != html:
     idx.write_text(new, encoding='utf-8', newline='')
+
+# the offline helper caches exactly the files this build uses; a different list is a different cache
+sw = root / 'sw.js'
+if sw.is_file():
+    files = sorted(set(re.findall(r'(?:src|href)="((?:js|css)/[^"]+\?v=[^"]+)"', new)))
+    for css in re.findall(r'href="(css/[^"?]+)', new):           # fonts the stylesheets point at
+        files += sorted(set(re.sub(r'^\.\./', '', u) for u in re.findall(r'url\("?(\.\./fonts/[^")]+)', (root / css).read_text(encoding='utf-8'))))
+    build = hashlib.sha256('\n'.join(files).encode()).hexdigest()[:12]
+    block = '/* build:start */\nconst BUILD = ' + repr(ver + '-' + build) + ';\nconst FILES = [\n' + ',\n'.join("  '" + f + "'" for f in files) + '\n];\n/* build:end */'
+    txt = sw.read_text(encoding='utf-8')
+    txt2 = re.sub(r'/\* build:start \*/.*?/\* build:end \*/', lambda m: block, txt, flags=re.S)
+    if txt2 != txt:
+        sw.write_text(txt2, encoding='utf-8', newline='')
+    print('sw.js  <-  ' + str(len(files)) + ' files for offline use, build ' + build)
 print(str(len(scripts)) + ' scripts preloaded in parallel')
 print('index.html  <-  ' + str(len(re.findall(r'\?v=' + re.escape(ver) + '-', new))) + ' files stamped for v' + ver)

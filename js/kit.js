@@ -211,7 +211,8 @@ function sigmaParse(code){
 }
 function recFields(r){
   const f = {_raw:(r.title + ' ' + r.body).toLowerCase(), _orig:r.title + ' ' + r.body}; const s = r.body || '';
-  for(const m of s.matchAll(/(\w+)=("([^"]*)"|'([^']*)'|(\S+))/g)) f[m[1].toLowerCase()] = (m[3] ?? m[4] ?? m[5] ?? '').toLowerCase();
+  /* key=value pairs; the key starts at a word boundary and is at most 64 long, so a long unbroken line stays linear (it was quadratic: 3.5 s on 200 KB) */
+  for(const m of s.matchAll(/\b(\w{1,64})=("([^"]*)"|'([^']*)'|(\S+))/g)) f[m[1].toLowerCase()] = (m[3] ?? m[4] ?? m[5] ?? '').toLowerCase();
   const ev = s.match(/EventID[:= ]\s*(\d+)/i); if(ev) f.eventid = ev[1];
   if(r.host) f.computer = r.host.toLowerCase(); f.source = (r.source || '').toLowerCase();
   const P = typeof parseLog === 'function' ? parseLog(r.body) : null;
