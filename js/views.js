@@ -234,14 +234,50 @@ function keyRow(e){
     <span class="kel-s">${v ? `<span class="kel-vd ${v}">${esc(v[0].toUpperCase() + v.slice(1))}</span>` : '<span class="kel-vd">No verdict</span>'}<span class="kel-p ${e.priority}">${esc(e.priority[0].toUpperCase() + e.priority.slice(1))}</span></span>
     <span class="kel-m" title="Records that mention it">${m ? m + ' rec' : ''}</span>${e.starred ? `<span class="kel-star" role="img" aria-label="Starred">${ico('star','sm')}</span>` : '<span></span>'}</button>`;
 }
+/* everything a vault card or row says about an entry, worked out once per change */
+const ECTX = {rev:-1, m:new Map()};
+function entryCtx(e){
+  if(ECTX.rev !== rev){ ECTX.rev = rev; ECTX.m.clear(); }
+  let x = ECTX.m.get(e.id); if(x) return x;
+  const k = entryKey(e), recs = entryMentions(e), ts = recs.map(r => r.ts).filter(Boolean).sort((a, b) => a - b), t = TYPES[e.type];
+  const links = DB.links.filter(l => l.a === e.id || l.b === e.id).map(l => entryById(l.a === e.id ? l.b : l.a)).filter(Boolean);
+  const g = k && typeof globalEnts === 'function' ? globalEnts().get(k) : null;
+  const other = [...new Set([...(g ? g.recs.map(r => r.caseId) : []), ...(k ? DB.entries.filter(z => z.caseId !== e.caseId && entryKey(z) === k).map(z => z.caseId) : [])])].filter(id => id !== e.caseId).map(theCase).filter(Boolean);
+  const look = k ? (((DB.intel && DB.intel.lookHist) || []).find(h => h.k + ':' + h.v === k)) : null;
+  const open = k ? DB.records.filter(r => r.caseId === e.caseId && r.type === 'lead' && !r.answer && r.ents.some(z => entKey(z) === k)).length : 0;
+  const facts = t.fields.slice(1).filter(([n]) => e.fields[n] && String(e.fields[n]).trim() && e.fields[n] !== '—').slice(0, 3);
+  const src = recById(e.src), pic = src && (src.att || []).find(a => /^image\//.test(a.type) || /^video\//.test(a.type));
+  x = {k, recs, first:ts[0], last:ts[ts.length - 1], links, other, look, open, facts, pic, watched:!!(k && DB.watch && DB.watch[k]), note:(e.notes || '').split('\n').find(l => l.trim()) || ''};
+  ECTX.m.set(e.id, x); return x;
+}
+const shortDay = ts => ts ? new Date(ts).toISOString().slice(5, 10) : '';
 function entryCard(e){
-  const t = TYPES[e.type], v = entryVerdict(e), m = entryMentions(e).length;
-  const extra = t.fields.slice(1).filter(([n]) => e.fields[n]).slice(0, 2);
-  return `<div class="ecard" data-id="${e.id}" aria-current="${!!(UI.sel && UI.sel.id === e.id)}"><button class="gcard-hit" data-act="selEntry" data-id="${e.id}" aria-label="${esc(t.label + ': ' + primary(e))}"></button>
-    <div class="h">${tbadge(e.type)}<div class="tt"><div class="kind">${esc(t.label)}</div><div class="val${MONO_TYPES.has(e.type) ? ' mono' : ''}" title="${esc(primary(e))}">${esc(primary(e))}</div></div>
-      <span class="star${e.starred ? ' on' : ''}" data-act="star" data-id="${e.id}" role="button" tabindex="0" aria-label="${e.starred ? 'Unstar' : 'Star'}">${ico('star','sm')}</span></div>
-    ${extra.length ? `<dl>${extra.map(([n, l]) => `<dt>${esc(l)}</dt><dd>${esc(e.fields[n])}</dd>`).join('')}</dl>` : ''}
-    <div class="f">${prioLabel(e.priority)}${v ? vdLabel(v) : ''}<span class="sp"></span>${m ? `<span title="Records that mention it">${ico('file-text','sm')} ${m}</span>` : ''}${e.tags.slice(0, 1).map(tg => `<span class="chip sq" style="height:22px;font-size:calc(12px * var(--ts,1))">#${esc(tg)}</span>`).join('')}</div></div>`;
+  const t = TYPES[e.type], v = entryVerdict(e), X = entryCtx(e), mono = MONO_TYPES.has(e.type);
+  const seen = X.recs.length ? `${X.recs.length} record${X.recs.length > 1 ? 's' : ''}${X.first ? ' · ' + shortDay(X.first) + (X.last && shortDay(X.last) !== shortDay(X.first) ? '–' + shortDay(X.last) : '') : ''}` : '';
+  return `<div class="ecard ec2${v === 'malicious' ? ' bad' : v === 'suspicious' ? ' sus' : ''}" data-id="${e.id}" aria-current="${!!(UI.sel && UI.sel.id === e.id)}"><button class="gcard-hit" data-act="selEntry" data-id="${e.id}" aria-label="${esc(t.label + ': ' + primary(e))}"></button>
+    <div class="h">${X.pic ? `<span class="ec-pic"><img data-pid="${esc(X.pic.id)}" data-pk="${/^video/.test(X.pic.type) ? 'video' : 'image'}" alt=""></span>` : tbadge(e.type)}<div class="tt"><div class="kind">${esc(t.label)}${X.other.length ? ` <span class="ec-also" title="Also in ${esc(X.other.map(c => c.code).join(', '))}">${ico('git-compare-arrows','sm')}${X.other.length === 1 ? esc(X.other[0].code) : X.other.length + ' cases'}</span>` : ''}</div>
+      <div class="val${mono ? ' mono' : ''}" title="${esc(primary(e))}">${esc(primary(e))}</div></div>
+      ${X.watched ? `<span class="ec-w" title="Watched — you hear when it shows up again">${ico('eye','sm')}</span>` : ''}<span class="star${e.starred ? ' on' : ''}" data-act="star" data-id="${e.id}" role="button" tabindex="0" aria-label="${e.starred ? 'Unstar' : 'Star'}">${ico('star','sm')}</span></div>
+    ${X.facts.length ? `<dl>${X.facts.map(([n, l]) => `<dt>${esc(l)}</dt><dd title="${esc(e.fields[n])}">${esc(e.fields[n])}</dd>`).join('')}</dl>` : ''}
+    ${X.note ? `<p class="ec-note">${esc(X.note)}</p>` : ''}
+    <ul class="ec-sig">${v || X.look ? `<li class="${v || ''}">${ico(v === 'malicious' ? 'shield-alert' : v === 'benign' ? 'shield-check' : 'shield','sm')}<span>${v ? esc(v[0].toUpperCase() + v.slice(1)) : 'No verdict'}${X.look ? ` · lookup ${esc(X.look.band || '')}${X.look.score != null ? ' ' + X.look.score : ''}` : ''}</span></li>` : ''}
+      ${seen ? `<li>${ico('file-text','sm')}<span>${esc(seen)}</span></li>` : ''}
+      ${X.links.length ? `<li title="${esc(X.links.map(primary).join(', '))}">${ico('link','sm')}<span>${X.links.length} link${X.links.length > 1 ? 's' : ''}: ${esc(X.links.slice(0, 2).map(primary).join(', '))}${X.links.length > 2 ? ' …' : ''}</span></li>` : ''}
+      ${X.open ? `<li class="q">${ico('circle-help','sm')}<span>${X.open} open question${X.open > 1 ? 's' : ''}</span></li>` : ''}</ul>
+    <div class="f">${prioLabel(e.priority)}<span class="ec-tags">${e.tags.slice(0, 2).map(tg => `<span class="chip sq">#${esc(tg)}</span>`).join('')}${e.tags.length > 2 ? `<span class="t3">+${e.tags.length - 2}</span>` : ''}</span><span class="sp"></span>
+      <span class="ec-act">${X.k ? `<button class="iconbtn" data-act="ecCopy" data-id="${e.id}" aria-label="Copy ${esc(primary(e))}" title="Copy">${ico('copy','sm')}</button>` : ''}${X.k && X.recs.length ? `<button class="iconbtn" data-act="pivot" data-id="${esc(X.k)}" aria-label="Its events in the timeline" title="Its events in the timeline">${ico('clock','sm')}</button>` : ''}<button class="iconbtn" data-act="showInGraph" data-id="${e.id}" aria-label="Show in the graph" title="Show in the graph">${ico('waypoints','sm')}</button></span></div></div>`;
+}
+/* the dense list: one row per entry, sortable */
+function entryRows(list){
+  const sk = UI.vsk || '', sd = UI.vsd || 'desc', val = e => { const X = entryCtx(e); return sk === 'value' ? primary(e).toLowerCase() : sk === 'type' ? TYPES[e.type].label : sk === 'verdict' ? ({malicious:3, suspicious:2, benign:0}[entryVerdict(e)] ?? 1) : sk === 'prio' ? {critical:3, high:2, medium:1, low:0}[e.priority] : sk === 'recs' ? X.recs.length : sk === 'last' ? X.last || 0 : sk === 'links' ? X.links.length : 0; };
+  const L = sk ? list.slice().sort((a, b) => { const x = val(a), y = val(b); return (x < y ? -1 : x > y ? 1 : 0) * (sd === 'asc' ? 1 : -1); }) : list;
+  const th = (k, l, c) => `<th class="${c || ''}"${sk === k ? ` aria-sort="${sd === 'asc' ? 'ascending' : 'descending'}"` : ''}><button data-act="vSort" data-v="${k}">${l}${sk === k ? ico(sd === 'asc' ? 'chevron-up' : 'chevron-down','sm') : ''}</button></th>`;
+  return `<div class="card ev-list" style="overflow:auto"><table class="tbl vl-t"><thead><tr><th class="c-st"><span class="sr">Star</span></th>${th('value', 'Entry')}${th('type', 'Type', 'hide-m')}<th class="hide-m">Details</th>${th('verdict', 'Verdict')}${th('prio', 'Priority', 'hide-m')}${th('recs', 'Records', 'n')}${th('last', 'Last seen', 'hide-m')}${th('links', 'Links', 'n hide-m')}</tr></thead><tbody>
+    ${L.map(e => { const X = entryCtx(e), v = entryVerdict(e), t = TYPES[e.type];
+      return `<tr data-act="selEntry" data-id="${e.id}" tabindex="0" aria-current="${!!(UI.sel && UI.sel.id === e.id)}"><td class="c-st"><span class="star${e.starred ? ' on' : ''}" data-act="star" data-id="${e.id}" role="button" tabindex="0" aria-label="${e.starred ? 'Unstar' : 'Star'}">${ico('star','sm')}</span></td>
+        <td><div class="vl-v">${tbadge(e.type)}<span class="${MONO_TYPES.has(e.type) ? 'mono' : ''}" title="${esc(primary(e))}">${esc(primary(e))}</span>${X.watched ? `<span class="ec-w" title="Watched">${ico('eye','sm')}</span>` : ''}${X.other.length ? `<span class="ec-also">${ico('git-compare-arrows','sm')}${esc(X.other.map(c => c.code).join(', '))}</span>` : ''}</div></td>
+        <td class="hide-m t2">${esc(t.label)}</td><td class="hide-m t2 vl-d">${esc(X.facts.map(([n]) => e.fields[n]).join(' · '))}</td><td>${v ? vdLabel(v) : '<span class="t3">—</span>'}</td><td class="hide-m">${prioLabel(e.priority)}</td>
+        <td class="n">${X.recs.length || '<span class="t3">0</span>'}</td><td class="hide-m t2 mono">${X.last ? esc(E.fmtFull(X.last, tz()).slice(5, 16)) : '<span class="t3">—</span>'}</td><td class="n hide-m">${X.links.length || '<span class="t3">0</span>'}</td></tr>`; }).join('')}</tbody></table></div>`;
 }
 function caseVault(c, D){
   const q = UI.vq.toLowerCase(), cat = UI.vcat;
@@ -259,9 +295,9 @@ function caseVault(c, D){
       ${GROUPS.map(([g, l,, col]) => catBtn(g, l, D.entries.filter(e => TYPES[e.type].group === g).length, col)).join('')}</aside>
     <div class="vmain">
       <div class="toolbar"><div class="search-in">${ico('search')}<label class="sr" for="vq">Search this vault</label><input id="vq" class="inp" placeholder="Search entries, fields, tags…" value="${esc(UI.vq)}"></div>
-        <span class="t3" style="font-size:calc(13.5px * var(--ts,1))">${list.length} entries</span><span style="flex:1"></span>
+        <span class="t3" style="font-size:calc(13.5px * var(--ts,1))">${list.length} entries</span><span style="flex:1"></span>${layoutSeg('vLay', DB.prefs.vLay || 'cards', [['cards','layout-grid','Cards'],['list','rows-3','List']])}
         <button class="btn primary" data-act="addEntry">${ico('plus','sm')}Add entry</button></div>
-      ${list.length ? (groups ? groups.map(([g, l, i, col]) => { const gl = list.filter(e => TYPES[e.type].group === g);
+      ${list.length && DB.prefs.vLay === 'list' ? entryRows(list) : list.length ? (groups ? groups.map(([g, l, i, col]) => { const gl = list.filter(e => TYPES[e.type].group === g);
           return `<div class="vgroup"><span class="tb sm" style="--c:var(${col})">${ico(i)}</span><h3>${l}</h3><span class="t3">${gl.length}</span></div><div class="egrid">${gl.map(entryCard).join('')}</div>`; }).join('')
         : `<div class="egrid">${list.map(entryCard).join('')}</div>`)
         : empty('layers','Nothing here yet','Add an entry by hand, or capture evidence and promote what it finds.', `<button class="btn primary" data-act="addEntry">${ico('plus','sm')}Add entry</button>`)}

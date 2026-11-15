@@ -34,6 +34,14 @@ const CHANGELOG_DATA = [
         "text": "Notes have a formatting bar: to-do, bullet, numbered item, heading, bold, code, today's date and a divider. Enter carries a list on, Enter on an empty item ends it, Ctrl+B makes bold. Notes now show headings, bullets, numbers, bold, italics and code."
       },
       {
+        "type": "changed",
+        "text": "Vault cards say what matters at a glance: the full value, only the fields that are filled in, your note, the verdict with its lookup score, how many records mention it and when, what it is linked to, open questions about it, whether it is watched or also in another case, and a picture for media entries. Copy, timeline and graph are one click away. A new List layout shows every entry in a sortable table."
+      },
+      {
+        "type": "fixed",
+        "text": "New rule from the Coverage or Health view now opens the rule editor instead of silently adding rules."
+      },
+      {
         "type": "fixed",
         "text": "A note's due date is marked overdue against today's date; the rule editor no longer fails when there are no cases."
       }

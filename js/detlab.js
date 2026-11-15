@@ -224,7 +224,7 @@ function dlDraftFromPick(){
   const r0 = {type:'sigma', code}, P = sigmaParse(code), others = DB.records.filter(x => x.type !== 'lead' && !ids.includes(x.id)), extra = others.filter(x => { try{ return sigmaEval(P, recFields(x)); }catch(e){ return false; } });
   const now = Date.now(), R = {id:uid('r'), type:'sigma', title:code.match(/^title: (.*)$/m)[1], desc:`Drafted from ${recs.length} selected event${recs.length > 1 ? 's' : ''}. Also matches ${extra.length} other event${extra.length === 1 ? '' : 's'} in your evidence.`, code, severity:'medium', category:'process', technique:'', author:'You', platform:'Windows', tags:['draft'], refs:[], created:now, modified:now, starred:false, caseId:DB.active || null,
     tests:recs.slice(0, 5).map(x => ({id:uid('t'), kind:'hit', text:x.body.slice(0, 2000)})).concat(others.filter(x => !extra.includes(x)).slice(0, 3).map(x => ({id:uid('t'), kind:'miss', text:x.body.slice(0, 2000)})))};
-  DB.rules.unshift(R); UI.evPick = new Set(); UI.tlSel = false; UI.rule = R.id; UI.ropen = true; UI.rtab = 'tests'; mutate('drafted a rule from events'); go('#/detections');
+  DB.rules.unshift(R); UI.evPick = new Set(); UI.tlSel = false; UI.rule = R.id; UI.ropen = true; UI.rtab = 'tests'; UI.dview = 'rules'; mutate('drafted a rule from events'); go('#/detections');
   toast(extra.length ? `Draft rule made — it also matches ${extra.length} other event${extra.length === 1 ? '' : 's'}; tighten it before use` : 'Draft rule made, with the selected events as tests — it matches nothing else in your evidence');
 }
 

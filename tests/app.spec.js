@@ -1380,6 +1380,8 @@ test('no serious accessibility problems on the newer screens (copilot, investiga
     ruleQueries: () => { UI.rtab = 'queries'; location.hash = '#/detections'; },
     ruleTests: () => { const r = DB.rules.find(x => x.id === UI.rule); r.tests = [{ id: 't1', kind: 'hit', text: 'CommandLine="powershell -enc AAA" Image="C:\\x\\powershell.exe"' }, { id: 't2', kind: 'miss', text: 'CommandLine="cmd"' }]; UI.rtab = 'tests'; location.hash = '#/detections'; },
     notesBar: () => { location.hash = '#/notes'; },
+    vaultCards: () => { DB.prefs.vLay = 'cards'; location.hash = '#/case/c-lantern/vault'; },
+    vaultList: () => { DB.prefs.vLay = 'list'; location.hash = '#/case/c-lantern/vault'; },
     picInsights: () => { UI.mdV = 'pic'; location.hash = '#/case/c-lantern/media'; },
     automations: () => { autoEnsure(); if(!DB.autos.length){ DB.autos.push({ id: 'au1', name: 'Check new indicators', on: true, when: { ev: 'ind', kinds: ['ip'] }, scope: 'all', then: [{ a: 'store' }], runs: 2, last: Date.now() }); DB.autoLog.push({ at: Date.now(), rule: 'au1', name: 'Check new indicators', c: 'c-lantern', what: 'watching 203.0.113.47' }); } UI.pbTab = 'auto'; UI.pb = null; location.hash = '#/playbooks'; },
     activity: () => { location.hash = '#/home'; setTimeout(() => { DB.prefs.seen = DB.prefs.seen || {}; DB.prefs.seen['c-portal'] = Date.now() - 864e5 * 400; location.hash = '#/case/c-portal/overview'; }, 80); },
@@ -1902,5 +1904,27 @@ test('notes: a formatting bar for to-dos, bullets, headings and bold; Enter cont
   await expect(card.locator('.nli')).toContainText('a <b>tag</b> and');   // typed markup stays text
   // the same bar in the edit dialog
   await card.locator('[data-act=nEdit]').click(); await expect(page.locator('#dlg .nfmt')).toBeVisible();
+  noErrors(errors);
+});
+
+test('a new rule opens its editor from any Detections view; vault cards and the vault list say what matters', async ({ page }) => {
+  const errors = await open(page, '#/detections');
+  for (const view of ['coverage', 'health']) {
+    await page.evaluate(v => { UI.dview = v; renderMain(); }, view);
+    const n = await page.evaluate(() => DB.rules.length);
+    await page.locator('.page [data-act=rNew]').first().click(); await page.click('.ctx-it:has-text("Sigma")');
+    await expect(page.locator('form.rx')).toBeVisible(); expect(await page.evaluate(() => [UI.dview, DB.rules.length])).toEqual(['rules', n + 1]);
+  }
+  await page.evaluate(() => { DB.watch = { 'email:billing@lantern-invoice.example': { at: Date.now() } }; mutate('w'); go(caseHash('c-lantern', 'vault')); });
+  const card = page.locator('.ec2[data-id=v-sender]');
+  await expect(card).toHaveClass(/bad/); await expect(card.locator('.ec-sig')).toContainText('Malicious'); await expect(card.locator('.ec-sig')).toContainText('1 record');
+  await expect(card.locator('.ec-sig')).toContainText('links:'); await expect(card.locator('.ec-w')).toBeVisible();
+  await expect(page.locator('.ec2:has-text("203.0.113.47") .ec-also')).toContainText('TN-2026-011');   // also in another case
+  await expect(page.locator('.ec2 dd:text-is("—")')).toHaveCount(0);   // empty fields are not shown
+  await page.click('[data-act=vLay][data-v=list]');
+  await expect(page.locator('.vl-t tbody tr')).toHaveCount(await page.evaluate(() => DB.entries.filter(e => e.caseId === 'c-lantern').length));
+  await page.click('[data-act=vSort][data-v=recs]');
+  const first = await page.locator('.vl-t tbody tr').first().locator('.vl-v').textContent(); expect(first).toContain('203.0.113.47');
+  await page.locator('.vl-t tbody tr').first().click(); await expect(page.locator('#insp')).toBeVisible();
   noErrors(errors);
 });

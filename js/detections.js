@@ -219,7 +219,7 @@ function ruleFromCase(){
   const now = Date.now();
   const a = {id:uid('r'), type:'sigma', title:c.name.split(' — ')[0] + ' — network indicators', desc:'Generated from ' + mal.size + ' malicious entities in ' + c.code, code:sig, severity:'high', category:'network', technique:'T1071', author:'You', platform:'Windows', tags:['generated', c.code], refs:[], created:now, modified:now, starred:false, caseId:c.id};
   const b = {id:uid('r'), type:'yara', title:c.name.split(' — ')[0] + ' — indicator strings', desc:'Generated from ' + mal.size + ' malicious entities in ' + c.code, code:yar, severity:'high', category:'malware', technique:'', author:'You', platform:'Any', tags:['generated', c.code], refs:[], created:now, modified:now, starred:false, caseId:c.id};
-  DB.rules.unshift(a, b); UI.rule = a.id; UI.ropen = true; UI.dtype = 'all'; UI.dcat = ''; mutate('generated 2 rules from ' + c.code);
+  DB.rules.unshift(a, b); UI.rule = a.id; UI.ropen = true; UI.dview = 'rules'; UI.rtab = 'rule'; UI.dtype = 'all'; UI.dcat = ''; mutate('generated 2 rules from ' + c.code);
   if(UI.route.area !== 'detections') go('#/detections'); else renderMain();
   toast('Two starter rules generated from ' + mal.size + ' malicious entities — review before use');
 }

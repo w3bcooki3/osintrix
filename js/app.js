@@ -213,6 +213,9 @@ document.addEventListener('click', ev => {
     case 'selFeed': return select('feed', id);
     case 'entVerdict': if(v) DB.verdicts[id] = v; else delete DB.verdicts[id]; mutate('verdict on ' + entSplit(id).v); renderMain(); return renderInsp();
     case 'setT0': { const c = theCase(); c.t0 = c.t0 === id ? null : id; mutate('T0 changed'); return renderAll(); }
+    case 'ecCopy': { const e = entryById(id); return e && copyText(primary(e)); }
+    case 'vLay': DB.prefs.vLay = v; save(); return renderMain();
+    case 'vSort': UI.vsd = UI.vsk === v && UI.vsd === 'desc' ? 'asc' : 'desc'; UI.vsk = v; return renderMain();
     case 'pivot': UI.pivot = id; UI.tlMode = 'events'; return go(caseHash(DB.active, 'timeline'));
     case 'pivotOff': UI.pivot = null; return renderMain();
     case 'facet': UI.facet[t.dataset.f] = UI.facet[t.dataset.f] === v ? null : v; return renderMain();
@@ -317,12 +320,12 @@ document.addEventListener('click', ev => {
       mutate('imported ' + n + ' queries'); renderAll(); toast(n + ' queries imported'); });
     /* detections */
     case 'dtype': UI.dtype = v; UI.dcat = ''; UI.dlim = 0; return renderMain();
-    case 'rSel': if(id === UI.rule && (UI.ropen || rLay() === 'ide')) return; if(ruleDirty()) return confirmDlg('Discard unsaved changes?', 'You have edits to this rule that are not saved yet.', 'Discard changes', () => clickAct('rSel', id), true); UI.rule = id; UI.ropen = true; renderMain(); { const r = document.querySelector('.wb-main'); if(r && window.innerWidth <= 1180) r.scrollIntoView({block:'start'}); } return;
+    case 'rSel': if(id === UI.rule && (UI.ropen || rLay() === 'ide')) return; if(ruleDirty()) return confirmDlg('Discard unsaved changes?', 'You have edits to this rule that are not saved yet.', 'Discard changes', () => clickAct('rSel', id), true); UI.rule = id; UI.ropen = true; UI.dview = 'rules'; renderMain(); { const r = document.querySelector('.wb-main'); if(r && window.innerWidth <= 1180) r.scrollIntoView({block:'start'}); } return;
     case 'rNew': { const r0 = t.getBoundingClientRect(); return showMenu(r0.left, r0.bottom + 6, [
       {label:'Sigma rule (log detection)', icon:'file-code', fn:() => newRule('sigma')}, {label:'YARA rule (file / memory)', icon:'binary', fn:() => newRule('yara')}], 'New rule'); }
     case 'rTest': { const r = DB.rules.find(z => z.id === id), code = $('rCode') ? $('rCode').value : r.code, res = testRule({...r, code}, DB.active), out = $('rTestOut');
       if(res.error){ out.innerHTML = `<div class="note amber"><span class="ic">${ico('triangle-alert','sm')}</span><div><b>Could not run this rule here.</b> ${esc(res.error)}</div></div>`; return; }
-      out.innerHTML = `<div class="rtres"><b>${res.hits.length ? res.hits.length + ' of ' + res.total + ' records would trigger this rule' : 'No record in ' + esc(theCase().code) + ' matches'}</b>${res.hits.slice(0, 20).map(x => `<button class="li" data-act="selRec" data-id="${x.id}"><span class="mono t3">${x.ts ? esc(E.fmtClock(x.ts, tz())) : '—'}</span><div class="main2"><b>${esc(x.title)}</b><small>${esc(x.host || x.source)}</small></div></button>`).join('')}
+      out.innerHTML = `<div class="rtres"><b>${res.hits.length ? res.hits.length + ' of ' + res.total + ' records would trigger this rule' : 'No record in ' + esc((theCase() || {code:'this case'}).code) + ' matches'}</b>${res.hits.slice(0, 20).map(x => `<button class="li" data-act="selRec" data-id="${x.id}"><span class="mono t3">${x.ts ? esc(E.fmtClock(x.ts, tz())) : '—'}</span><div class="main2"><b>${esc(x.title)}</b><small>${esc(x.host || x.source)}</small></div></button>`).join('')}
         <p class="t3" style="font-size:calc(12px * var(--ts,1));margin:8px 0 0">${r.type === 'sigma' ? 'Sigma fields are read from key=value pairs in the evidence text (Image=…, CommandLine=…, EventID …). A subset of Sigma: selections, lists, modifiers contains / startswith / endswith / re / all, and / or / not, “1 of” and “all of”.' : 'YARA runs on each record’s text.'}</p></div>`; return; }
     case 'rTestFile': { const r = DB.rules.find(z => z.id === id), code = $('rCode') ? $('rCode').value : r.code; const i = document.createElement('input'); i.type = 'file';
       i.onchange = async () => { const f = i.files[0]; if(!f) return; if(f.size > 60 * 1048576) return toast('Up to 60 MB in the browser'); const res = yaraScan(code, new Uint8Array(await f.arrayBuffer())), out = $('rTestOut'); if(!out) return;
@@ -338,7 +341,7 @@ document.addEventListener('click', ev => {
     case 'rStar': { const r = DB.rules.find(z => z.id === id); r.starred = !r.starred; mutate('star rule'); return renderMain(); }
     case 'rDel': { const r = DB.rules.find(z => z.id === id); if(!r) return; DB.rules = DB.rules.filter(z => z.id !== id); if(r.builtin) DB.deletedRules = [...new Set([...(DB.deletedRules || []), r.id])]; UI.rule = null; mutate('deleted rule'); renderAll();
       return toast('Deleted “' + r.title + '”', 'Undo', () => { DB.rules.unshift(r); if(DB.deletedRules) DB.deletedRules = DB.deletedRules.filter(x => x !== r.id); UI.rule = r.id; mutate('restored rule'); renderAll(); }); }
-    case 'rDup': { const r = DB.rules.find(z => z.id === id); const c2 = {...r, builtin:false, id:uid('r'), title:copyName(r.title, DB.rules.map(x => x.title)), created:Date.now(), modified:Date.now(), starred:false}; DB.rules.unshift(c2); UI.rule = c2.id; mutate('duplicated rule'); return renderMain(); }
+    case 'rDup': { const r = DB.rules.find(z => z.id === id); const c2 = {...r, builtin:false, id:uid('r'), title:copyName(r.title, DB.rules.map(x => x.title)), created:Date.now(), modified:Date.now(), starred:false}; DB.rules.unshift(c2); UI.rule = c2.id; UI.ropen = true; UI.dview = 'rules'; mutate('duplicated rule'); return renderMain(); }
     case 'rCopy': { const r = DB.rules.find(z => z.id === id); return copyText(ruleText(r, $('rCode') ? $('rCode').value : r.code)); }
     case 'rExport': { const r = DB.rules.find(z => z.id === id); return download(slug(r.title) + (r.type === 'sigma' ? '.yml' : '.yar'), ruleText(r, $('rCode') ? $('rCode').value : r.code), 'text/plain'); }
     case 'rExportAll': return download('osintrix-detections.json', JSON.stringify(DB.rules.map(r => ({type:r.type, title:r.title, description:r.desc, code:ruleText(r), severity:r.severity, category:r.category, technique:r.technique, author:r.author, platform:r.platform, tags:r.tags, refs:r.refs || [], starred:!!r.starred, caseId:r.caseId || null, created:r.created, tests:r.tests && r.tests.length ? r.tests : undefined})), null, 2), 'application/json');
@@ -705,7 +708,7 @@ async function bootRest(unlocked){
 }
 
 function newRule(type){ ensureRules(); const now = Date.now(); const r = {id:uid('r'), type, title:nextName(type === 'sigma' ? 'New Sigma rule' : 'New YARA rule', DB.rules.map(x => x.title)), desc:'', code:RULE_TPL[type].replace('00000000-0000-4000-8000-000000000000', crypto.randomUUID ? crypto.randomUUID() : uid('sig')), severity:'medium', category:'', technique:'', author:'You', platform:'', tags:[], refs:[], created:now, modified:now, starred:false, caseId:null};
-  DB.rules.unshift(r); UI.rule = r.id; UI.ropen = true; UI.dtype = 'all'; UI.dcat = ''; mutate('new rule'); if(UI.route.area !== 'detections') go('#/detections'); else renderMain(); setTimeout(() => { const x = $('rTitle'); if(x){ x.focus(); x.select(); } }, 50); }
+  DB.rules.unshift(r); UI.rule = r.id; UI.ropen = true; UI.rtab = 'rule'; UI.dview = 'rules'; UI.dtype = 'all'; UI.dcat = ''; UI.dq = ''; mutate('new rule'); if(UI.route.area !== 'detections') go('#/detections'); else renderMain(); setTimeout(() => { const x = $('rTitle'); if(x){ x.focus(); x.select(); } }, 50); }
 function copyText(s){ if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(s).then(() => toast('Copied'), () => toast('Clipboard blocked by the browser')); else toast('Clipboard not available'); }
 
 function confirmDlg(title, body, label, fn, neutral){

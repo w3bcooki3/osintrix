@@ -15,8 +15,10 @@ _Build, test and harden detection rules inside OSINTrix — SIEM queries, rule t
 
 ### Changed
 - The browser Sigma engine now understands |windash, |cidr, |base64 and |base64offset, and null values; regular expressions are no longer lower-cased before matching.
+- Vault cards say what matters at a glance: the full value, only the fields that are filled in, your note, the verdict with its lookup score, how many records mention it and when, what it is linked to, open questions about it, whether it is watched or also in another case, and a picture for media entries. Copy, timeline and graph are one click away. A new List layout shows every entry in a sortable table.
 
 ### Fixed
+- New rule from the Coverage or Health view now opens the rule editor instead of silently adding rules.
 - A note's due date is marked overdue against today's date; the rule editor no longer fails when there are no cases.
 
 ## [1.34] — The engine works for you (2026-11-15)
