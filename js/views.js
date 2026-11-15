@@ -197,6 +197,7 @@ function caseOverview(c, D){
   const key = D.entries.filter(e => e.starred || e.priority === 'critical').slice(0, 6);
   const beacon = [...D.ents.values()].map(e => ({e, b:E.beaconOf(e.recs.map(r => r.ts))})).find(x => x.b && x.b.regular && x.e.k === 'hostport');
   return `<div class="scroll"><div class="page">
+    ${typeof activityCard === 'function' ? activityCard(c) : ''}
     ${c.scope ? `<p style="margin:0 0 20px;max-width:880px;color:var(--text-2);font-size:calc(15.5px * var(--ts,1));line-height:1.65">${esc(c.scope)}</p>` : ''}
     ${typeof cpCard === 'function' ? cpCard(c) : ''}
     <div class="stats">
@@ -279,15 +280,16 @@ function dayOf(ts){ const z = tz(), k = z + '|' + Math.floor(ts / 9e5); let v = 
 function caseTimeline(c, D){
   const list = D.recs.filter(passes);
   const hosts = countBy(D.recs, r => r.host);
-  const bar = `<div class="tlbar"><div class="seg" role="group" aria-label="View"><button data-act="tlMode" data-v="events" aria-pressed="${UI.tlMode === 'events'}">${ico('clock','sm')}Events</button><button data-act="tlMode" data-v="story" aria-pressed="${UI.tlMode === 'story'}">${ico('book-open','sm')}Story</button></div>
+  const bar = `<div class="tlbar"><div class="seg" role="group" aria-label="View"><button data-act="tlMode" data-v="events" aria-pressed="${UI.tlMode === 'events'}">${ico('clock','sm')}Events</button><button data-act="tlMode" data-v="story" aria-pressed="${UI.tlMode === 'story'}">${ico('book-open','sm')}Story</button><button data-act="tlMode" data-v="patterns" aria-pressed="${UI.tlMode === 'patterns'}">${ico('activity','sm')}Patterns</button></div>
     ${UI.tlMode === 'events' ? `<div class="search-in tlq">${ico('filter')}<label class="sr" for="tlq">Filter the timeline</label><input id="tlq" class="inp" placeholder="Filter — host:DC01 verdict:malicious 4624" value="${esc(UI.q || '')}" autocomplete="off" spellcheck="false"></div><span class="t3" style="font-size:calc(13.5px * var(--ts,1))">${list.length} of ${D.recs.length}</span>
     ${hosts.slice(0, 5).map(([h, n]) => `<button class="chip" data-act="facet" data-f="host" data-v="${esc(h)}" aria-pressed="${UI.facet.host === h}">${esc(h)}<span class="n">${n}</span></button>`).join('')}
     ${UI.pivot ? `<span class="chip accent">Pivot: ${esc(entSplit(UI.pivot).v)} <button data-act="pivotOff" aria-label="Exit pivot">${ico('x','sm')}</button></span>` : ''}
     ${UI.facet.slot ? `<span class="chip accent">${esc(UI.facet.slot.day != null ? UI.facet.slot.day.replace(/^\w+,?\s*/, '') : WD[UI.facet.slot.wd])} ${String(UI.facet.slot.h).padStart(2, '0')}:00 <button data-act="slotOff" aria-label="Clear time filter">${ico('x','sm')}</button></span>` : ''}
-    ${UI.facet.win ? `<span class="chip accent">±5 min of ${esc(E.fmtClock(UI.facet.win.at, tz()))} <button data-act="winOff" aria-label="Clear time window">${ico('x','sm')}</button></span>` : ''}
+    ${UI.facet.win ? `<span class="chip accent">${UI.facet.win.label ? esc(UI.facet.win.label) : '±5 min of ' + esc(E.fmtClock(UI.facet.win.at, tz()))} <button data-act="winOff" aria-label="Clear time window">${ico('x','sm')}</button></span>` : ''}
     ${UI.facet.host || UI.pivot || UI.q || UI.facet.slot || UI.facet.win ? `<button class="btn xs ghost" data-act="clearFilters">Clear</button>` : ''}
     <span class="sp"></span><button class="btn xs${UI.tlSel ? ' on' : ''}" data-act="tlSel" aria-pressed="${!!UI.tlSel}">${ico('square-check','sm')}Select</button><button class="btn xs${UI.tlHeat ? ' on' : ''}" data-act="tlHeat" aria-pressed="${!!UI.tlHeat}">${ico('grid-3x3','sm')}Heatmap</button>` : ''}</div>`;
   if(UI.tlMode === 'story') return `<div class="scroll">${bar}${storyHTML(D)}</div>`;
+  if(UI.tlMode === 'patterns') return `<div class="scroll">${bar}${tlxView(D)}</div>`;
   /* every matching event is in the list; only the ones near the screen are drawn (vlist.js) */
   const items = [], dayN = new Map(); let lastDay = null, prev = null;
   for(const r of list) if(r.ts){ const d = dayOf(r.ts); dayN.set(d, (dayN.get(d) || 0) + 1); }

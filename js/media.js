@@ -38,7 +38,10 @@ async function mediaProbe(blob, kind){
     if(kind === 'image'){ if(/svg/i.test(blob.type)) return out; const bm = await createImageBitmap(blob); out.w = bm.width; out.h = bm.height; out.prev = await drawSmall(bm, bm.width, bm.height); if(bm.close) bm.close(); }
     else if(kind === 'video' || kind === 'audio'){
       const u = URL.createObjectURL(blob), v = document.createElement(kind); v.muted = true; v.preload = 'metadata';
-      try{ v.src = u; await waitEv(v, 'loadedmetadata', 6000); if(isFinite(v.duration)) out.dur = Math.round(v.duration * 10) / 10;
+      try{ v.src = u; await waitEv(v, 'loadedmetadata', 6000);
+        /* recordings from browsers and some phones leave the length out; seeking to the end makes the player work it out */
+        if(!isFinite(v.duration)){ try{ v.currentTime = 1e7; await waitEv(v, 'durationchange', 4000); }catch(e){} try{ v.currentTime = 0; }catch(e){} }
+        if(isFinite(v.duration) && v.duration > 0) out.dur = Math.round(v.duration * 10) / 10;
         if(kind === 'video' && v.videoWidth){ out.w = v.videoWidth; out.h = v.videoHeight;
           try{ v.currentTime = Math.min(1, (out.dur || 0) / 10); await waitEv(v, 'seeked', 6000); out.prev = await drawSmall(v, v.videoWidth, v.videoHeight); }catch(e){} } }
       finally { v.removeAttribute('src'); try{ v.load(); }catch(e){} URL.revokeObjectURL(u); }
@@ -106,7 +109,9 @@ function caseMedia(c){
         ${x.k === 'video' ? `<span class="md-play">${ico('play','sm')}</span>` : ''}${a.dur ? `<span class="md-dur">${fmtDur(a.dur)}</span>` : ''}${x.big ? '<span class="md-dur">not stored</span>' : ''}</button>
       <div class="md-b"><b title="${esc(a.name)}">${esc(a.name)}</b><span class="t3">${esc(meta)}${a.gps ? ' · ' + ico('map-pin','sm') : ''}</span>
         <span class="md-a"><button class="linkbtn" data-act="selRec" data-id="${r.id}">Record</button>${x.big ? '' : `<button class="iconbtn" data-act="attDl" data-id="${r.id}" data-v="${esc(a.id)}" aria-label="Save ${esc(a.name)}" title="Save a copy">${ico('download','sm')}</button>`}</span></div></article>`; };
-  return `<div class="scroll md-drop"><div class="page wide">
+  const seg = `<div class="tlbar"><div class="seg" role="group" aria-label="View"><button data-act="mdView" data-v="files" aria-pressed="${UI.mdV !== 'pic'}">${ico('images','sm')}Files</button><button data-act="mdView" data-v="pic" aria-pressed="${UI.mdV === 'pic'}">${ico('scan-face','sm')}Picture insights</button></div></div>`;
+  if(UI.mdV === 'pic') return `<div class="scroll md-drop">${seg}${picView(c)}</div>`;
+  return `<div class="scroll md-drop">${seg}<div class="page wide">
     <section class="card md-head"><div class="body"><div class="wrap" style="align-items:center">
       <div style="flex:1;min-width:220px"><h3 style="margin:0">${all.length ? all.length + ' file' + (all.length > 1 ? 's' : '') + ' · ' + fmtBytes(bytes) : 'No media yet'}</h3>
         <p class="t3" style="margin:4px 0 0">Drop pictures, videos, audio or saved web pages anywhere on this case, or paste a screenshot with Ctrl+V. Originals are kept unchanged with their SHA-256; files over 50 MB are recorded by fingerprint only.</p></div>
@@ -133,14 +138,17 @@ async function mediaOpen(rid, fid){
 /* ---------- a vault entry's own file (Image / video entries) ---------- */
 function entryMedia(e){
   const src = recById(e.src), A = src ? (src.att || []).map(a => ({a, k:mediaKind(a)})) : [];
+  const big = src && src.big ? `<p class="t3 small" style="margin:0 0 8px">${ico('file','sm')} ${esc(src.big.name)} · ${fmtBytes(src.big.size)} · not stored<br><span class="mono" style="overflow-wrap:anywhere">${esc(src.big.sha256 || 'no fingerprint (over 512 MB)')}</span></p>` : '';
   if(e.type !== 'media' && !A.some(x => x.k === 'image' || x.k === 'video')) return '';
   return `<div class="isec"><h4>File ${A.length ? '<span class="t3">' + A.length + '</span>' : ''}</h4>
-    ${A.map(({a, k}) => `<div class="md-ent"><button class="md-th${k === 'image' || k === 'video' ? '' : ' noprev'}" data-act="mdOpen" data-id="${src.id}" data-v="${a.id}" aria-label="Open ${esc(a.name)}">${k === 'image' || k === 'video' ? `<img data-pid="${a.id}" data-pk="${k}" alt="">` : ''}<span class="md-ic">${ico(MEDIA_ICON[k])}</span>${a.dur ? `<span class="md-dur">${fmtDur(a.dur)}</span>` : ''}</button>
+    ${big}${A.map(({a, k}) => `<div class="md-ent"><button class="md-th${k === 'image' || k === 'video' ? '' : ' noprev'}" data-act="mdOpen" data-id="${src.id}" data-v="${a.id}" aria-label="Open ${esc(a.name)}">${k === 'image' || k === 'video' ? `<img data-pid="${a.id}" data-pk="${k}" alt="">` : ''}<span class="md-ic">${ico(MEDIA_ICON[k])}</span>${a.dur ? `<span class="md-dur">${fmtDur(a.dur)}</span>` : ''}</button>
       <div class="t3 small" style="margin-top:4px">${esc(a.name)} · ${fmtBytes(a.size)}</div></div>`).join('')}
     <button class="btn sm" data-act="mdEntryUp" data-id="${e.id}">${ico('upload','sm')}${A.length ? 'Add another file' : 'Upload the file'}</button></div>`;
 }
 async function mediaForEntry(e, files){
-  const f = files[0]; if(!f) return; if(f.size > MEDIA_MAX) return toast('That file is over 50 MB — add it to the case instead, where its fingerprint is recorded');
+  const f = files[0]; if(!f) return;
+  if(f.size > MEDIA_MAX){ const r = await bigFileRecord(f, e.caseId); DB.records.push(r); if(!recById(e.src)) e.src = r.id; e.fields = e.fields || {}; if(!e.fields.title) e.fields.title = f.name;
+    mutate('fingerprint for ' + primary(e)); await hashRecords(); renderAll(); return toast('Over 50 MB, so the file is not stored — its name, size and SHA-256 are recorded with the entry'); }
   let m; try{ m = await storeFile(f); }catch(err){ return toast(err.message === 'full' ? 'Browser storage is full — free space in Settings → Storage' : 'That file could not be stored'); }
   let r = recById(e.src);
   if(r && r.caseId === e.caseId) r.att = (r.att || []).concat([m]);

@@ -4,6 +4,66 @@
    Each change has a type: "added" | "changed" | "fixed" | "removed". */
 const CHANGELOG_DATA = [
   {
+    "version": "1.34",
+    "name": "The engine works for you",
+    "date": "2026-11-15",
+    "summary": "Timeline patterns, picture intelligence, automations, a since-you-were-last-here feed, a guided tour, faster long lists and backup reminders — all running in the browser.",
+    "changes": [
+      {
+        "type": "added",
+        "text": "Timeline → Patterns: the likely first sign of compromise (with its reasons, the host, and the dwell time after it), bursts of activity against the case's usual rate, quiet periods, hosts that went silent early, cleared logs, time zone mix-ups and impossible dates, and the working hours the activity fits. Each finding opens just its events."
+      },
+      {
+        "type": "added",
+        "text": "Media → Picture insights: the same or a near-identical picture in this case or another, the same camera (by serial number, or make and model) across cases, pictures taken within 250 m of pictures in other cases, and signs of editing — an editing program, changes after capture, a future capture date, a disagreeing GPS date, or stripped metadata. Older pictures are read once, the first time the view opens."
+      },
+      {
+        "type": "added",
+        "text": "Automations (Playbooks → Automations): when a new indicator appears, evidence mentions something, or an indicator is judged malicious — check it against the indicator store, look it up, watch it, add it to the vault, ask a question, set a verdict or run a playbook. Five ready-made rules. They run while the app is open, act once per item, never on the demo cases, and write everything they do to a log. Automations restored from a backup arrive switched off."
+      },
+      {
+        "type": "added",
+        "text": "Since you were last here: a case's Overview lists what arrived while it was closed — evidence (yours and the automations'), new vault entries, lookups that came back, indicator-store and news matches, its indicators turning up in other cases, and notes that fell due."
+      },
+      {
+        "type": "added",
+        "text": "A guided tour of the demo case in eight stops, from Help or the setup."
+      },
+      {
+        "type": "changed",
+        "text": "Backup reminders after a week of your own work instead of two, on the dashboard and in the sidebar footer, offering automatic folder backup where the browser supports it; the setup offers it too."
+      },
+      {
+        "type": "changed",
+        "text": "The indicator store, the known-exploited vulnerabilities list and the detection rules (table and editor) draw only the rows on screen: 50,000 indicators open in about 30 ms, and nothing is cut off at 200 rows any more."
+      },
+      {
+        "type": "fixed",
+        "text": "The indicator store no longer fails to draw when there are no cases."
+      }
+    ]
+  },
+  {
+    "version": "1.33",
+    "name": "Media fixes",
+    "date": "2026-11-15",
+    "summary": "Two fixes from using the new media features.",
+    "changes": [
+      {
+        "type": "fixed",
+        "text": "Switching between a case's tabs now closes the details panel, so a vault entry opened on the Vault tab no longer sits over the Overview. Opening a record from elsewhere still keeps it selected."
+      },
+      {
+        "type": "added",
+        "text": "The New image / video form has a file field: choose or drop the picture, video, audio or saved page, and the title, media type and resolution fill themselves in. Files over 50 MB are recorded by fingerprint."
+      },
+      {
+        "type": "fixed",
+        "text": "Videos recorded by browsers and some phones, which leave their length out, now show their length."
+      }
+    ]
+  },
+  {
     "version": "1.32",
     "name": "Media in every case",
     "date": "2026-11-15",

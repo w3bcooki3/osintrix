@@ -314,7 +314,7 @@ function viewHelp(){
   const qa = (q, a) => `<details class="hq hs-i"><summary>${q}${ico('chevron-down','sm')}</summary><p>${a}</p></details>`;
   const pic = n => typeof WL_IMG !== 'undefined' ? `<img class="hx2-d" src="${WL_IMG[n + '-dark']}" alt="" loading="lazy" decoding="async"><img class="hx2-l" src="${WL_IMG[n + '-light']}" alt="" loading="lazy" decoding="async">` : '';
   const start = [['capture','dashboard','Capture your first evidence','Paste a log line, a post or a WHOIS record — indicators and times come out on their own.','2 min'],
-    ['welcomeDemo','graph','Explore the demo case','Op Lantern has the timeline, link graph, map and report already filled in.','4 min'],
+    ['tourStart','graph','Take the guided tour','Eight stops through Op Lantern, a finished case: copilot, timeline patterns, graph, media and automations.','3 min'],
     ['helpWelcome','phone','Take the welcome tour','What OSINTrix is for, how your data stays private, and where everything lives.','1 min']];
   const dir = [['Investigate',[['#/home','Dashboard','Open cases, activity and pinned notes'],['#/cases','Cases','Vault, timeline, graph, questions and report'],['#/notes','Notes','Sticky notes and to-dos'],['#/entities','Entities','Every indicator across every case'],['#/trash','Trash & restore points','Deleted items and snapshots']]],
     ['Research',[['#/toolbox','Toolbox','Your library of OSINT and security tools'],['#/queries','Query library','Search recipes filled from your vault'],['#/playbooks','Playbooks','Investigation checklists for a case'],['#/feeds','Threat Intel','News checked against your entities'],['#/watch','Watchlist','Entities you track']]],

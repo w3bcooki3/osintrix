@@ -97,7 +97,7 @@ function aroundHTML(r){
     ${near.slice(0, 8).sort((a, b) => a.ts - b.ts).map(x => `<button class="li around" data-act="selRec" data-id="${x.id}"><span class="mono ${x.ts < r.ts ? 't3' : ''}" style="width:64px;font-size:calc(12px * var(--ts,1))">${sgn(x.ts - r.ts)}</span><div class="main2"><b style="font-weight:520;font-size:calc(13.5px * var(--ts,1))">${esc(x.title)}</b><small>${esc([x.host, x.source].filter(Boolean).join(' · '))}${x.host && r.host && x.host !== r.host ? ' · <span style="color:var(--amber)">other host</span>' : ''}</small></div></button>`).join('')}
     <button class="btn sm" data-act="tlWin" data-id="${r.id}" style="margin-top:8px">${ico('clock','sm')}Show this window on the timeline</button></div>`;
 }
-function winPass(r){ const w = UI.facet.win; return !w || (r.ts && r.ts >= w.from && r.ts <= w.to); }
+function winPass(r){ const w = UI.facet.win; return !w || (w.added ? (r.addedAt || 0) > w.from : r.ts && r.ts >= w.from && r.ts <= w.to); }
 const WATCH_ACTS = {
   watch:id => toggleWatch(id),
   tlWin:id => { const r = recById(id); if(!r || !r.ts) return; UI.facet.win = {from:r.ts - 5 * 60000, to:r.ts + 5 * 60000, at:r.ts}; UI.tlMode = 'events'; go(caseHash(r.caseId, 'timeline')); renderMain(); },

@@ -119,14 +119,27 @@ function viewTrash(){
 }
 
 /* ---------- backup reminder ---------- */
-function backupBanner(){
+/* is a backup due? Own work only (not the demo), a week since the last export or folder backup */
+function backupDue(){
   const p = DB.prefs; if(!p.firstUse){ p.firstUse = Date.now(); save(); }
-  const own = DB.records.filter(r => !(theCase(r.caseId) || {}).sample).length + (DB.notes || []).filter(n => !n.sample).length;
-  if(typeof fbOn === 'function' && fbOn() && FB.state === 'on' && Date.now() - fbGet().last < 3 * 864e5) return '';   // folder backup is doing the job
-  const since = p.lastExport || p.firstUse, days = Math.floor((Date.now() - since) / 864e5);
-  if(own < 5 || days < 14 || (p.remindAt && p.remindAt > Date.now())) return '';
-  return `<div class="note amber bkp"><span class="ic">${ico('hard-drive-download','sm')}</span><div><b>${p.lastExport ? `Last backup was ${days} days ago.` : 'You have not exported a backup yet.'}</b> Your ${own} records and notes live only in this browser — clearing site data or a new device loses them.</div>
-    <div class="acts"><button class="btn xs primary" data-act="exportAll">${ico('download','sm')}Export now</button><button class="btn xs ghost" data-act="bkpLater">Remind me in a week</button></div></div>`;
+  const own = DB.records.filter(r => !(theCase(r.caseId) || {}).sample).length + (DB.notes || []).filter(n => !n.sample).length + DB.entries.filter(e => !(theCase(e.caseId) || {}).sample).length;
+  const fbLast = typeof fbOn === 'function' && fbOn() ? fbGet().last || 0 : 0, folder = typeof fbOn === 'function' && fbOn() ? FB.state : 'off';
+  const last = Math.max(p.lastExport || 0, fbLast), days = Math.floor((Date.now() - (last || p.firstUse)) / 864e5);
+  const due = own >= 3 && (folder === 'paused' || folder === 'missing' || days >= 7) && !(p.remindAt && p.remindAt > Date.now());
+  return {due, days, own, last, folder};
+}
+function backupBanner(){
+  const B = backupDue(); if(!B.due) return '';
+  const fbOk = typeof fbSupported === 'function' && fbSupported();
+  const head = B.folder === 'paused' ? 'Folder backup is paused.' : B.folder === 'missing' ? 'The backup folder can no longer be found.' : B.last ? `Last backup was ${B.days} day${B.days === 1 ? '' : 's'} ago.` : 'You have not backed up yet.';
+  return `<div class="note amber bkp"><span class="ic">${ico('hard-drive-download','sm')}</span><div><b>${head}</b> Your ${B.own} records, entries and notes live only in this browser — clearing site data or a new device loses them.</div>
+    <div class="acts">${B.folder === 'paused' ? `<button class="btn xs primary" data-act="fbResume">Resume</button>` : B.folder === 'missing' || (fbOk && B.folder === 'off') ? `<button class="btn xs primary" data-act="fbChoose">${ico('folder-open','sm')}Back up to a folder automatically</button><button class="btn xs" data-act="exportAll">Export now</button>` : `<button class="btn xs primary" data-act="exportAll">${ico('download','sm')}Export now</button>`}<button class="btn xs ghost" data-act="bkpLater">Remind me in 3 days</button></div></div>`;
+}
+/* the sidebar footer turns into a reminder when a backup is due */
+function paintBackupFoot(){
+  const f = document.querySelector('.sidefoot'); if(!f) return; const B = backupDue(), sp = f.querySelector('span'), was = f.classList.contains('due');
+  if(B.due === was && f.dataset.d === String(B.days)) return; f.dataset.d = B.days; f.classList.toggle('due', B.due);
+  sp.innerHTML = B.due ? `<button class="linkbtn" data-act="exportAll">${B.folder === 'paused' ? 'Folder backup paused' : 'Backup due' + (B.last ? ' · ' + B.days + ' days' : '')}</button>` : 'Offline · data stays in this browser';
 }
 
 /* ---------- attachments ---------- */
@@ -142,13 +155,13 @@ async function storeFile(f){
   if(typeof nbRoomFor === 'function' && !await nbRoomFor(f.size)) throw new Error('full');
   const id = uid('f'), blob = new Blob([buf], {type});
   if(!await IDB.set('file:' + id, await sealBlob(blob))) throw new Error('idb');
-  let gps = null, cam = ''; if(/jpe?g|tiff|heic/i.test(f.type || f.name || '')){ try{ const x = exif(new Uint8Array(buf)); if(x){ if(x.GPS) gps = x.GPS; cam = [x.Make, x.Model].filter(Boolean).join(' '); } }catch(e){} }
+  let gps = null, cam = '', ex = null; if(/jpe?g|tiff|heic/i.test(f.type || f.name || '')){ try{ ex = exif(new Uint8Array(buf)); if(ex){ if(ex.GPS) gps = ex.GPS; cam = [ex.Make, ex.Model].filter(Boolean).join(' '); } }catch(e){} }
   const dhash = /^image\//.test(f.type || '') ? await dhashBlob(blob) : null;
   /* picture size, length and a small preview for pictures, videos and audio */
   const kind = typeof mediaKind === 'function' ? mediaKind({type:f.type, name:f.name}) : '', P = kind === 'image' || kind === 'video' || kind === 'audio' ? await mediaProbe(blob, kind) : {};
   if(P.prev) await IDB.set('file:' + id + '.p', await sealBlob(P.prev));
   const m = {id, name:f.name || 'pasted-image.png', type:f.type || '', size:f.size, sha256:sha, modified:f.lastModified || Date.now(), added:Date.now(), gps, cam, dhash};
-  if(P.w){ m.w = P.w; m.h = P.h; } if(P.dur) m.dur = P.dur; return m;
+  if(P.w){ m.w = P.w; m.h = P.h; } if(P.dur) m.dur = P.dur; if(kind === 'image' && typeof picMeta === 'function') m.x = picMeta(ex); return m;
 }
 async function fileBlob(fid){ return await openBlob(await IDB.get('file:' + fid)); }
 async function fileURL(fid){ if(FILE_URLS.has(fid)) return FILE_URLS.get(fid); const b = await fileBlob(fid); if(!b) return null; const u = URL.createObjectURL(b); FILE_URLS.set(fid, u); return u; }
@@ -331,7 +344,7 @@ const SAFE_ACTS = {
   snapNow:() => snapNow(), snapRestore:id => snapRestore(id), snapDl:id => snapDownload(id),
   snapDel:id => confirmDlg('Delete this restore point?', 'It is removed from this browser and cannot be restored. Your workspace is not changed.', 'Delete', async () => { await snapsLoad(); const at = +id, i = SNAPS.findIndex(s => s.at === at); if(i < 0) return;
     SNAPS.splice(i, 1); await IDB.del('osintrix-snap:' + at); await IDB.set('osintrix-snaps', await sealStr(JSON.stringify(SNAPS))); renderMain(); toast('Restore point deleted'); }),
-  bkpLater:() => { DB.prefs.remindAt = Date.now() + 7 * 864e5; save(); renderMain(); },
+  bkpLater:() => { DB.prefs.remindAt = Date.now() + 3 * 864e5; save(); renderAll(); },
   recDel:id => delRecord(id),
   attAdd:(id, v, t) => attAct('attAdd', id, v), attOpen:(id, v) => attAct('attOpen', id, v), attDl:(id, v) => attAct('attDl', id, v), attKit:(id, v) => attAct('attKit', id, v), attDel:(id, v) => attAct('attDel', id, v),
   bkGo:(id, v) => { closeDlg(); exportEverything(UI.bkEnc, v === 'nofiles'); },

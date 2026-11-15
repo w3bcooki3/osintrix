@@ -13,11 +13,11 @@ function vlist(id, items, o = {}){
   VL.pend.set(id, {items, o});
   const est = items.reduce((a, x) => a + (x.h || o.est || 60), 0);
   return o.tbody ? `<tbody class="vl" id="${id}"><tr class="vl-sp" aria-hidden="true"><td colspan="${o.cols || 1}" style="height:${est}px"></td></tr></tbody>`
-    : `<div class="vl" id="${id}"><div class="vl-sp" aria-hidden="true" style="height:${est}px"></div></div>`;
+    : `<div class="vl" id="${id}"${o.role ? ` role="${o.role}"` : ''}${o.label ? ` aria-label="${esc(o.label)}"` : ''}><div class="vl-sp" aria-hidden="true" style="height:${est}px"></div></div>`;
 }
 function vlMount(){
   for(const [id, L] of VL.pend){ const el = document.getElementById(id); if(!el) continue;
-    const sc = el.closest('.scroll') || document.scrollingElement, old = VL.live.get(id);
+    const sc = el.closest('[data-vlsc], .scroll') || document.scrollingElement, old = VL.live.get(id);
     const S = {id, el, sc, items:L.items, o:L.o, hs:L.items.map(x => x.h || L.o.est || 60), seen:new Map(old ? old.seen : []), start:-1, end:-1, raf:0};
     /* heights measured last time are kept for rows that are still in the list */
     S.items.forEach((x, i) => { const h = S.seen.get(x.k); if(h) S.hs[i] = h; });

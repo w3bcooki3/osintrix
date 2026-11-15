@@ -64,6 +64,11 @@ Press `Ctrl K` or `/`, or click the search bar, to search the whole app at once:
 - **Timeline:** every record in order, with day headers, event markers and filters. Search with `host:`, `verdict:`, `type:`, `tag:`, `after:` and `before:`.
   - **Activity heatmap** (day × hour): click a cell to see just that hour.
   - **Multi-select:** tag, mark as key evidence, export to CSV or delete many records at once.
+  - **Patterns:** the likely first sign of compromise (with its reasons and the dwell time after it), bursts against the usual rate, quiet periods, hosts that went silent early, cleared logs, time zone mix-ups and impossible dates, and the working hours the activity fits. Each finding opens just its events.
+- **Media:** drop pictures, videos, audio or saved web pages anywhere on a case, or paste a screenshot. Originals are kept with their SHA-256, stored once, with small previews; videos play in the app; files over 50 MB are recorded by fingerprint.
+  - **Picture insights:** the same or a near-identical picture in other cases, the same camera (serial number or model), pictures taken within 250 m of each other, and signs of editing.
+- **Since you were last here:** a case's Overview lists what arrived while it was closed — new evidence and entries, lookups that came back, indicator-store and news matches, and its indicators turning up in other cases.
+- **Automations:** "when a new domain appears, check it against the indicator store and look it up", "when evidence mentions phishing, run the phishing playbook". They run in the browser while the app is open, act once per item, skip the demo cases and log everything they do.
 - **Places:** every location in the case on one page. Points come from Location entries, coordinates in evidence and photo GPS; countries come from country fields, phone country codes and log fields.
   - An offline overview map (Natural Earth borders) shows where everything is, with the movement path in time order.
   - Each place opens in Google Maps, Street View, Google Earth, OpenStreetMap, Bing aerial, Apple Maps, Yandex, Mapillary, Sentinel satellite history, Wikimapia, Overpass turbo or SunCalc (sun position at the time of the evidence). Links open in a new tab; nothing is fetched by OSINTrix.
@@ -317,6 +322,11 @@ osintrix/
 │   ├── caseents.js         ← the Entities tab inside each case
 │   ├── vlist.js            ← virtual lists: long timelines and tables draw only what is on screen
 │   ├── media.js            ← the Media tab: drop / paste pictures, videos and saved pages, previews, de-duplication
+│   ├── tlx.js              ← timeline patterns: first sign of compromise, bursts, gaps, cleared logs, time problems
+│   ├── picx.js             ← picture insights: repeats across cases, cameras, places, signs of editing
+│   ├── activity.js         ← "since you were last here" on each case
+│   ├── auto.js             ← automations: when this happens in a case, do that
+│   ├── tour.js             ← the guided tour of the demo case
 │   ├── map.js · ach.js     ← case places, hypothesis board
 │   ├── pcap.js · sqlite.js ← packet capture reader, SQLite viewer
 │   ├── validate.js         ← form checks, duplicate names

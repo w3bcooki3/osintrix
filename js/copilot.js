@@ -137,7 +137,7 @@ function cpCard(c){
 }
 
 /* ---------- auto-check new indicators ---------- */
-function onMutate(){ clearTimeout(CP.t); CP.t = setTimeout(cpAutoScan, 1500); }
+function onMutate(){ clearTimeout(CP.t); CP.t = setTimeout(cpAutoScan, 1500); if(typeof autoSchedule === 'function') autoSchedule(); }
 function cpAutoScan(){
   if(typeof LK_PROVIDERS === 'undefined' || !LK_PROVIDERS.some(lkOn)) return;
   const H = cpHist(), queued = new Set(CP.q.map(x => x.key));

@@ -46,10 +46,12 @@ function setupPaint(){
     body = `<h2>You are set up</h2>
       <ul class="su-sum"><li>${ico(on ? 'globe' : 'wifi-off','sm')}${on ? on + ' lookup source' + (on > 1 ? 's' : '') + ' on' + (lkRelay() ? ', relay connected' : '') : 'Offline — no lookups'}</li>
         <li>${ico('rss','sm')}${DB.prefs.liveFeeds ? 'Security news on' : 'Security news off'} · ${['kev', 'epss', 'nvd', 'attack'].filter(id => ctiSrc(id) && ctiSrc(id).on).length} threat-data sources</li>
+        <li>${ico('hard-drive-download','sm')}${typeof fbOn === 'function' && fbOn() ? 'Backing up to “' + esc(fbGet().name) + '”' : 'No automatic backup yet'}</li>
         <li>${ico(locked ? 'lock' : 'lock-open','sm')}${locked ? 'Workspace encrypted' : 'Not encrypted yet — anyone with this browser profile can read your cases'}</li></ul>
+      ${typeof fbSupported === 'function' && fbSupported() && !fbOn() ? `<div class="note"><span class="ic">${ico('hard-drive-download','sm')}</span><div><b>Keep a backup without thinking about it.</b> Pick a folder (Documents, or a OneDrive or Google Drive folder) and OSINTrix saves a copy there a few minutes after each change. <button class="btn xs" data-act="fbChoose">${ico('folder-open','sm')}Choose a folder</button></div></div>` : ''}
       ${locked ? '' : `<div class="note amber"><span class="ic">${ico('key-round','sm')}</span><div><b>Protect your cases with a passphrase.</b> Evidence, keys and lookups are then encrypted in this browser. <button class="btn xs" data-act="suLock">Set a passphrase</button></div></div>`}
       <h3>Where to start</h3><div class="su-cards">
-        <button type="button" class="su-card" data-act="suGo" data-v="demo">${ico('sparkles')}<b>See the copilot on a finished case</b><span>Op Lantern: next steps, the story so far, graph risk and the report.</span></button>
+        <button type="button" class="su-card" data-act="suGo" data-v="demo">${ico('sparkles')}<b>Take the guided tour</b><span>Eight stops through Op Lantern, a finished case: the copilot, patterns in the timeline, the graph, media and automations.</span></button>
         <button type="button" class="su-card" data-act="suGo" data-v="look">${ico('radar')}<b>Investigate an indicator</b><span>Paste an IP, domain, hash or CVE and get one verdict from every source.</span></button>
         <button type="button" class="su-card" data-act="suGo" data-v="new">${ico('folder-plus')}<b>Open your own case</b><span>Name it, then press N and paste evidence — indicators come out on their own.</span></button></div>`;
     next = 'Finish';
@@ -73,7 +75,7 @@ const SU_ACTS = {
   suBack:() => setupStep(-1), suNext:() => SU.step >= 4 ? setupDone() : setupStep(1),
   suLater:() => { DB.prefs.setupLater = Date.now(); save(); closeDlg(); renderAll(); },
   suLock:() => { setupDone(); go('#/security'); },
-  suGo:(id, v) => { setupDone(); if(v === 'demo' && theCase('c-lantern')) go(caseHash('c-lantern', 'overview')); else if(v === 'look'){ UI.itab = 'look'; UI.look = null; go('#/feeds'); } else { go('#/cases'); setTimeout(() => typeof caseDlg === 'function' && caseDlg(), 60); } },
+  suGo:(id, v) => { setupDone(); if(v === 'demo' && theCase('c-lantern')) setTimeout(tourStart, 80); else if(v === 'look'){ UI.itab = 'look'; UI.look = null; go('#/feeds'); } else { go('#/cases'); setTimeout(() => typeof caseDlg === 'function' && caseDlg(), 60); } },
   setupHide:() => { DB.prefs.setupLater = Date.now(); save(); renderMain(); },
 };
 /* a gentle nudge on the dashboard until setup is done or put off */

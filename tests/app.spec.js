@@ -1375,6 +1375,10 @@ test('no serious accessibility problems on the newer screens (copilot, investiga
     overview: () => { location.hash = '#/case/c-lantern/overview'; },
     media: () => { const r = DB.records.find(x => x.caseId === 'c-lantern'); r.att = [{ id: 'fx1', name: 'shot.png', type: 'image/png', size: 2048, sha256: 'a'.repeat(64), added: Date.now(), w: 10, h: 10 }, { id: 'fx2', name: 'clip.webm', type: 'video/webm', size: 4096, sha256: 'b'.repeat(64), added: Date.now(), dur: 12 }]; DB.records.push({ ...r, id: 'rbig', att: [], big: { name: 'huge.mp4', type: 'video/mp4', size: 6e7, sha256: '' } }); mutate('m'); location.hash = '#/case/c-lantern/media'; },
     mediaEmpty: () => { location.hash = '#/case/c-portal/media'; },
+    patterns: () => { UI.tlMode = 'patterns'; location.hash = '#/case/c-lantern/timeline'; },
+    picInsights: () => { UI.mdV = 'pic'; location.hash = '#/case/c-lantern/media'; },
+    automations: () => { autoEnsure(); if(!DB.autos.length){ DB.autos.push({ id: 'au1', name: 'Check new indicators', on: true, when: { ev: 'ind', kinds: ['ip'] }, scope: 'all', then: [{ a: 'store' }], runs: 2, last: Date.now() }); DB.autoLog.push({ at: Date.now(), rule: 'au1', name: 'Check new indicators', c: 'c-lantern', what: 'watching 203.0.113.47' }); } UI.pbTab = 'auto'; UI.pb = null; location.hash = '#/playbooks'; },
+    activity: () => { location.hash = '#/home'; setTimeout(() => { DB.prefs.seen = DB.prefs.seen || {}; DB.prefs.seen['c-portal'] = Date.now() - 864e5 * 400; location.hash = '#/case/c-portal/overview'; }, 80); },
     report: () => { DB.prefs.repT = 'full'; location.hash = '#/case/c-lantern/report'; },
     investigate: () => { UI.itab = 'look'; UI.look = { k: 'ipv4', v: '203.0.113.47' }; LKV.key = 'ipv4:203.0.113.47'; LKV.res = { idb: { ok: true, at: Date.now(), sig: [{ t: 'mal', w: 0.8, why: 'Shodan tags it c2', ts: 0 }], facts: [['Open ports', '4444']], attrs: { ports: [4444] }, related: [{ k: 'domain', v: 'update-lamp.test', rel: 'hostname' }], link: 'https://www.shodan.io/host/203.0.113.47' } }; LKV.pending = new Set(); location.hash = '#/feeds'; },
     investigateEmpty: () => { UI.itab = 'look'; UI.look = null; LKV.bulk = null; location.hash = '#/feeds'; },
@@ -1638,7 +1642,7 @@ test('media: drop, paste or add pictures, videos and saved pages to a case; orig
   await expect(page.locator('.md-c')).toHaveCount(3);
   const st = await page.evaluate(async () => { const I = caseMediaItems('c-lantern'), keys = (await IDB.keys()).filter(k => /^file:/.test(k));
     const v = I.find(x => x.k === 'video').a, im = I.find(x => x.a.name === 'photo.png').a;
-    return { names: I.map(x => x.a.name).sort(), stored: keys.filter(k => !k.endsWith('.p')).length, prev: keys.filter(k => k.endsWith('.p')).length, vw: v.w, vdur: v.dur > 0, iw: im.w, shot: I.some(x => /^screenshot-/.test(x.a.name)) }; });
+    return { names: I.map(x => x.a.name).sort(), stored: keys.filter(k => !k.endsWith('.p')).length, prev: keys.filter(k => k.endsWith('.p')).length, vw: v.w, vdur: v.dur == null || v.dur > 0, iw: im.w, shot: I.some(x => /^screenshot-/.test(x.a.name)) }; });
   expect(st).toMatchObject({ stored: 2, prev: 2, vw: 640, vdur: true, iw: 640, shot: true });
   await expect(page.locator('.md-c img[src]').first()).toBeVisible();
   // the video plays in the app
@@ -1673,5 +1677,170 @@ test('media: drop, paste or add pictures, videos and saved pages to a case; orig
   const dl = page.waitForEvent('download'); await page.click('[data-act=bkGo][data-v=nofiles]');
   const o = JSON.parse(require('fs').readFileSync(await (await dl).path(), 'utf8'));
   expect([o.filesLeftOut, o.files]).toEqual([true, undefined]);
+  noErrors(errors);
+});
+
+test('switching case tabs closes the details panel; a new Image / video entry takes its file in the form', async ({ page }) => {
+  const errors = await open(page, '#/case/c-portal/vault');
+  await page.evaluate(() => selectEntry(DB.entries.find(e => e.caseId === 'c-portal').id));
+  await expect(page.locator('#insp')).toBeVisible();
+  await page.evaluate(() => go(caseHash('c-portal', 'overview')));
+  expect(await page.evaluate(() => [UI.inspOpen, UI.sel])).toEqual([false, null]);
+  // "open in timeline" from the panel still keeps the record selected
+  await page.evaluate(() => { UI.sel = { kind: 'rec', id: DB.records.find(r => r.caseId === 'c-portal').id }; UI.inspOpen = true; go(caseHash('c-portal', 'timeline')); });
+  expect(await page.evaluate(() => UI.inspOpen)).toBe(true);
+  await page.evaluate(() => entryDlg(null, { type: 'media' }));
+  const png = await page.evaluate(async () => { const c = document.createElement('canvas'); c.width = 300; c.height = 200; c.getContext('2d').fillRect(0, 0, 300, 200); return [...new Uint8Array(await (await new Promise(r => c.toBlob(r, 'image/png'))).arrayBuffer())]; });
+  await page.setInputFiles('#ef-file', { name: 'suspect-profile.png', mimeType: 'image/png', buffer: Buffer.from(png) });
+  await expect(page.locator('#ef-resolution')).toHaveValue('300×200');
+  await expect(page.locator('#ef-title')).toHaveValue('suspect-profile');
+  await page.click('#dlg button[type=submit]');
+  await expect(page.locator('#insp .md-ent img[src]')).toBeVisible();
+  expect(await page.evaluate(() => { const e = DB.entries[DB.entries.length - 1]; return [e.fields.type, recById(e.src).att[0].name]; })).toEqual(['Image', 'suspect-profile.png']);
+  noErrors(errors);
+});
+
+test('timeline patterns: first sign of compromise, cleared logs, bursts, quiet periods and time problems, each opening its events', async ({ page }) => {
+  const errors = await open(page, '#/case/c-lantern/timeline');
+  await page.evaluate(() => { const b = 'logged 2026-09-14T09:00:00Z by the proxy'; DB.records.push({ id: 'rzone', caseId: 'c-lantern', type: 'evidence', title: 'Proxy line', body: b, tsRaw: '', tsZone: 'explicit', ts: Date.parse('2026-09-14T14:00:00Z'), host: 'PX1', source: 'proxy', tags: [], ents: [], answer: '', addedBy: 'You', addedAt: Date.now(), hash: '' },
+    { id: 'rfut', caseId: 'c-lantern', type: 'evidence', title: 'Clock wrong', body: '', tsRaw: '', tsZone: 'explicit', ts: Date.now() + 40 * 864e5, host: 'PX1', source: 'x', tags: [], ents: [], answer: '', addedBy: 'You', addedAt: Date.now(), hash: '' }); mutate('t'); });
+  await page.click('[data-act=tlMode][data-v=patterns]');
+  const first = page.locator('.tlx-c:has-text("Likely first sign of compromise")');
+  await expect(first).toContainText('Invoice email delivered to finance');
+  await expect(first).toContainText('judged malicious');
+  await expect(page.locator('.tlx-c:has-text("Logs were cleared")')).toContainText('Security log cleared on DC01');
+  await expect(page.locator('.tlx-c:has-text("Bursts of activity")')).toBeVisible();
+  await expect(page.locator('.tlx-c:has-text("Quiet periods")')).toBeVisible();
+  const tp = page.locator('.tlx-c:has-text("Time problems")');
+  await expect(tp).toContainText('in the future'); await expect(tp).toContainText('5 hours from the time in their own text');
+  await expect(page.locator('.tlx-spark')).toBeVisible();
+  // a finding opens just its events
+  await first.locator('[data-act=tlxWin]').last().click();
+  expect(await page.evaluate(() => [UI.tlMode, !!UI.facet.win, UI.facet.win.label])).toEqual(['events', true, 'hour after the first sign']);
+  await expect(page.locator('.chip.accent:has-text("hour after the first sign")')).toBeVisible();
+  noErrors(errors);
+});
+
+test('picture insights: the same picture and the same place across cases, cameras, and signs of editing', async ({ page }) => {
+  const errors = await open(page, '#/case/c-lantern/media');
+  const jpg = [...require('fs').readFileSync(require('path').resolve(__dirname, 'fixtures', 'photo-gps.jpg'))];
+  await page.evaluate(async jpg => { const f = new File([new Uint8Array(jpg)], 'harbour.jpg', { type: 'image/jpeg' });
+    const bm = await createImageBitmap(f), c = document.createElement('canvas'); c.width = Math.round(bm.width * .6); c.height = Math.round(bm.height * .6); c.getContext('2d').drawImage(bm, 0, 0, c.width, c.height);
+    const small = await new Promise(r => c.toBlob(r, 'image/jpeg', .7));
+    draft.caseId = 'c-lantern'; await attachFiles([f]); draft.caseId = 'c-portal'; await attachFiles([new File([small], 'resized.jpg', { type: 'image/jpeg' })]); }, jpg);
+  await page.evaluate(() => go(caseHash('c-lantern', 'media'))); await page.click('[data-act=mdView][data-v=pic]');
+  await expect(page.locator('.tlx-c:has-text("The same picture, more than once")')).toContainText('also in another case');
+  await expect(page.locator('.tlx-c:has-text("Cameras")')).toContainText('Canon');
+  // editing signs read from the metadata
+  const flags = await page.evaluate(() => [picFlags({ x: { soft: 'Adobe Photoshop 25.0', taken: '2024:05:01 10:00:00', mod: '2024:06:01 10:00:00' } }).map(f => f[1]), picFlags({ type: 'image/jpeg', x: { none: true } }).length]);
+  expect(flags[0]).toEqual(['Edited in Adobe Photoshop 25.0', 'Changed 31d 0h after it was taken']); expect(flags[1]).toBe(1);
+  // older pictures without fingerprints are read when the view opens
+  await page.evaluate(() => { for(const r of DB.records) for(const a of r.att || []){ delete a.dhash; delete a.x; } renderMain(); });
+  await expect.poll(() => page.evaluate(() => picAll().every(x => x.a.dhash && x.a.x))).toBe(true);
+  noErrors(errors);
+});
+
+test('automations: ready-made rules act once on new evidence, log what they did, and arrive switched off from a backup', async ({ page }) => {
+  const errors = await open(page, '#/playbooks');
+  await page.click('[data-act=pbTab][data-v=auto]');
+  for (const id of ['t-store', 't-email', 't-phish']) await page.click(`[data-act=auTpl][data-id=${id}]`);
+  await expect(page.locator('.au-r')).toHaveCount(3);
+  await page.evaluate(async () => { const c = { id: 'c-mine', code: 'MY-1', name: 'My case', status: 'active', color: '#4f46e5', icon: 'folder', scope: '', created: Date.now() }; normCase(c); DB.cases.push(c);
+    await ctiLoad(); ctiAddIocs([{ v: 'evil-cdn.example.net', type: 'domain', threat: 'QakBot' }], 'Test'); mutate('c');
+    const body = 'Link to https://evil-cdn.example.net/x and reply to boss.fake@corp-pay.example';
+    DB.records.push({ id: 'rph', caseId: 'c-mine', type: 'evidence', title: 'Phishing mail', body, tsRaw: '', tsZone: 'explicit', ts: Date.now() - 36e5, host: 'mail01', source: 'email', tags: ['phishing'], ents: E.extract(body), answer: '', addedBy: 'You', addedAt: Date.now(), hash: '' }); mutate('add'); });
+  await expect.poll(() => page.evaluate(() => DB.autoLog.length)).toBeGreaterThanOrEqual(4);
+  const r = await page.evaluate(() => ({ v: DB.verdicts['domain:evil-cdn.example.net'], q: DB.records.filter(x => x.caseId === 'c-mine' && x.type === 'lead').length, e: DB.entries.filter(x => x.caseId === 'c-mine').map(primary), demo: DB.autoLog.every(l => l.c === 'c-mine') }));
+  expect(r).toMatchObject({ v: 'suspicious', e: ['boss.fake@corp-pay.example'], demo: true }); expect(r.q).toBeGreaterThan(4);
+  // nothing repeats on the next change
+  const n = await page.evaluate(() => DB.autoLog.length); await page.evaluate(() => mutate('again')); await page.waitForTimeout(1500);
+  expect(await page.evaluate(() => DB.autoLog.length)).toBe(n);
+  await page.evaluate(() => renderMain()); await expect(page.locator('.au-log li').first()).toBeVisible();
+  // a custom rule from the form
+  await page.click('[data-act=auNew]'); await page.fill('#auName', 'Watch hashes'); await page.uncheck('[name=auK][value=ip]'); await page.uncheck('[name=auK][value=domain]'); await page.check('[name=auK][value=hash]');
+  await page.uncheck('[name=auDo][value=store]'); await page.check('[name=auDo][value=watch]'); await page.click('#dlg button[type=submit]');
+  await expect(page.locator('.au-r:has-text("Watch hashes")')).toContainText('file hash');
+  // a backup cannot bring in automations that act by themselves
+  const bk = await page.evaluate(async () => JSON.stringify(await backupObject()));
+  page.once('filechooser', fc => fc.setFiles({ name: 'b.json', mimeType: 'application/json', buffer: Buffer.from(bk) }));
+  await page.evaluate(() => clickAct('importAll')); await page.click('#dlg button:has-text("Import backup")');
+  await expect.poll(() => page.evaluate(() => DB.autos.length && DB.autos.every(R => R.on === false))).toBe(true);
+  noErrors(errors);
+});
+
+test('since you were last here: a case lists what arrived while it was closed', async ({ page }) => {
+  const errors = await open(page, '#/case/c-portal/overview');
+  await page.evaluate(() => go('#/home'));
+  await page.evaluate(() => { DB.prefs.seen['c-portal'] = Date.now() - 2 * 864e5;
+    const b = 'Callback to 203.0.113.47 seen again'; DB.records.push({ id: 'rnew', caseId: 'c-portal', type: 'evidence', title: 'New callback', body: b, tsRaw: '', tsZone: 'explicit', ts: Date.now() - 6e5, host: 'WEB02', source: 'edr', tags: [], ents: E.extract(b), answer: '', addedBy: 'Automation', addedAt: Date.now() - 36e5, hash: '' });
+    DB.records.push({ id: 'rnew2', caseId: 'c-lantern', type: 'evidence', title: 'Also here', body: b, tsRaw: '', tsZone: 'explicit', ts: Date.now() - 6e5, host: 'X', source: 'edr', tags: [], ents: E.extract(b), answer: '', addedBy: 'You', addedAt: Date.now() - 36e5, hash: '' }); mutate('x'); });
+  await page.evaluate(() => go(caseHash('c-portal', 'overview')));
+  const card = page.locator('.act-c'); await expect(card).toContainText('Since you were last here');
+  await expect(card).toContainText('added by Automation'); await expect(card).toContainText('turned up in another case');
+  await card.locator('[data-act=tlFrom]').click();
+  await expect(page.locator('#tlV .ev')).toHaveCount(1);
+  noErrors(errors);
+});
+
+test('backup reminders: due after a week of own work, shown on the dashboard and in the sidebar, folder backup offered', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  await page.evaluate(() => { const c = { id: 'c-own', code: 'OWN-1', name: 'Own', status: 'active', color: '#4f46e5', icon: 'folder', scope: '', created: Date.now() }; normCase(c); DB.cases.push(c);
+    for (let i = 0; i < 4; i++) DB.records.push({ id: 'ro' + i, caseId: 'c-own', type: 'evidence', title: 'x' + i, body: '', tsRaw: '', tsZone: '', ts: null, host: '', source: '', tags: [], ents: [], answer: '', addedBy: 'You', addedAt: Date.now(), hash: '' });
+    DB.prefs.firstUse = Date.now() - 10 * 864e5; DB.prefs.lastExport = 0; DB.prefs.remindAt = 0; mutate('own'); renderAll(); });
+  await expect(page.locator('.bkp')).toContainText('You have not backed up yet');
+  await expect(page.locator('.sidefoot.due')).toContainText('Backup due');
+  await page.click('.bkp [data-act=bkpLater]');
+  await expect(page.locator('.bkp')).toHaveCount(0); await expect(page.locator('.sidefoot.due')).toHaveCount(0);
+  noErrors(errors);
+});
+
+test('guided tour walks through the demo case and can be left with Escape', async ({ page }) => {
+  const errors = await open(page, '#/help');
+  await page.click('[data-act=tourStart]');
+  for (let i = 0; i < 7; i++) { await expect(page.locator('#tourCard .tour-n')).toHaveText(`${i + 1} of 8`); await expect(page.locator('#tourRing')).toBeVisible(); await page.click('[data-act=tourNext]'); }
+  await expect(page.locator('#tourCard')).toContainText('Now your own case');
+  await page.keyboard.press('Escape'); await expect(page.locator('#tourCard')).toHaveCount(0);
+  noErrors(errors);
+});
+
+test('fast long lists: 50,000 indicators and 5,000 rules draw only what is on screen', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  await page.evaluate(async () => { await ctiLoad(); const L = []; for (let i = 0; i < 50000; i++) L.push({ v: '10.' + (i >> 16 & 255) + '.' + (i >> 8 & 255) + '.' + (i & 255), type: 'ipv4', tags: ['bulk'] }); ctiAddIocs(L, 'Bulk');
+    const base = DB.rules[0]; for (let i = 0; i < 5000; i++) DB.rules.push({ ...base, id: 'rx' + i, title: 'Rule ' + i }); mutate('x'); UI.itab = 'iocs'; go('#/feeds'); });
+  await expect(page.locator('#ioV [data-vi]').first()).toBeVisible();
+  expect(await page.locator('#ioV [data-vi]').count()).toBeLessThan(120);
+  const t = await page.evaluate(() => { const t0 = performance.now(); renderMain(); return performance.now() - t0; }); expect(t).toBeLessThan(400);
+  await page.evaluate(() => { DB.prefs.dLay = 'table'; UI.dview = 'rules'; go('#/detections'); });
+  await page.evaluate(() => { const v = document.querySelector('[data-act=dLay][data-v=table], [data-act=rLay][data-v=table]'); if (v) v.click(); });
+  await expect(page.locator('#dtV [data-vi], #ideV [data-vi]').first()).toBeVisible();
+  expect(await page.locator('#dtV [data-vi], #ideV [data-vi]').count()).toBeLessThan(120);
+  noErrors(errors);
+});
+
+test('a large workspace stays usable: 50,000 records and their indicators', async ({ page }) => {
+  test.setTimeout(180_000);
+  const errors = await open(page, '#/home');
+  const r = await page.evaluate(async () => { const t0 = Date.UTC(2026, 8, 1); const hosts = ['WEB01', 'DB01', 'WS-07', 'DC01'];
+    for (let i = 0; i < 50000; i++) { const b = `conn ${i} from 198.51.${(i >> 8) & 255}.${i & 255} to evil${i % 300}.example.org user u${i % 50}`;
+      DB.records.push({ id: 'big' + i, caseId: 'c-portal', type: 'evidence', title: 'Event ' + i, body: b, tsRaw: '', tsZone: 'explicit', ts: t0 + i * 37000, host: hosts[i % 4], source: 'gen', tags: [], ents: E.extract(b), answer: '', addedBy: 'You', addedAt: Date.now(), hash: '' }); }
+    mutate('big'); const out = {};
+    for (const tab of ['overview', 'timeline', 'entities']) { const s = performance.now(); location.hash = caseHash('c-portal', tab); onRoute(); out[tab] = Math.round(performance.now() - s); }
+    UI.tlMode = 'patterns'; let s = performance.now(); renderMain(); out.patterns = Math.round(performance.now() - s);
+    out.heap = performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : 0; return out; });
+  console.log('large workspace', JSON.stringify(r));
+  for (const k of ['overview', 'timeline', 'entities', 'patterns']) expect(r[k]).toBeLessThan(6000);
+  if (r.heap) expect(r.heap).toBeLessThan(1500);
+  noErrors(errors);
+});
+
+test('newer screens fit a phone: patterns, media, picture insights, automations, tour @phone', async ({ page }) => {
+  const errors = await open(page, '#/case/c-lantern/timeline');
+  const fits = () => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1 && [...document.querySelectorAll('#main .card')].every(c => c.getBoundingClientRect().right <= innerWidth + 1));
+  await page.evaluate(() => { UI.tlMode = 'patterns'; renderMain(); }); await expect(page.locator('.tlx-c').first()).toBeVisible(); expect(await fits()).toBe(true);
+  await page.evaluate(() => go(caseHash('c-lantern', 'media'))); await expect(page.locator('.md-head, .md-empty').first()).toBeVisible(); expect(await fits()).toBe(true);
+  await page.evaluate(() => { UI.mdV = 'pic'; renderMain(); }); expect(await fits()).toBe(true);
+  await page.evaluate(() => { UI.pbTab = 'auto'; go('#/playbooks'); }); await expect(page.locator('.au-intro')).toBeVisible(); expect(await fits()).toBe(true);
+  await page.evaluate(() => tourStart()); await expect(page.locator('#tourCard')).toBeVisible();
+  expect(await page.evaluate(() => { const r = $('tourCard').getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth; })).toBe(true);
   noErrors(errors);
 });

@@ -38,7 +38,7 @@ function renderMain(){
   radialHide(); layoutFocus(); if(typeof placeInsp === 'function') requestAnimationFrame(placeInsp);
   if(typeof workSync === 'function') workSync();
 }
-function renderAll(){ document.documentElement.dataset.area = UI.route.area; renderNav(); renderMain(); renderInsp(); paintLock(); $('inspBtn').classList.toggle('on', UI.inspOpen); placeInsp(); }
+function renderAll(){ document.documentElement.dataset.area = UI.route.area; renderNav(); renderMain(); renderInsp(); paintLock(); $('inspBtn').classList.toggle('on', UI.inspOpen); placeInsp(); if(typeof paintBackupFoot === 'function') paintBackupFoot(); }
 /* the floating details card starts below the page's own toolbars (graph tools, case tabs), so it never covers them */
 function placeInsp(){ const t = document.querySelector('.gtools') || document.querySelector('.chead .tabs, .ctabs'); let y = 0;
   if(t){ const r = t.getBoundingClientRect(); if(r.height) y = Math.round(r.bottom + 10); }
@@ -51,8 +51,9 @@ function onRoute(){
   const m = $('main'); m.classList.add('enter'); clearTimeout(onRoute.t); onRoute.t = setTimeout(() => m.classList.remove('enter'), 320);
   if(UI.route.area !== 'case' || UI.route.tab !== 'graph'){ UI.graph.mode = null; UI.graph.first = null; }
   if(UI.sel && UI.sel.kind === 'entry'){ const e = entryById(UI.sel.id); if(!e || e.caseId !== DB.active) UI.sel = null; }
-  { const where = UI.route.area === 'case' ? 'case:' + DB.active : UI.route.area;   // a new page closes the details panel
+  { const where = UI.route.area === 'case' ? 'case:' + DB.active + ':' + UI.route.tab : UI.route.area;   // a new page or case tab closes the details panel
     if(onRoute.where && onRoute.where !== where && UI.sel === UI.shownSel){ UI.sel = null; UI.inspOpen = false; } onRoute.where = where; }   // a selection made just before navigating (Open in timeline…) is kept
+  if(typeof seenRoute === 'function') seenRoute();
   renderAll(); const s = $('main').querySelector('.scroll'); if(s) s.scrollTop = 0;
   /* opening a record from elsewhere brings it into view in the timeline */
   if(UI.route.area === 'case' && UI.route.tab === 'timeline' && UI.sel && UI.sel.kind === 'rec' && typeof vlScrollTo === 'function') vlScrollTo('tlV', UI.sel.id);
@@ -116,6 +117,11 @@ document.addEventListener('click', ev => {
   if(typeof SH_ACTS !== 'undefined' && SH_ACTS[a]) return SH_ACTS[a](id, v, t, ev);
   if(typeof SU_ACTS !== 'undefined' && SU_ACTS[a]) return SU_ACTS[a](id, v, t, ev);
   if(typeof MD_ACTS !== 'undefined' && MD_ACTS[a]) return MD_ACTS[a](id, v, t, ev);
+  if(typeof TLX_ACTS !== 'undefined' && TLX_ACTS[a]) return TLX_ACTS[a](id, v, t, ev);
+  if(typeof PIC_ACTS !== 'undefined' && PIC_ACTS[a]) return PIC_ACTS[a](id, v, t, ev);
+  if(typeof ACT_ACTS !== 'undefined' && ACT_ACTS[a]) return ACT_ACTS[a](id, v, t, ev);
+  if(typeof AU_ACTS !== 'undefined' && AU_ACTS[a]) return AU_ACTS[a](id, v, t, ev);
+  if(typeof TOUR_ACTS !== 'undefined' && TOUR_ACTS[a]) return TOUR_ACTS[a](id, v, t, ev);
   if(NBX_ACTS[a]) return NBX_ACTS[a](id, v, t, ev);
   if(a === 'toolRun') return toolRunDlg(id);
   if(a === 'trPick'){ $('trV').value = v; return $('trV').focus(); }
@@ -263,7 +269,7 @@ document.addEventListener('click', ev => {
       { const errs = checkImport(d, 'backup'); if(errs.length) return importRefused('The backup', errs); }
       confirmDlg('Replace everything with this backup?', 'Your current cases, notes, tools and rules in this browser are replaced by the ' + d.cases.length + ' case' + (d.cases.length === 1 ? '' : 's') + ' in the file. You can undo right after.', 'Import backup', async () => {
         await snapshot('Before importing a backup'); if(d.files){ await rekeyFiles(d.files, d.records, d.trash); delete d.files; } const nbfiles = d.nbfiles; delete d.nbfiles;
-        d.records.forEach(normRecord); d.entries.forEach(normEntry); d.cases.forEach(normCase); (d.links || []).forEach(normLink); d.verdicts = normVerdicts(d.verdicts);
+        d.records.forEach(normRecord); d.entries.forEach(normEntry); d.cases.forEach(normCase); (d.links || []).forEach(normLink); d.verdicts = normVerdicts(d.verdicts); d.autos = normAutos(d.autos); d.autoDone = {}; d.autoLog = [];
         if(typeof ctiLoad === 'function') await ctiLoad(); const prevIocs = typeof CTI !== 'undefined' && CTI.iocs ? CTI.iocs.slice() : null;
         const noFiles = d.filesLeftOut === true; delete d.filesLeftOut;
         const prev = DB, inIocs = Array.isArray(d.ctiIocs) ? d.ctiIocs.slice(0, CTI_IOC_MAX) : null; delete d.ctiIocs; DB = d; DB.recent = prev.recent; DB.work = prev.work; if(DB.intel && prev.intel) (DB.intel.sources || []).forEach(s => { const o = (prev.intel.sources || []).find(x => x.id === s.id); s.key = o ? o.key || '' : ''; }); importSafeIntel(prev); DB.security = prev.security;          /* trusted keys, signing key and auto-lock stay this browser's own */ if(inIocs){ await ctiLoad(); CTI.iocs = []; ctiIocIndex(); const iso = t => { const z = new Date(t); return t && !isNaN(z) ? z.toISOString() : ''; }; ctiAddIocs(inIocs.filter(x => x && typeof x === 'object').map(x => ({v:x.v, type:x.k, tags:x.tags, threat:x.threat, desc:x.desc, ref:x.ref, tlp:x.tlp, conf:x.conf, srcs:x.srcs, first:iso(x.first), last:iso(x.last), exp:iso(x.exp)})), 'Backup'); await ctiSaveIocs(); } DB.prefs = Object.assign({}, prev.prefs, d.prefs || {}); ensureTools(); ensurePlaybooks(); ensureIntel(); ensureQueries(); ensureRules(); ensureNotes(); if(DB.nb){ nbSanitize(); await nbRestoreFiles(nbfiles); } else ensureNB(); UI.nbView = 'lib'; UI.nbRev = null; if(!DB.cases.some(c => c.id === DB.active)) DB.active = DB.cases[0] && DB.cases[0].id;
@@ -486,15 +492,18 @@ document.addEventListener('submit', ev => {
     { const pv = normName(fields[t.fields[0][0]]), twin = DB.entries.find(x => x.caseId === DB.active && x.type === d.type && x.id !== d.id && normName(x.fields[t.fields[0][0]]) === pv);
       if(twin && !softDup(f, twin.id, 'ef-' + t.fields[0][0], `This ${t.label.toLowerCase()} is already in this case's vault.`)) return; }
     const tags = $('ef-tags').value.split(',').map(s => s.trim()).filter(Boolean), priority = $('ef-prio').value, notes = $('ef-notes').value.trim();
-    if(d.id){ const e = entryById(d.id); Object.assign(e, {fields, tags, priority, notes}); mutate('edited ' + primary(e)); closeDlg(); renderAll(); return toast('Saved'); }
+    const upFile = UI.entFile; UI.entFile = null;
+    if(d.id){ const e = entryById(d.id); Object.assign(e, {fields, tags, priority, notes}); mutate('edited ' + primary(e)); closeDlg(); renderAll(); if(upFile) return mediaForEntry(e, [upFile]); return toast('Saved'); }
     const e = {id:uid('v'), caseId:DB.active, type:d.type, fields, priority, starred:false, tags, notes, src:d.src || '', created:Date.now(), pos:UI.graph.newPos || null};
     if(!e.pos && cy){ const ext = cy.extent(); e.pos = {x:(ext.x1 + ext.x2) / 2, y:(ext.y1 + ext.y2) / 2}; }
     UI.graph.newPos = null;
     if(!e.pos && DB.entries.some(x => x.caseId === DB.active && x.pos)){ const ps = DB.entries.filter(x => x.caseId === DB.active && x.pos).map(x => x.pos); e.pos = {x:Math.max(...ps.map(p => p.x)) + 90, y:ps.reduce((s, p) => s + p.y, 0) / ps.length}; }
     const lf = UI.graph.linkFrom; DB.entries.push(e); mutate('added ' + primary(e)); closeDlg(); UI.sel = {kind:'entry', id:e.id}; UI.inspOpen = true; renderAll();
     if(lf && entryById(lf)){ setTimeout(() => linkDlg({a:lf, b:e.id}), 60); }
+    if(upFile) return mediaForEntry(e, [upFile]);
     return toast(t.label + ' added to the vault' + (UI.route.tab === 'graph' ? ' and the graph' : ''));
   }
+  if(k === 'auto') return autoSave(f);
   if(k === 'case'){
     const st = window.__caseDraft, name = $('cName').value.trim().replace(/\s+/g, ' '); if(!name) return fieldErr('cName', 'Give the case a name.'); if(!checkLen('cName', name, LIMITS.name, 'Name') || !checkLen('cScope', $('cScope').value.trim(), LIMITS.desc, 'Scope')) return;
     if(clash(DB.cases, name, 'name', f.dataset.edit ? DB.active : null)) return fieldErr('cName', `A case called “${name}” already exists. Use a different name so you can tell them apart.`);

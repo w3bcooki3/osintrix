@@ -133,8 +133,22 @@ function paintEntryDlg(){
     <div class="frow">${t.fields.map(f).join('')}</div>
     <div class="frow"><div class="field"><label for="ef-prio">Priority</label><select id="ef-prio">${['low','medium','high','critical'].map(p => `<option value="${p}"${d.priority === p ? ' selected' : ''}>${p[0].toUpperCase() + p.slice(1)}</option>`).join('')}</select></div>
       <div class="field"><label for="ef-tags">Tags</label><input id="ef-tags" value="${esc(d.tags)}" placeholder="actor, c2"></div></div>
+    ${d.type === 'media' ? `<div class="field"><label for="ef-file">File <span class="t3">optional — the picture, video, audio or saved page itself</span></label>
+      <label class="md-pick" id="efDrop"><input id="ef-file" type="file" accept="image/*,video/*,audio/*,.mhtml,.mht,.html,.htm">${ico('upload','sm')}<span id="efFileT">Choose a file or drop it here — kept unchanged with its SHA-256</span></label></div>` : ''}
     <div class="field" style="margin:0"><label for="ef-notes">Notes</label><textarea id="ef-notes" rows="3" placeholder="What you know and how you know it">${esc(d.notes)}</textarea></div></div>
-    <footer><span class="t3">${d.id ? '' : 'Lands in ' + esc(theCase().name.split(' — ')[0])}</span><button class="btn" type="button" data-act="dclose">Cancel</button><button class="btn primary" type="submit">${d.id ? 'Save changes' : 'Add to vault'}</button></footer></form>`, true);
+    <footer><span class="t3">${d.id ? '' : 'Lands in ' + esc(theCase().name.split(' — ')[0])}</span><button class="btn" type="button" data-act="dclose">Cancel</button><button class="btn primary" type="submit">${d.id ? 'Save changes' : 'Add to vault'}</button></footer></form>`, true);  UI.entFile = null; if(d.type === 'media') entFileWire();
+}
+/* the file chosen in the Image / video form: fills in what it can, stored when the entry is saved */
+function entFileWire(){
+  const inp = $('ef-file'), zone = $('efDrop'); if(!inp) return;
+  const take = async f => { if(!f) return; UI.entFile = f; const k = mediaKind(f);
+    $('efFileT').textContent = f.name + ' · ' + fmtBytes(f.size) + (f.size > MEDIA_MAX ? ' — over 50 MB: its fingerprint is recorded, the file is not stored' : '');
+    const set = (n, v) => { const el = $('ef-' + n); if(el && !el.value && v) el.value = v; };
+    set('title', f.name.replace(/\.[^.]+$/, '')); const ty = $('ef-type'); if(ty && !ty.value){ const want = {image:'Image', video:'Video', audio:'Audio', page:'Web page'}[k]; if(want && [...ty.options].some(o => o.value === want || o.text === want)) ty.value = want; }
+    if((k === 'image' || k === 'video') && f.size <= MEDIA_MAX){ const P = await mediaProbe(f, k); if(P.w) set('resolution', P.w + '×' + P.h); } };
+  inp.onchange = () => take(inp.files[0]);
+  zone.ondragover = ev => { ev.preventDefault(); ev.stopPropagation(); zone.classList.add('on'); }; zone.ondragleave = () => zone.classList.remove('on');
+  zone.ondrop = ev => { ev.preventDefault(); ev.stopPropagation(); zone.classList.remove('on'); take(ev.dataTransfer.files[0]); };
 }
 
 function caseDlg(edit){

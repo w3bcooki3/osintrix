@@ -34,7 +34,7 @@ async function fbChoose(){
   catch(e){ if(e && e.name !== 'AbortError') toast('Could not use that folder: ' + (e.message || e.name)); return; }
   FB.dir = dir; try{ await IDB.set(FB_DIR, dir); }catch(e){}
   const p = fbGet(); Object.assign(p, {on:true, name:dir.name || 'folder', err:''}); fbSet(p); FB.state = 'on';
-  await fbRun(true); toast('Backing up to “' + p.name + '”');
+  await fbRun(true); toast('Backing up to “' + p.name + '”'); if(document.querySelector('#dlg .su') && typeof setupPaint === 'function') setupPaint(); else renderAll();
 }
 async function fbResume(){
   if(!FB.dir) FB.dir = await IDB.get(FB_DIR);

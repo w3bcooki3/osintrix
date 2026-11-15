@@ -34,7 +34,7 @@ const TYPE_LIST = [
   ['device','Device / MAC','cpu','tech','--t-infra','mac',[['mac','MAC address','text'],['vendor','Vendor','text'],['hostname','Host name','text']]],
   ['url','URL','link-2','tech','--t-infra','url',[['url','URL','text'],['status','Status','select',['Live','Down','Unknown']]]],
   ['document','Document','file-text','files','--t-file',null,[['title','Title','text'],['type','Type','select',['PDF','DOC','XLS','TXT','Other']],['url','Source URL','url'],['hash','SHA-256','text']]],
-  ['media','Image / video','image','files','--t-file',null,[['title','Title','text'],['type','Media type','select',['Image','Video','Audio']],['url','Source URL','url'],['resolution','Resolution','text']]],
+  ['media','Image / video','image','files','--t-file',null,[['title','Title','text'],['type','Media type','select',['Image','Video','Audio','Web page']],['url','Source URL','url'],['resolution','Resolution','text']]],
   ['file','File / hash','hash','files','--t-file','sha256',[['hash','SHA-256','text'],['filename','File name','text'],['size','Size','text'],['type','Type','text']]],
   ['threat','Threat / campaign','shield-alert','intel','--t-threat',null,[['name','Name','text'],['kind','Kind','select',['Malware family','Campaign','Actor','Technique']],['severity','Severity','select',['Low','Medium','High','Critical']],['confidence','Confidence','select',['Low','Medium','High']]]],
   ['vulnerability','Vulnerability','bug','intel','--t-threat','cve',[['cve','CVE','text'],['product','Product','text'],['cvss','CVSS','text']]],

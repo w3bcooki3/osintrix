@@ -129,7 +129,7 @@ function viewDetections(){
         <div class="ide-h">Sigma</div>${node('sigma','','All Sigma',n('sigma'),'scroll-text')}${cats('sigma').map(([c, k]) => node('sigma', c, cap(c), k, '', true)).join('')}
         <div class="ide-h">YARA</div>${node('yara','','All YARA',n('yara'),'binary')}${cats('yara').map(([c, k]) => node('yara', c, cap(c), k, '', true)).join('')}</nav>
       <div class="ide-list"><div class="ide-lh">${search}<button class="iconbtn" data-act="rNew" aria-label="New rule" title="New rule">${ico('plus','sm')}</button></div>
-        <div class="ide-items">${list.slice(0, LIM).map(r => `<button class="ide-i" data-act="rSel" data-id="${esc(r.id)}" aria-current="${!!(cur && cur.id === r.id)}"><b>${esc(r.title)}${r.starred ? ` <span class="tstar">${ico('star','sm')}</span>` : ''}</b><small>${sevTag(r)}${esc([RTYPE[r.type][0], r.technique].filter(Boolean).join(' · '))}</small></button>`).join('') || '<p class="t3" style="padding:16px">No rules match.</p>'}${more}</div></div>
+        <div class="ide-items" data-vlsc>${list.length ? vlist('ideV', list.map(r => ({k:r.id, h:62, r:() => `<button class="ide-i" data-act="rSel" data-id="${esc(r.id)}" aria-current="${!!(cur && cur.id === r.id)}"><b>${esc(r.title)}${r.starred ? ` <span class="tstar">${ico('star','sm')}</span>` : ''}</b><small>${sevTag(r)}${esc([RTYPE[r.type][0], r.technique].filter(Boolean).join(' · '))}</small></button>`})), {focus:cur ? cur.id : null}) : '<p class="t3" style="padding:16px">No rules match.</p>'}</div></div>
       <section class="ide-ed">${cur ? ruleEditor(cur) : none}</section></div></div>`;
   }
 
@@ -139,13 +139,13 @@ function viewDetections(){
         <h3>${esc(r.title)}</h3>${r.desc ? `<p>${esc(r.desc)}</p>` : ''}
         <pre class="gcode hl">${hlCode(r.type, r.code.split('\n').slice(0, 7).join('\n'))}</pre>
         <div class="gcard-f"><span class="mono t3">${esc(r.technique || '—')}</span>${r.platform ? `<span class="t3">· ${esc(r.platform)}</span>` : ''}<span style="flex:1"></span><span class="t3">${ago(r)}</span></div></article>`).join('')}</div>${more}`
-    : `<div class="card dtw"><table class="dt"><thead><tr><th class="c-star"></th>${sortTh('rSort','title',sk,sd,'Rule')}${sortTh('rSort','type',sk,sd,'Type','c-cat')}${sortTh('rSort','severity',sk,sd,'Severity','c-sev')}${sortTh('rSort','technique',sk,sd,'Technique','c-tech')}<th class="c-plat">Platform</th>${sortTh('rSort','modified',sk,sd,'Updated','c-upd')}<th class="c-act"></th></tr></thead><tbody>
-      ${list.slice(0, LIM).map(r => { const c = r.caseId ? theCase(r.caseId) : null;
+    : `<div class="card dtw"><table class="dt"><thead><tr><th class="c-star"></th>${sortTh('rSort','title',sk,sd,'Rule')}${sortTh('rSort','type',sk,sd,'Type','c-cat')}${sortTh('rSort','severity',sk,sd,'Severity','c-sev')}${sortTh('rSort','technique',sk,sd,'Technique','c-tech')}<th class="c-plat">Platform</th>${sortTh('rSort','modified',sk,sd,'Updated','c-upd')}<th class="c-act"></th></tr></thead>
+      ${vlist('dtV', list.map(r => ({k:r.id, h:66, r:() => { const c = r.caseId ? theCase(r.caseId) : null;
         return `<tr data-act="rSel" data-id="${esc(r.id)}" aria-current="${!!(open && cur.id === r.id)}" tabindex="0">
           <td class="c-star"><button class="tb-ic${r.starred ? ' on star' : ''}" data-act="rStar" data-id="${esc(r.id)}" aria-label="Star">${ico('star','sm')}</button></td>
           <td class="c-name"><b>${esc(r.title)}</b><span>${esc(r.desc || '')}</span>${c ? `<em class="c-case" style="--c:${esc(c.color)}">${esc(c.code)}</em>` : ''}</td>
           <td class="c-cat">${typeTag(r)}</td><td class="c-sev">${sevTag(r)}</td><td class="c-tech mono">${esc(r.technique || '—')}</td><td class="c-plat">${esc(r.platform || '—')}</td><td class="c-upd">${ago(r)}</td>
-          <td class="c-act">${ico('chevron-right','sm')}</td></tr>`; }).join('')}</tbody></table></div>${more}`;
+          <td class="c-act">${ico('chevron-right','sm')}</td></tr>`; }})), {tbody:true, cols:8})}</table></div>`;
   return `<div class="scroll"><div class="page wide">${head}
     <div class="toolbar ltb">${search}${typeSeg}${sevSel}${platSel}${lvlSel}<span style="flex:1"></span><span class="t3 lcount">${total} rule${total === 1 ? '' : 's'}</span></div>
     ${body}</div></div>${lay === 'table' && open ? drawer(ruleEditor(cur), 'rClose', cur.title, ico(RTYPE[cur.type][1],'sm') + RTYPE[cur.type][0] + ' rule') : ''}`;

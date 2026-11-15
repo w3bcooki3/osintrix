@@ -199,3 +199,12 @@ if(TABS.ch) TABS.ch.onmessage = async ev => {
   if(TABS.writer || !ev.data || ev.data.t !== 'saved' || !DB || SEC.key || SEC.locked) return;
   clearTimeout(TABS.rt); TABS.rt = setTimeout(async () => { const d = await loadAll(); if(d && !d.__locked && !d.__bad && usable(d)){ const prefs = DB.prefs; DB = d; DB.prefs = prefs; cache = {}; renderAll(); } }, 300);
 };
+
+/* automations from a backup arrive switched off and checked field by field: a file must never start acting on its own */
+function normAutos(L){
+  if(!Array.isArray(L)) return []; const kinds = AUTO_KINDS.map(x => x[0]), acts = Object.keys(AUTO_DO);
+  return L.filter(R => R && typeof R === 'object').slice(0, 100).map(R => { const w = R.when && typeof R.when === 'object' ? R.when : {};
+    return {id:typeof R.id === 'string' && /^[\w-]{1,60}$/.test(R.id) ? R.id : uid('au'), tpl:typeof R.tpl === 'string' ? R.tpl.slice(0, 40) : undefined, name:String(R.name || 'Automation').slice(0, 120), on:false, runs:0,
+      when:{ev:['ind', 'tag', 'verdict'].includes(w.ev) ? w.ev : 'ind', kinds:(Array.isArray(w.kinds) ? w.kinds : []).filter(k => kinds.includes(k)), text:String(w.text || '').slice(0, 80), verdict:['malicious', 'suspicious'].includes(w.verdict) ? w.verdict : 'malicious'},
+      scope:typeof R.scope === 'string' && /^[\w-]{1,60}$/.test(R.scope) ? R.scope : 'all',
+      then:(Array.isArray(R.then) ? R.then : []).filter(t => t && acts.includes(t.a)).slice(0, 8).map(t => ({a:t.a, prio:['low', 'medium', 'high', 'critical'].includes(t.prio) ? t.prio : undefined, text:t.text ? String(t.text).slice(0, 200) : undefined, v:['malicious', 'suspicious', 'benign'].includes(t.v) ? t.v : undefined, id:typeof t.id === 'string' ? t.id.slice(0, 60) : undefined}))}; }); }
