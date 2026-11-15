@@ -212,6 +212,9 @@ test('broken versions of real log formats never break the importer', async ({ pa
       'Mar  1 10:00:00 web01 sshd[123]: Failed password for root from 203.0.113.50 port 51234 ssh2',
       '{"eventVersion":"1.08","eventTime":"2024-03-01T10:00:00Z","eventName":"ConsoleLogin","sourceIPAddress":"198.51.100.7","userIdentity":{"type":"IAMUser","userName":"ops"}}',
       '#fields\tts\tuid\tid.orig_h\tid.resp_h\tquery\n1709287200.0\tC1\t10.0.0.5\t8.8.8.8\tevil.example',
+      '<Events><Event><System><EventID>4625</EventID><TimeCreated SystemTime="2024-03-01T13:00:00.000Z"/></System><EventData><Data Name="TargetUserName">admin</Data></EventData></Event><Event><System><EventID>4624</EventID></System></Event></Events>',
+      'CreationDate,UserIds,Operations,AuditData\r\n2024-03-01T12:00:00Z,a@b.example,New-InboxRule,"{""CreationTime"":""2024-03-01T12:00:00"",""Operation"":""New-InboxRule"",""UserId"":""a@b.example"",""ClientIP"":""[2001:db8::7]:5"",""Workload"":""Exchange""}"',
+      '[{"published":"2024-03-01T11:00:00Z","eventType":"user.session.start","actor":{"alternateId":"e@x.example"},"client":{"ipAddress":"45.33.32.156"},"outcome":{"result":"FAILURE"}}]',
     ];
     let seed = 11; const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648, pick = a => a[Math.floor(rnd() * a.length)];
     const mutate = s => { const k = Math.floor(rnd() * 10), i = Math.floor(rnd() * s.length);
@@ -366,5 +369,214 @@ test('timeline: a source whose clock is off is found (and normal jitter is not),
   // show one session: the timeline filters to that host and time
   await page.locator('.tlx-c:has-text("Sessions") [data-act=tx2Sess]').first().click();
   expect(await page.evaluate(() => [UI.tlMode, UI.facet.host])).toEqual(['events', 'WS-02']);
+  noErrors(errors);
+});
+
+test('blind spots of the same kind are grouped, previewed for noise, and one draft rule closes the whole group', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  await page.evaluate(() => { UI.tlMode = 'rules'; UI.crf = 'blind'; go(caseHash('c-lantern', 'timeline')); });
+  await expect(page.locator('.cr-sum')).toBeVisible({ timeout: 20000 });
+  const G = await page.evaluate(() => CR.res.groups.map(g => ({ n: g.G.length, title: g.G[0].r.title, ok: g.ok, extra: g.extra, ids: g.G.map(x => x.r.id) })));
+  const beacons = G.find(g => /beacon/i.test(g.title)); expect(beacons).toBeTruthy(); expect(beacons.n).toBeGreaterThanOrEqual(3); expect(beacons.ok).toBe(true);
+  expect(G.every(g => g.n >= 2)).toBe(true);
+  const card = page.locator('.cr-g', { hasText: beacons.title }).first();
+  await expect(card).toContainText(beacons.n + ' alike');
+  await expect(card).toContainText(beacons.extra ? 'would also match' : 'would match nothing else');
+  const blind0 = await page.evaluate(() => CR.res.blind.length);
+  await card.locator('[data-act=crDraftG]').click();
+  await expect(page).toHaveURL(/#\/detections/);
+  const rule = await page.evaluate(() => { const r = DB.rules[0]; return { tests: r.tests.filter(t => t.kind === 'hit').length, draft: r.tags.includes('draft') }; });
+  expect(rule.draft).toBe(true); expect(rule.tests).toBe(Math.min(5, beacons.n));
+  await page.evaluate(() => { UI.tlMode = 'rules'; go(caseHash('c-lantern', 'timeline')); });
+  await expect.poll(() => page.evaluate(() => CR.res && CR.sig === crSig('c-lantern') && CR.res.blind.length)).toBe(blind0 - beacons.n);
+  noErrors(errors);
+});
+
+test('a corrected clock shows on every event it touched, can be taken back from any of them, and survives export and import', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  await page.evaluate(() => {
+    DB.cases.push({ id: 'c-ts', code: 'TS-1', name: 'Clock', color: '#0ea5e9', status: 'active', created: Date.now(), updated: Date.now() });
+    const T = Date.UTC(2024, 4, 2, 9); let i = 0; const mk = (src, t, b) => ({ id: 'r-ts' + (i++), caseId: 'c-ts', type: 'evidence', title: src + ' ' + i, body: b, ts: t, tsRaw: '', tsZone: 'explicit', source: src, host: 'H', tags: [], ents: extractRich(b), addedAt: Date.now() });
+    for (const [m, v] of [[0, '203.0.113.10'], [5, '198.51.100.7'], [9, '203.0.113.10'], [14, '198.51.100.7']]) DB.records.push(mk('edr', T + m * 6e4, 'connect ' + v), mk('fw', T + m * 6e4 + 36e5, 'allow tcp 10.0.0.5:5000 -> ' + v + ':443'));
+    rev++; DB.active = 'c-ts'; UI.tlMode = 'patterns'; go(caseHash('c-ts', 'timeline'));
+  });
+  await page.locator('.tlx-c:has-text("Clocks that disagree") [data-act=tx2Shift]').first().click();
+  const shifted = await page.evaluate(() => DB.records.filter(r => r.caseId === 'c-ts' && r.tsShift).map(r => r.source));
+  expect(shifted.length).toBe(4); expect(new Set(shifted).size).toBe(1);
+  // the timeline marks each corrected event; the details panel explains and offers to take it back
+  await page.evaluate(() => { UI.tlMode = 'events'; renderMain(); });
+  await expect(page.locator('.tshift')).toHaveCount(4);
+  const id = await page.evaluate(() => DB.records.find(r => r.caseId === 'c-ts' && r.tsShift).id);
+  await page.evaluate(i => { UI.sel = { kind: 'rec', id: i }; UI.inspOpen = true; renderAll(); }, id);
+  await expect(page.locator('.tshift-n')).toContainText('Time corrected by');
+  await expect(page.locator('.tshift-n')).toContainText('recorded as');
+  // export the case and import it back: the correction travels with it; junk values are dropped
+  const back = await page.evaluate(() => { const r = normRecord({ title: 'x', body: '', ts: 5, tsShift: 'evil' }), r2 = normRecord({ title: 'x', body: '', ts: 5, tsShift: 9e12 }), r3 = normRecord({ title: 'x', body: '', ts: 5, tsShift: 36e5 }); return [r.tsShift, r2.tsShift, r3.tsShift]; });
+  expect(back).toEqual([undefined, undefined, 36e5]);
+  await page.locator('.tshift-n [data-act=tx2Unshift]').click();
+  expect(await page.evaluate(() => DB.records.filter(r => r.caseId === 'c-ts' && r.tsShift).length)).toBe(0);
+  await page.click('#toastBtn');
+  expect(await page.evaluate(() => DB.records.filter(r => r.caseId === 'c-ts' && r.tsShift).length)).toBe(4);
+  noErrors(errors);
+});
+
+test('the same run of stages on a second host, later, is pointed out; hosts that only log on are not', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  const R = await page.evaluate(() => {
+    DB.cases.push({ id: 'c-rp', code: 'RP-1', name: 'Repeat', color: '#0ea5e9', status: 'active', created: Date.now(), updated: Date.now() });
+    const T = Date.UTC(2024, 4, 2, 9), M = 6e4, H = 36e5; let i = 0;
+    const mk = (host, t, title, body, tags) => ({ id: 'r-rp' + (i++), caseId: 'c-rp', type: 'evidence', title, body, ts: t, tsRaw: '', tsZone: 'explicit', source: 'sysmon', host, tags: tags || [], ents: extractRich(body), addedAt: Date.now() });
+    const run = (host, t0) => [mk(host, t0, 'Logon', 'EventID=4624 TargetUserName=eve LogonType=10 logon'), mk(host, t0 + 3 * M, 'whoami', 'EventID=1 Image=C:\\Windows\\System32\\whoami.exe', ['discovery']),
+      mk(host, t0 + 8 * M, '7z', 'EventID=1 Image=C:\\Program Files\\7-Zip\\7z.exe', ['staging']), mk(host, t0 + 12 * M, 'upload', 'EventID=3 Image=curl.exe', ['exfiltration'])];
+    DB.records.push(...run('WS-01', T), ...run('WS-02', T + 3 * H),
+      mk('WS-03', T + H, 'Logon', 'EventID=4624 TargetUserName=bob LogonType=2 logon'), mk('WS-03', T + H + M, 'Logon', 'EventID=4624 TargetUserName=bob LogonType=2 logon'), mk('WS-03', T + H + 2 * M, 'Logon', 'EventID=4624 TargetUserName=bob LogonType=2 logon'),
+      mk('WS-04', T + 5 * H, 'beacon', 'x', ['c2']), mk('WS-04', T + 5 * H + M, 'beacon', 'x', ['c2']), mk('WS-04', T + 5 * H + 2 * M, 'beacon', 'x', ['c2']));
+    rev++; const D = derive('c-rp'), Ts = D.recs.filter(r => r.ts).sort((a, b) => a.ts - b.ts);
+    return tx2Repeats(tx2Sessions(Ts)).map(x => ({ a: x.A.host, b: x.B.host, steps: x.steps, after: x.after }));
+  });
+  expect(R).toHaveLength(1);
+  expect(R[0]).toMatchObject({ a: 'WS-01', b: 'WS-02', after: 3 * 36e5 });
+  expect(R[0].steps).toEqual(['Logon', 'Discovery', 'Collection', 'Exfiltration']);
+  await page.evaluate(() => { DB.active = 'c-rp'; UI.tlMode = 'patterns'; go(caseHash('c-rp', 'timeline')); });
+  await expect(page.locator('.tx2-rep')).toContainText('WS-02 went through Logon → Discovery → Collection → Exfiltration 3h 0m after WS-01 did');
+  await page.locator('.tx2-rep [data-act=tlxWin]').click();
+  expect(await page.evaluate(() => [UI.tlMode, UI.facet.win.label])).toEqual(['events', 'WS-01 → WS-02']);
+  noErrors(errors);
+});
+
+test('connected cases: shared malicious indicators and vault entries are a strong link; same /24 is weaker; private, benign and everywhere-things are not links', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  const R = await page.evaluate(() => {
+    const mkC = (id, code) => DB.cases.push({ id, code, name: code + ' — test', color: '#0ea5e9', status: 'active', created: Date.now(), updated: Date.now() });
+    ['A', 'B', 'C', 'D'].forEach(x => mkC('c-' + x, 'LK-' + x));
+    let i = 0; const rec = (c, body) => DB.records.push({ id: 'r-lk' + (i++), caseId: c, type: 'evidence', title: body.slice(0, 30), body, ts: Date.now(), tsRaw: '', source: 's', host: '', tags: [], ents: extractRich(body), addedAt: Date.now() });
+    rec('c-A', 'beacon to 203.0.113.47 and lookup of evil-lamp.com, also 10.0.0.5 and mail via gmail.com, safe cdn.okfine.net');
+    rec('c-B', 'seen 203.0.113.47 again, and 10.0.0.5, gmail.com, cdn.okfine.net');
+    rec('c-C', 'scan from 203.0.113.99 and login.evil-lamp.com, gmail.com');
+    rec('c-D', 'nothing shared except gmail.com');
+    DB.verdicts = DB.verdicts || {}; DB.verdicts[entKey({ k: 'ipv4', v: '203.0.113.47' })] = 'malicious'; DB.verdicts[entKey({ k: 'domain', v: 'cdn.okfine.net' })] = 'benign';
+    const en = (c, v) => DB.entries.push({ id: uid('e'), caseId: c, type: 'phone', fields: { number: v }, tags: [], notes: '', priority: 'medium', created: Date.now() });
+    en('c-A', '+44 7700 900123'); en('c-B', '07700-900-123');
+    rev++;
+    const L = caseLinks('c-A').map(x => ({ code: x.c.code, strength: x.strength, shared: x.shared.map(s => s.kind + ':' + s.v), near: x.near.map(n => n.why) }));
+    return { L, sample: caseLinks('c-A').some(x => x.c.sample) };
+  });
+  const B = R.L.find(x => x.code === 'LK-B'), C = R.L.find(x => x.code === 'LK-C');
+  expect(R.L[0].code).toBe('LK-B'); expect(B.strength).toBe('strong');
+  expect(B.shared).toEqual(expect.arrayContaining(['ind:203.0.113.47', 'vault:+44 7700 900123']));
+  expect(B.shared.join()).not.toMatch(/10\.0\.0\.5|okfine|gmail/);          // private, benign, everywhere
+  expect(C.strength).toBe('weak'); expect(C.near).toEqual(expect.arrayContaining(['same /24 network', 'same registered domain evil-lamp.com']));
+  expect(R.L.some(x => x.code === 'LK-D')).toBe(false); expect(R.sample).toBe(false);
+  await page.evaluate(() => go(caseHash('c-A', 'overview')));
+  await expect(page.locator('.lk')).toContainText('LK-B'); await expect(page.locator('.lk .lk-c').first()).toContainText('Strong link');
+  await page.locator('.lk [data-act=lkEnt]').first().click();
+  expect(await page.evaluate(() => UI.sel && UI.sel.kind)).toBe('ent');
+  noErrors(errors);
+});
+
+test('rule history: saves keep what they replace, two versions compare line by line, an old one goes back in the editor and is kept again on save', async ({ page }) => {
+  const errors = await open(page, '#/detections');
+  await page.locator('.page [data-act=rNew]').first().click(); await page.click('.ctx-it:has-text("Sigma")');
+  await page.click('[data-rtab=history]'); await expect(page.locator('#dlPane')).toContainText('There are none yet');
+  const v1 = await page.inputValue('#rCode');
+  // save 1: a code change; save 2: a title change; save 3: nothing changed
+  await page.click('[data-rtab=rule]'); await page.fill('#rCode', v1.replace(/condition: .*/, 'condition: selection\n# first edit')); await page.keyboard.press('Control+s');
+  await page.fill('#rTitle', 'Renamed rule'); await page.keyboard.press('Control+s');
+  await page.keyboard.press('Control+s');
+  const n = await page.evaluate(() => rvList(DB.rules.find(r => r.id === UI.rule)).length); expect(n).toBe(2);
+  await page.click('[data-rtab=history]');
+  await expect(page.locator('.rv-t tbody tr')).toHaveCount(3);
+  await expect(page.locator('form.rx')).not.toHaveClass(/dirty/);
+  // compare the original with the editor: one added line and the title change
+  await page.locator('.rv-t [data-act=rvPick][data-v="a:2"]').check();
+  await expect(page.locator('.rv-sum')).toContainText('+1');
+  await expect(page.locator('.rv-d .rv-l.add')).toContainText('# first edit');
+  await expect(page.locator('.rv-m')).toContainText('Renamed rule');
+  await expect(page.locator('form.rx')).not.toHaveClass(/dirty/);                  // picking versions is not an edit
+  // put the original back: the editor holds it, unsaved; saving keeps the replaced version
+  await page.locator('.rv-t tbody tr').nth(2).locator('[data-act=rvUse]').click();
+  expect(await page.inputValue('#rCode')).toBe(v1); await expect(page.locator('form.rx')).toHaveClass(/dirty/);
+  await page.keyboard.press('Control+s');                                              // focus is back in the editor, so the shortcut saves
+  const after = await page.evaluate(() => { const r = DB.rules.find(r => r.id === UI.rule); return { code: r.code, n: rvList(r).length, last: rvList(r).slice(-1)[0].title }; });
+  expect(after.code).toBe(v1); expect(after.n).toBe(3); expect(after.last).toBe('Renamed rule');
+  // a bad history from an import is ignored, not trusted
+  expect(await page.evaluate(() => rvList({ versions: [null, { code: 5, at: 1 }, { code: 'x', at: 0 }, { code: 'ok', at: 9 }] }).length)).toBe(1);
+  noErrors(errors);
+});
+
+test('cloud, identity and network log files import as real events: CloudTrail, Okta, Microsoft 365 (CSV with AuditData), Zeek TSV and JSON, Windows XML exports', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  const R = await page.evaluate(() => {
+    const imp = (text, name) => { const P = logParse(text, name), cols = [...new Set(P.rows.slice(0, 200).flatMap(r => Object.keys(r)))], M = { time: logGuess(cols, 'time'), title: logGuess(cols, 'title'), host: logGuess(cols, 'host'), source: logGuess(cols, 'source') };
+      const recs = P.rows.map(r => logRec(r, M, name)); return { fmt: P.fmt, cols: cols.filter(c => c.startsWith('__')).length, recs: recs.map(r => { const p = parseLog(r.body.length <= 20000 ? r.body : ''); return { title: r.title, ts: r.ts, format: p && p.format, user: p && p.norm.user, ip: p && p.norm['src.ip'], action: p && p.norm.action, status: p && p.norm.status }; }) }; };
+    const ct = JSON.stringify({ Records: [
+      { eventVersion: '1.08', userIdentity: { type: 'IAMUser', userName: 'ops-admin', arn: 'arn:aws:iam::111122223333:user/ops-admin' }, eventTime: '2024-03-01T10:00:00Z', eventSource: 'signin.amazonaws.com', eventName: 'ConsoleLogin', awsRegion: 'us-east-1', sourceIPAddress: '198.51.100.7', userAgent: 'Mozilla/5.0', errorMessage: 'Failed authentication', errorCode: 'Failed authentication', eventType: 'AwsConsoleSignIn' },
+      { eventVersion: '1.08', userIdentity: { type: 'AssumedRole', principalId: 'AROA:dev', sessionContext: { sessionIssuer: { userName: 'deploy-role' } } }, eventTime: '2024-03-01T10:05:00Z', eventSource: 's3.amazonaws.com', eventName: 'PutBucketPolicy', sourceIPAddress: '203.0.113.9', requestParameters: { bucketName: 'prod-backups' } }] }, null, 2);
+    const okta = JSON.stringify([{ uuid: 'a1', published: '2024-03-01T11:00:00.000Z', eventType: 'user.session.start', displayMessage: 'User login to Okta', actor: { id: '00u1', alternateId: 'eve@corp.example', type: 'User' }, client: { ipAddress: '45.33.32.156', userAgent: { rawUserAgent: 'curl/8.0' }, geographicalContext: { country: 'Netherlands' } }, outcome: { result: 'FAILURE', reason: 'INVALID_CREDENTIALS' } }]);
+    const audit = { CreationTime: '2024-03-01T12:00:00', Operation: 'New-InboxRule', UserId: 'cfo@corp.example', Workload: 'Exchange', ClientIP: '[2001:db8::7]:51234', ResultStatus: 'True', Parameters: [{ Name: 'ForwardTo', Value: 'x@evil.example' }] };
+    const m365 = 'CreationDate,UserIds,Operations,AuditData\r\n2024-03-01T12:00:00.0000000Z,cfo@corp.example,New-InboxRule,"' + JSON.stringify(audit).replace(/"/g, '""') + '"\r\n';
+    const zeek = '#separator \\x09\n#set_separator\t,\n#empty_field\t(empty)\n#unset_field\t-\n#path\tconn\n#fields\tts\tuid\tid.orig_h\tid.orig_p\tid.resp_h\tid.resp_p\tproto\tservice\tduration\n#types\ttime\tstring\taddr\tport\taddr\tport\tenum\tstring\tinterval\n1709287200.123456\tCx1\t10.0.0.5\t51022\t203.0.113.47\t4444\ttcp\t-\t12.5\n1709287260.5\tCx2\t10.0.0.5\t51031\t203.0.113.47\t4444\ttcp\t-\t-\n#close\t2024-03-01-11-00-00';
+    const zjson = '{"ts":1709287200.1,"uid":"Cd1","id.orig_h":"10.0.0.5","id.orig_p":5353,"id.resp_h":"8.8.8.8","id.resp_p":53,"proto":"udp","query":"update-lamp.test","qtype_name":"A"}\n{"ts":1709287201.2,"uid":"Cd2","id.orig_h":"10.0.0.5","id.orig_p":5354,"id.resp_h":"8.8.8.8","id.resp_p":53,"proto":"udp","query":"evil.example"}';
+    const xml = '<?xml version="1.0" encoding="UTF-8"?>\n<Events>\n<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Security-Auditing"/><EventID>4625</EventID><TimeCreated SystemTime="2024-03-01T13:00:00.000Z"/><Computer>DC01</Computer></System><EventData><Data Name="TargetUserName">admin</Data><Data Name="IpAddress">198.51.100.7</Data><Data Name="LogonType">3</Data></EventData></Event>\n<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><EventID>4624</EventID><TimeCreated SystemTime="2024-03-01T13:01:00.000Z"/><Computer>DC01</Computer></System><EventData><Data Name="TargetUserName">admin</Data></EventData></Event>\n</Events>';
+    return { ct: imp(ct, 'ct.json'), okta: imp(okta, 'okta.json'), m365: imp(m365, 'audit.csv'), zeek: imp(zeek, 'conn.log'), zjson: imp(zjson, 'dns.log'), xml: imp(xml, 'sec.xml') };
+  });
+  const t = s => Date.parse(s);
+  // CloudTrail: who, what, from where, and that it failed
+  expect(R.ct.recs).toHaveLength(2); expect(R.ct.cols).toBe(0);
+  expect(R.ct.recs[0]).toMatchObject({ format: 'AWS CloudTrail · ConsoleLogin', user: 'ops-admin', ip: '198.51.100.7', action: 'ConsoleLogin', ts: t('2024-03-01T10:00:00Z') });
+  expect(R.ct.recs[0].status).toMatch(/failure/); expect(R.ct.recs[0].title).toMatch(/ConsoleLogin.*ops-admin.*from 198\.51\.100\.7/);
+  expect(R.ct.recs[1]).toMatchObject({ user: 'deploy-role', action: 'PutBucketPolicy' });
+  // Okta
+  expect(R.okta.recs[0]).toMatchObject({ format: 'Okta · User login to Okta', user: 'eve@corp.example', ip: '45.33.32.156', status: 'FAILURE', ts: t('2024-03-01T11:00:00Z') });
+  // Microsoft 365 CSV export: the event inside AuditData is unpacked; the bracketed IPv6:port is cleaned
+  expect(R.m365.fmt).toMatch(/AuditData/); expect(R.m365.recs).toHaveLength(1);
+  expect(R.m365.recs[0].title).toMatch(/New-InboxRule/);
+  expect(R.m365.recs[0].ts).toBe(t('2024-03-01T12:00:00Z'));
+  // Zeek TSV: columns from #fields, "-" empty, epoch seconds read, comment lines skipped
+  expect(R.zeek.fmt).toBe('Zeek conn'); expect(R.zeek.recs).toHaveLength(2);
+  expect(R.zeek.recs[0].ts).toBe(1709287200123); expect(R.zeek.recs[0].title).toMatch(/10\.0\.0\.5:51022 → 203\.0\.113\.47:4444/);
+  // Zeek JSON
+  expect(R.zjson.recs[0].format).toBe('Zeek · dns'); expect(R.zjson.recs[0].ts).toBe(1709287200100);
+  // Windows XML export: two events, each with its own time and a readable title
+  expect(R.xml.fmt).toBe('Windows event XML'); expect(R.xml.recs).toHaveLength(2);
+  expect(R.xml.recs[0].ts).toBe(t('2024-03-01T13:00:00Z')); expect(R.xml.recs[1].ts).toBe(t('2024-03-01T13:01:00Z'));
+  expect(R.xml.recs[0].title).toMatch(/4625/);
+  noErrors(errors);
+});
+
+test('rule packs: a downloaded zip comes back with tests and history; identical rules are skipped, clashes are your choice, and one Undo takes it all back', async ({ page }) => {
+  const errors = await open(page, '#/detections');
+  await page.evaluate(() => {
+    const code = t => "title: " + t + "\nlogsource:\n    category: process_creation\n    product: windows\ndetection:\n    s:\n        Image|endswith: '\\\\" + t.toLowerCase().replace(/\W+/g, '') + ".exe'\n    condition: s\nlevel: high";
+    const mk = (id, t) => ({ id, type: 'sigma', title: t, desc: 'mine', code: code(t), severity: 'high', category: 'process', technique: '', author: 'You', platform: 'Windows', tags: [], created: Date.now(), updated: Date.now(),
+      tests: [{ id: uid('t'), kind: 'hit', text: 'Image="C:\\\\x\\\\' + t.toLowerCase().replace(/\W+/g, '') + '.exe"' }] });
+    const A = mk('r-pa', 'Pack Alpha'), B = mk('r-pb', 'Pack Bravo'); DB.rules.unshift(A, B);
+    rvKeep(A, { ...A, code: A.code + '\n# v2' }); A.code += '\n# v2'; dlAfterSave(A);
+    UI.dview = 'rules'; DB.prefs.rlay = 'table'; UI.dq = 'Pack '; UI.rpick = new Set(['r-pa', 'r-pb', DB.rules.find(r => r.builtin).id]); renderMain();
+  });
+  const dl = page.waitForEvent('download'); await page.click('[data-act=rbDl]'); const zip = await (await dl).path();
+  // later: Alpha is gone, Bravo was rewritten here
+  await page.evaluate(() => { DB.rules = DB.rules.filter(r => r.id !== 'r-pa'); const b = DB.rules.find(r => r.id === 'r-pb'); b.code = b.code.replace('high', 'low') + '\n# changed here'; UI.rpick = new Set(); mutate('t'); renderMain(); });
+  const n0 = await page.evaluate(() => DB.rules.length);
+  const fc = page.waitForEvent('filechooser'); await page.evaluate(() => importRules()); await (await fc).setFiles({ name: 'osintrix-rules-3.zip', mimeType: 'application/zip', buffer: require('fs').readFileSync(zip) });
+  await expect(page.locator('#dlg .rp')).toBeVisible();
+  await expect(page.locator('#dlg .tlx-kpi')).toContainText('1new');
+  await expect(page.locator('#dlg .tlx-kpi')).toContainText('1already here');
+  await expect(page.locator('#dlg .tlx-kpi')).toContainText('1same title, different logic');
+  await page.selectOption('#dlg [data-rp="0"]', 'replace');
+  await page.click('[data-act=rpGo]');
+  const R = await page.evaluate(() => { const a = DB.rules.find(r => r.title === 'Pack Alpha'), b = DB.rules.find(r => r.id === 'r-pb');
+    return { n: DB.rules.length, a: a && { tests: a.tests.length, versions: rvList(a).length, hist: dlHist(a).length, v2: a.code.includes('# v2') }, bCode: b.code.includes('# changed here'), bKept: rvList(b).some(v => v.code.includes('# changed here')), bravos: DB.rules.filter(r => /^Pack Bravo/.test(r.title)).length }; });
+  expect(R.n).toBe(n0 + 1);
+  expect(R.a).toEqual({ tests: 1, versions: 1, hist: 1, v2: true });
+  expect(R.bCode).toBe(false); expect(R.bKept).toBe(true); expect(R.bravos).toBe(1);
+  await page.click('#toastBtn');
+  expect(await page.evaluate(() => [DB.rules.length, DB.rules.find(r => r.id === 'r-pb').code.includes('# changed here')])).toEqual([n0, true]);
+  // a hostile or broken pack: nothing unsafe gets in
+  const fc2 = page.waitForEvent('filechooser'); await page.evaluate(() => importRules());
+  await (await fc2).setFiles({ name: 'bad.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify([{ type: 'sigma', title: '<img src=x onerror=alert(1)>', code: 'detection:\n  s:\n    a: b\n  condition: s', refs: ['javascript:alert(1)', 'https://ok.example'], severity: 'apocalyptic', versions: [{ code: 5 }], testHist: [{ at: 1, pass: 9, total: 2 }] }, { type: 'evil', code: 'x' }, 'junk', null])) });
+  await expect(page.locator('#dlg img')).toHaveCount(0); await page.click('[data-act=rpGo]');
+  const bad = await page.evaluate(() => { const r = DB.rules[0]; return { title: r.title, refs: r.refs, sev: r.severity, v: rvList(r).length, h: dlHist(r).length }; });
+  expect(bad).toEqual({ title: '<img src=x onerror=alert(1)>', refs: ['https://ok.example'], sev: 'medium', v: 0, h: 0 });
   noErrors(errors);
 });

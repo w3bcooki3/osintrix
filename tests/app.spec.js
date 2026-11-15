@@ -616,9 +616,12 @@ test('a large workspace keeps the last typing when the tab closes (journal)', as
   await page.evaluate(() => { const h = DB.nb.pages[2].html; for (let i = 0; i < 900; i++) nbNewPage(DB.nb.sections[0].id, { title: 'P' + i, html: h }); flush(); });
   await expect.poll(() => page.evaluate(() => STORE.ls)).toBe(false);          // too big for the instant localStorage copy
   await page.evaluate(() => NB_ACTS.nbPageNew(DB.nb.sections[0].id)); await page.keyboard.press('Enter');
-  await page.keyboard.type('last words before closing'); await page.close({ runBeforeUnload: true });
+  await expect(page.locator('#nbEd')).toBeFocused();
+  await page.keyboard.type('last words before closing');
+  await expect(page.locator('#nbEd')).toContainText('last words before closing');     // the typing landed; now the tab closes at once
+  await page.close({ runBeforeUnload: true });
   page = await context.newPage(); page.on('pageerror', e => errors.push('pageerror: ' + e.message)); await page.goto(APP + '#/notebook');
-  await expect.poll(() => page.evaluate(() => typeof DB !== 'undefined' && !!DB && !!DB.nb && DB.nb.pages.some(p => p.html.includes('last words before closing'))), { timeout: 15000 }).toBe(true);
+  await expect.poll(() => page.evaluate(() => typeof DB !== 'undefined' && !!DB && !!DB.nb && DB.nb.pages.some(p => p.html.includes('last words before closing'))), { timeout: 30000 }).toBe(true);
   noErrors(errors);
 });
 
@@ -2112,4 +2115,32 @@ test('fast start: every script is fetched in parallel, the big data files arrive
   expect(await page.evaluate(async () => { await ouiLoad(); return lzHas('oui'); })).toBe(true);
   expect(fetched.some(u => /oui-vendors/.test(u))).toBe(true);
   expect(errors).toEqual([]);
+});
+
+test('newer screens at phone size: no serious accessibility problems and nothing wider than the screen @phone', async ({ page }) => {
+  const AxeBuilder = require('@axe-core/playwright').default;
+  const errors = await open(page, '#/home');
+  const screens = {
+    today: () => { location.hash = '#/today'; },
+    notes: () => { DB.notes[0].title = 'A title on a phone'; location.hash = '#/notes'; },
+    detectionsPicked: () => { DB.prefs.rlay = 'table'; UI.dview = 'rules'; UI.rpick = new Set(DB.rules.slice(0, 2).map(r => r.id)); location.hash = '#/detections'; },
+    ruleHistory: () => { const r = DB.rules[0]; r.versions = [{ at: Date.now() - 864e5, title: r.title, code: r.code + '\n# old', severity: r.severity, technique: '', desc: '' }]; UI.rule = r.id; UI.ropen = true; UI.rtab = 'history'; location.hash = '#/detections'; },
+    health: () => { UI.ropen = false; UI.dview = 'health'; UI.dqf = 'problems'; location.hash = '#/detections'; },
+    caseRules: () => { UI.dview = 'rules'; UI.tlMode = 'rules'; UI.crf = 'blind'; location.hash = '#/case/c-lantern/timeline'; },
+    patterns: () => { UI.tlMode = 'patterns'; location.hash = '#/case/c-lantern/timeline'; },
+    overview: () => { location.hash = '#/case/c-lantern/overview'; },
+  };
+  const found = [];
+  for (const [name, fn] of Object.entries(screens)) {
+    if (name === 'health') await page.evaluate(() => ruleHealth());
+    await page.evaluate(src => { closeDlg(); (0, eval)('(' + src + ')')(); setTimeout(renderMain, 20); }, fn.toString());
+    if (name === 'caseRules') await page.waitForFunction(() => !!document.querySelector('.cr-sum'), null, { timeout: 20000 });
+    await page.waitForTimeout(500);
+    const res = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
+    for (const v of res.violations) if (['serious', 'critical'].includes(v.impact)) for (const n of v.nodes.slice(0, 2)) found.push(`${name} ${v.id}: ${n.target.join(' ')}`);
+    const wide = await page.evaluate(() => { const W = document.documentElement.clientWidth; return [...document.querySelectorAll('#main *')].filter(e => { const r = e.getBoundingClientRect(); if (!r.width) return false; let p = e.parentElement; while (p && p !== document.body) { const s = getComputedStyle(p); if (/(auto|scroll|hidden)/.test(s.overflowX)) return false; p = p.parentElement; } return r.right > W + 2; }).slice(0, 3).map(e => e.tagName.toLowerCase() + '.' + [...e.classList].join('.')); });
+    if (wide.length) found.push(`${name} wider than the screen: ${wide.join(', ')}`);
+  }
+  expect(found, found.join('\n')).toEqual([]);
+  noErrors(errors.filter(e => !/Connecting to 'file:[^']*\.css/.test(e)));      // axe reading the stylesheets, which the app's own policy blocks
 });

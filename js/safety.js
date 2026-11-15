@@ -287,17 +287,31 @@ function csvParse(text, delim){
 }
 function flatObj(o, p = '', out = {}){ for(const [k, v] of Object.entries(o || {})){ const key = p ? p + '.' + k : k; if(v && typeof v === 'object' && !Array.isArray(v) && Object.keys(out).length < 80) flatObj(v, key, out); else out[key] = Array.isArray(v) ? v.join(', ') : v == null ? '' : String(v); } return out; }
 function logParse(text, name){
-  text = text.replace(/^﻿/, ''); const t = text.trim();
-  if(/^\[/.test(t)){ try{ const a = JSON.parse(t); if(Array.isArray(a)) return {fmt:'JSON array', rows:a.filter(x => x && typeof x === 'object').map(x => flatObj(x))}; }catch(e){} }
+  const P = logParse0(text, name);
+  /* a column holding a JSON object (Microsoft 365 exports keep the whole event in "AuditData"): its fields join the row */
+  if(P.rows.length && /CSV|TSV/.test(P.fmt)){ const jc = Object.keys(P.rows[0]).filter(k => P.rows.slice(0, 20).some(r => /^\s*\{[\s\S]*\}\s*$/.test(r[k] || '')));
+    if(jc.length){ for(const r of P.rows) for(const k of jc){ let o = null; try{ o = JSON.parse(r[k]); }catch(e){} if(o && typeof o === 'object' && !Array.isArray(o)){ const f = flatObj(o); for(const [a, v] of Object.entries(f)) if(r[a] == null || r[a] === '') r[a] = v; if(jc.length === 1) Object.defineProperty(r, '__raw', {value:JSON.stringify(o), enumerable:false}); delete r[k]; } } P.fmt += ' with JSON in ' + jc.join(', '); } }
+  return P;
+}
+/* a JSON event: flat columns to map, and the event itself kept whole as the record's body (hidden key __raw) */
+const logJRow = x => Object.defineProperty(flatObj(x), '__raw', {value:JSON.stringify(x), enumerable:false});
+function logParse0(text, name){
+  text = text.replace(/^\uFEFF/, ''); const t = text.trim();
+  /* Windows Event Viewer "Save as XML": many <Event> elements in one file — one row each */
+  if(/<Event[\s>]/.test(t) && /<\/Event>/.test(t)){ const ev = t.match(/<Event[\s>][\s\S]*?<\/Event>/g) || []; if(ev.length) return {fmt:'Windows event XML', rows:ev.slice(0, 200000).map(x => ({line:x.replace(/\s*\n\s*/g, ' ')}))}; }
+  /* Zeek / Bro TSV logs: "#fields" names the columns, "-" is empty, "#path" says which log */
+  if(/^#separator\b/m.test(t) || /^#fields\t/m.test(t)){ const lines = t.split(/\r?\n/), h = lines.find(l => /^#fields\t/.test(l)), path = ((lines.find(l => /^#path\t/.test(l)) || '').split('\t')[1] || '').trim();
+    if(h){ const names = h.split('\t').slice(1); return {fmt:'Zeek ' + (path || 'log'), rows:lines.filter(l => l && !l.startsWith('#')).map(l => { const v = l.split('\t'), o = {}; names.forEach((n, i) => { if(v[i] != null && v[i] !== '-' && v[i] !== '(empty)') o[n] = v[i]; }); const raw = JSON.stringify(o); if(o.ts && /^\d+(\.\d+)?$/.test(o.ts)) o.ts = new Date(parseFloat(o.ts) * 1000).toISOString(); return Object.defineProperty(o, '__raw', {value:raw, enumerable:false}); })}; } }
+  if(/^\[/.test(t)){ try{ const a = JSON.parse(t); if(Array.isArray(a)) return {fmt:'JSON array', rows:a.filter(x => x && typeof x === 'object').map(logJRow)}; }catch(e){} }
   if(/^\{/.test(t)){ const lines = t.split(/\r?\n/).filter(Boolean), rows = []; let bad = 0;
-    for(const l of lines){ try{ rows.push(flatObj(JSON.parse(l))); }catch(e){ bad++; } }
+    for(const l of lines){ try{ const o = JSON.parse(l); if(o && typeof o === 'object') rows.push(logJRow(o)); else bad++; }catch(e){ bad++; } }
     if(rows.length && bad < rows.length) return {fmt:'NDJSON', rows};
-    try{ const o = JSON.parse(t); const arr = Object.values(o).find(Array.isArray); if(arr) return {fmt:'JSON', rows:arr.map(x => flatObj(x))}; }catch(e){} }
+    try{ const o = JSON.parse(t); const arr = Object.values(o).find(Array.isArray); if(arr) return {fmt:'JSON', rows:arr.filter(x => x && typeof x === 'object').map(logJRow)}; }catch(e){} }
   const head = t.split(/\r?\n/)[0], cnt = c => head.split(c).length - 1, delim = [['\t', cnt('\t')], [',', cnt(',')], [';', cnt(';')], ['|', cnt('|')]].sort((a, b) => b[1] - a[1])[0];
   if(delim[1] >= 1){ const rs = csvParse(t, delim[0]); if(rs.length > 1){ const h = rs[0].map((x, i) => (x || 'col' + (i + 1)).trim()); return {fmt:(delim[0] === '\t' ? 'TSV' : 'CSV'), rows:rs.slice(1).map(r => Object.fromEntries(h.map((k, i) => [k, (r[i] || '').trim()])))}; } }
   return {fmt:'text lines', rows:t.split(/\r?\n/).filter(x => x.trim()).map(l => ({line:l}))};
 }
-const LOG_GUESS = {time:/^(@?timestamp|time|date|datetime|eventtime|_time|ts|utctime|created(_at)?|timecreated|event\.created|when)$/i, title:/^(message|msg|title|summary|description|event|action|name|_raw|line|commandline|query)$/i, host:/^(host|hostname|computer|computername|device|machine|host\.name|src_host|agent\.hostname)$/i, source:/^(source|sourcetype|provider|channel|log|logname|index|program|app)$/i};
+const LOG_GUESS = {time:/^(@?timestamp|time|date|datetime|eventtime|_time|ts|utctime|created(_at)?|timecreated|event\.created|when|published|creationtime|creationdate|eventtime)$/i, title:/^(message|msg|title|summary|description|event|action|name|_raw|line|commandline|query)$/i, host:/^(host|hostname|computer|computername|device|machine|host\.name|src_host|agent\.hostname)$/i, source:/^(source|sourcetype|provider|channel|log|logname|index|program|app)$/i};
 function logGuess(cols, key){ return cols.find(c => LOG_GUESS[key].test(c)) || cols.find(c => LOG_GUESS[key].test(c.split('.').pop())) || ''; }
 function logTime(raw){
   if(raw == null || raw === '') return null; const s = String(raw).trim();
@@ -314,10 +328,14 @@ function logImportFile(f){
   fr.readAsText(f);
 }
 function logRec(row, M, name){
-  const tsRaw = M.time ? row[M.time] : '', ts = logTime(tsRaw);
-  const kv = Object.entries(row).filter(([k, v]) => v !== '' && k !== M.time).map(([k, v]) => { const key = k.replace(/\W+/g, '_'); v = String(v).replace(/\s*\n\s*/g, ' '); return key + '=' + (/[\s"]/.test(v) ? '"' + v.replace(/"/g, "'") + '"' : v); }).join(' ');
-  const title = (M.title && row[M.title] ? String(row[M.title]) : parsedTitle(parseLog(kv)) || kv).replace(/\s+/g, ' ').slice(0, 110) || 'Log row';
-  const body = (row.line != null && Object.keys(row).length === 1) ? row.line : kv;
+  let tsRaw = M.time ? row[M.time] : '', ts = logTime(tsRaw);
+  /* no time column (one event per line, XML exports): read the time from the event itself */
+  const own = row.__raw || (row.line != null ? String(row.line) : '');
+  if(ts == null && own){ const P = parseLog(own.slice(0, 20000)); const raw = (P && P.norm.time) || (P && P.fields['TimeCreated.SystemTime']) || E.lineTime(own); if(raw){ const t = logTime(raw); if(t != null){ tsRaw = String(raw); ts = t; } } }
+  const kv = Object.entries(row).filter(([k, v]) => v !== '' && k !== M.time && !k.startsWith('__')).map(([k, v]) => { const key = k.replace(/\W+/g, '_'); v = String(v).replace(/\s*\n\s*/g, ' '); return key + '=' + (/[\s"]/.test(v) ? '"' + v.replace(/"/g, "'") + '"' : v); }).join(' ');
+  const body = row.__raw ? row.__raw : (row.line != null && Object.keys(row).length === 1) ? row.line : kv;
+  const named = M.title && M.title !== 'line' && row[M.title] ? String(row[M.title]) : '';     // a whole line is not a title: summarise it
+  const title = (named || parsedTitle(parseLog(body.length <= 20000 ? body : kv)) || (M.title && row[M.title] ? String(row[M.title]) : '') || kv).replace(/\s+/g, ' ').slice(0, 110) || 'Log row';
   return {id:uid('r'), caseId:(LOGIMP && LOGIMP.caseId) || DB.active, type:'evidence', title, body, tsRaw:tsRaw ? String(tsRaw) : '', tsZone:'explicit', ts, source:(M.source && row[M.source]) || 'import:' + name, host:(M.host && row[M.host]) || '', tags:['imported'], ents:extractRich(body), answer:'', addedBy:'You', addedAt:Date.now(), hash:'', pv:1};
 }
 function logImportDlg(){

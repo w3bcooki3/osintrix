@@ -2,6 +2,22 @@
 
 All notable changes to OSINTrix, newest first. The format is based on [Keep a Changelog](https://keepachangelog.com); this file is generated from `js/data/changelog.js` by `tools/changelog.py`.
 
+## [1.41] — Connected cases, rule history, cloud logs (2026-11-15)
+
+_See which cases connect and why, keep every version of a rule, fix blind spots a group at a time, catch the same attack on a second host, and import cloud, identity and network logs as real events._
+
+### Added
+- Case overview → Connected cases: the other cases this one shares indicators or vault entries with (phones, wallets, handles compared the way duplicate detection does), weighted by your verdicts — malicious counts most — plus nearby infrastructure (same /24, same registered domain), said to be weaker. Private addresses, benign indicators and anything in most of your cases are left out.
+- Detections → rule editor → History: every save that changes a rule keeps the version it replaces (last 25). Compare any two line by line, with title and severity changes listed; put an old version back in the editor and save — the one it replaces is kept too.
+- Timeline → Rules → Not caught: blind spots of the same kind are grouped, with One rule for all and a preview of whether the draft would also match other events in your evidence.
+- Timeline → Patterns → Sessions: the same run of stages on a second host, later (e.g. Logon → Discovery → Collection → Exfiltration 3 hours after the first host), is pointed out as a likely sign of lateral movement, with both sessions and what happened between one click away.
+- A corrected clock now shows on every event it touched (a clock mark in the timeline; the details panel says by how much and what was recorded), and can be taken back from any of those events.
+- Log import: AWS CloudTrail, Okta System Log, Microsoft 365 audit (JSON, or the CSV export with the event in AuditData), Zeek (TSV with #fields, or JSON) and Windows Event Viewer XML exports are read as real events — who, what, from where, the outcome and the time — and titled that way (“ConsoleLogin · user ops-admin · from 198.51.100.7 · failure”, “4625 Failed logon · user admin”). Firewall lines like “allow tcp 10.0.0.5:51022 -> 203.0.113.47:4444” now give rules source, destination, port and action to match on.
+- Rule packs: Import takes .yml, .yar, .json or the zip that Download makes, and shows before anything changes what is new, what you already have (skipped — but tests it brings are added) and what clashes with one of yours by title: keep both, replace yours (yours stays in its history) or skip. Packs carry tests, version history and test history. One Undo takes the whole import back.
+
+### Fixed
+- The newer screens were checked at phone size: no serious accessibility problems and nothing wider than the screen.
+
 ## [1.40] — Rules against cases, works offline (2026-11-15)
 
 _See what your rules catch in a case and what they miss, follow rule health over time, spot clocks that disagree and sessions of activity, and use the app with no connection._

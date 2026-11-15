@@ -239,7 +239,7 @@ function dlTrend(r){ const H = dlHist(r); if(!H.length) return null; const last 
 function dlAfterSave(r){ const R = dlRunTests(r), bad = R.filter(x => !x.ok); dlRecord(r, R); if(bad.length) toast(`Saved — but ${bad.length} of ${R.length} tests now fail`, 'Show', () => { UI.rtab = 'tests'; renderMain(); }); return bad.length; }
 function dlPaneFill(){
   const r = DB.rules.find(z => z.id === UI.rule), el = $('dlPane'), ta = $('rCode'); if(!r || !el) return; const code = ta ? ta.value : r.code;
-  el.innerHTML = UI.rtab === 'queries' ? dlQueriesPane(r, code) : UI.rtab === 'tests' ? dlTestsPane(r, code) : UI.rtab === 'evasion' ? dlEvasionPane(r, code) : '';
+  el.innerHTML = UI.rtab === 'queries' ? dlQueriesPane(r, code) : UI.rtab === 'tests' ? dlTestsPane(r, code) : UI.rtab === 'evasion' ? dlEvasionPane(r, code) : UI.rtab === 'history' && typeof rvPane === 'function' ? rvPane(r, code) : '';
 }
 const DL_ACTS = {
   dlB:(id, v) => { UI.dlB = v; dlPaneFill(); },

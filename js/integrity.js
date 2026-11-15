@@ -93,7 +93,7 @@ function normRecord(r){
   r.title = String(r.title || 'Untitled record'); r.body = String(r.body || ''); r.type = ['evidence','finding','lead','note'].includes(r.type) ? r.type : 'evidence';
   r.tags = Array.isArray(r.tags) ? r.tags.map(String) : []; r.att = Array.isArray(r.att) ? r.att : [];
   r.ents = Array.isArray(r.ents) ? r.ents.filter(e => e && typeof e.k === 'string' && typeof e.v === 'string') : E.extract(r.body);
-  r.host = String(r.host || ''); r.source = String(r.source || ''); if(typeof r.ts !== 'number') r.ts = null; r.answer = String(r.answer || '');
+  r.host = String(r.host || ''); r.source = String(r.source || ''); if(typeof r.ts !== 'number') r.ts = null; r.answer = String(r.answer || ''); if(r.tsShift != null && (typeof r.tsShift !== 'number' || !isFinite(r.tsShift) || Math.abs(r.tsShift) > 864e5 * 2 || r.ts == null)) delete r.tsShift;   // a clock correction: a number of ms within ±2 days, on a timed event
   return r;
 }
 function normEntry(e){ e.fields = isObj(e.fields) ? Object.fromEntries(Object.entries(e.fields).map(([k, v]) => [k, String(v == null ? '' : v)])) : {}; e.tags = Array.isArray(e.tags) ? e.tags.map(String) : []; e.notes = String(e.notes || ''); e.priority = ['low', 'medium', 'high', 'critical'].includes(e.priority) ? e.priority : 'medium'; e.starred = !!e.starred; return e; }

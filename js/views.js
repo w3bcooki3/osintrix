@@ -198,6 +198,7 @@ function caseOverview(c, D){
   const beacon = [...D.ents.values()].map(e => ({e, b:E.beaconOf(e.recs.map(r => r.ts))})).find(x => x.b && x.b.regular && x.e.k === 'hostport');
   return `<div class="scroll"><div class="page">
     ${typeof activityCard === 'function' ? activityCard(c) : ''}
+    ${typeof linksCard === 'function' ? linksCard(c) : ''}
     ${c.scope ? `<p style="margin:0 0 20px;max-width:880px;color:var(--text-2);font-size:calc(15.5px * var(--ts,1));line-height:1.65">${esc(c.scope)}</p>` : ''}
     ${typeof cpCard === 'function' ? cpCard(c) : ''}
     <div class="stats">
@@ -351,7 +352,7 @@ function evHTML(r, D, c){
   const meta = [r.host ? `<span>${ico('cpu','sm')}${esc(r.host)}</span>` : '', r.source ? `<span>${ico('scroll-text','sm')}${esc(r.source)}</span>` : '', r.ents.length ? `<span>${ico('fingerprint','sm')}${r.ents.length} entities</span>` : ''].filter(Boolean).join('');
   const badges = [mal.length ? `<span class="chip red sq">${ico('shield-alert','sm')}${mal.length} malicious</span>` : '', ob.length ? `<span class="chip amber sq" title="${esc(ob.map(o => o.t).join(' · '))}">${esc(ob[0].tag[0].toUpperCase() + ob[0].tag.slice(1))}${ob.length > 1 ? ' +' + (ob.length - 1) : ''}</span>` : '', r.type !== 'evidence' ? `<span class="chip sq">${tl}</span>` : '', r.tags.includes('key-evidence') ? `<span class="chip accent sq">${ico('star','sm')}Key</span>` : '', (r.att || []).length ? `<span class="chip sq">${ico('paperclip','sm')}${r.att.length}</span>` : ''].join('');
   return `<button class="ev${c.t0 === r.id ? ' t0' : ''}${mal.length ? ' mal' : ''}" data-act="selRec" data-id="${r.id}" aria-current="${!!(UI.sel && UI.sel.id === r.id)}">
-    <span class="when"><span class="clk">${r.ts ? esc(E.fmtClock(r.ts, tz())) : '—'}</span>${rel ? `<span class="rl">${rel}</span>` : ''}</span>
+    <span class="when"><span class="clk">${r.ts ? esc(E.fmtClock(r.ts, tz())) : '—'}${typeof tsShifted === 'function' && tsShifted(r) ? `<span class="tshift" title="${esc(tsShiftNote(r))}" aria-label="${esc(tsShiftNote(r))}">${ico('clock-alert','sm')}</span>` : ''}</span>${rel ? `<span class="rl">${rel}</span>` : ''}</span>
     <span class="mk" style="--c:${col}">${c.t0 === r.id ? ico('crosshair','sm') : ico(ic,'sm')}</span>
     <span class="bd"><span class="ttl">${esc(r.title)}</span>${meta ? `<span class="meta">${meta}</span>` : ''}
       ${r.body && r.body !== r.title ? `<span class="raw">${markEnts(r.body, r.ents)}</span>` : ''}

@@ -214,6 +214,11 @@ function recFields(r){
   /* key=value pairs; the key starts at a word boundary and is at most 64 long, so a long unbroken line stays linear (it was quadratic: 3.5 s on 200 KB) */
   for(const m of s.matchAll(/\b(\w{1,64})=("([^"]*)"|'([^']*)'|(\S+))/g)) f[m[1].toLowerCase()] = (m[3] ?? m[4] ?? m[5] ?? '').toLowerCase();
   const ev = s.match(/EventID[:= ]\s*(\d+)/i); if(ev) f.eventid = ev[1];
+  /* network flow lines (firewalls, NetFlow, many syslogs): "allow tcp 10.0.0.5:51022 -> 203.0.113.47:4444", "SRC=… DST=… DPT=…" */
+  const fl = s.slice(0, 2000).match(/(?:\b(allow(?:ed)?|accept(?:ed)?|permit(?:ted)?|deny|denied|block(?:ed)?|drop(?:ped)?|reject(?:ed)?)\s+)?(?:\b(tcp|udp|icmp|gre|esp)\s+)?(\d{1,3}(?:\.\d{1,3}){3}|\[[0-9a-f:]+\])(?::(\d{1,5}))?\s*(?:->|=>|>|→|\bto\b)\s*(\d{1,3}(?:\.\d{1,3}){3}|\[[0-9a-f:]+\])(?::(\d{1,5}))?/i);
+  if(fl){ const set = (k, v) => { if(v != null && v !== '' && f[k] == null) f[k] = String(v).toLowerCase().replace(/^\[|\]$/g, ''); };
+    set('action', fl[1]); set('protocol', fl[2]); set('sourceip', fl[3]); set('sourceport', fl[4]); set('destinationip', fl[5]); set('destinationport', fl[6]); }
+  for(const [k, n] of [['src', 'sourceip'], ['dst', 'destinationip'], ['spt', 'sourceport'], ['dpt', 'destinationport'], ['proto', 'protocol']]) if(f[k] != null && f[n] == null) f[n] = f[k];
   if(r.host) f.computer = r.host.toLowerCase(); f.source = (r.source || '').toLowerCase();
   const P = typeof parseLog === 'function' ? parseLog(r.body) : null;
   if(P){ for(const [k, v] of Object.entries(P.fields)){ const key = k.toLowerCase().replace(/^.*\./, ''); if(f[key] == null) f[key] = String(v).toLowerCase(); }

@@ -129,6 +129,9 @@ document.addEventListener('click', ev => {
   if(typeof RB_ACTS !== 'undefined' && RB_ACTS[a]) return RB_ACTS[a](id, v, t, ev);
   if(typeof CR_ACTS !== 'undefined' && CR_ACTS[a]) return CR_ACTS[a](id, v, t, ev);
   if(typeof TX2_ACTS !== 'undefined' && TX2_ACTS[a]) return TX2_ACTS[a](id, v, t, ev);
+  if(typeof CLK_ACTS !== 'undefined' && CLK_ACTS[a]) return CLK_ACTS[a](id, v, t, ev);
+  if(typeof RV_ACTS !== 'undefined' && RV_ACTS[a]) return RV_ACTS[a](id, v, t, ev);
+  if(typeof RP_ACTS !== 'undefined' && RP_ACTS[a]) return RP_ACTS[a](id, v, t, ev);
   if(NBX_ACTS[a]) return NBX_ACTS[a](id, v, t, ev);
   if(a === 'toolRun') return toolRunDlg(id);
   if(a === 'trPick'){ $('trV').value = v; return $('trV').focus(); }
@@ -560,6 +563,7 @@ document.addEventListener('submit', ev => {
     if(clash(DB.rules, rt, 'title', r.id)){ const w = $('rTitleWarn'); if(w){ w.hidden = false; w.textContent = `A rule called “${rt}” already exists — rename this one before saving.`; $('rTitle').classList.add('invalid'); $('rTitle').focus(); $('rTitle').scrollIntoView({block:'nearest'}); return; } return fieldErr('rTitle', `A rule called “${rt}” already exists.`); }
     const tech = $('rTech').value.trim().toUpperCase(); if(tech && !/^(T\d{4}(\.\d{3})?)(\s*,\s*T\d{4}(\.\d{3})?)*$/.test(tech)) return fieldErr('rTech', 'Use MITRE ATT&CK IDs like T1059 or T1059.001 (comma-separated).');
     if(!$('rCode').value.trim()) return fieldErr('rCode', 'The rule body is empty.');
+    if(typeof rvKeep === 'function') rvKeep(r, {title:rt, code:$('rCode').value, severity:$('rSev').value, technique:$('rTech').value.trim().toUpperCase(), desc:$('rDesc').value.trim()});
     Object.assign(r, {title:rt, severity:$('rSev').value, technique:$('rTech').value.trim().toUpperCase(), caseId:$('rCase').value || null, desc:$('rDesc').value.trim(), code:$('rCode').value,
       platform:$('rPlat').value.trim(), author:$('rAuthor').value.trim(), tags:$('rTags').value.split(',').map(x => x.trim()).filter(Boolean).slice(0, 20), modified:Date.now()});
     mutate('saved rule ' + r.title); renderAll(); if(typeof dlAfterSave === 'function' && dlAfterSave(r)) return; const iss = validateRule(r.type, r.code, r.title); return toast(iss.length ? 'Saved — with ' + iss.length + ' structure warning' + (iss.length > 1 ? 's' : '') : 'Rule saved'); }

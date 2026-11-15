@@ -110,6 +110,14 @@ function normalise(fields){
   if(norm.url && !norm.domain){ const h = (norm.url.match(/^https?:\/\/([^/:?#]+)/i) || [])[1]; if(h) norm.domain = h; }
   return norm;
 }
+/* well-known cloud and identity logs arrive as JSON: name them and map their fields to the common ones */
+const ipOnly = v => String(v || '').trim().replace(/^\[?([0-9a-f.:]+?)\]?(?::\d{1,5})?$/i, '$1');
+const JSON_PROD = [
+  ['AWS CloudTrail', f => f.eventVersion && f.eventSource && f.eventName, f => ({action:f.eventName, app:f.eventSource, 'src.ip':f.sourceIPAddress, user:f['userIdentity.userName'] || f['userIdentity.sessionContext.sessionIssuer.userName'] || f['userIdentity.arn'] || f['userIdentity.principalId'], status:f.errorCode ? 'failure: ' + f.errorCode : 'success', ua:f.userAgent, time:f.eventTime, 'event.type':f.eventType}), f => f.eventName],
+  ['Okta', f => f.eventType && f.published && (f['actor.alternateId'] || f['actor.id']), f => ({action:f.eventType, user:f['actor.alternateId'], 'src.ip':f['client.ipAddress'], status:f['outcome.result'], ua:f['client.userAgent.rawUserAgent'], country:f['client.geographicalContext.country'], time:f.published}), f => f.displayMessage || f.eventType],
+  ['Microsoft 365 audit', f => f.Operation && f.CreationTime && (f.Workload || f.RecordType != null || f.UserId), f => ({action:f.Operation, user:f.UserId, 'src.ip':ipOnly(f.ClientIP || f.ClientIPAddress || f.ActorIpAddress), app:f.Workload, status:f.ResultStatus, time:/[zZ]|[+-]\d\d:?\d\d$/.test(f.CreationTime) ? f.CreationTime : f.CreationTime + 'Z'}), f => f.Operation],
+  ['Zeek', f => f['id.orig_h'] && (f.uid || f.ts != null), f => ({time:f.ts != null && /^\d+(\.\d+)?$/.test(String(f.ts)) ? new Date(parseFloat(f.ts) * 1000).toISOString() : f.ts}), f => f.query ? 'dns' : f.method || f.uri ? 'http' : f.server_name ? 'ssl' : f.proto ? 'conn' : ''],
+];
 const P_CACHE = new Map();
 function parseLog(text, all){
   const s = String(text || ''); if(!s.trim()) return null; const key = s.length > 4000 ? null : s;
@@ -125,7 +133,10 @@ function parseLog(text, all){
   else if(fields && fields['cef.vendor']) format = 'CEF · ' + fields['cef.vendor'] + ' ' + fields['cef.product'];
   else if(fields && /Windows event text/.test(format)) format = 'Windows event' + (fields.EventID ? ' ' + fields.EventID : '') + ' (text)';
   else if(fields && fields.EventID && (fields.Image || fields.CommandLine || fields.QueryName)) format = format.includes('XML') ? 'Sysmon (XML)' : 'Sysmon (' + format + ')';
-  const out = fields ? {format, fields, norm:normalise(fields)} : null;
+  let extraNorm = null;
+  if(fields && /^(Syslog · )?JSON$/.test(format)) for(const [name, test, map, sub] of JSON_PROD){ let ok = false; try{ ok = !!test(fields); }catch(e){} if(!ok) continue;
+    format = name + (sub && sub(fields) ? ' · ' + sub(fields) : ''); extraNorm = Object.fromEntries(Object.entries(map(fields)).filter(([, v]) => v != null && v !== '').map(([k, v]) => [k, String(v)])); break; }
+  const out = fields ? {format, fields, norm:Object.assign(normalise(fields), extraNorm || {})} : null;
   if(key){ if(P_CACHE.size > 3000) P_CACHE.clear(); P_CACHE.set(key, out); }
   return out;
 }
@@ -149,13 +160,16 @@ function extractRich(text){
   return base;
 }
 /* a readable title for a structured log line */
+const WIN_EV = {4624:'Logon', 4625:'Failed logon', 4634:'Logoff', 4648:'Logon with explicit credentials', 4672:'Admin rights at logon', 4688:'Process created', 4697:'Service installed', 4698:'Scheduled task created', 4720:'User created', 4722:'User enabled', 4724:'Password reset', 4728:'Added to a global group', 4732:'Added to a local group', 4740:'Account locked out', 4756:'Added to a universal group', 4768:'Kerberos TGT requested', 4769:'Kerberos service ticket requested', 4771:'Kerberos pre-auth failed', 4776:'Credential validation', 1102:'Audit log cleared', 104:'Log cleared', 7045:'Service installed', 4104:'PowerShell script block'};
 function parsedTitle(P){
   if(!P || /Label: value/.test(P.format)) return ''; const n = P.norm, parts = [];
   const vendor = P.format.replace(/\s*\(.*\)$/, '').replace(/^Syslog · /, '');
-  if(n['src.ip'] || n['dst.ip']) parts.push([n.proto, (n['src.ip'] || '?') + (n['src.port'] ? ':' + n['src.port'] : ''), '→', (n['dst.ip'] || n.domain || '?') + (n['dst.port'] ? ':' + n['dst.port'] : '')].filter(Boolean).join(' '));
+  const who = !n['dst.ip'] && !n['dst.port'] && n['src.ip'] && (n.action || n.user);   // sign-ins and API calls: who did what, from where — not a flow
+  if(!who && (n['src.ip'] || n['dst.ip'])) parts.push([n.proto, (n['src.ip'] || '?') + (n['src.port'] ? ':' + n['src.port'] : ''), '→', (n['dst.ip'] || n.domain || '?') + (n['dst.port'] ? ':' + n['dst.port'] : '')].filter(Boolean).join(' '));
   else if(n.method || n.url) parts.push([n.method, n.url, n.status].filter(Boolean).join(' '));
   if(n.action) parts.push(n.action); if(n.user && !parts.join(' ').includes(n.user)) parts.push('user ' + n.user);
-  if(n.app && parts.length < 3) parts.push(n.app); if(n.process) parts.push(n.process.split(/[\\/]/).pop()); if(n['event.id'] && parts.length < 2) parts.unshift('Event ' + n['event.id']);
+  if(who) parts.push('from ' + n['src.ip']); if(who && n.status && /fail|deny|denied|error/i.test(n.status)) parts.push(n.status);
+  if(n.app && parts.length < 3) parts.push(n.app); if(n.process) parts.push(n.process.split(/[\\/]/).pop()); if(n['event.id'] && /Windows|Sysmon|XML/.test(P.format) && WIN_EV[n['event.id']] && !/Sysmon/.test(P.format)) parts.unshift(n['event.id'] + ' ' + WIN_EV[n['event.id']]); else if(n['event.id'] && parts.length < 2) parts.unshift('Event ' + n['event.id']);
   return parts.length ? (parts.join(' · ') + (/key=value|JSON/.test(vendor) ? '' : ' — ' + vendor)).slice(0, 110) : '';
 }
 /* the one-line summary shown in capture and the record panel */

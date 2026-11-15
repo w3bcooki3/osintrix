@@ -4,6 +4,46 @@
    Each change has a type: "added" | "changed" | "fixed" | "removed". */
 const CHANGELOG_DATA = [
   {
+    "version": "1.41",
+    "name": "Connected cases, rule history, cloud logs",
+    "date": "2026-11-15",
+    "summary": "See which cases connect and why, keep every version of a rule, fix blind spots a group at a time, catch the same attack on a second host, and import cloud, identity and network logs as real events.",
+    "changes": [
+      {
+        "type": "added",
+        "text": "Case overview → Connected cases: the other cases this one shares indicators or vault entries with (phones, wallets, handles compared the way duplicate detection does), weighted by your verdicts — malicious counts most — plus nearby infrastructure (same /24, same registered domain), said to be weaker. Private addresses, benign indicators and anything in most of your cases are left out."
+      },
+      {
+        "type": "added",
+        "text": "Detections → rule editor → History: every save that changes a rule keeps the version it replaces (last 25). Compare any two line by line, with title and severity changes listed; put an old version back in the editor and save — the one it replaces is kept too."
+      },
+      {
+        "type": "added",
+        "text": "Timeline → Rules → Not caught: blind spots of the same kind are grouped, with One rule for all and a preview of whether the draft would also match other events in your evidence."
+      },
+      {
+        "type": "added",
+        "text": "Timeline → Patterns → Sessions: the same run of stages on a second host, later (e.g. Logon → Discovery → Collection → Exfiltration 3 hours after the first host), is pointed out as a likely sign of lateral movement, with both sessions and what happened between one click away."
+      },
+      {
+        "type": "added",
+        "text": "A corrected clock now shows on every event it touched (a clock mark in the timeline; the details panel says by how much and what was recorded), and can be taken back from any of those events."
+      },
+      {
+        "type": "added",
+        "text": "Log import: AWS CloudTrail, Okta System Log, Microsoft 365 audit (JSON, or the CSV export with the event in AuditData), Zeek (TSV with #fields, or JSON) and Windows Event Viewer XML exports are read as real events — who, what, from where, the outcome and the time — and titled that way (“ConsoleLogin · user ops-admin · from 198.51.100.7 · failure”, “4625 Failed logon · user admin”). Firewall lines like “allow tcp 10.0.0.5:51022 -> 203.0.113.47:4444” now give rules source, destination, port and action to match on."
+      },
+      {
+        "type": "added",
+        "text": "Rule packs: Import takes .yml, .yar, .json or the zip that Download makes, and shows before anything changes what is new, what you already have (skipped — but tests it brings are added) and what clashes with one of yours by title: keep both, replace yours (yours stays in its history) or skip. Packs carry tests, version history and test history. One Undo takes the whole import back."
+      },
+      {
+        "type": "fixed",
+        "text": "The newer screens were checked at phone size: no serious accessibility problems and nothing wider than the screen."
+      }
+    ]
+  },
+  {
     "version": "1.40",
     "name": "Rules against cases, works offline",
     "date": "2026-11-15",

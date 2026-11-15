@@ -164,16 +164,16 @@ function ruleEditor(r){
       <button type="button" class="iconbtn" data-act="rMenu" data-id="${esc(r.id)}" aria-label="More actions" title="More">${ico('ellipsis','sm')}</button></div>
     <div class="rx-tw"><label class="sr" for="rTitle">Title</label><input id="rTitle" class="rx-title" value="${esc(r.title)}" required autocomplete="off" placeholder="Rule title" aria-describedby="rTitleWarn"><p class="ferr" id="rTitleWarn" role="status" hidden></p></div>
     <label class="sr" for="rDesc">Description</label><input id="rDesc" class="rx-desc" value="${esc(r.desc)}" placeholder="What does this detect, and why does it matter?" autocomplete="off">
-    <div class="rx-tabs" role="tablist"><button type="button" role="tab" data-rtab="rule" aria-selected="${tab === 'rule'}">${ico('code','sm')}Rule</button><button type="button" role="tab" data-rtab="meta" aria-selected="${tab === 'meta'}">${ico('tag','sm')}Details</button><button type="button" role="tab" data-rtab="tests" aria-selected="${tab === 'tests'}">${ico('circle-check','sm')}Tests${(r.tests || []).length ? ' <span class="t3">' + r.tests.length + '</span>' : ''}</button>${r.type === 'sigma' ? `<button type="button" role="tab" data-rtab="queries" aria-selected="${tab === 'queries'}">${ico('terminal','sm')}Queries</button><button type="button" role="tab" data-rtab="evasion" aria-selected="${tab === 'evasion'}">${ico('shield-alert','sm')}Evasion</button>` : ''}
+    <div class="rx-tabs" role="tablist"><button type="button" role="tab" data-rtab="rule" aria-selected="${tab === 'rule'}">${ico('code','sm')}Rule</button><button type="button" role="tab" data-rtab="meta" aria-selected="${tab === 'meta'}">${ico('tag','sm')}Details</button><button type="button" role="tab" data-rtab="tests" aria-selected="${tab === 'tests'}">${ico('circle-check','sm')}Tests${(r.tests || []).length ? ' <span class="t3">' + r.tests.length + '</span>' : ''}</button><button type="button" role="tab" data-rtab="history" aria-selected="${tab === 'history'}">${ico('history','sm')}History${typeof rvList === 'function' && rvList(r).length ? ' <span class="t3">' + rvList(r).length + '</span>' : ''}</button>${r.type === 'sigma' ? `<button type="button" role="tab" data-rtab="queries" aria-selected="${tab === 'queries'}">${ico('terminal','sm')}Queries</button><button type="button" role="tab" data-rtab="evasion" aria-selected="${tab === 'evasion'}">${ico('shield-alert','sm')}Evasion</button>` : ''}
       <span style="flex:1"></span><span class="rx-edited">Edited ${esc(E.fmtAgo(Math.max(0, Date.now() - r.modified)))}</span></div>
-    <div class="rx-pane" data-pane="rule"${tab === 'rule' || !/^(meta|tests|queries|evasion)$/.test(tab) ? '' : ' hidden'}>
+    <div class="rx-pane" data-pane="rule"${tab === 'rule' || !/^(meta|tests|queries|evasion|history)$/.test(tab) ? '' : ' hidden'}>
       <div class="cx"><div class="cx-g" id="rGut" aria-hidden="true"></div><div class="cx-ed"><pre class="cx-hl" id="rHl" aria-hidden="true"></pre>
         <label class="sr" for="rCode">Rule source</label><textarea id="rCode" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off">${esc(r.code)}</textarea></div></div>
       <div class="cx-bar" id="rStatus"></div>
       <div class="rtest"><button type="button" class="btn sm" data-act="rTest" data-id="${esc(r.id)}">${ico('play','sm')}Test against ${esc((theCase() || {code:'case'}).code)} evidence</button>${r.type === 'yara' ? `<button type="button" class="btn sm" data-act="rTestFile" data-id="${esc(r.id)}">${ico('file-search','sm')}Scan a file…</button>` : ''}<span class="t3">Runs locally on the current rule text — saved or not.</span></div>
       <div id="rTestOut"></div>
       ${r.type === 'sigma' && !/^\s*title\s*:/m.test(r.code) ? `<p class="hint rx-note">${ico('circle-help','sm')}The title above is added as <span class="mono">title:</span> when you copy or download this rule.</p>` : ''}</div>
-    <div class="rx-pane" data-pane="lab"${/^(tests|queries|evasion)$/.test(tab) ? '' : ' hidden'}><div id="dlPane" aria-live="polite"></div></div>
+    <div class="rx-pane" data-pane="lab"${/^(tests|queries|evasion|history)$/.test(tab) ? '' : ' hidden'}><div id="dlPane" aria-live="polite"></div></div>
     <div class="rx-pane" data-pane="meta"${tab === 'meta' ? '' : ' hidden'}>
       <div class="frow"><div class="field"><label for="rSev">Severity</label><select id="rSev">${Object.entries(SEV).map(([k, [l]]) => `<option value="${k}"${r.severity === k ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
         <div class="field"><label for="rTech">ATT&amp;CK technique</label><input id="rTech" value="${esc(r.technique)}" placeholder="T1059.001" class="mono"></div></div>
@@ -188,7 +188,7 @@ function ruleEditor(r){
 function bindRuleEditor(){
   const ta = $('rCode'), r = DB.rules.find(z => z.id === UI.rule); if(!ta || !r) return;
   const f = ta.form, hl = $('rHl'), gut = $('rGut'), st = $('rStatus');
-  const snap = () => [...f.querySelectorAll('input,select,textarea')].map(i => i.value).join('\u0001'); const base = snap();
+  const snap = () => [...f.querySelectorAll('input,select,textarea')].filter(i => !i.closest('#dlPane')).map(i => i.value).join('\u0001'); const base = snap();
   let vt = null;
   const status = () => { const iss = validateRule(r.type, ta.value, $('rTitle').value), n = ta.value.split('\n').length;
     st.className = 'cx-bar ' + (iss.length ? 'bad' : 'ok');
@@ -206,8 +206,8 @@ function bindRuleEditor(){
       if(ind){ ev.preventDefault(); ta.setRangeText('\n' + ind, s, ta.selectionEnd, 'end'); ta.dispatchEvent(new Event('input', {bubbles:true})); } } });
   f.addEventListener('keydown', ev => { if((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 's'){ ev.preventDefault(); f.requestSubmit(); } });
   f.querySelectorAll('[data-rtab]').forEach(b => b.onclick = () => { UI.rtab = b.dataset.rtab; f.querySelectorAll('[data-rtab]').forEach(x => x.setAttribute('aria-selected', String(x === b)));
-    const pane = /^(tests|queries|evasion)$/.test(UI.rtab) ? 'lab' : UI.rtab; f.querySelectorAll('[data-pane]').forEach(p => p.hidden = p.dataset.pane !== pane); if(pane === 'lab') dlPaneFill(); });
-  paint(); status(); tcheck(); if(/^(tests|queries|evasion)$/.test(UI.rtab || '')) dlPaneFill();
+    const pane = /^(tests|queries|evasion|history)$/.test(UI.rtab) ? 'lab' : UI.rtab; f.querySelectorAll('[data-pane]').forEach(p => p.hidden = p.dataset.pane !== pane); if(pane === 'lab') dlPaneFill(); });
+  paint(); status(); tcheck(); if(/^(tests|queries|evasion|history)$/.test(UI.rtab || '')) dlPaneFill();
 }
 /* picking several rules at once: star, download or delete them together */
 const rPicked = id => !!(UI.rpick && UI.rpick.has(id));
@@ -225,7 +225,7 @@ function paintRBulk(){
   const el = $('rbk'); if(!el) return; const n = rPickN(); el.hidden = !n; el.innerHTML = rBulkInner();
   const all = document.querySelector('[data-act=rPickAll]'), shown = UI.rShown || []; if(all){ all.checked = !!shown.length && shown.every(rPicked); all.indeterminate = !all.checked && shown.some(rPicked); }
 }
-const ruleExportObj = r => ({type:r.type, title:r.title, description:r.desc, code:ruleText(r), severity:r.severity, category:r.category, technique:r.technique, author:r.author, platform:r.platform, tags:r.tags, refs:r.refs || [], starred:!!r.starred, caseId:r.caseId || null, created:r.created, tests:r.tests && r.tests.length ? r.tests : undefined});
+const ruleExportObj = r => ({type:r.type, title:r.title, description:r.desc, code:ruleText(r), severity:r.severity, category:r.category, technique:r.technique, author:r.author, platform:r.platform, tags:r.tags, refs:r.refs || [], starred:!!r.starred, caseId:r.caseId || null, created:r.created, tests:r.tests && r.tests.length ? r.tests : undefined, versions:typeof rvList === 'function' && rvList(r).length ? rvList(r) : undefined, testHist:typeof dlHist === 'function' && dlHist(r).length ? dlHist(r) : undefined});
 const ruleFileName = r => safeName(slug(r.title) || 'rule').slice(0, 60) + (r.type === 'yara' ? '.yar' : '.yml');
 /* one rule: its .yml / .yar file. Several: a zip with each rule's file, and a JSON bundle that Import reads back with tests and metadata */
 function rulesDownload(xs){
@@ -268,20 +268,4 @@ function ruleFromCase(){
   if(UI.route.area !== 'detections') go('#/detections'); else renderMain();
   toast('Two starter rules generated from ' + mal.size + ' malicious entities — review before use');
 }
-function importRules(){
-  const i = document.createElement('input'); i.type = 'file'; i.multiple = true; i.accept = '.yml,.yaml,.yar,.yara,.json,.txt';
-  i.onchange = async () => { let n = 0;
-    /* a rule counts as already here if its text matches — with or without the title line the export adds */
-    const norm = x => String(x || '').replace(/\r\n?/g, '\n').replace(/[ \t]+$/gm, '').trim(), have = new Set(DB.rules.flatMap(x => [norm(x.code), norm(ruleText(x))])), dup = c => { const k = norm(c); if(have.has(k)) return true; have.add(k); return false; };
-    for(const f of [...i.files].slice(0, 50)){ if(f.size > 1048576) continue; const txt = await f.text();
-      if(/\.json$/i.test(f.name)){ try{ const d = JSON.parse(txt); for(const r of (Array.isArray(d) ? d : [d])) if(r && r.code && /^(sigma|yara)$/.test(r.type) && !dup(r.code)){ DB.rules.unshift({id:uid('r'), type:r.type, title:importName(String(r.title || f.name).slice(0, 150), DB.rules.map(x => x.title)), desc:String(r.description || r.desc || ''), code:String(r.code), severity:String(r.severity || 'medium').toLowerCase(), category:String(r.category || ''), technique:String(r.technique || ''), author:String(r.author || ''), platform:String(r.platform || ''), tags:Array.isArray(r.tags) ? r.tags.map(String) : [], refs:Array.isArray(r.refs) ? r.refs.filter(u => typeof u === 'string' && E.safeUrl(u)).slice(0, 30) : [], created:+r.created || Date.now(), modified:Date.now(), starred:r.starred === true, caseId:typeof r.caseId === 'string' && DB.cases.some(c => c.id === r.caseId) ? r.caseId : null, tests:normRuleTests(r.tests)}); n++; } }catch(e){} continue; }
-      const yara = /\brule\s+\w+\s*[:{]/.test(txt) && !/^\s*title\s*:/m.test(txt);
-      for(const part of yara ? [txt] : txt.split(/^---\s*$/m).filter(p => p.trim())){
-        const title = yara ? ((part.match(/\brule\s+(\w+)/) || [])[1] || f.name) : ((part.match(/^\s*title\s*:\s*(.+)$/m) || [])[1] || f.name);
-        const lvl = ((part.match(/^\s*level\s*:\s*(\w+)/m) || [])[1] || 'medium').toLowerCase();
-        if(dup(part)) continue;
-        DB.rules.unshift({id:uid('r'), type:yara ? 'yara' : 'sigma', title:importName(title.trim().slice(0, 150), DB.rules.map(x => x.title)), desc:((part.match(/^\s*description\s*:\s*(.+)$/m) || part.match(/description\s*=\s*"([^"]+)"/) || [])[1] || '').trim(), code:part.trim(), severity:SEV[lvl] ? lvl : 'medium', category:'', technique:((part.match(/attack\.(t\d{4}(?:\.\d{3})?)/i) || [])[1] || '').toUpperCase(), author:((part.match(/author\s*[:=]\s*"?([^"\n]+)/) || [])[1] || '').trim(), platform:'', tags:['imported'], refs:[], created:Date.now(), modified:Date.now(), starred:false, caseId:null}); n++;
-      } }
-    mutate('imported ' + n + ' rules'); UI.rule = DB.rules[0] && DB.rules[0].id; renderAll(); toast(n ? n + ' rule' + (n > 1 ? 's' : '') + ' imported' : 'No Sigma or YARA rules found in those files'); };
-  i.click();
-}
+/* importRules() lives in rulepack.js: a preview of what is new, already here, or clashes, before anything changes */

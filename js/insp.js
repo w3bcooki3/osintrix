@@ -61,7 +61,7 @@ function inspRecord(r){
   return ihead(typeLabel(r.type)) + `<div class="ibody"><h2>${esc(r.title)}</h2>
     ${r.type === 'lead' ? `<div class="isec"><h4>Answer</h4><form data-form="answer" data-id="${r.id}" style="display:flex;gap:8px"><label class="sr" for="ansIn">Answer</label><input id="ansIn" class="inp" value="${esc(r.answer)}" placeholder="What you concluded"><button class="btn primary" type="submit">Save</button></form></div>` : ''}
     <div class="isec"><h4>Where it came from</h4><dl class="kv">
-      <dt>When</dt><dd>${r.ts ? esc(E.fmtFull(r.ts, tz())) + ' ' + esc(tz()) : 'No timestamp'}</dd>${rel ? `<dt>Since T0</dt><dd style="color:var(--amber)" class="mono">${rel}</dd>` : ''}
+      <dt>When</dt><dd>${r.ts ? esc(E.fmtFull(r.ts, tz())) + ' ' + esc(tz()) : 'No timestamp'}${typeof tsShifted === 'function' && tsShifted(r) ? `<div class="tshift-n">${ico('clock-alert','sm')}<span>${esc(tsShiftNote(r))}. <button class="lnk" data-act="tx2Unshift" data-id="${r.id}">Use the recorded times for ${esc(tx2Src(r))}</button></span></div>` : ''}</dd>${rel ? `<dt>Since T0</dt><dd style="color:var(--amber)" class="mono">${rel}</dd>` : ''}
       <dt>Source</dt><dd>${esc(r.source || '—')}</dd><dt>Host</dt><dd>${esc(r.host || '—')}</dd><dt>Case</dt><dd>${esc(c.name)}</dd>
       <dt>Added</dt><dd>${esc(r.addedBy)} · ${esc(E.fmtFull(r.addedAt, tz()).slice(0, 16))}</dd><dt>SHA-256</dt><dd class="mono" title="Fingerprint of the captured text">${esc((r.hash || '…').slice(0, 24))}…</dd></dl>
       ${r.ts ? `<button class="btn sm" data-act="setT0" data-id="${r.id}" style="margin-top:12px">${ico('crosshair','sm')}${c.t0 === r.id ? 'Clear T0' : 'Make this T0'}</button>` : ''}</div>
