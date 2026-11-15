@@ -147,12 +147,12 @@ function ctfWriteups(){
 }
 
 /* ---------- forensics kit ---------- */
-const LAB_TABS = [['file','File inspector','file-search'], ['logs','Log parser','scan-text'], ['pcap','PCAP','network'], ['sqlite','SQLite','database'], ['image','Image','image'], ['email','Email headers','mail'], ['time','Time & IDs','clock-3'], ['hash','Hashes','fingerprint'], ['geo','Coordinates','compass'], ['net','Network','network'], ['gen','Generators','users']];
+const LAB_TABS = [['file','File inspector','file-search'], ['logs','Log parser','scan-text'], ['pcap','PCAP','network'], ['sqlite','SQLite','database'], ['image','Image','image'], ['email','Email headers','mail'], ['time','Time & IDs','clock-3'], ['hash','Hashes','fingerprint'], ['geo','Coordinates','compass'], ['net','Network','network'], ['gen','Generators','users'], ['twist','Look-alikes','copy'], ['ident','Identity','fingerprint']];
 function viewLab(){
   const t = LAB_TABS.some(x => x[0] === UI.labTab) ? UI.labTab : 'file';
-  const body = {file:labFile, logs:labParse, pcap:labPcap, sqlite:labSql, image:labImage, email:labEmail, time:labTime, hash:labHash, geo:labGeo, net:labNet, gen:labGen}[t]();
+  const body = {file:labFile, logs:labParse, pcap:labPcap, sqlite:labSql, image:labImage, email:labEmail, time:labTime, hash:labHash, geo:labGeo, net:labNet, gen:labGen, twist:labTwist, ident:labIdent}[t]();
   return `<div class="scroll"><div class="page wide">
-    ${libHead('Forensics kit', 'Inspect files and images, read email headers, decode timestamps and IDs, identify hashes — entirely in your browser. Nothing is uploaded.', '', '')}
+    ${libHead('Forensics kit', 'Inspect files and images, read email headers, decode timestamps and IDs, identify hashes, find look-alike domains and pivot on identities. Files never leave your browser; online checks use only the sources you switched on.', '', '')}
     <div class="mpick"><label for="labSel" class="ix">Tool</label><select id="labSel" class="gsel bord">${LAB_TABS.map(([k, l]) => `<option value="${k}"${t === k ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
     <nav class="labtabs" role="tablist">${LAB_TABS.map(([k, l, i]) => `<button role="tab" data-act="labTab" data-v="${k}" aria-selected="${t === k}">${ico(i,'sm')}${l}</button>`).join('')}</nav>
     ${body}</div></div>`;

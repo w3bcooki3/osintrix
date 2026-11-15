@@ -50,8 +50,11 @@ function reportModel(c, D, tpl, redact){
     add('Tools and sources used', [...new Set(D.recs.map(r => r.source).filter(Boolean))].map(s => row('Source', red(s))));
     add('Still open', open.map(a => para('', '☐ ' + red(a.title))));
   } else {
+    const W = typeof rwSections === 'function' ? rwSections(c, D, red, tpl) : null;
+    if(W) add('Bottom line', [{k:'bl', t:red(W.bl), level:W.C.level, edited:W.edited}]);
     add('Summary', [para('', red(c.scope || 'No scope written yet.')), para('Scale. ', scale)]);
     add('Findings', f.length ? f.map(x => para(red(x.title) + '. ', red(x.body), cite(x.id))) : [para('', 'None recorded.')]);
+    if(W) add('Attack path', W.path.map(p => row(p.tac, (p.r.ts ? rwDay(p.r.ts) + ' — ' : '') + red(p.what) + ' — ' + red(p.r.title), cite(p.r.id))), {cols:['Tactic', 'First seen in the evidence']});
     if(tpl !== 'exec' || key.length) add('Key evidence', key.map(r => row(r.ts ? E.fmtFull(r.ts, tz()).slice(0, 16) : '—', red(r.title), cite(r.id))));
     add('Answers', ans.map(a => para(red(a.title) + ' — ', red(a.answer), cite(a.id))));
     add('Still open', open.map(a => para('', '☐ ' + red(a.title))));
@@ -61,7 +64,11 @@ function reportModel(c, D, tpl, redact){
       add('Key relationships', D.links.filter(l => l.conf >= 2).slice(0, tpl === 'tech' ? 60 : 12).map(l => row(l.label, red(primary(entryById(l.a))) + ' → ' + red(primary(entryById(l.b))), cite(l.src))));
     }
     if(tpl === 'exec' && timed.length) add('Timeline at a glance', [timed[0], ...E.chapters(timed).map(ch => ch[0]).slice(1, 6), timed[timed.length - 1]].filter((r, i, a) => a.indexOf(r) === i).map(r => row(E.fmtFull(r.ts, tz()).slice(0, 16), red(r.title), cite(r.id))));
-    if(tpl === 'full') add('Chronology', timed.slice(0, 40).map(r => row(E.fmtFull(r.ts, tz()), red(r.title), cite(r.id), true)));
+    if(tpl === 'full') add('Chronology', timed.slice(0, 40).map(r => row(E.fmtFull(r.ts, tz()), red(r.title), cite(r.id), true)), {cols:['Time', 'Event']});
+    if(tpl === 'full'){ const H = typeof cpHist === 'function' ? cpHist() : new Map(); add('Indicators', caseIOCs(c.id).filter(x => x.verdict === 'malicious' || x.verdict === 'suspicious' || (H.get(x.id) && /malicious|suspicious/.test(H.get(x.id).band))).slice(0, 60)
+      .map(x => { const h = H.get(x.id); return row((E.LABEL[x.k] || x.k) + ' · ' + (x.verdict || 'no verdict') + (h ? ' · live ' + h.score : ''), red(x.v), null, true); }), {cols:['Kind · verdict', 'Indicator']}); }
+    if(W){ add('Recommendations', W.recs.map(r => ({k:'rec', key:r.key, when:r.when, t:red(r.t), why:red(r.why), items:r.items.map(red)})), {hidden:W.hidden});
+      add('Confidence and limitations', [para('Confidence: ', W.C.level[0].toUpperCase() + W.C.level.slice(1) + (W.C.why.length ? ', based on ' + rwList(W.C.why, 6) : '') + '.'), ...W.C.lim.map(l => para('', '• ' + red(l)))]); }
     if(tpl === 'tech'){
       add('Chronology', timed.map(r => row(E.fmtFull(r.ts, tz()), red(r.title) + (r.host ? ' · ' + red(r.host) : ''), cite(r.id), true)));
       add('Indicators', caseIOCs(c.id).filter(x => x.verdict !== 'benign').slice(0, 200).map(x => row((E.LABEL[x.k] || x.k) + (x.verdict ? ' · ' + x.verdict : ''), red(x.v), null, true)));
@@ -82,8 +89,10 @@ function reportHTML(c, D, M){
     : it.k === 'row' ? `<div class="ev2"><span class="${it.mono ? 'mono ' : ''}t3" style="font-size:13px">${esc(it.l)}</span><span${it.mono ? ' class="mono" style="font-size:13.5px;overflow-wrap:anywhere"' : ''}>${esc(it.t)}${ci(it.c)}</span></div>`
     : it.k === 'step' ? `<div class="rstep"><span class="n">${it.n}</span><div><b>${esc(it.t)}</b>${ci(it.c)}${it.src ? ` <span class="t3" style="font-size:12.5px">· ${esc(it.src)}</span>` : ''}${it.body && it.body !== it.t ? `<pre>${esc(it.body)}</pre>` : ''}</div></div>`
     : it.k === 'map' ? `<figure class="repfig">${reportMap(c, D, M.red)}<figcaption>Entries from the vault and the relationships you drew. Solid lines are medium/high confidence, dashed are low; a red ring marks malicious.</figcaption></figure>`
+    : it.k === 'bl' ? `<div class="rw-bl"><div class="rw-bh"><span class="rw-cf ${it.level}">${esc(RW_CONF[it.level])}</span>${it.edited ? '<span class="t3">edited by you</span>' : '<span class="t3">drafted from the case</span>'}<button class="btn xs ghost noprint" data-act="repEdit">${ico('pencil','sm')}Edit</button></div><p>${esc(it.t)}</p></div>`
+    : it.k === 'rec' ? `<div class="rw-rec"><span class="rw-w ${it.when}">${esc(RW_WHEN[it.when])}</span><div><b>${esc(it.t)}</b><p>${esc(it.why)}</p>${it.items.length ? `<p class="mono t3">${esc(rwList(it.items, 6))}</p>` : ''}</div><button class="iconbtn noprint" data-act="repRecOff" data-id="${esc(it.key)}" aria-label="Drop this recommendation" title="Drop">${ico('x','sm')}</button></div>`
     : it.k === 'src' ? `<p style="font-size:13.5px">[${it.n}] ${esc(it.t)} · ${esc(it.s)} <span class="mono t3">sha256 ${esc(it.h)}…</span></p>` : '';
-  return M.S.map(s => `<h2>${esc(s.h)}</h2>${s.items.map(item).join('')}`).join('');
+  return M.S.map(s => `<h2>${esc(s.h)}${s.hidden ? ` <button class="btn xs ghost noprint" data-act="repRecAll">Show ${s.hidden} dropped</button>` : ''}</h2>${s.items.map(item).join('')}`).join('');
 }
 function reportMdText(c, D, M, tplName){
   const ci = x => x && x.n ? ' [' + x.n + ']' : '', L = ['# ' + M.red(c.name), '', '_' + c.code + ' · ' + tplName + ' report · ' + tz() + (UI.redact ? ' · redacted' : '') + '_', ''];
@@ -93,6 +102,8 @@ function reportMdText(c, D, M, tplName){
       else if(it.k === 'row') L.push('- ' + (it.mono ? '`' + it.l + '`' : it.l) + ' — ' + (it.mono ? '`' + it.t + '`' : it.t) + ci(it.c));
       else if(it.k === 'step') L.push(it.n + '. **' + it.t + '**' + ci(it.c) + (it.src ? ' _(' + it.src + ')_' : ''), ...(it.body && it.body !== it.t ? ['', '   ```', ...it.body.split('\n').map(l => '   ' + l), '   ```', ''] : []));
       else if(it.k === 'map') L.push('_Relationship map: open the case graph in OSINTrix, or print this report to PDF to include it._');
+      else if(it.k === 'bl') L.push('> **Bottom line (' + RW_CONF[it.level] + ').** ' + it.t, '');
+      else if(it.k === 'rec') L.push('- **' + RW_WHEN[it.when] + ': ' + it.t + '** — ' + it.why + (it.items.length ? ' (`' + it.items.slice(0, 8).join('`, `') + '`)' : ''));
       else if(it.k === 'src') L.push('[' + it.n + '] ' + it.t + ' · ' + it.s + ' · sha256 `' + it.h + '…`');
     }
     L.push(''); }
@@ -103,7 +114,7 @@ function caseReport(c, D){
   return `<div class="scroll"><div class="page">
     <div class="toolbar rep-tb"><div class="seg" role="group" aria-label="Template">${REP_T.map(([v, l, i]) => `<button data-act="repT" data-v="${v}" aria-pressed="${tpl === v}">${ico(i,'sm')}${l}</button>`).join('')}</div>
       <label class="chk swl"><span class="sw"><input type="checkbox" data-act="repRedact"${UI.redact ? ' checked' : ''}><span></span></span>Redact personal data</label>
-      <span class="sp"></span><button class="btn primary" data-act="exportMd">${ico('download','sm')}Markdown</button><button class="btn" data-act="printReport">${ico('file-text','sm')}Print / PDF</button><button class="btn" data-act="iocMenu">${ico('fingerprint','sm')}IOCs &amp; case data${ico('chevron-down','sm')}</button></div>
+      <span class="sp"></span><button class="btn primary" data-act="exportMd">${ico('download','sm')}Markdown</button><button class="btn" data-act="exportDocx">${ico('download','sm')}Word</button><button class="btn" data-act="printReport">${ico('file-text','sm')}Print / PDF</button><button class="btn" data-act="iocMenu">${ico('fingerprint','sm')}IOCs &amp; case data${ico('chevron-down','sm')}</button></div>
     ${UI.redact ? `<p class="note" style="margin:0 0 14px"><span class="ic">${ico('eye-off','sm')}</span><span>Emails, phone numbers, IP addresses, @handles and the names of Person entries are masked in this view, the Markdown and the PDF. Check it before sharing — free-text can still hold personal details.</span></p>` : ''}
     <article class="doc"><h1>${esc(M.red(c.name))}</h1><p class="mono t3" style="font-size:13px">${esc(c.code)} · ${esc(REP_T.find(x => x[0] === tpl)[1])} report · generated from ${D.recs.length} records and ${D.entries.length} vault entries · ${esc(tz())}${UI.redact ? ' · redacted' : ''}</p>
       ${reportHTML(c, D, M)}</article></div></div>`;

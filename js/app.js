@@ -106,6 +106,8 @@ document.addEventListener('click', ev => {
   if(typeof CTI_ACTS !== 'undefined' && CTI_ACTS[a]) return CTI_ACTS[a](id, v, t, ev);
   if(typeof LK_ACTS !== 'undefined' && LK_ACTS[a]) return LK_ACTS[a](id, v, t, ev);
   if(typeof CP_ACTS !== 'undefined' && CP_ACTS[a]) return CP_ACTS[a](id, v, t, ev);
+  if(typeof RW_ACTS !== 'undefined' && RW_ACTS[a]) return RW_ACTS[a](id, v, t, ev);
+  if(typeof OS_ACTS !== 'undefined' && OS_ACTS[a]) return OS_ACTS[a](id, v, t, ev);
   if(NBX_ACTS[a]) return NBX_ACTS[a](id, v, t, ev);
   if(a === 'toolRun') return toolRunDlg(id);
   if(a === 'trPick'){ $('trV').value = v; return $('trV').focus(); }
@@ -540,6 +542,9 @@ document.addEventListener('submit', ev => {
   if(k === 'src'){ const url = $('srcUrl').value.trim(), sn = $('srcName').value.trim().replace(/\s+/g, ' ') || hostOf(url); if(!E.safeUrl(url)) return fieldErr('srcUrl', 'Enter the feed address, starting with http:// or https://.');
     if(DB.feedSources.some(x => x.url.replace(/\/+$/, '') === url.replace(/\/+$/, ''))) return fieldErr('srcUrl', 'This feed is already in your sources.'); if(clash(DB.feedSources, sn)) return fieldErr('srcName', `A source called “${sn}” already exists.`); if(!checkLen('srcName', sn, 60, 'Name')) return;
     DB.feedSources.push({id:uid('s'), name:sn.slice(0, 80), url, on:true, status:'', last:0}); mutate('added source'); return sourcesDlg('news'); }
+  if(k === 'twGen'){ const d = $('twD').value.trim(), S = twSplit(d); if(!S || !S.name) return fieldErr('twD', 'Enter a domain such as example.com'); if(UI.tw && UI.tw.sig) UI.tw.sig.stop = true; UI.tw = {d:S.name + '.' + S.tld, list:twGen(d)}; return renderMain(); }
+  if(k === 'idGo'){ UI.idq = cap($('idQ').value.trim(), 200); return renderMain(); }
+  if(k === 'repBL'){ const c = theCase(), t = cap($('repBLt').value.trim(), 3000); c.rep = c.rep || {}; if(t) c.rep.bl = t; else delete c.rep.bl; closeDlg(); mutate('edited the report bottom line'); return renderMain(); }
   if(k === 'ctiLook'){ const q = $('lkQ').value.trim(), n = lkParse(q); if(!n) return fieldErr('lkQ', 'Enter an IP address, domain, URL, MD5/SHA-1/SHA-256 hash, CVE ID or ASN.'); return lookGo(n.k, n.v); }
   if(k === 'ctiStack'){ const raw = $('ctiStackIn').value.trim().replace(/\s+/g, ' ').slice(0, 160); if(!raw) return fieldErr('ctiStackIn', 'Type a vendor, or vendor / product.');
     const [vendor, product] = raw.split(/\s*\/\s*/); const known = ctiVendors().find(v => v.vendor.toLowerCase() === vendor.toLowerCase());

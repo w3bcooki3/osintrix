@@ -59,7 +59,8 @@ function rsProgress(kind, value){ const l = pivotLinks(kind, value); if(!l.lengt
 function pivotSection(kind, value){
   const l = pivotLinks(kind, value); if(!l.length) return '';
   const key = rsKey(kind, value), st = rsState(key), done = l.filter(([n]) => st[n]).length, next = l.find(([n]) => !st[n]);
-  return `<div class="isec rs"><h4>Research <span class="t3">${done} of ${l.length} checked</span></h4>
+  const plan = typeof pivotPlan === 'function' ? pivotPlan(kind, value) : [];
+  return `${plan.length ? `<div class="isec pp"><h4>Next steps</h4>${plan.map(p => `<button class="pp-s" data-act="${p.act}" data-id="${esc(p.v)}" data-v="${esc(p.v)}"><b>${esc(p.t)}</b><small>${esc(p.why)}</small>${ico('arrow-right','sm')}</button>`).join('')}</div>` : ''}<div class="isec rs"><h4>Research <span class="t3">${done} of ${l.length} checked</span></h4>
     <div class="rsbar"><i style="width:${Math.round(done / l.length * 100)}%"></i></div>
     <div class="rslist">${l.map(([n, u]) => { const d = st[n]; return `<div class="rsi${d ? ' done' : ''}"><button class="rsc" data-act="rsTick" data-id="${esc(key)}" data-v="${esc(n)}" aria-pressed="${!!d}" aria-label="${d ? 'Mark not checked' : 'Mark checked'}: ${esc(n)}">${d ? ico('check','sm') : ''}</button>
       <a href="${esc(u)}" target="_blank" rel="noopener noreferrer" data-act="rsOpen" data-id="${esc(key)}" data-v="${esc(n)}">${esc(n)}${ico('arrow-up-right','sm')}</a>${d ? `<span class="t3">${esc(E.fmtAgo(Date.now() - d.at))} ago</span>` : ''}</div>`; }).join('')}</div>
@@ -109,6 +110,7 @@ function printReport(){
   const doc = document.querySelector('article.doc'); if(!doc) return;
   let root = $('printRoot'); if(!root){ root = document.createElement('div'); root.id = 'printRoot'; document.body.appendChild(root); }
   root.innerHTML = doc.outerHTML + `<p class="print-foot">Generated with ${esc(BRAND.name)} · ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC</p>`;
+  root.querySelectorAll('.noprint').forEach(x => x.remove());
   const done = () => { root.innerHTML = ''; window.removeEventListener('afterprint', done); }; window.addEventListener('afterprint', done);
   setTimeout(() => window.print(), 30);
 }

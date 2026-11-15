@@ -1252,3 +1252,55 @@ test('smart search: plain questions become filters shown as chips, run over ever
   await page.keyboard.press('Control+k'); await page.fill('#srQ', 'lamp loader'); await expect(page.locator('.sr-nl')).toHaveCount(0); await expect(page.locator('#srList')).toContainText('Lamp loader');
   noErrors(errors);
 });
+
+test('report writer: bottom line, attack path, recommendations and confidence are drafted from the case; editable; Word export', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  await page.evaluate(() => { DB.prefs.repT = 'full'; }); await page.goto(page.url().replace(/#.*/, await page.evaluate(() => caseHash(DB.active, 'report'))));
+  const doc = page.locator('article.doc');
+  await expect(doc.locator('.rw-bl')).toContainText('A phishing intrusion affected WS-FIN-07 and DC01');
+  await expect(doc).toContainText('Attack path'); await expect(doc).toContainText('Initial Access');
+  await expect(doc.locator('.rw-rec').first()).toContainText('Isolate and image WS-FIN-07 and DC01');
+  await expect(doc).toContainText('Confidence and limitations');
+  // drop a recommendation, then bring it back
+  const n = await doc.locator('.rw-rec').count(); await doc.locator('.rw-rec [data-act=repRecOff]').first().click();
+  await expect(doc.locator('.rw-rec')).toHaveCount(n - 1); await page.click('[data-act=repRecAll]'); await expect(doc.locator('.rw-rec')).toHaveCount(n);
+  // rewrite the bottom line; it shows in Markdown; reset returns to the draft
+  await page.click('[data-act=repEdit]'); await page.fill('#repBLt', 'Contained intrusion <b>by</b> a commodity loader.'); await page.click('#dlg button[type=submit]');
+  await expect(doc.locator('.rw-bl')).toContainText('Contained intrusion <b>by</b>'); await expect(doc.locator('.rw-bl b')).toHaveCount(0);
+  expect(await page.evaluate(() => reportMd())).toContain('**Bottom line (moderate confidence).** Contained intrusion');
+  await page.click('[data-act=repEdit]'); await page.click('[data-act=repBLReset]'); await expect(doc.locator('.rw-bl')).toContainText('A phishing intrusion');
+  // redaction reaches the drafted text
+  await page.check('[data-act=repRedact]'); await expect(doc.locator('.rw-bl')).not.toContainText('billing@lantern-invoice.example');
+  // Word
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('[data-act=exportDocx]')]);
+  expect(dl.suggestedFilename()).toMatch(/report\.docx$/);
+  const buf = require('fs').readFileSync(await dl.path()); expect(buf.slice(0, 2).toString()).toBe('PK');
+  noErrors(errors);
+});
+
+test('OSINT: look-alike domains are generated and checked through DNS only when allowed; identity pivots; next steps in the inspector', async ({ page }) => {
+  const errors = await open(page, '#/lab');
+  const g = await page.evaluate(() => { const L = twGen('paypal.com'); return { n: L.length, has: ['paypa1.com', 'paypal.net', 'paypal-login.com', 'paypla.com', 'xn--pypal-4ve.com'].map(d => L.some(x => x.d === d)), kinds: [...new Set(L.map(x => x.kind))].length }; });
+  expect(g.n).toBeGreaterThan(200); expect(g.has).toEqual([true, true, true, true, true]); expect(g.kinds).toBeGreaterThan(10);
+  const hits = []; await page.route(/^https:\/\/(?!dns\.google)[^/]+\//, r => r.abort());
+  await page.route('https://dns.google/**', r => { const u = new URL(r.request().url()), n = u.searchParams.get('name'), t = u.searchParams.get('type'); hits.push(n);
+    const reg = { 'paypa1.com': { A: '45.77.10.20', MX: '10 mx.paypa1.com.' }, 'paypal.com': { A: '64.4.250.36' }, 'paypal.net': { A: '64.4.250.36' } }[n];
+    r.fulfill({ headers: { 'access-control-allow-origin': '*', 'content-type': 'application/json' }, body: JSON.stringify(reg ? { Status: 0, Answer: reg[t] ? [{ type: t === 'A' ? 1 : t === 'MX' ? 15 : 2, data: reg[t] }] : [] } : { Status: 3 }) }); });
+  await page.click('[data-act=labTab][data-v=twist]'); await page.fill('#twD', 'https://www.paypal.com/signin'); await page.press('#twD', 'Enter');
+  await expect(page.locator('[data-act=twCheck]')).toBeDisabled(); expect(hits).toEqual([]);                 // nothing is sent until DNS lookups are allowed
+  await page.click('[data-act=twDnsOn]'); await page.click('[data-act=twCheck]');
+  await expect(page.locator('.tw-tbl')).toContainText('paypa1.com', { timeout: 30000 });
+  await expect.poll(() => page.evaluate(() => !UI.tw.running), { timeout: 60000 }).toBe(true);
+  const rows = await page.evaluate(() => UI.tw.list.filter(x => x.exists).map(x => [x.d, twRisk(x, UI.tw.orig).s]));
+  expect(rows.find(r => r[0] === 'paypa1.com')[1]).toBeGreaterThan(rows.find(r => r[0] === 'paypal.net')[1]);                 // mail-capable look-alike outranks one on the original's servers
+  // identity
+  await page.click('[data-act=labTab][data-v=ident]'); await page.fill('#idQ', 'Jordan.Okafor1992+shop@GoogleMail.com'); await page.press('#idQ', 'Enter');
+  await expect(page.locator('.id-dl')).toContainText('Jordan Okafor'); await expect(page.locator('.labgrid')).toContainText('Delivers to jordanokafor1992@gmail.com');
+  await expect(page.locator('.labgrid')).toContainText('1992');
+  await page.fill('#idQ', '+44 20 7946 0000'); await page.press('#idQ', 'Enter'); await expect(page.locator('.id-dl')).toContainText('United Kingdom');
+  await page.fill('#idQ', '@n1ghtlamp'); await page.press('#idQ', 'Enter'); await expect(page.locator('.id-grid a[href="https://github.com/n1ghtlamp"]')).toHaveCount(1);
+  expect(await page.evaluate(() => [idEmail('ops@mailinator.com').disposable, idEmail('admin@corp.example').role])).toEqual([true, true]);
+  // the inspector suggests next steps for a domain
+  expect(await page.evaluate(() => pivotPlan('domain', 'lantern-invoice.example').map(p => p.act))).toContain('osTwist');
+  noErrors(errors.filter(e => !/Failed to load resource/.test(e)));
+});

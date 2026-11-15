@@ -4,6 +4,50 @@
    Each change has a type: "added" | "changed" | "fixed" | "removed". */
 const CHANGELOG_DATA = [
   {
+    "version": "1.28",
+    "name": "Report writer and OSINT research",
+    "date": "2026-11-15",
+    "summary": "Reports now write the parts analysts write last — a bottom line with a stated confidence, the attack path, recommendations with reasons, and the limitations — and export to Word. The Forensics kit gains look-alike domain hunting and identity pivots, and every indicator's details suggest the next steps worth taking.",
+    "changes": [
+      {
+        "type": "added",
+        "text": "Report bottom line: what happened, to which hosts, when, how, what is confirmed and what is still open, drafted from the case with a stated confidence (high, moderate or low). Rewrite it in your own words or go back to the draft."
+      },
+      {
+        "type": "added",
+        "text": "Attack path: the ATT&CK tactics in the order the evidence shows them, each with the first record and a citation."
+      },
+      {
+        "type": "added",
+        "text": "Recommendations sorted into Now, Next and Later, each with its reason and the indicators it covers. They include isolating hosts, blocking network indicators, purging phishing mail, resetting credentials, hunting hashes, removing persistence, patching exploited CVEs, preserving logs, domain takedown via the registrar, detections, watching and lessons learned. Drop any one, and bring it back."
+      },
+      {
+        "type": "added",
+        "text": "Confidence and limitations: what the confidence rests on (findings, answers, confirmations, timeline, sources) and what weakens it (open questions, missing times, assumed time zones, unchecked indicators, disagreements, close hypotheses)."
+      },
+      {
+        "type": "added",
+        "text": "The full report lists every malicious or suspicious indicator with its live score. Reports export to Word (.docx) with the relationship map, as well as Markdown and PDF."
+      },
+      {
+        "type": "added",
+        "text": "Look-alike domains (Forensics kit): over 250 imitations of a domain — typos, keyboard slips, look-alike and Unicode characters, bit flips, other endings and added words. Check which exist through Google DNS, with registration age from RDAP. Each is ranked by risk (receives mail, newly registered, hard to spot; on the original's own servers counts against). Add the risky ones to a case or export CSV."
+      },
+      {
+        "type": "added",
+        "text": "Identity pivots (Forensics kit): a username across more than 50 sites in seven groups, with ticks remembered; an email address taken apart (canonical Gmail form, sub-address, disposable inbox, role account, likely name and year, mail provider from its MX records, Gravatar); a phone number read into country and international format with messaging and lookup links."
+      },
+      {
+        "type": "added",
+        "text": "Next steps in an indicator's details: what is worth doing next given what is already known, such as checking it online, finding its registration date, hunting look-alikes, pivoting on the username or finding the abuse contact."
+      },
+      {
+        "type": "changed",
+        "text": "Printed reports leave out on-screen controls."
+      }
+    ]
+  },
+  {
     "version": "1.27",
     "name": "Copilot, graph intelligence and smart search",
     "date": "2026-11-14",
