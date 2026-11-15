@@ -2075,3 +2075,32 @@ test('note titles: optional, shown on the card, cleaned, escaped, duplicate warn
   expect(await page.evaluate(() => [noteTitle({ title: 5 }), noteTitle({ title: '  a\u0000b‏c ' }), noteLabel({ title: '', text: '# Head line\nbody' })])).toEqual(['', 'abc', 'Head line']);
   noErrors(errors);
 });
+
+test('fast start: every script is fetched in parallel, the big data files arrive after the first screen and fill it in', async ({ page }) => {
+  // the security policy tag stops the browser looking ahead, so each script must be listed as a preload
+  const html = require('fs').readFileSync(require('path').resolve(__dirname, '..', 'index.html'), 'utf8');
+  const scripts = [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map(m => m[1]), pre = new Set([...html.matchAll(/<link rel="preload" as="script" href="([^"]+)">/g)].map(m => m[1]));
+  expect(scripts.length).toBeGreaterThan(50); for (const s of scripts) expect(pre.has(s), s + ' is preloaded with the same address').toBe(true);
+  for (const m of html.matchAll(/(?:src|href)="((?:js|css)\/[^"]+)"/g)) expect(m[1], 'fingerprinted').toMatch(/\?v=\d+\.\d+-[0-9a-f]{8}$/);
+  // hold the big files back: the app starts without them
+  const held = /(detections-pack|cytoscape\.min|kev-snapshot|playbooks-pack)\.js/; let release; const gate = new Promise(r => release = r);
+  await page.route(held, async route => { await gate; await route.continue(); });
+  const errors = [];
+  page.on('pageerror', e => errors.push(e.message)); page.on('console', m => { if (m.type() === 'error' && !/localStorage.*sandboxed/.test(m.text())) errors.push(m.text()); });
+  await page.goto('file://' + require('path').resolve(__dirname, '..', 'index.html') + '#/detections');
+  await expect.poll(() => page.evaluate(() => !!document.querySelector('#sidenav .nv'))).toBe(true);
+  await expect(page.locator('.ph .sub, .lib-h .sub, .page').first()).toContainText('loading the built-in rules');
+  const before = await page.evaluate(() => [DB.rules.length, lzHas('rules'), lzHas('cy'), typeof cytoscape]);
+  expect(before[1]).toBe(false); expect(before[2]).toBe(false);
+  // a case graph opened before the library arrives draws once it does
+  await page.evaluate(() => go(caseHash('c-lantern', 'graph')));
+  release();
+  await expect.poll(() => page.evaluate(() => lazyPending())).toBe(0);
+  await expect(page.locator('#cy canvas').first()).toBeVisible();
+  await page.evaluate(() => go('#/detections'));
+  const after = await page.evaluate(() => DB.rules.length); expect(after).toBeGreaterThan(before[0] + 200);
+  await expect(page.locator('.page').first()).not.toContainText('loading the built-in rules');
+  expect(await page.evaluate(() => new Set(DB.rules.map(r => r.id)).size === DB.rules.length && new Set(DB.playbooks.map(p => p.id)).size === DB.playbooks.length)).toBe(true);   // nothing merged twice
+  expect(await page.evaluate(() => CTI.kevMeta.n)).toBeGreaterThan(1000);
+  expect(errors).toEqual([]);
+});

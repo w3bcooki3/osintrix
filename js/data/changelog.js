@@ -4,6 +4,26 @@
    Each change has a type: "added" | "changed" | "fixed" | "removed". */
 const CHANGELOG_DATA = [
   {
+    "version": "1.39",
+    "name": "Starts much faster",
+    "date": "2026-11-15",
+    "summary": "The app opens in a fraction of the time it took, especially on a real internet connection.",
+    "changes": [
+      {
+        "type": "fixed",
+        "text": "The page's security policy was stopping the browser from fetching scripts ahead of time, so all ~90 of them downloaded one after another — each waiting a full round trip. They are now all fetched at once. On a typical connection the first screen appears in about 2 seconds instead of 6–9."
+      },
+      {
+        "type": "changed",
+        "text": "The big reference files — the MAC vendor list, the CISA KEV catalogue, the built-in rules and playbooks, the graph and map libraries, the reference and cloud packs, the certificate and notebook samples — are no longer on the critical path. That is half of what the app downloads. They load in the background right after the first screen, and any screen that needs one waits for it and fills in when it arrives (never while you are typing). Detections says “loading the built-in rules…” for that moment."
+      },
+      {
+        "type": "fixed",
+        "text": "The demo notebook's picture no longer depends on load order."
+      }
+    ]
+  },
+  {
     "version": "1.38",
     "name": "Note titles",
     "date": "2026-11-15",

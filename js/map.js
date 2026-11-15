@@ -16,7 +16,7 @@ function topoToGeo(t){
 }
 async function worldLoad(){
   if(WORLD) return WORLD; if(WORLD_LOADING) return WORLD_LOADING;
-  WORLD_LOADING = (async () => { try{ const bin = Uint8Array.from(atob(WORLD_B64), c => c.charCodeAt(0));
+  WORLD_LOADING = (async () => { try{ await lazyNeed('world'); const bin = Uint8Array.from(atob(WORLD_B64), c => c.charCodeAt(0));
     WORLD = topoToGeo(JSON.parse(await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'))).text())); }catch(e){ WORLD = {type:'FeatureCollection', features:[]}; } return WORLD; })();
   return WORLD_LOADING;
 }

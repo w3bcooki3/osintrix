@@ -9,6 +9,7 @@ import base64, pathlib, re
 root = pathlib.Path(__file__).resolve().parent.parent
 import runpy; runpy.run_path(str(root / 'tools' / 'stamp.py'))   # fresh cache-busting addresses first
 html = (root / 'index.html').read_text(encoding='utf-8')
+html = re.sub(r'\n<!-- preload:start -->.*?<!-- preload:end -->', '', html, flags=re.S)   # everything is inline in the single file
 
 def css(href):
     text = (root / href).read_text(encoding='utf-8')
@@ -23,6 +24,7 @@ def js(src):
     return '<script>' + code + '</script>'
 
 html = re.sub(r'<link rel="stylesheet" href="([^"]+)">', lambda m: css(m.group(1).split('?')[0]), html)
+html = re.sub(r'<link rel="prefetch" as="script" href="([^"]+)" data-lazy>', r'<script src="\1"></script>', html)   # in the single file everything is inline
 html = re.sub(r'<script src="([^"]+)"></script>', lambda m: js(m.group(1).split('?')[0]), html)
 # welcome-screen pictures become data: URIs so the one-file copy has no loose files
 for n in ('dashboard-dark', 'dashboard-light', 'graph-dark', 'graph-light', 'phone-dark', 'phone-light', 'timeline-dark', 'timeline-light'):

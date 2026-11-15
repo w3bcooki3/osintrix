@@ -711,6 +711,7 @@ async function bootRest(unlocked){
   UI.inspOpen = false; UI.graph.legendMin = window.innerWidth < 1100;
   if(window.innerWidth <= 760) $('gq').placeholder = 'Search everything';
   $('gq').addEventListener('focus', () => { $('gq').blur(); srchOpen(); }); $('gq').addEventListener('mousedown', ev => { ev.preventDefault(); srchOpen(); });
+  if(typeof lazyWatch === 'function') lazyWatch();
   ensureTools(); ensureToolTpl(); ensurePlaybooks(); ensureIntel(); if(typeof ctiLoad === 'function') ctiLoad(); if(typeof watchMonitor === 'function'){ lkLoad(); watchMonitor(); } ensureQueries(); ensureRules(); ensureNotes(); ensureSample(); ensureCTF(); ensureNB(); ensureAchDemo(); applyPrefs(); storageCheck(); await hashRecords(); migrateFieldEnts(); ensurePositions(); flush(); onRoute(); nbFlushMedia(); fbInit();
   let seen = false; try{ seen = !!localStorage.getItem('osintrix:welcomed'); }catch(e){}
   if(!unlocked) setTimeout(() => { $('splash').classList.add('out'); setTimeout(() => $('splash').remove(), 320); if(!seen) showWelcome(); }, 350);

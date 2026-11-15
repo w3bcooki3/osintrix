@@ -2,6 +2,17 @@
 
 All notable changes to OSINTrix, newest first. The format is based on [Keep a Changelog](https://keepachangelog.com); this file is generated from `js/data/changelog.js` by `tools/changelog.py`.
 
+## [1.39] — Starts much faster (2026-11-15)
+
+_The app opens in a fraction of the time it took, especially on a real internet connection._
+
+### Changed
+- The big reference files — the MAC vendor list, the CISA KEV catalogue, the built-in rules and playbooks, the graph and map libraries, the reference and cloud packs, the certificate and notebook samples — are no longer on the critical path. That is half of what the app downloads. They load in the background right after the first screen, and any screen that needs one waits for it and fills in when it arrives (never while you are typing). Detections says “loading the built-in rules…” for that moment.
+
+### Fixed
+- The page's security policy was stopping the browser from fetching scripts ahead of time, so all ~90 of them downloaded one after another — each waiting a full round trip. They are now all fetched at once. On a typical connection the first screen appears in about 2 seconds instead of 6–9.
+- The demo notebook's picture no longer depends on load order.
+
 ## [1.38] — Note titles (2026-11-15)
 
 _Every note can have its own title, shown at the top of the card._

@@ -5,7 +5,7 @@
 let ENR = null, ENR_LOADING = null;
 async function enrLoad(){
   if(ENR) return ENR; if(ENR_LOADING) return ENR_LOADING;
-  ENR_LOADING = (async () => { try{
+  ENR_LOADING = (async () => { try{ await lazyNeed('enrich');
     const bin = Uint8Array.from(atob(ENRICH_B64), c => c.charCodeAt(0));
     const txt = await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'))).text(), d = JSON.parse(txt);
     const prov = []; for(const [name, flat] of Object.entries(d.providers)){ let p = 0; for(let i = 0; i < flat.length; i += 2){ const a = p + flat[i], b = a + flat[i + 1]; prov.push([a, b, name]); p = b; } }

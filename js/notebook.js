@@ -134,9 +134,9 @@ const nbInline = m => m && (m.data || (m.demo && typeof NB_DEMO_SHOT !== 'undefi
 const nbReadURL = f => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); r.readAsDataURL(f); });
 const nbLoadImg = u => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('not a picture this browser can read')); i.src = u; });
 const nbURLBlob = u => { const m = u.match(/^data:([^;,]*)(;base64)?,(.*)$/s); const b = m[2] ? Uint8Array.from(atob(m[3]), c => c.charCodeAt(0)) : new TextEncoder().encode(decodeURIComponent(m[3])); return new Blob([b], {type:m[1] || 'application/octet-stream'}); };
-async function nbBlob(id){ const m = nbM(id); if(!m) return null; const d = nbInline(m); if(d) return nbURLBlob(d); try{ return await openBlob(await IDB.get('nbm:' + id)); }catch(e){ return null; } }
+async function nbBlob(id){ const m = nbM(id); if(!m) return null; if(m.demo && typeof lazyNeed === 'function') await lazyNeed('nbdemo'); const d = nbInline(m); if(d) return nbURLBlob(d); try{ return await openBlob(await IDB.get('nbm:' + id)); }catch(e){ return null; } }
 async function nbURL(id){ if(NB_URLS.has(id)) return NB_URLS.get(id); const b = await nbBlob(id); if(!b) return null; const u = URL.createObjectURL(b); NB_URLS.set(id, u); return u; }
-async function nbDataURL(id){ const m = nbM(id); if(!m) return null; const d = nbInline(m); if(d) return d; if(NB_DATA.has(id)) return NB_DATA.get(id); const b = await nbBlob(id); if(!b) return null; const u = await nbReadURL(b); NB_DATA.set(id, u); return u; }
+async function nbDataURL(id){ const m = nbM(id); if(!m) return null; if(m.demo && typeof lazyNeed === 'function') await lazyNeed('nbdemo'); const d = nbInline(m); if(d) return d; if(NB_DATA.has(id)) return NB_DATA.get(id); const b = await nbBlob(id); if(!b) return null; const u = await nbReadURL(b); NB_DATA.set(id, u); return u; }
 /* exports need the bytes inline: load every picture the pages use first */
 async function nbPreload(pages){ const ids = new Set(); for(const p of pages){ nbInfo(p).imgs.forEach(i => ids.add(i)); } await Promise.all([...ids].map(nbDataURL)); }
 async function nbPut(id, blob){ if(!STORE.idb) return false; try{ return await IDB.set('nbm:' + id, await sealBlob(blob)); }catch(e){ return false; } }
@@ -661,8 +661,8 @@ function nbImport(){
 /* ---------- sample notebooks ---------- */
 function nbSeed(){
   const N = DB.nb, T0 = Date.now(), H = 36e5, mk = (b, s, title, html, o) => nbNewPage(s.id, {title, html, sample:true, ...o});
-  const shot = typeof NB_DEMO_SHOT !== 'undefined' ? NB_DEMO_SHOT : null;
-  if(shot) N.media['m-demo-spn'] = {id:'m-demo-spn', type:'image/png', name:'lab3-spns.png', demo:true, w:shot.w, h:shot.h, size:Math.round(shot.data.length * .75), at:T0};
+  /* the sample picture's data loads in the background (js/data/notebook-demo.js); the page refers to it either way */
+  const shot = true; N.media['m-demo-spn'] = {id:'m-demo-spn', type:'image/png', name:'lab3-spns.png', demo:true, w:1380, h:395, size:78000, at:T0};
   const ad = nbNewBook({name:'Active Directory course', kind:'Course', color:'#6366f1', sample:true, created:T0 - 30 * NB_DAY});
   const en = nbNewSec(ad.id, 'Enumeration'), kb = nbNewSec(ad.id, 'Kerberos attacks'), lm = nbNewSec(ad.id, 'Lateral movement'); en.open = false; lm.open = false;
   mk(ad, en, 'BloodHound basics', `<p>BloodHound maps who can reach what in Active Directory. Collect with SharpHound, load the zip, then ask for paths.</p><pre>SharpHound.exe -c All --zipfilename lab.zip

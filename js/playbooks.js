@@ -120,9 +120,9 @@ const PB_SEED = [
     ['Scan the IaC that defined the exposed resource', 'Cloud → Misconfig scanner on the Terraform / CloudFormation — the gap that allowed it may still be in the templates.'],
     ['Rotate everything the identity could read, and record the timeline', 'Send the flagged log events to the case timeline for the report.']]},
 ];
-if(typeof PB_PACK !== 'undefined') PB_SEED.push(...PB_PACK);
 const pbSteps = p => p.steps.map(s => Array.isArray(s) ? {t:s[0], h:s[1] || ''} : s);
 function ensurePlaybooks(){
+  if(typeof PB_PACK !== 'undefined' && !PB_SEED.packed){ PB_SEED.push(...PB_PACK); PB_SEED.packed = true; }   // the pack loads in the background
   if(!DB.playbooks) DB.playbooks = PB_SEED.map(p => ({...p, steps:pbSteps(p), custom:false, created:Date.now()}));
   const have = new Set(DB.playbooks.map(p => p.id)), gone = new Set(DB.deletedPb || []);
   for(const p of PB_SEED) if(!have.has(p.id) && !gone.has(p.id)) DB.playbooks.push({...p, steps:pbSteps(p), custom:false, created:Date.now()});

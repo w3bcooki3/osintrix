@@ -33,7 +33,7 @@ let RULES_MERGED = false;
 /* Built-in rules are added once; later versions add the new ones without touching rules you changed or deleted. */
 function ensureRules(){
   if(!DB.rules) DB.rules = [];
-  if(RULES_MERGED) return; RULES_MERGED = true;
+  if(RULES_MERGED) return; if(typeof RULE_PACK !== 'undefined') RULES_MERGED = true;   // until the pack has loaded, only the starter rules are merged
   const have = new Set(DB.rules.map(r => r.id)), gone = new Set(DB.deletedRules || []), add = RULE_BUILTIN().filter(r => !have.has(r.id) && !gone.has(r.id)).map(ruleFromSeed);
   /* a built-in rule that was improved: update copies still holding the old, unedited text; edited copies are left alone */
   let fixed = 0;
@@ -104,7 +104,7 @@ function viewDetections(){
   const open = cur && (lay === 'ide' || UI.ropen);
   const n = k => DB.rules.filter(r => r.type === k).length;
   const seg = layoutSeg('rLay', lay, [['table','table-2','Table'],['gallery','layout-grid','Gallery'],['ide','columns-3','IDE']]);
-  const head = libHead('Detections', `${DB.rules.length} rules · ${n('sigma')} Sigma, ${n('yara')} YARA · ${DB.rules.filter(r => r.caseId).length} linked to cases`,
+  const head = libHead('Detections', `${DB.rules.length} rules · ${n('sigma')} Sigma, ${n('yara')} YARA · ${DB.rules.filter(r => r.caseId).length} linked to cases${typeof lzHas === 'function' && !lzHas('rules') && !LZ.rules.failed ? ' · loading the built-in rules…' : ''}`,
     (typeof DQ_ACTS !== 'undefined' ? `<div class="seg dv-seg" role="group" aria-label="View">${[['rules','Rules','list'],['coverage','Coverage','grid-3x3'],['health','Health','activity']].map(([k, l, i]) => `<button data-act="dview" data-v="${k}" aria-pressed="${(UI.dview || 'rules') === k}">${ico(i,'sm')}${l}</button>`).join('')}</div>` : '') + `<button class="btn" data-act="rImport">${ico('upload','sm')}Import</button><button class="btn" data-act="rExportAll">${ico('download','sm')}Export</button><button class="btn" data-act="rFromCase">${ico('folder-open','sm')}From case</button><button class="btn primary" data-act="rNew">${ico('plus','sm')}New rule</button>`, seg);
   if(UI.dview === 'coverage' || UI.dview === 'health') return `<div class="scroll"><div class="page wide">${head}${UI.dview === 'coverage' ? covView() : healthView()}</div></div>`;
   const search = `<div class="search-in">${ico('search')}<label class="sr" for="dq">Search rules</label><input id="dq" class="inp" placeholder="Search title, technique, content…" value="${esc(UI.dq || '')}"></div>`;

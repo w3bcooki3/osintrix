@@ -500,7 +500,7 @@ async function imgLoad(f, keep = true){
   if(f.size > 100 * 1048576) return toast('That image is over 100 MB — too big to open here');
   if(f.type && !/^image\//.test(f.type)) return toast('That is not an image');
   UI.img = {busy:true}; renderMain();
-  try{ const r = await loadImageData(f); UI.img = {name:f.name, w:r.w, h:r.h, scaled:r.scaled, data:r.data, qr:qrDecode(r.data)}; UI.imgCh = 'rgb'; UI.imgBit = 'all'; if(keep) recentKeepFile('image', f); }
+  try{ await lazyNeed('qr'); const r = await loadImageData(f); UI.img = {name:f.name, w:r.w, h:r.h, scaled:r.scaled, data:r.data, qr:qrDecode(r.data)}; UI.imgCh = 'rgb'; UI.imgBit = 'all'; if(keep) recentKeepFile('image', f); }
   catch(e){ UI.img = null; toast(e.message || 'Could not open that image'); }
   renderMain();
 }

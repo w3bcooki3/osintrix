@@ -12,6 +12,8 @@ async function open(page, hash = '#/home') {
   await page.goto(APP + hash);
   // the app's Content Security Policy blocks eval, so poll with plain evaluate calls instead of waitForFunction
   await expect.poll(() => page.evaluate(() => typeof DB !== 'undefined' && !!DB && !!document.querySelector('#sidenav .nv')), { timeout: 15000 }).toBe(true);
+  // the big data files load in the background; tests about their features start once they are in
+  await expect.poll(() => page.evaluate(() => typeof lazyPending !== 'function' || lazyPending() === 0), { timeout: 15000 }).toBe(true);
   return errors;
 }
 async function capture(page, text, caseId) {

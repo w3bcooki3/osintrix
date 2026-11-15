@@ -22,7 +22,14 @@ def stamp(m):
     return f'{attr}="{path}?v={ver}-{h}"'
 
 html = idx.read_text(encoding='utf-8')
+# The Content-Security-Policy meta tag turns off the browser's look-ahead fetching, so without these hints the
+# scripts would download one after another. Rebuilt from the script tags each time.
+html = re.sub(r'\n<!-- preload:start -->.*?<!-- preload:end -->', '', html, flags=re.S)
+scripts = re.findall(r'<script src="(js/[^"?]+\.js)[^"]*"></script>', html)
+block = '\n<!-- preload:start -->\n' + '\n'.join(f'<link rel="preload" as="script" href="{s}">' for s in scripts) + '\n<!-- preload:end -->'
+html = re.sub(r'(<link rel="stylesheet"[^>]*>\n)(?!<link rel="stylesheet")', lambda m: m.group(1).rstrip('\n') + block + '\n', html, count=1)
 new = re.sub(r'(src|href)="((?:js|css)/[^"?]+\.(?:js|css))(?:\?v=[^"]*)?"', stamp, html)
 if new != html:
     idx.write_text(new, encoding='utf-8', newline='')
+print(str(len(scripts)) + ' scripts preloaded in parallel')
 print('index.html  <-  ' + str(len(re.findall(r'\?v=' + re.escape(ver) + '-', new))) + ' files stamped for v' + ver)

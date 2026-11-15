@@ -343,7 +343,7 @@ function subnet(input){
     mask:n2ip(2 ** 32 - size), wildcard:n2ip(size - 1), cls:E.ipClass(ip), bin:ip.split('.').map(o => (+o).toString(2).padStart(8, '0')).join('.')};
 }
 let OUI = null;
-async function ouiLoad(){ if(OUI) return OUI; if(typeof DecompressionStream === 'undefined') throw new Error('This browser cannot decompress the vendor list');
+async function ouiLoad(){ if(OUI) return OUI; await lazyNeed('oui'); if(typeof DecompressionStream === 'undefined') throw new Error('This browser cannot decompress the vendor list');
   const bin = Uint8Array.from(atob(OUI_B64), c => c.charCodeAt(0)), txt = await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
   const [names, rows] = txt.split('\n##\n'), N = names.split('\n'), M = new Map(); for(const r of rows.split('\n')){ const k = r.indexOf(','); M.set(r.slice(0, k), N[+r.slice(k + 1)]); } return (OUI = M); }
 async function macVendor(mac){ const h = String(mac).replace(/[^0-9a-f]/gi, '').toUpperCase(); if(h.length < 6) return null; const M = await ouiLoad(); const first = parseInt(h.slice(0, 2), 16);
