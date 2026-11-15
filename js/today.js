@@ -18,7 +18,7 @@ function todayItems(){
   /* notes */
   for(const n of DB.notes || []){ if(!n.due || (n.caseId && !ids.has(n.caseId) && own.length)) continue; const open = noteTasks(n).filter(t => !t.done); if(n.due > today || (noteTasks(n).length && !open.length)) continue;
     const late = n.due < today, c = n.caseId ? theCase(n.caseId) : null;
-    add(late ? 3 : 2, 'calendar-clock', `${late ? 'Overdue since ' + n.due : 'Due today'}: ${n.text.split('\n')[0].slice(0, 80)}`, (c ? c.code + ' · ' : '') + (open.length ? open.length + ' to-do' + (open.length > 1 ? 's' : '') + ' left: ' + open.slice(0, 2).map(t => t.t).join(' · ') : ''), {act:'nEdit', id:n.id, l:'Open the note'}); }
+    add(late ? 3 : 2, 'calendar-clock', `${late ? 'Overdue since ' + n.due : 'Due today'}: ${noteLabel(n).slice(0, 80)}`, (c ? c.code + ' · ' : '') + (open.length ? open.length + ' to-do' + (open.length > 1 ? 's' : '') + ' left: ' + open.slice(0, 2).map(t => t.t).join(' · ') : ''), {act:'nEdit', id:n.id, l:'Open the note'}); }
   /* indicators flagged but not judged */
   const keysIn = new Map(); for(const c of cases){ for(const k of derive(c.id).ents.keys()) if(!keysIn.has(k)) keysIn.set(k, c); }
   const looked = ((DB.intel && DB.intel.lookHist) || []).filter(h => /mal|susp/.test(h.band || '') && keysIn.has(h.k + ':' + h.v) && !verdictOf(h.k + ':' + h.v));

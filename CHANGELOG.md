@@ -2,6 +2,17 @@
 
 All notable changes to OSINTrix, newest first. The format is based on [Keep a Changelog](https://keepachangelog.com); this file is generated from `js/data/changelog.js` by `tools/changelog.py`.
 
+## [1.38] — Note titles (2026-11-15)
+
+_Every note can have its own title, shown at the top of the card._
+
+### Added
+- Notes have an optional title — a line above the text when you jot a note, and a Title field when you edit one. It shows at the top of the card, and Today, search, the trash and the activity list call the note by it. A note can be just a title.
+- Titles are cleaned (hidden and direction-changing characters out, spaces collapsed, up to 120 characters) and always shown as plain text. Another note with the same title in the same place (General or the same case) gets a warning; press again to keep both. Duplicating a note gives it “Title (copy)”.
+
+### Removed
+- The heading groups added in 1.37 (+ Heading in the notes filter row). Notes keep their case or General as before; any heading groups made are simply ignored.
+
 ## [1.37] — Many rules at once, and note headings (2026-11-15)
 
 _Detections can now be picked several at a time, notes can go under headings of your own, and the rule editor says right away when a title is taken._

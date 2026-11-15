@@ -127,7 +127,6 @@ document.addEventListener('click', ev => {
   if(typeof TD_ACTS !== 'undefined' && TD_ACTS[a]) return TD_ACTS[a](id, v, t, ev);
   if(typeof DUP_ACTS !== 'undefined' && DUP_ACTS[a]) return DUP_ACTS[a](id, v, t, ev);
   if(typeof RB_ACTS !== 'undefined' && RB_ACTS[a]) return RB_ACTS[a](id, v, t, ev);
-  if(typeof NH_ACTS !== 'undefined' && NH_ACTS[a]) return NH_ACTS[a](id, v, t, ev);
   if(NBX_ACTS[a]) return NBX_ACTS[a](id, v, t, ev);
   if(a === 'toolRun') return toolRunDlg(id);
   if(a === 'trPick'){ $('trV').value = v; return $('trV').focus(); }
@@ -360,11 +359,10 @@ document.addEventListener('click', ev => {
     case 'nMenu': { const n = DB.notes.find(z => z.id === id), r0 = t.getBoundingClientRect(); return showMenu(r0.left - 180, r0.bottom + 4, [
       {label:n.pinned ? 'Unpin' : 'Pin', icon:'pin', fn:() => { n.pinned = !n.pinned; mutate('pin note'); renderAll(); }},
       {label:'Edit…', icon:'pencil', fn:() => noteDlg(id)},
-      {label:noteHeads().length ? 'Change heading…' : 'Add a heading…', icon:'heading', fn:() => { if(!noteHeads().length) return nhDlg(); noteDlg(id); setTimeout(() => { const x = $('nHead'); if(x) x.focus(); }, 60); }},
       {label:'Colour', seg:NOTE_COLORS.map(([k]) => ({label:k[0].toUpperCase() + k.slice(1), on:n.color === k, fn:() => { n.color = k; mutate('note colour'); renderAll(); }}))},
-      {label:'Duplicate', icon:'copy', fn:() => { const first = (n.text.split('\n')[0] || '').trim(), rest = n.text.slice(n.text.indexOf('\n') < 0 ? n.text.length : n.text.indexOf('\n')), c2 = {...n, id:uid('n'), pinned:false, created:Date.now(), updated:Date.now(), text:(copyName(first.slice(0, 200) || 'Note', DB.notes.map(x => (x.text.split('\n')[0] || '').trim())) + rest).slice(0, 4000), copyOf:n.id}; DB.notes.splice(DB.notes.indexOf(n) + 1, 0, c2); mutate('duplicated note'); renderAll(); toast('Duplicated as “' + c2.text.split('\n')[0].slice(0, 60) + '”'); }},
+      {label:'Duplicate', icon:'copy', fn:() => { if(noteTitle(n)){ const c2 = {...n, id:uid('n'), pinned:false, created:Date.now(), updated:Date.now(), title:copyName(noteTitle(n), DB.notes.map(noteTitle).filter(Boolean)).slice(0, NT_MAX), copyOf:n.id}; DB.notes.splice(DB.notes.indexOf(n) + 1, 0, c2); mutate('duplicated note'); renderAll(); return toast('Duplicated as “' + c2.title.slice(0, 60) + '”'); } const first = (n.text.split('\n')[0] || '').trim(), rest = n.text.slice(n.text.indexOf('\n') < 0 ? n.text.length : n.text.indexOf('\n')), c2 = {...n, id:uid('n'), pinned:false, created:Date.now(), updated:Date.now(), text:(copyName(first.slice(0, 200) || 'Note', DB.notes.map(x => (x.text.split('\n')[0] || '').trim())) + rest).slice(0, 4000), copyOf:n.id}; DB.notes.splice(DB.notes.indexOf(n) + 1, 0, c2); mutate('duplicated note'); renderAll(); toast('Duplicated as “' + c2.text.split('\n')[0].slice(0, 60) + '”'); }},
       {sep:true}, {label:'Delete', icon:'trash-2', danger:true, fn:() => clickAct('nDel', id)}]); }
-    case 'nDel': { const n = DB.notes.find(z => z.id === id); DB.notes = DB.notes.filter(z => z.id !== id); const tx = trashPut('note', (n.text || '').split('\n')[0].replace(/^#+\s*/, '') || 'Note', {n}, n.caseId); closeDlg(); mutate('deleted note'); renderAll(); return toast('Note deleted', 'Undo', () => { DB.trash = DB.trash.filter(x => x !== tx); DB.notes.push(n); mutate('restored note'); renderAll(); }); }
+    case 'nDel': { const n = DB.notes.find(z => z.id === id); DB.notes = DB.notes.filter(z => z.id !== id); const tx = trashPut('note', noteLabel(n), {n}, n.caseId); closeDlg(); mutate('deleted note'); renderAll(); return toast('Note deleted', 'Undo', () => { DB.trash = DB.trash.filter(x => x !== tx); DB.notes.push(n); mutate('restored note'); renderAll(); }); }
     case 'nColor': document.querySelectorAll('.ncolors.big button').forEach(b => b.setAttribute('aria-pressed', String(b === t))); UI.noteColorEdit = v; return;
     case 'nFmt': return noteFmt($(id), v);
     case 'nColorPick': UI.ncolor = v; t.parentElement.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === t))); return;
@@ -567,12 +565,17 @@ document.addEventListener('submit', ev => {
     if(vals.flagRe && !checkRegex('evR', vals.flagRe)) return; if(vals.url && !E.safeUrl(vals.url)) return fieldErr('evU', 'Enter a full address starting with http:// or https://.');
     if(f.dataset.id) Object.assign(DB.ctf.events.find(e => e.id === f.dataset.id), vals); else { const ev = {id:uid('ev'), ...vals, created:Date.now()}; DB.ctf.events.push(ev); UI.ctfEv = ev.id; }
     mutate('saved event'); closeDlg(); return renderAll(); }
-  if(k === 'nh') return nhSubmit(f);
-  if(k === 'nQuick'){ const ta = f.querySelector('textarea'), text = ta.value.trim(); if(!text) return; if(text.length > 4000) return fieldErr(ta, `Notes can be up to 4,000 characters — this one is ${text.length.toLocaleString()}.`);
-    const hs = f.querySelector('[data-nq=head]'), head = hs && noteHeads().some(h => h.id === hs.value) ? hs.value : null;
-    DB.notes.unshift({id:uid('n'), caseId:f.dataset.case || null, head, color:UI.ncolor || 'yellow', pinned:false, text:text.slice(0, 4000), due:'', created:Date.now(), updated:Date.now()});
-    mutate('added note'); renderAll(); const x = document.querySelector('.nquick textarea'); if(x) x.focus(); return; }
-  if(k === 'note'){ const n = DB.notes.find(z => z.id === f.dataset.id); if(!$('nText').value.trim()) return fieldErr('nText', 'A note cannot be empty — delete it instead if you no longer need it.'); if(!checkLen('nText', $('nText').value, 4000, 'Note')) return; Object.assign(n, {text:$('nText').value.slice(0, 4000), caseId:$('nCase').value || null, head:$('nHead') && noteHeads().some(h => h.id === $('nHead').value) ? $('nHead').value : null, due:$('nDue').value, pinned:$('nPin').checked, color:UI.noteColorEdit || n.color, updated:Date.now()});
+  if(k === 'nQuick'){ const ta = f.querySelector('textarea'), ti = f.querySelector('[data-nq=title]'), text = ta.value.trim(), title = ntClean(ti ? ti.value : ''), cid = f.dataset.case || null;
+    if(!text && !title) return; if(text.length > 4000) return fieldErr(ta, `Notes can be up to 4,000 characters — this one is ${text.length.toLocaleString()}.`);
+    if(title.length > NT_MAX) return fieldErr(ti, `Titles can be up to ${NT_MAX} characters — this one is ${title.length}.`);
+    if(title && noteTitleTwin(title, cid) && !softDup(f, 'nt:' + normName(title), ti, `There is already a note called “${title}” ${cid ? 'in this case' : 'in General'}.`)) return;
+    DB.notes.unshift({id:uid('n'), caseId:cid, title, color:UI.ncolor || 'yellow', pinned:false, text:text.slice(0, 4000), due:'', created:Date.now(), updated:Date.now()});
+    mutate('added note'); renderAll(); const x = document.querySelector('.nquick [data-nq=title]') || document.querySelector('.nquick textarea'); if(x) x.focus(); return; }
+  if(k === 'note'){ const n = DB.notes.find(z => z.id === f.dataset.id); if(!n) return closeDlg(); const title = ntClean($('nTitle').value), cid = $('nCase').value || null;
+    if(!$('nText').value.trim() && !title) return fieldErr('nText', 'A note cannot be empty — delete it instead if you no longer need it.'); if(!checkLen('nText', $('nText').value, 4000, 'Note')) return;
+    if(title.length > NT_MAX) return fieldErr('nTitle', `Titles can be up to ${NT_MAX} characters — this one is ${title.length}.`);
+    if(title && noteTitleTwin(title, cid, n.id) && !softDup(f, 'nt:' + normName(title) + ':' + cid, 'nTitle', `There is already a note called “${title}” ${cid ? 'in that case' : 'in General'}.`)) return;
+    Object.assign(n, {text:$('nText').value.slice(0, 4000), title, caseId:cid, due:$('nDue').value, pinned:$('nPin').checked, color:UI.noteColorEdit || n.color, updated:Date.now()});
     UI.noteColorEdit = null; mutate('edited note'); closeDlg(); return renderAll(); }
   if(k === 'src'){ const url = $('srcUrl').value.trim(), sn = $('srcName').value.trim().replace(/\s+/g, ' ') || hostOf(url); if(!E.safeUrl(url)) return fieldErr('srcUrl', 'Enter the feed address, starting with http:// or https://.');
     if(DB.feedSources.some(x => x.url.replace(/\/+$/, '') === url.replace(/\/+$/, ''))) return fieldErr('srcUrl', 'This feed is already in your sources.'); if(clash(DB.feedSources, sn)) return fieldErr('srcName', `A source called “${sn}” already exists.`); if(!checkLen('srcName', sn, 60, 'Name')) return;

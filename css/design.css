@@ -2662,9 +2662,9 @@ body.md-dropping .md-drop,body.md-dropping #main{outline:2px dashed var(--accent
 .rx-tw{display:flex;flex-direction:column}
 .rx-tw .ferr{margin:2px 0 6px}
 .rx-title.invalid{border-color:var(--red)!important;box-shadow:0 0 0 3px color-mix(in srgb,var(--red) 18%,transparent)}
-/* notes: headings */
-.ncase.hd{--cc:var(--text-2);font-family:var(--font);border:0;cursor:pointer}
-.ncase.hd:hover{background:color-mix(in srgb,var(--cc) 34%,transparent)}
-.ds .nquick .nqbar .nqhead{height:32px;max-width:180px;margin-left:auto}
-.ds .nquick .nqbar .nqhead + .btn{margin-left:0}
-.chip.nhchip svg.i{color:var(--text-3)}
+/* notes: a title above the note */
+.note-card .ntitle{margin:2px 0 6px;font-size:calc(15.5px * var(--ts,1));font-weight:700;line-height:1.35;color:var(--text);overflow-wrap:anywhere}
+.nquick .nqtitle{display:block;width:100%;border:0;background:transparent;padding:2px 0 4px;font:700 calc(15px * var(--ts,1))/1.4 var(--font);color:var(--text);outline:none}
+.nquick .nqtitle::placeholder{color:var(--text-3);font-weight:600}
+.note-card .ntitle + .nbody p:first-child{font-weight:inherit}
+.note-card .ntitle + .nbody{color:var(--text-2)}

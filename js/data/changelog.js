@@ -4,6 +4,26 @@
    Each change has a type: "added" | "changed" | "fixed" | "removed". */
 const CHANGELOG_DATA = [
   {
+    "version": "1.38",
+    "name": "Note titles",
+    "date": "2026-11-15",
+    "summary": "Every note can have its own title, shown at the top of the card.",
+    "changes": [
+      {
+        "type": "added",
+        "text": "Notes have an optional title — a line above the text when you jot a note, and a Title field when you edit one. It shows at the top of the card, and Today, search, the trash and the activity list call the note by it. A note can be just a title."
+      },
+      {
+        "type": "added",
+        "text": "Titles are cleaned (hidden and direction-changing characters out, spaces collapsed, up to 120 characters) and always shown as plain text. Another note with the same title in the same place (General or the same case) gets a warning; press again to keep both. Duplicating a note gives it “Title (copy)”."
+      },
+      {
+        "type": "removed",
+        "text": "The heading groups added in 1.37 (+ Heading in the notes filter row). Notes keep their case or General as before; any heading groups made are simply ignored."
+      }
+    ]
+  },
+  {
     "version": "1.37",
     "name": "Many rules at once, and note headings",
     "date": "2026-11-15",

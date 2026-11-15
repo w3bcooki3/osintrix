@@ -2016,48 +2016,6 @@ test('detections: pick several rules to star, download or delete together; disca
   noErrors(errors);
 });
 
-test('notes headings: add, file notes under them, names cleaned and checked for duplicates, rename, delete with undo, bad backups tidied', async ({ page }) => {
-  const errors = await open(page, '#/notes');
-  const add = async name => { await page.click('[data-act=nhNew]'); await page.fill('#nhName', name); await page.click('#dlg [type=submit]'); };
-  // blank, reserved, too long, case name — refused with the reason under the field
-  for (const [name, msg] of [['   ', 'Give the heading a name'], ['general', 'already one of the note filters'], ['x'.repeat(41), 'up to 40 characters'], ['op lantern', 'A case is called']]) {
-    await add(name); await expect(page.locator('#dlg .ferr')).toContainText(msg); await page.click('#dlg [data-act=dclose]');
-  }
-  // control and direction characters are taken out, spaces collapsed
-  await add('  Re‮search \u0007  ideas  ');
-  await expect(page.locator('.nhchip')).toHaveCount(1); await expect(page.locator('.nhchip')).toContainText('Research ideas');
-  expect(await page.evaluate(() => UI.nf.startsWith('h:'))).toBe(true);           // the new heading is selected
-  // same name in another case and spacing: duplicate
-  await add('RESEARCH   Ideas'); await expect(page.locator('#dlg .ferr')).toContainText('already exists'); await page.click('#dlg [data-act=dclose]');
-  // a note added while the heading is selected goes under it; markup in the name or note is shown as text
-  await page.fill('.nquick textarea', 'Check <img src=x onerror=alert(1)> later'); await page.click('.nquick [type=submit]');
-  await expect(page.locator('.note-card')).toHaveCount(1); await expect(page.locator('.note-card .ncase.hd')).toHaveText('Research ideas');
-  await expect(page.locator('.note-card img')).toHaveCount(0);
-  // General no longer lists it; All does
-  await page.click('[data-act=nf][data-v=general]'); await expect(page.locator('.note-card:has-text("Check")')).toHaveCount(0);
-  // move an existing note under the heading from the edit dialog
-  await page.click('[data-act=nf][data-v=all]');
-  await page.locator('.note-card:has-text("This week") [data-act=nEdit]').click();
-  const hid = await page.evaluate(() => noteHeads()[0].id); await page.selectOption('#nHead', hid); await page.click('#dlg [type=submit]');
-  await page.locator('.nhchip').click(); await expect(page.locator('.note-card')).toHaveCount(2); await expect(page.locator('.nhchip .n')).toHaveText('2');
-  // rename to a clean new name; renaming to itself is fine
-  await page.click('[data-act=nhEdit]'); await page.fill('#nhName', 'Research ideas'); await page.click('#dlg [type=submit]'); await expect(page.locator('#dlg')).toBeHidden();
-  await page.click('[data-act=nhEdit]'); await page.fill('#nhName', 'Follow-ups'); await page.click('#dlg [type=submit]');
-  await expect(page.locator('.nhchip')).toContainText('Follow-ups');
-  // delete: notes stay, without a heading; undo puts both back
-  await page.click('[data-act=nhEdit]'); await page.click('#dlg [data-act=nhDel]');
-  await expect(page.locator('.nhchip')).toHaveCount(0); expect(await page.evaluate(() => DB.notes.filter(n => n.head).length)).toBe(0);
-  expect(await page.evaluate(() => DB.notes.some(n => n.text.startsWith('Check')))).toBe(true);
-  await page.click('#toastBtn'); await expect(page.locator('.nhchip')).toHaveCount(1); expect(await page.evaluate(() => DB.notes.filter(n => n.head).length)).toBe(2);
-  // a backup with junk headings: tidied, nothing breaks
-  await page.evaluate(() => { DB.noteHeads = [null, 5, { id: 'bad id!', name: 'x' }, { id: 'nh-a', name: '  Dup ' }, { id: 'nh-b', name: 'dup' }, { id: 'nh-c', name: '' }, { id: 'nh-d', name: '<b>bold</b>' }];
-    DB.notes[0].head = 'nh-gone'; UI.nf = 'h:nh-gone'; renderMain(); });
-  expect(await page.evaluate(() => noteHeads().map(h => h.name))).toEqual(['Dup', '<b>bold</b>']);
-  await expect(page.locator('.nhchip:has-text("<b>bold</b>")')).toHaveCount(1); await expect(page.locator('.nhchip b')).toHaveCount(0);
-  expect(await page.evaluate(() => UI.nf)).toBe('all');                              // a filter for a heading that is gone falls back to All
-  noErrors(errors);
-});
-
 test('a rule title that is already taken is flagged right under the title, as you type', async ({ page }) => {
   const errors = await open(page, '#/detections');
   await page.locator('.page [data-act=rNew]').first().click(); await page.click('.ctx-it:has-text("YARA")');
@@ -2073,14 +2031,47 @@ test('a rule title that is already taken is flagged right under the title, as yo
   noErrors(errors);
 });
 
-test('a note\'s menu changes its heading', async ({ page }) => {
+
+test('note titles: optional, shown on the card, cleaned, escaped, duplicate warned, carried by duplicate, search and Today', async ({ page }) => {
   const errors = await open(page, '#/notes');
-  await page.locator('.note-card:has-text("This week") [data-act=nMenu]').click(); await page.click('.ctx-it:has-text("Add a heading")');
-  await page.fill('#nhName', 'Personal'); await page.click('#dlg [type=submit]');
+  await page.evaluate(() => { UI.nf = 'general'; renderMain(); });
+  // a title with hidden and direction characters and markup; a body as before
+  await page.fill('.nquick [data-nq=title]', '  Weekly ‮catch-up  <img src=x onerror=alert(1)> ');
+  await page.fill('.nquick textarea', '[ ] Call the client');
+  await page.click('.nquick [type=submit]');
+  const card = page.locator('.note-card:has-text("Call the client")');
+  await expect(card.locator('.ntitle')).toHaveText('Weekly catch-up <img src=x onerror=alert(1)>');
+  await expect(card.locator('img')).toHaveCount(0); await expect(card.locator('.ntask')).toHaveCount(1);
+  expect(await page.evaluate(() => DB.notes[0].title)).toBe('Weekly catch-up <img src=x onerror=alert(1)>');
+  // a title alone is a note; too long is refused
+  await page.fill('.nquick [data-nq=title]', 'x'.repeat(121)); await page.click('.nquick [type=submit]');
+  await expect(page.locator('.nquick .ferr')).toContainText('up to 120 characters');
+  await page.fill('.nquick [data-nq=title]', 'Just a title'); await page.click('.nquick [type=submit]');
+  await expect(page.locator('.note-card .ntitle:text-is("Just a title")')).toHaveCount(1);
+  // the same title again in General: warned once, kept on the second press
+  const n0 = await page.evaluate(() => DB.notes.length);
+  await page.fill('.nquick [data-nq=title]', 'just   A TITLE'); await page.click('.nquick [type=submit]');
+  await expect(page.locator('.nquick .ferr')).toContainText('already a note called'); expect(await page.evaluate(() => DB.notes.length)).toBe(n0);
+  await page.click('.nquick [type=submit]'); expect(await page.evaluate(() => DB.notes.length)).toBe(n0 + 1);
+  // the same title in a case is fine
+  expect(await page.evaluate(() => !!noteTitleTwin('Just a title', 'c-lantern'))).toBe(false);
+  // edit an existing note: add a title to it
   await page.click('[data-act=nf][data-v=all]');
-  await page.locator('.note-card:has-text("This week") [data-act=nMenu]').click(); await page.click('.ctx-it:has-text("Change heading")');
-  await expect(page.locator('#nHead')).toBeFocused();
-  await page.selectOption('#nHead', { label: 'Personal' }); await page.click('#dlg [type=submit]');
-  await expect(page.locator('.note-card:has-text("This week") .ncase.hd')).toHaveText('Personal');
+  await page.locator('.note-card:has-text("Beacon interval") [data-act=nEdit]').click();
+  await page.fill('#nTitle', 'Beacon timing'); await page.click('#dlg [type=submit]');
+  await expect(page.locator('.note-card:has-text("Beacon interval") .ntitle')).toHaveText('Beacon timing');
+  // clearing the body but keeping the title is allowed; clearing both is not
+  await page.locator('.note-card:has-text("Beacon timing") [data-act=nEdit]').click();
+  await page.fill('#nText', ''); await page.fill('#nTitle', ''); await page.click('#dlg [type=submit]');
+  await expect(page.locator('#dlg .ferr')).toContainText('cannot be empty'); await page.click('#dlg [data-act=dclose]');
+  // duplicate copies the title as "(copy)"
+  await page.locator('.note-card:has-text("Beacon timing") [data-act=nMenu]').click(); await page.click('.ctx-it:has-text("Duplicate")');
+  await expect(page.locator('.note-card .ntitle:text-is("Beacon timing (copy)")')).toHaveCount(1);
+  // the notes search and global search find it by title; Today names a due note by its title
+  await page.fill('#nqs', 'beacon timing'); await page.keyboard.press('Enter');
+  await expect(page.locator('.note-card .ntitle')).toContainText(['Beacon timing']);
+  expect(await page.evaluate(() => { const n = DB.notes.find(x => x.title === 'Beacon timing'); n.due = new Date().toISOString().slice(0, 10); return todayItems().items.some(i => i.t.includes('Due today: Beacon timing')); })).toBe(true);
+  // a bad title from a backup or import is tidied when shown
+  expect(await page.evaluate(() => [noteTitle({ title: 5 }), noteTitle({ title: '  a\u0000b‏c ' }), noteLabel({ title: '', text: '# Head line\nbody' })])).toEqual(['', 'abc', 'Head line']);
   noErrors(errors);
 });
