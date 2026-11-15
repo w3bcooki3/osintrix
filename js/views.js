@@ -177,8 +177,8 @@ function bindCases(){
 }
 function viewCase(tab){
   const c = theCase(), D = derive();
-  const counts = {vault:D.entries.length, entities:caseEntList(c.id).length, timeline:D.recs.filter(r => r.ts).length, questions:D.recs.filter(r => r.type === 'lead' && !r.answer).length || null};
-  const body = {map:caseMapView, overview:caseOverview, vault:caseVault, entities:caseEntities, timeline:caseTimeline, graph:caseGraph, questions:caseQuestions, report:caseReport}[tab] || caseOverview;
+  const counts = {vault:D.entries.length, entities:caseEntList(c.id).length, timeline:D.recs.filter(r => r.ts).length, questions:D.recs.filter(r => r.type === 'lead' && !r.answer).length || null, media:D.recs.reduce((n, r) => n + (r.att ? r.att.length : 0) + (r.big ? 1 : 0), 0) || null};
+  const body = {map:caseMapView, media:caseMedia, overview:caseOverview, vault:caseVault, entities:caseEntities, timeline:caseTimeline, graph:caseGraph, questions:caseQuestions, report:caseReport}[tab] || caseOverview;
   return `<div class="chead${tab === 'graph' ? ' g' : ''}" style="--cc:${esc(c.color)}"><div class="crumb"><a href="#/cases">Cases</a>${ico('chevron-right','sm')}<span>${esc(c.code)}</span></div>
     <div class="row1"><span class="cicon" style="--cc:${esc(c.color)}">${ico(c.icon)}</span>
       <div style="flex:1;min-width:0"><h1>${esc(c.name)}</h1><div class="meta">${statusTag(c.status)}<span>${ico('calendar','sm')}Opened ${esc(E.fmtDate(c.created, tz()))}</span><span>${ico('user','sm')}${esc(c.owner)}</span></div></div>

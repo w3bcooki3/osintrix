@@ -255,7 +255,7 @@ async function analyseFile(file){
     md5:buf.length <= 200e6 ? md5(buf) : '', sha1:s1, sha256:s256, entropy:entropy(buf), exif:exif(buf), png:pngInfo(buf), trailing:tr, trailPreview:trTxt.slice(0, 400),
     c2pa:/c2pa\./.test(txt) ? ((txt.match(/claim_generator[^\n]{0,80}/) || [''])[0].replace(/[^\x20-\x7e]/g, ' ') || 'present') : '',     carve:carve(buf).filter(([o]) => o > 0), strings:st, good:good.length, iocs, flags:findFlags(txt + '\n' + trTxt), head:buf.slice(0, 256), zip, pdf, pe, elf, noise:noise.length > 0};
 }
-const fmtBytes = n => n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(2) + ' MB';
+const fmtBytes = n => { n = +n || 0; const t = (v, d) => String(+v.toFixed(d)); return n < 1024 ? n + ' B' : n < 1048576 ? t(n / 1024, 1) + ' KB' : n < 1073741824 ? t(n / 1048576, 2) + ' MB' : t(n / 1073741824, 2) + ' GB'; };
 function hexdump(b){ const L = []; for(let o = 0; o < b.length; o += 16){ const row = b.slice(o, o + 16); L.push(o.toString(16).padStart(8, '0') + '  ' + [...row].map(x => x.toString(16).padStart(2, '0')).join(' ').padEnd(48) + '  ' + [...row].map(x => x >= 32 && x < 127 ? String.fromCharCode(x) : '.').join('')); } return L.join('\n'); }
 const kvr = (k, v, mono) => v || v === 0 ? `<div class="kv"><span>${esc(k)}</span>${mono ? `<code>${esc(v)}</code>` : `<b>${esc(v)}</b>`}</div>` : '';
 function fileStructure(r){

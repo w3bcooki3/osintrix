@@ -115,6 +115,7 @@ document.addEventListener('click', ev => {
   if(typeof TRI_ACTS !== 'undefined' && TRI_ACTS[a]) return TRI_ACTS[a](id, v, t, ev);
   if(typeof SH_ACTS !== 'undefined' && SH_ACTS[a]) return SH_ACTS[a](id, v, t, ev);
   if(typeof SU_ACTS !== 'undefined' && SU_ACTS[a]) return SU_ACTS[a](id, v, t, ev);
+  if(typeof MD_ACTS !== 'undefined' && MD_ACTS[a]) return MD_ACTS[a](id, v, t, ev);
   if(NBX_ACTS[a]) return NBX_ACTS[a](id, v, t, ev);
   if(a === 'toolRun') return toolRunDlg(id);
   if(a === 'trPick'){ $('trV').value = v; return $('trV').focus(); }
@@ -264,8 +265,9 @@ document.addEventListener('click', ev => {
         await snapshot('Before importing a backup'); if(d.files){ await rekeyFiles(d.files, d.records, d.trash); delete d.files; } const nbfiles = d.nbfiles; delete d.nbfiles;
         d.records.forEach(normRecord); d.entries.forEach(normEntry); d.cases.forEach(normCase); (d.links || []).forEach(normLink); d.verdicts = normVerdicts(d.verdicts);
         if(typeof ctiLoad === 'function') await ctiLoad(); const prevIocs = typeof CTI !== 'undefined' && CTI.iocs ? CTI.iocs.slice() : null;
+        const noFiles = d.filesLeftOut === true; delete d.filesLeftOut;
         const prev = DB, inIocs = Array.isArray(d.ctiIocs) ? d.ctiIocs.slice(0, CTI_IOC_MAX) : null; delete d.ctiIocs; DB = d; DB.recent = prev.recent; DB.work = prev.work; if(DB.intel && prev.intel) (DB.intel.sources || []).forEach(s => { const o = (prev.intel.sources || []).find(x => x.id === s.id); s.key = o ? o.key || '' : ''; }); importSafeIntel(prev); DB.security = prev.security;          /* trusted keys, signing key and auto-lock stay this browser's own */ if(inIocs){ await ctiLoad(); CTI.iocs = []; ctiIocIndex(); const iso = t => { const z = new Date(t); return t && !isNaN(z) ? z.toISOString() : ''; }; ctiAddIocs(inIocs.filter(x => x && typeof x === 'object').map(x => ({v:x.v, type:x.k, tags:x.tags, threat:x.threat, desc:x.desc, ref:x.ref, tlp:x.tlp, conf:x.conf, srcs:x.srcs, first:iso(x.first), last:iso(x.last), exp:iso(x.exp)})), 'Backup'); await ctiSaveIocs(); } DB.prefs = Object.assign({}, prev.prefs, d.prefs || {}); ensureTools(); ensurePlaybooks(); ensureIntel(); ensureQueries(); ensureRules(); ensureNotes(); if(DB.nb){ nbSanitize(); await nbRestoreFiles(nbfiles); } else ensureNB(); UI.nbView = 'lib'; UI.nbRev = null; if(!DB.cases.some(c => c.id === DB.active)) DB.active = DB.cases[0] && DB.cases[0].id;
-        await hashRecords(); ensurePositions(); mutate('imported backup'); UI.sel = null; applyPrefs(); renderAll(); toast('Backup imported', 'Undo', async () => { DB = prev; if(inIocs && prevIocs){ CTI.iocs = prevIocs; ctiIocIndex(); await ctiSaveIocs(); } mutate('undo import'); applyPrefs(); renderAll(); }); }); }));
+        await hashRecords(); ensurePositions(); mutate('imported backup'); UI.sel = null; applyPrefs(); renderAll(); toast(noFiles ? 'Backup imported — it was made without files, so attachments and pictures are not in it' : 'Backup imported', 'Undo', async () => { DB = prev; if(inIocs && prevIocs){ CTI.iocs = prevIocs; ctiIocIndex(); await ctiSaveIocs(); } mutate('undo import'); applyPrefs(); renderAll(); }); }); }));
     case 'freshStart': return confirmDlg('Start fresh?', 'Deletes every case, vault entry, evidence record and note in this browser. Tools, queries, rules and settings stay. Export first if you might need them. You can undo right after.', 'Delete my cases', async () => {
       await snapshot('Before starting fresh'); const prev = JSON.parse(JSON.stringify(DB)); const c = {id:uid('c'), name:'My first case', code:'TN-2026-001', status:'active', owner:'You', created:Date.now(), updated:Date.now(), scope:'', color:CASE_COLORS[0], icon:'briefcase'};
       Object.assign(DB, {cases:[c], entries:[], links:[], records:[], notes:[], verdicts:{}, active:c.id}); UI.sel = null; mutate('started fresh'); go('#/home'); renderAll();
@@ -457,7 +459,7 @@ document.addEventListener('click', ev => {
         const verdicts = Object.fromEntries(Object.entries(DB.verdicts || {}).filter(([k]) => keys.has(k)));   // the verdicts on this case's indicators go with it
         const o = {format:'osintrix-case', v:3, case:c, entries:DB.entries.filter(e => e.caseId === c.id), links:DB.links.filter(l => l.caseId === c.id), records:recs, notes:(DB.notes || []).filter(n => n.caseId === c.id), verdicts, files};
       if(SEC.key || v === 'enc') return downloadEncrypted(slug(c.name) + '.json', o); download(slug(c.name) + '.json', JSON.stringify(o, null, 2), 'application/json'); }); }
-    case 'exportAll': return exportEverything();
+    case 'exportAll': return backupDlg();
     case 'resetDemo': { snapshot('Before resetting to the demo'); const prev = DB; DB = seedDB(); DB.prefs = prev.prefs; DB.recent = prev.recent; DB.work = prev.work; mutate('reset demo'); hashRecords(); UI.sel = null; renderAll(); return toast('Demo data reset', 'Undo', () => { DB = prev; mutate('undo reset'); renderAll(); }); }
   }
 });

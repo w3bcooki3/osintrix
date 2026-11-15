@@ -69,7 +69,9 @@ async function snapRefs(){ await snapsLoad(); const sig = SNAPS.map(s => s.at).j
     try{ const d = JSON.parse(await openStr(await IDB.get('osintrix-snap:' + s.at))); refsOf(d).forEach(k => set.add(k)); }catch(e){ SNAP_REFS = null; return null; } }   // unreadable: say so, so nothing is deleted
   SNAP_REFS = {sig, set}; return set; }
 /* delete a stored file only if no restore point still needs it */
-async function blobDel(k){ const R = await snapRefs(); if(!R || R.has(k)) return false; return IDB.del(k); }
+async function blobDel(k){ const base = k.replace(/\.p$/, ''), R = await snapRefs(); if(!R || R.has(base)) return false;
+  if(k.startsWith('file:') && base === k){ IDB.del(k + '.p'); if(typeof previewForget === 'function') previewForget(k.slice(5)); }   // its preview goes with it
+  return IDB.del(k); }
 /* restore points are made one at a time, so two at once cannot overwrite each other's list */
 let SNAP_Q = Promise.resolve();
 function snapshot(why){ const run = SNAP_Q.then(() => snapshot0(why)); SNAP_Q = run.catch(() => false); return run; }
@@ -133,42 +135,58 @@ async function sha256Hex(buf){ const h = await crypto.subtle.digest('SHA-256', b
 async function storeFile(f){
   if(!STORE.idb) throw new Error('idb');
   if(f.size > 50 * 1048576) throw new Error('big');
+  const buf = await f.arrayBuffer(), sha = await sha256Hex(buf), type = f.type || 'application/octet-stream';
+  /* the same bytes already in this browser are not stored a second time */
+  const same = typeof fileBySha === 'function' ? fileBySha(sha) : null;
+  if(same && await IDB.get('file:' + same.id)) return {...same, name:f.name || same.name, modified:f.lastModified || same.modified, added:Date.now()};
   if(typeof nbRoomFor === 'function' && !await nbRoomFor(f.size)) throw new Error('full');
-  const buf = await f.arrayBuffer(), sha = await sha256Hex(buf), id = uid('f');
-  if(!await IDB.set('file:' + id, await sealBlob(new Blob([buf], {type:f.type || 'application/octet-stream'})))) throw new Error('idb');
+  const id = uid('f'), blob = new Blob([buf], {type});
+  if(!await IDB.set('file:' + id, await sealBlob(blob))) throw new Error('idb');
   let gps = null, cam = ''; if(/jpe?g|tiff|heic/i.test(f.type || f.name || '')){ try{ const x = exif(new Uint8Array(buf)); if(x){ if(x.GPS) gps = x.GPS; cam = [x.Make, x.Model].filter(Boolean).join(' '); } }catch(e){} }
-  const dhash = /^image\//.test(f.type || '') ? await dhashBlob(new Blob([buf], {type:f.type})) : null;
-  return {id, name:f.name || 'pasted-image.png', type:f.type || '', size:f.size, sha256:sha, modified:f.lastModified || Date.now(), added:Date.now(), gps, cam, dhash};
+  const dhash = /^image\//.test(f.type || '') ? await dhashBlob(blob) : null;
+  /* picture size, length and a small preview for pictures, videos and audio */
+  const kind = typeof mediaKind === 'function' ? mediaKind({type:f.type, name:f.name}) : '', P = kind === 'image' || kind === 'video' || kind === 'audio' ? await mediaProbe(blob, kind) : {};
+  if(P.prev) await IDB.set('file:' + id + '.p', await sealBlob(P.prev));
+  const m = {id, name:f.name || 'pasted-image.png', type:f.type || '', size:f.size, sha256:sha, modified:f.lastModified || Date.now(), added:Date.now(), gps, cam, dhash};
+  if(P.w){ m.w = P.w; m.h = P.h; } if(P.dur) m.dur = P.dur; return m;
 }
 async function fileBlob(fid){ return await openBlob(await IDB.get('file:' + fid)); }
 async function fileURL(fid){ if(FILE_URLS.has(fid)) return FILE_URLS.get(fid); const b = await fileBlob(fid); if(!b) return null; const u = URL.createObjectURL(b); FILE_URLS.set(fid, u); return u; }
 function hydrateThumbs(root){ (root || document).querySelectorAll('img[data-fid]:not([src])').forEach(async im => { const u = await fileURL(im.dataset.fid); if(u) im.src = u; else im.replaceWith(Object.assign(document.createElement('span'), {className:'t3', textContent:'File missing from this browser'})); }); }
 new MutationObserver(() => { if(document.querySelector('img[data-fid]:not([src])')) hydrateThumbs(); }).observe(document.documentElement, {childList:true, subtree:true});
 
+function fileRecord(m, cid){
+  const k = typeof mediaKind === 'function' ? mediaKind(m) : /^image\//.test(m.type) ? 'image' : 'other';
+  const what = k === 'image' ? (m.cam || m.gps ? 'Photo' : /png/i.test(m.type) ? 'Screenshot' : 'Image') : k === 'video' ? 'Video' : k === 'audio' ? 'Audio' : 'File';
+  const body = `${what}: ${m.name}\nType: ${m.type || 'unknown'}\nSize: ${m.size} bytes${m.w ? '\nPicture size: ' + m.w + ' × ' + m.h : ''}${m.dur ? '\nLength: ' + fmtDur(m.dur) : ''}\nSHA-256: ${m.sha256}${m.cam ? '\nCamera: ' + m.cam : ''}${m.gps ? '\nEXIF GPS: ' + m.gps.lat.toFixed(6) + ', ' + m.gps.lon.toFixed(6) : ''}`;
+  return {id:uid('r'), caseId:cid, type:'evidence', title:what + ': ' + m.name, body, tsRaw:new Date(m.modified).toISOString(), tsZone:'explicit', ts:m.modified, source:'attachment', host:'', tags:[k === 'image' ? 'screenshot' : k === 'video' || k === 'audio' ? k : 'file'], ents:E.extract(body).filter(e => e.k !== 'file'), answer:'', addedBy:'You', addedAt:Date.now(), hash:'', att:[m]}; }
 async function attachFiles(files, recId){
   files = [...files].filter(f => f && f.size != null); if(!files.length) return;
   if(!recId){ const pages = files.filter(isWebPage); if(pages.length){ files = files.filter(f => !isWebPage(f)); await importWebPages(pages); if(!files.length) return; } }
   if(!STORE.idb) return toast('Attachments need IndexedDB, which this browser blocked');
-  const made = [], metas = []; let skipped = 0;
-  let full = false; for(const f of files){ let m; try{ m = await storeFile(f); }catch(e){ skipped++; if(e.message === 'full') full = true; continue; } metas.push(m); }
-  if(!metas.length) return toast(full ? 'Browser storage is full — free space in Settings → Storage' : skipped ? 'Files over 50 MB are not stored' : 'Nothing attached');
-  if(recId){ const r = recById(recId); r.att = (r.att || []).concat(metas); mutate('attached ' + metas.length + ' file(s)'); renderAll(); return toast(metas.length + ' file' + (metas.length > 1 ? 's' : '') + ' attached'); }
+  const made = [], metas = [], bigs = []; let skipped = 0;
+  const t = files.length > 1 || files.some(f => f.size > 8e6) ? setTimeout(() => toast('Storing ' + files.length + ' file' + (files.length > 1 ? 's' : '') + '…'), 300) : 0;
+  let full = false; for(const f of files){ let m; try{ m = await storeFile(f); }catch(e){ if(e.message === 'big' && !recId) bigs.push(f); else { skipped++; if(e.message === 'full') full = true; } continue; } metas.push(m); }
+  clearTimeout(t);
+  if(!metas.length && !bigs.length) return toast(full ? 'Browser storage is full — free space in Settings → Storage' : skipped ? 'Files over 50 MB are not stored' : 'Nothing attached');
+  if(recId){ const r = recById(recId); r.att = (r.att || []).concat(metas); mutate('attached ' + metas.length + ' file(s)'); renderAll(); return toast(metas.length + ' file' + (metas.length > 1 ? 's' : '') + ' attached' + (skipped ? ' · ' + skipped + ' not stored' : '') + await roomNote()); }
   const cid = capCase();
-  for(const m of metas){ const img = /^image\//.test(m.type), body = `${img ? (m.cam || m.gps ? 'Photo' : /png/i.test(m.type) ? 'Screenshot' : 'Image') : 'File'}: ${m.name}\nType: ${m.type || 'unknown'}\nSize: ${m.size} bytes\nSHA-256: ${m.sha256}${m.cam ? '\nCamera: ' + m.cam : ''}${m.gps ? '\nEXIF GPS: ' + m.gps.lat.toFixed(6) + ', ' + m.gps.lon.toFixed(6) : ''}`;
-    made.push({id:uid('r'), caseId:cid, type:'evidence', title:(img ? (m.cam || m.gps ? 'Photo: ' : /png/i.test(m.type) ? 'Screenshot: ' : 'Image: ') : 'File: ') + m.name, body, tsRaw:new Date(m.modified).toISOString(), tsZone:'explicit', ts:m.modified, source:'attachment', host:'', tags:[img ? 'screenshot' : 'file'], ents:E.extract(body).filter(e => e.k !== 'file'), answer:'', addedBy:'You', addedAt:Date.now(), hash:'', att:[m]}); }
+  for(const m of metas) made.push(fileRecord(m, cid));
+  for(const f of bigs) made.push(await bigFileRecord(f, cid));   // too big to keep: its fingerprint is recorded instead
   DB.records.push(...made); mutate('added ' + made.length + ' file record(s)'); await hashRecords(); closeDlg();
   afterCapture(cid, made.map(r => r.id)); watchNotify(made);
-  UI.sel = {kind:'rec', id:made[0].id}; UI.inspOpen = true; UI.tlMode = 'events'; go(caseHash(cid, 'timeline'));
-  toast(made.length + ' file' + (made.length > 1 ? 's' : '') + ' added as evidence' + (skipped ? ' · ' + skipped + ' skipped (over 50 MB)' : ''));
+  if(UI.route.area === 'case' && UI.route.tab === 'media' && DB.active === cid) renderAll();   // adding from the Media tab stays there
+  else { UI.sel = {kind:'rec', id:made[0].id}; UI.inspOpen = true; UI.tlMode = 'events'; go(caseHash(cid, 'timeline')); }
+  toast((metas.length ? metas.length + ' file' + (metas.length === 1 ? '' : 's') + ' added as evidence' : '') + (bigs.length ? (metas.length ? ' · ' : '') + bigs.length + ' file' + (bigs.length > 1 ? 's' : '') + ' too big to store — fingerprint recorded' : '') + (skipped ? ' · ' + skipped + ' not stored' : '') + await roomNote());
 }
 function attSection(r){
   const A = r.att || [];
   return `<div class="isec"><h4>Files <span class="t3">${A.length}</span></h4>
-    ${A.map(a => `<div class="att">${/^image\//.test(a.type) ? `<button class="attimg" data-act="attOpen" data-id="${r.id}" data-v="${a.id}" aria-label="Open ${esc(a.name)}"><img data-fid="${a.id}" alt=""></button>` : ''}
-      <div class="atth">${ico(/^image\//.test(a.type) ? 'image' : 'file','sm')}<b title="${esc(a.name)}">${esc(a.name)}</b><span class="t3">${fmtBytes(a.size)}</span></div>
+    ${A.map(a => { const k = typeof mediaKind === 'function' ? mediaKind(a) : ''; return `<div class="att">${k === 'image' || k === 'video' ? `<button class="attimg" data-act="attOpen" data-id="${r.id}" data-v="${a.id}" aria-label="Open ${esc(a.name)}"><img data-pid="${a.id}" data-pk="${k}" alt="">${k === 'video' ? `<span class="md-play">${ico('play','sm')}</span>` : ''}</button>` : ''}
+      <div class="atth">${ico(typeof MEDIA_ICON !== 'undefined' ? MEDIA_ICON[k] || 'file' : 'file','sm')}<b title="${esc(a.name)}">${esc(a.name)}</b><span class="t3">${fmtBytes(a.size)}</span></div>
       <div class="mono atts" title="SHA-256 of the stored bytes">sha256 ${esc(a.sha256.slice(0, 32))}…</div>
       <div class="wrap"><button class="btn xs" data-act="attOpen" data-id="${r.id}" data-v="${a.id}">${ico('arrow-up-right','sm')}Open</button><button class="btn xs" data-act="attDl" data-id="${r.id}" data-v="${a.id}">${ico('download','sm')}Save</button>
-        <button class="btn xs" data-act="attKit" data-id="${r.id}" data-v="${a.id}">${ico('file-search','sm')}Inspect</button><button class="iconbtn" data-act="attDel" data-id="${r.id}" data-v="${a.id}" aria-label="Remove file" title="Remove file">${ico('x','sm')}</button></div></div>`).join('')}
+        <button class="btn xs" data-act="attKit" data-id="${r.id}" data-v="${a.id}">${ico('file-search','sm')}Inspect</button><button class="iconbtn" data-act="attDel" data-id="${r.id}" data-v="${a.id}" aria-label="Remove file" title="Remove file">${ico('x','sm')}</button></div></div>`; }).join('')}
     <button class="btn sm" data-act="attAdd" data-id="${r.id}">${ico('paperclip','sm')}Attach file or screenshot</button></div>`;
 }
 function pickFiles(accept, cb, multi = true){ const i = document.createElement('input'); i.type = 'file'; i.accept = accept || ''; i.multiple = multi; i.onchange = () => { if(i.files && i.files.length) cb([...i.files]); }; i.click(); }
@@ -176,7 +194,8 @@ async function attAct(a, rid, fid){
   const r = recById(rid), m = r && (r.att || []).find(x => x.id === fid);
   if(a === 'attAdd') return pickFiles('', fs => attachFiles(fs, rid));
   if(!m) return;
-  if(a === 'attOpen'){ if(/html|xml|svg|mhtml|multipart|message\/rfc822|^image\//i.test(m.type) || /\.(html?|xhtml|svg|xml|mhtml?|mht)$/i.test(m.name)) return safeView(rid, fid);
+  if(a === 'attOpen'){ if(typeof mediaKind === 'function' && /^(video|audio)$/.test(mediaKind(m))) return mediaOpen(rid, fid);
+    if(/html|xml|svg|mhtml|multipart|message\/rfc822|^image\//i.test(m.type) || /\.(html?|xhtml|svg|xml|mhtml?|mht)$/i.test(m.name)) return safeView(rid, fid);
     // open by what the bytes are, never by the type the file claimed: markup goes to the sandbox, the rest opens with a fixed safe type
     const b = await fileBlob(fid); if(!b) return toast('That file is missing from this browser');
     const kind = await sniffKind(b);
@@ -195,20 +214,37 @@ async function filesForExport(recs){
 }
 async function filesFromImport(files){ let n = 0; for(const [fid, url] of Object.entries(files || {})){ if(typeof url !== 'string' || !url.startsWith('data:')) continue; try{ const m = url.match(/^data:([^;,]*)(;base64)?,(.*)$/); const bytes = m[2] ? b64d8(m[3]) : new TextEncoder().encode(decodeURIComponent(m[3])); if(await IDB.set('file:' + fid, await sealBlob(new Blob([bytes], {type:m[1] || 'application/octet-stream'})))) n++; }catch(e){} } return n; }
 /* everything in one object: the workspace plus attached files and notebook media as data URLs */
-async function backupObject(){
+async function backupObject(opt = {}){
   const all = DB.records.concat((DB.trash || []).flatMap(x => x.kind === 'record' ? [x.data.r] : x.kind === 'case' ? x.data.records : []));
-  const files = await filesForExport(all), nbfiles = typeof nbBackupFiles === 'function' ? await nbBackupFiles() : {}, n = Object.keys(files).length;
+  const files = opt.noFiles ? {} : await filesForExport(all), nbfiles = !opt.noFiles && typeof nbBackupFiles === 'function' ? await nbBackupFiles() : {}, n = Object.keys(files).length;
   // recent tool inputs belong to this browser: they are not part of a backup
   // threat intel: the indicator store goes with the backup; feed API keys never do
   if(typeof ctiLoad === 'function') await ctiLoad();
   const intel = DB.intel ? Object.assign({}, DB.intel, {sources:(DB.intel.sources || []).map(s => Object.assign({}, s, {key:''})), look:DB.intel.look ? {on:DB.intel.look.on || {}, keys:{}, relay:{url:(DB.intel.look.relay || {}).url || '', token:''}} : undefined}) : undefined, ctiIocs = typeof CTI !== 'undefined' && CTI.iocs && CTI.iocs.length ? CTI.iocs : undefined;
-  return Object.assign({}, DB, {recent:undefined, work:undefined, intel, ctiIocs}, n ? {files} : {}, Object.keys(nbfiles).length ? {nbfiles} : {}, DB.security && DB.security.sign ? {security:Object.assign({}, DB.security, {sign:{pub:DB.security.sign.pub, made:DB.security.sign.made}})} : {});   // the signing key's private half never goes into a backup
+  return Object.assign({}, DB, {recent:undefined, work:undefined, intel, ctiIocs}, opt.noFiles ? {filesLeftOut:true} : {}, n ? {files} : {}, Object.keys(nbfiles).length ? {nbfiles} : {}, DB.security && DB.security.sign ? {security:Object.assign({}, DB.security, {sign:{pub:DB.security.sign.pub, made:DB.security.sign.made}})} : {});   // the signing key's private half never goes into a backup
 }
-async function exportEverything(enc){
+/* how big a backup is with and without its files (files grow by about a third as text) */
+function backupSizes(){
+  const all = DB.records.concat((DB.trash || []).flatMap(x => x.kind === 'record' ? [x.data.r] : x.kind === 'case' ? x.data.records || [] : [])), seen = new Set(); let files = 0, n = 0;
+  for(const r of all) for(const a of (r && r.att) || []) if(!seen.has(a.id)){ seen.add(a.id); files += +a.size || 0; n++; }
+  for(const m of Object.values((DB.nb && DB.nb.media) || {})) if(!m.demo && !m.gone && !m.data){ files += +m.size || 0; n++; }
+  let data = 0; try{ data = JSON.stringify(DB).length; }catch(e){}
+  return {data, files, n, withFiles:data + Math.ceil(files * 4 / 3)};
+}
+function backupDlg(enc){
+  const S = backupSizes(); if(!S.n) return exportEverything(enc);
+  openDlg(dhead('Back up everything') + `<div class="in"><p class="t2" style="margin:0 0 14px">Your workspace has ${S.n.toLocaleString()} stored file${S.n > 1 ? 's' : ''} (pictures, videos, attachments, notebook media) taking ${fmtBytes(S.files)}.</p>
+      <div class="su-cards"><button type="button" class="su-card" data-act="bkGo" data-v="files">${ico('images')}<b>With files <span class="chip sq green">complete</span></b><span>About ${fmtBytes(S.withFiles)}. Everything comes back on restore, on any computer.</span></button>
+        <button type="button" class="su-card" data-act="bkGo" data-v="nofiles">${ico('file-text')}<b>Without files</b><span>About ${fmtBytes(S.data)}. Cases, notes and evidence text only; restored records say their files are missing. Good for frequent backups.</span></button></div></div>
+    <footer><button class="btn" data-act="dclose">Cancel</button></footer>`);
+  UI.bkEnc = enc;
+}
+async function exportEverything(enc, noFiles){
   if(enc == null) enc = !!SEC.key;
-  const obj = await backupObject();
+  const t = !noFiles ? setTimeout(() => toast('Preparing the backup…'), 300) : 0;
+  const obj = await backupObject({noFiles:!!noFiles}); clearTimeout(t);
   DB.prefs.lastExport = Date.now(); DB.prefs.remindAt = 0; save();
-  const name = 'osintrix-' + new Date().toISOString().slice(0, 10) + '.json';
+  const name = 'osintrix-' + new Date().toISOString().slice(0, 10) + (noFiles ? '-no-files' : '') + '.json';
   if(enc) return downloadEncrypted(name, obj);
   download(name, JSON.stringify(obj, null, 2), 'application/json');
   if(UI.route.area === 'home') renderMain();
@@ -298,6 +334,7 @@ const SAFE_ACTS = {
   bkpLater:() => { DB.prefs.remindAt = Date.now() + 7 * 864e5; save(); renderMain(); },
   recDel:id => delRecord(id),
   attAdd:(id, v, t) => attAct('attAdd', id, v), attOpen:(id, v) => attAct('attOpen', id, v), attDl:(id, v) => attAct('attDl', id, v), attKit:(id, v) => attAct('attKit', id, v), attDel:(id, v) => attAct('attDel', id, v),
+  bkGo:(id, v) => { closeDlg(); exportEverything(UI.bkEnc, v === 'nofiles'); },
   evtxGo:() => evtxGo(), capFiles:() => pickFiles('', fs => attachFiles(fs)), capWeb:() => pickFiles('.mhtml,.mht,.html,.htm,.xhtml', fs => importWebPages(fs)), capLog:() => pickFiles('.evtx,.csv,.tsv,.json,.ndjson,.jsonl,.log,.txt', fs => logImportFile(fs[0]), false), logGo:() => logGo()
 };
 

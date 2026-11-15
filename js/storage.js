@@ -49,7 +49,7 @@ async function storageBreakdown(){
   const wk = new Set((DB.recent || []).filter(x => x.kind === 'file').map(x => 'wk:' + x.id));
   /* files a restore point still needs are not leftovers; if a restore point cannot be read, nothing is called a leftover */
   const R = await snapRefs();
-  const orphans = !R ? [] : keys.filter(k => typeof k === 'string' && !R.has(k) && ((k.startsWith('file:') && !fids.has(k)) || (k.startsWith('nbm:') && !nbk.has(k)) || (k.startsWith('wk:') && !wk.has(k))));
+  const orphans = !R ? [] : keys.filter(k => typeof k === 'string' && !R.has(k.replace(/\.p$/, '')) && ((k.startsWith('file:') && !fids.has(k.replace(/\.p$/, ''))) || (k.startsWith('nbm:') && !nbk.has(k)) || (k.startsWith('wk:') && !wk.has(k))));
   stoInfo = {quota:STO_QUOTA(), usage:STORE.usage || 0, json:STORE.bytes || 0, att, nbLive, nbGone, nbGoneN:media.filter(m => m.gone).length, snaps, snapN:(SNAPS || []).length, trashN:(DB.trash || []).length, orphans};
   return stoInfo;
 }

@@ -1373,6 +1373,8 @@ test('no serious accessibility problems on the newer screens (copilot, investiga
   const errors = await open(page, '#/home');
   const setups = {
     overview: () => { location.hash = '#/case/c-lantern/overview'; },
+    media: () => { const r = DB.records.find(x => x.caseId === 'c-lantern'); r.att = [{ id: 'fx1', name: 'shot.png', type: 'image/png', size: 2048, sha256: 'a'.repeat(64), added: Date.now(), w: 10, h: 10 }, { id: 'fx2', name: 'clip.webm', type: 'video/webm', size: 4096, sha256: 'b'.repeat(64), added: Date.now(), dur: 12 }]; DB.records.push({ ...r, id: 'rbig', att: [], big: { name: 'huge.mp4', type: 'video/mp4', size: 6e7, sha256: '' } }); mutate('m'); location.hash = '#/case/c-lantern/media'; },
+    mediaEmpty: () => { location.hash = '#/case/c-portal/media'; },
     report: () => { DB.prefs.repT = 'full'; location.hash = '#/case/c-lantern/report'; },
     investigate: () => { UI.itab = 'look'; UI.look = { k: 'ipv4', v: '203.0.113.47' }; LKV.key = 'ipv4:203.0.113.47'; LKV.res = { idb: { ok: true, at: Date.now(), sig: [{ t: 'mal', w: 0.8, why: 'Shodan tags it c2', ts: 0 }], facts: [['Open ports', '4444']], attrs: { ports: [4444] }, related: [{ k: 'domain', v: 'update-lamp.test', rel: 'hostname' }], link: 'https://www.shodan.io/host/203.0.113.47' } }; LKV.pending = new Set(); location.hash = '#/feeds'; },
     investigateEmpty: () => { UI.itab = 'look'; UI.look = null; LKV.bulk = null; location.hash = '#/feeds'; },
@@ -1612,5 +1614,64 @@ test('data safety: restore points keep their files; a damaged restore-point list
   await page.evaluate(() => importRules()); await page.waitForTimeout(600);
   expect(await page.evaluate(() => DB.rules.length)).toBe(n0);
   const one = JSON.parse(rtxt)[0]; expect(one.starred).toBe(true); expect(Array.isArray(one.refs)).toBe(true);
+  noErrors(errors);
+});
+
+test('media: drop, paste or add pictures, videos and saved pages to a case; originals kept once with previews; big files recorded by fingerprint; media entries hold their file; backups with or without files', async ({ page }) => {
+  const errors = await open(page, '#/case/c-lantern/media');
+  await expect(page.locator('.md-empty')).toBeVisible();
+  // a picture and a short video, made in the page
+  await page.evaluate(async () => {
+    const c = document.createElement('canvas'); c.width = 640; c.height = 480; const g = c.getContext('2d'); g.fillStyle = '#c33'; g.fillRect(0, 0, 640, 480);
+    window.__png = await new Promise(r => c.toBlob(r, 'image/png'));
+    const st = c.captureStream(10), rec = new MediaRecorder(st, { mimeType: 'video/webm' }), ch = []; rec.ondataavailable = e => ch.push(e.data); rec.start();
+    let i = 0; const iv = setInterval(() => { g.fillStyle = i++ % 2 ? '#33c' : '#3c3'; g.fillRect(0, 0, 640, 480); }, 100); await new Promise(r => setTimeout(r, 900)); clearInterval(iv); rec.stop(); await new Promise(r => rec.onstop = r);
+    window.__vid = new Blob(ch, { type: 'video/webm' });
+  });
+  // dropped anywhere on the case
+  await page.evaluate(() => { const dt = new DataTransfer(); dt.items.add(new File([window.__png], 'photo.png', { type: 'image/png' })); dt.items.add(new File([window.__vid], 'clip.webm', { type: 'video/webm' }));
+    document.querySelector('#main').dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true })); document.querySelector('#main').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true })); });
+  await expect(page.locator('.md-c')).toHaveCount(2);
+  expect(await page.evaluate(() => location.hash)).toBe('#/case/c-lantern/media');   // adding from the Media tab stays there
+  // pasted: the same picture again is stored once
+  await page.evaluate(() => { const dt = new DataTransfer(); dt.items.add(new File([window.__png], 'image.png', { type: 'image/png' })); document.body.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); });
+  await expect(page.locator('.md-c')).toHaveCount(3);
+  const st = await page.evaluate(async () => { const I = caseMediaItems('c-lantern'), keys = (await IDB.keys()).filter(k => /^file:/.test(k));
+    const v = I.find(x => x.k === 'video').a, im = I.find(x => x.a.name === 'photo.png').a;
+    return { names: I.map(x => x.a.name).sort(), stored: keys.filter(k => !k.endsWith('.p')).length, prev: keys.filter(k => k.endsWith('.p')).length, vw: v.w, vdur: v.dur > 0, iw: im.w, shot: I.some(x => /^screenshot-/.test(x.a.name)) }; });
+  expect(st).toMatchObject({ stored: 2, prev: 2, vw: 640, vdur: true, iw: 640, shot: true });
+  await expect(page.locator('.md-c img[src]').first()).toBeVisible();
+  // the video plays in the app
+  await page.click('.md-c:has-text("clip.webm") .md-th');
+  await expect.poll(() => page.evaluate(() => { const v = document.querySelector('#dlg video'); return v ? v.readyState : -1; })).toBeGreaterThan(0);
+  await page.evaluate(() => closeDlg());
+  // too big to keep: recorded with its fingerprint
+  await page.evaluate(() => attachFiles([new File([new Uint8Array(51 * 1048576)], 'huge.mp4', { type: 'video/mp4' })]));
+  await expect(page.locator('.md-c.big')).toHaveCount(1);
+  expect(await page.evaluate(() => { const r = DB.records.find(x => x.big); return [r.big.size, r.big.sha256.length, /not stored/.test(r.title)]; })).toEqual([51 * 1048576, 64, true]);
+  // a saved web page
+  const mh = require('fs').readFileSync(require('path').resolve(__dirname, 'fixtures', 'forum-post.mhtml'));
+  page.once('filechooser', fc => fc.setFiles({ name: 'forum-post.mhtml', mimeType: 'multipart/related', buffer: mh }));
+  await page.click('[data-act=mdPage]');
+  await expect(page.locator('.md-c:has-text("forum-post.mhtml")')).toHaveCount(1);
+  // filters
+  await page.click('[data-act=mdKind][data-v=video]'); await expect(page.locator('.md-c')).toHaveCount(2);
+  await page.click('[data-act=mdKind][data-v=all]');
+  // an Image / video entry gets its own file
+  const eid = await page.evaluate(() => { const e = { id: uid('v'), caseId: 'c-lantern', type: 'media', fields: { title: '' }, tags: [], priority: 'medium', created: Date.now(), updated: Date.now() }; normEntry(e); DB.entries.push(e); mutate('e'); selectEntry(e.id); return e.id; });
+  await expect(page.locator('#insp [data-act=mdEntryUp]')).toBeVisible();
+  await page.evaluate(async id => mediaForEntry(entryById(id), [new File([window.__vid], 'entry.webm', { type: 'video/webm' })]), eid);
+  expect(await page.evaluate(id => { const e = entryById(id), r = recById(e.src); return [e.fields.title, e.fields.type, e.fields.resolution, r.att.length]; }, eid)).toEqual(['entry.webm', 'Video', '640×480', 1]);
+  // deleting the last record that uses a file removes the file and its preview (no restore point needs them here)
+  const gone = await page.evaluate(async () => { const r = DB.records.find(x => x.att && x.att[0].name === 'clip.webm'); const fid = r.att[0].id; SNAPS = []; SNAP_REFS = null; await IDB.set('osintrix-snaps', JSON.stringify([]));
+    const others = DB.records.filter(x => x !== r && (x.att || []).some(a => a.id === fid)); others.forEach(o => o.att = o.att.filter(a => a.id !== fid));
+    DB.records = DB.records.filter(x => x !== r); dropFilesOf({ kind: 'record', data: { r } }); await new Promise(z => setTimeout(z, 300)); return [!!(await IDB.get('file:' + fid)), !!(await IDB.get('file:' + fid + '.p'))]; });
+  expect(gone).toEqual([false, false]);
+  // backups: asked with or without files, sizes shown
+  await page.evaluate(() => clickAct('exportAll'));
+  await expect(page.locator('#dlg')).toContainText('Without files');
+  const dl = page.waitForEvent('download'); await page.click('[data-act=bkGo][data-v=nofiles]');
+  const o = JSON.parse(require('fs').readFileSync(await (await dl).path(), 'utf8'));
+  expect([o.filesLeftOut, o.files]).toEqual([true, undefined]);
   noErrors(errors);
 });

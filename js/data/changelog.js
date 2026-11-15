@@ -4,6 +4,42 @@
    Each change has a type: "added" | "changed" | "fixed" | "removed". */
 const CHANGELOG_DATA = [
   {
+    "version": "1.32",
+    "name": "Media in every case",
+    "date": "2026-11-15",
+    "summary": "Pictures, videos, audio and saved web pages can now be added to a case from anywhere — drop them, paste a screenshot, or use the new Media tab — and are kept as untouched evidence without filling the browser.",
+    "changes": [
+      {
+        "type": "added",
+        "text": "Media tab in every case: a grid of the case's pictures, videos, audio, saved web pages and documents with previews, video length, picture size and filters. Videos and audio play inside the app."
+      },
+      {
+        "type": "added",
+        "text": "Drop files anywhere on a case, or paste a screenshot with Ctrl+V, and they become evidence records with their SHA-256, picture size or length, camera and GPS position when the photo has them."
+      },
+      {
+        "type": "added",
+        "text": "Image / video entries in the Vault can hold the file itself, not just a link; the entry fills in its title, type and resolution from the file."
+      },
+      {
+        "type": "added",
+        "text": "Files over 50 MB are recorded with their name, size and SHA-256 instead of being stored, so you can later prove the copy on your computer is the same file."
+      },
+      {
+        "type": "changed",
+        "text": "Space: the same file added twice is stored once; pictures and videos get a small preview so lists stay fast while the original is kept unchanged; you are told when browser storage is over 85% full."
+      },
+      {
+        "type": "changed",
+        "text": "Back up everything now asks whether to include files and shows the size of each choice. A backup made without files says so when it is restored."
+      },
+      {
+        "type": "fixed",
+        "text": "Videos could not play inside the app because the page's security policy had no rule for media; it now allows only the app's own stored files."
+      }
+    ]
+  },
+  {
     "version": "1.31",
     "name": "Big lists and nothing lost",
     "date": "2026-11-15",

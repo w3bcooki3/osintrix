@@ -55,7 +55,8 @@ async function importWebPages(files){
   }
   if(!made.length) return;
   DB.records.push(...made); mutate('imported ' + made.length + ' web page(s)'); await hashRecords(); closeDlg(); afterCapture(cid, made.map(r => r.id)); watchNotify(made);
-  UI.sel = {kind:'rec', id:made[0].id}; UI.inspOpen = true; UI.tlMode = 'events'; go(caseHash(cid, 'timeline'));
+  if(UI.route.area === 'case' && UI.route.tab === 'media' && DB.active === cid) renderAll();
+  else { UI.sel = {kind:'rec', id:made[0].id}; UI.inspOpen = true; UI.tlMode = 'events'; go(caseHash(cid, 'timeline')); }
   toast(made.length === 1 ? 'Web page archived: ' + made[0].title.slice(10, 60) : made.length + ' web pages archived', 'Undo', () => { const s = new Set(made.map(r => r.id)); DB.records = DB.records.filter(r => !s.has(r.id)); mutate('undid web page import'); renderAll(); });
 }
 /* safe viewer: no scripts, no same-origin, and the app's policy blocks every outside request */

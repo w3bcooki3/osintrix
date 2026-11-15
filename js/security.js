@@ -289,7 +289,7 @@ const SEC_ACTS = {
     closeDlg(); setTimeout(() => passDlg('New passphrase', 'Choose the new passphrase.', 'Change', async nw => { await encChange(old, nw); closeDlg(); renderAll(); toast('Passphrase changed'); }, true), 50); }, false),
   secOff:() => passDlg('Turn off encryption', 'Your data will be stored unencrypted in this browser. Enter the passphrase to confirm.', 'Turn off', async p => { try{ await encDisable(p); }catch(e){ throw new Error('bad'); } closeDlg(); renderAll(); toast('Encryption is off'); }, false),
   secLock:() => lockNow(),
-  secBackup:() => { const files = null; exportEverything(true); },
+  secBackup:() => backupDlg(true),
   auditCheck:() => { UI.auditV = null; renderMain(); },
   auditCsv:() => { const A = DB.audit || {entries:[]}; download('osintrix-audit-' + new Date().toISOString().slice(0, 10) + '.csv', ['index,time,case,action,entry_hash,chain_hash'].concat(A.entries.map(e => [e.i, new Date(e.at).toISOString(), (theCase(e.c) || {}).code || '', e.what, e.d, e.h].map(csvCell).join(','))).join('\n'), 'text/csv'); },
   cusMake:async () => { const id = $('cusCase').value, m = await custodyManifest(id), c = theCase(id); download(slug(c.name) + '-custody.json', JSON.stringify(m, null, 2), 'application/json'); renderMain(); },

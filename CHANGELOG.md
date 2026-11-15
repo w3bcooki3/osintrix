@@ -2,6 +2,23 @@
 
 All notable changes to OSINTrix, newest first. The format is based on [Keep a Changelog](https://keepachangelog.com); this file is generated from `js/data/changelog.js` by `tools/changelog.py`.
 
+## [1.32] — Media in every case (2026-11-15)
+
+_Pictures, videos, audio and saved web pages can now be added to a case from anywhere — drop them, paste a screenshot, or use the new Media tab — and are kept as untouched evidence without filling the browser._
+
+### Added
+- Media tab in every case: a grid of the case's pictures, videos, audio, saved web pages and documents with previews, video length, picture size and filters. Videos and audio play inside the app.
+- Drop files anywhere on a case, or paste a screenshot with Ctrl+V, and they become evidence records with their SHA-256, picture size or length, camera and GPS position when the photo has them.
+- Image / video entries in the Vault can hold the file itself, not just a link; the entry fills in its title, type and resolution from the file.
+- Files over 50 MB are recorded with their name, size and SHA-256 instead of being stored, so you can later prove the copy on your computer is the same file.
+
+### Changed
+- Space: the same file added twice is stored once; pictures and videos get a small preview so lists stay fast while the original is kept unchanged; you are told when browser storage is over 85% full.
+- Back up everything now asks whether to include files and shows the size of each choice. A backup made without files says so when it is restored.
+
+### Fixed
+- Videos could not play inside the app because the page's security policy had no rule for media; it now allows only the app's own stored files.
+
 ## [1.31] — Big lists and nothing lost (2026-11-15)
 
 _The timeline and the entity table now show every row of a large case, drawing only what is on screen. A data-safety review of saving, restoring, exporting and importing found eight bugs, three of which could lose data; all are fixed and covered by tests._
