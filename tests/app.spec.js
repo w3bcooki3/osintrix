@@ -1174,3 +1174,81 @@ test('threat intel "For you": stories touching your cases, watchlist and stack c
   await page.evaluate(() => renderMain()); await expect(page.locator('.ti-why').first()).toContainText('watched');
   noErrors(errors);
 });
+
+test('case copilot: next steps, gaps and the story come from the case; actions work; auto-check runs only when the case asks', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  const h = await page.evaluate(() => caseHash(DB.active, 'overview')); await page.goto(page.url().replace(/#.*/, h));
+  const cp = page.locator('.cp'); await expect(cp).toBeVisible();
+  await expect(cp).toContainText('Phishing email triage'); await expect(cp.locator('.cp-story')).toContainText('judged malicious');
+  await expect(cp.locator('.cp-story')).toContainText('WS-FIN-07');
+  // story never contains markup from evidence
+  expect(await page.evaluate(() => /<(?!\/?(b|span)\b)/.test(copilot().story.join('')))).toBe(false);
+  // watch the malicious indicators
+  await page.click('.cp [data-act=cpAll]'); await page.click('.cp [data-act=cpWatch]');
+  expect(await page.evaluate(() => Object.keys(DB.watch).length)).toBeGreaterThanOrEqual(6);
+  await expect(cp).not.toContainText('Watch 6 malicious');
+  // save the story as a note
+  const n0 = await page.evaluate(() => DB.notes.length); await page.click('.cp [data-act=cpNote]');
+  expect(await page.evaluate(() => DB.notes[0].text)).toMatch(/^# Story so far/);
+  expect(await page.evaluate(() => DB.notes.length)).toBe(n0 + 1);
+  // auto-check is unavailable until sources are on; then it looks up only new public indicators of that case
+  await expect(cp.locator('[data-act=cpAuto]')).toBeDisabled();
+  const hits = []; await page.route(/^https:\/\/(?!internetdb)[^/]+\//, r => r.abort());
+  await page.route('https://internetdb.shodan.io/**', r => { hits.push(r.request().url()); r.fulfill({ headers: { 'access-control-allow-origin': '*', 'content-type': 'application/json' }, body: JSON.stringify({ ip: '45.77.10.20', ports: [50050], hostnames: [], tags: ['c2'], vulns: [], cpes: [] }) }); });
+  await page.evaluate(() => { lkSettings().on = { idb: true }; mutate('t'); renderMain(); });
+  await page.check('.cp [data-act=cpAuto]');
+  await page.evaluate(() => { DB.records.push({ id: uid('r'), caseId: DB.active, type: 'evidence', title: 'fw', body: 'deny 45.77.10.20', tsRaw: '', tsZone: 'explicit', ts: Date.now(), source: 't', host: 'FW-EDGE', tags: [], ents: E.extract('deny 45.77.10.20'), answer: '', addedBy: 'You', addedAt: Date.now(), hash: '' }); mutate('added'); });
+  await expect.poll(() => hits.length, { timeout: 10000 }).toBe(1);
+  expect(hits[0]).toContain('45.77.10.20');
+  await expect.poll(() => page.evaluate(() => (DB.intel.lookHist || []).some(x => x.v === '45.77.10.20'))).toBe(true);
+  // another case without auto-check: its new indicators are not looked up
+  await page.evaluate(() => { const o = DB.cases.find(c => c.id !== DB.active); DB.records.push({ id: uid('r'), caseId: o.id, type: 'evidence', title: 'x', body: '45.77.99.99', tsRaw: '', tsZone: 'explicit', ts: Date.now(), source: 't', host: '', tags: [], ents: E.extract('45.77.99.99'), answer: '', addedBy: 'You', addedAt: Date.now(), hash: '' }); mutate('x'); });
+  await page.waitForTimeout(2500); expect(hits.length).toBe(1);
+  noErrors(errors.filter(e => !/Failed to load resource/.test(e)));
+});
+
+test('graph intelligence: risk spreads from malicious along links with reasons, benign stops it; key nodes; hidden links from saved lookups; expand online with undo', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  const r = await page.evaluate(() => { const R = gRisk(), by = n => { const e = DB.entries.find(x => x.caseId === DB.active && primary(x) === n); return e && R.get(e.id); };
+    const lnk = by('Invoice_4471.pdf.lnk'), person = by('Jordan Okafor'); return { lnk: lnk && Math.round(lnk.r * 100), why: lnk && riskWhy(lnk), person: person && Math.round(person.r * 100) }; });
+  expect(r.lnk).toBe(60); expect(r.why).toMatch(/linked to http:\/\/update-lamp\.test/); expect(r.person).toBeLessThan(20);           // people take less risk than infrastructure
+  expect(await page.evaluate(() => { const lnk = DB.entries.find(x => x.caseId === DB.active && primary(x) === 'Invoice_4471.pdf.lnk'); lnk.fields.verdict = 'benign'; setEntryVerdict(lnk, 'benign'); mutate('b');
+    const p = DB.entries.find(x => x.caseId === DB.active && primary(x) === 'Jordan Okafor'); const x = gRisk().get(p.id); return x ? x.r : 0; })).toBeLessThan(0.05);
+  // insights panel
+  await page.evaluate(() => { UI.graph.panel = 'ins'; }); await page.goto(page.url().replace(/#.*/, await page.evaluate(() => caseHash(DB.active, 'graph'))));
+  await expect(page.locator('.gpanel')).toContainText('At risk'); await expect(page.locator('.gpanel')).toContainText('Key nodes');
+  await page.check('[data-act=gRiskOn]'); expect(await page.evaluate(() => cy.nodes('.rk1, .rk2, .rk3').length)).toBeGreaterThan(0);
+  // hidden links: two domains whose saved lookups share a certificate become a suggestion (no network)
+  const s = await page.evaluate(async () => { await lkLoad(); const mk = (v) => { const e = { id: uid('v'), caseId: DB.active, type: 'domain', fields: { domain: v }, priority: 'medium', starred: false, tags: [], notes: '', src: '', created: Date.now(), pos: null }; DB.entries.push(e); return e; };
+    const a = mk('alpha-pay.top'), b = mk('beta-pay.top'); const res = { ok: true, at: Date.now(), sig: [], facts: [], attrs: { certs: ['ab'.repeat(32)], ns: ['ns1.evilns.top'] }, related: [] };
+    LK.cache.set('vt|domain:alpha-pay.top', res); LK.cache.set('vt|domain:beta-pay.top', res); mutate('t');
+    const S = suggestLinks(DB.active).find(x => [x.a.id, x.b.id].sort().join() === [a.id, b.id].sort().join()); return S && { label: S.label, why: S.why.join() }; });
+  expect(s).toEqual({ label: 'shares infrastructure with', why: expect.stringMatching(/same TLS certificate/) });
+  // expand online: DNS answers become linked entries; undo removes them
+  await page.route(/^https:\/\/(?!dns\.google)[^/]+\//, r => r.abort());
+  await page.route('https://dns.google/**', r => { const t = new URL(r.request().url()).searchParams.get('type'); r.fulfill({ headers: { 'access-control-allow-origin': '*', 'content-type': 'application/json' }, body: JSON.stringify({ Status: 0, Answer: t === 'A' ? [{ type: 1, data: '45.77.10.20' }] : t === 'NS' ? [{ type: 2, data: 'ns1.evilns.top.' }] : [] }) }); });
+  const e0 = await page.evaluate(() => DB.entries.length);
+  await page.evaluate(async () => { lkSettings().on = { dns: true }; await expandOnline(DB.entries.find(x => primary(x) === 'alpha-pay.top').id); });
+  const got = await page.evaluate(() => { const ip = DB.entries.find(x => primary(x) === '45.77.10.20'); return ip && DB.links.filter(l => l.b === ip.id).map(l => l.label); });
+  expect(got).toEqual(['resolves to']); expect(await page.evaluate(() => DB.entries.length)).toBe(e0 + 1);
+  await page.click('#toast button, .toast button'); expect(await page.evaluate(() => DB.entries.length)).toBe(e0);
+  noErrors(errors.filter(e => !/Failed to load resource/.test(e)));
+});
+
+test('smart search: plain questions become filters shown as chips, run over every case; ordinary search still works', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  const R = await page.evaluate(() => Object.fromEntries(['malicious IPs', 'malicious domains in TN-2026-014', 'what talks to 203.0.113.47', 'IPs seen in september 2026 on DC01', 'unchecked hashes', 'lamp loader'].map(q => { const N = nlqParse(q); return [q, N ? { c: N.chips.map(x => x.t), v: nlqRun(N).map(x => x.v) } : null]; })));
+  expect(R['malicious IPs']).toEqual({ c: ['malicious', 'IP addresses'], v: ['203.0.113.47'] });
+  expect(R['malicious domains in TN-2026-014'].v.sort()).toEqual(['lantern-invoice.example', 'update-lamp.test']);
+  expect(R['what talks to 203.0.113.47'].v).toContain('203.0.113.47:4444'); expect(R['what talks to 203.0.113.47'].v).not.toContain('203.0.113.47');
+  expect(R['IPs seen in september 2026 on DC01']).toEqual({ c: ['IP addresses', 'seen september 2026', 'on DC01'], v: ['10.20.4.17'] });
+  expect(R['unchecked hashes'].v.length).toBe(2); expect(R['lamp loader']).toBeNull();
+  // time words
+  expect(await page.evaluate(() => { const t = nlqTime('last 3 days', 1e12); return [t[1] - t[0], t[2]]; })).toEqual([3 * 864e5, 'last 3 days']);
+  // the search box
+  await page.keyboard.press('Control+k'); await page.fill('#srQ', 'malicious domains in TN-2026-014');
+  await expect(page.locator('.sr-nl')).toContainText('in TN-2026-014'); await expect(page.locator('.sr-nl')).toContainText('2 matches');
+  await page.keyboard.press('Enter'); await expect(page).toHaveURL(/#\/entities/);
+  await page.keyboard.press('Control+k'); await page.fill('#srQ', 'lamp loader'); await expect(page.locator('.sr-nl')).toHaveCount(0); await expect(page.locator('#srList')).toContainText('Lamp loader');
+  noErrors(errors);
+});

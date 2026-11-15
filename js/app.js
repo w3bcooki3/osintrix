@@ -105,6 +105,7 @@ document.addEventListener('click', ev => {
   if(typeof RC_ACTS !== 'undefined' && RC_ACTS[a]) return RC_ACTS[a](id, v, t, ev);
   if(typeof CTI_ACTS !== 'undefined' && CTI_ACTS[a]) return CTI_ACTS[a](id, v, t, ev);
   if(typeof LK_ACTS !== 'undefined' && LK_ACTS[a]) return LK_ACTS[a](id, v, t, ev);
+  if(typeof CP_ACTS !== 'undefined' && CP_ACTS[a]) return CP_ACTS[a](id, v, t, ev);
   if(NBX_ACTS[a]) return NBX_ACTS[a](id, v, t, ev);
   if(a === 'toolRun') return toolRunDlg(id);
   if(a === 'trPick'){ $('trV').value = v; return $('trV').focus(); }

@@ -105,7 +105,7 @@ function flush(){ clearTimeout(saveT); if(!DB || SEC.locked) return; for(const f
 function paintSaved(){ const s = $('saved'); if(s && TABS.writer && storageOK && isDirty() && Date.now() - STORE.changedAt > 800){ s.innerHTML = '<i class="pulse" style="background:var(--text-3)"></i><span>Saving…</span>'; s.title = 'Writing your latest change to this browser'; return; } if(s && !TABS.writer){ s.innerHTML = '<i style="background:var(--amber)"></i><span>Read-only in this tab</span>'; s.title = 'This workspace is open in another tab'; return; } if(s) s.innerHTML = storageOK ? '<i></i><span>Saved in this browser</span>' : '<i style="background:var(--red)"></i><span>Not saved</span>'; s.title = storageOK ? 'Saved in this browser' : 'Not saved — this browser blocks storage'; }
 window.addEventListener('pagehide', flush); document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'hidden') flush(); });
 let rev = 0, cache = {};
-function mutate(what){ rev++; cache = {}; auditAdd(what); DB.log.unshift({at:Date.now(), what}); DB.log.length = Math.min(DB.log.length, 200); save(); }
+function mutate(what){ rev++; cache = {}; auditAdd(what); DB.log.unshift({at:Date.now(), what}); DB.log.length = Math.min(DB.log.length, 200); save(); if(typeof onMutate === 'function') onMutate(what); }
 
 /* ---------- lookups ---------- */
 const tz = () => DB.prefs.tz || 'UTC';

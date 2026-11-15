@@ -233,6 +233,8 @@ function suggestLinks(caseId){
   for(const [tgt, ls] of out){ const t = entryById(tgt); if(!t) continue; const lab = t.type === 'ip' ? 'shares IP with' : t.type === 'email' ? 'same registrant as' : null; if(!lab) continue;
     const srcs = ls.filter(l => /resolves|hosted|registered/.test(l.label)).map(l => entryById(l.a)).filter(Boolean);
     for(let i = 0; i < srcs.length; i++) for(let j = i + 1; j < srcs.length; j++) put(srcs[i], srcs[j], lab, 3, `Both point to ${primary(t)}`, null, 'infra'); }
+  /* shared infrastructure found by live lookups already saved (no new requests) */
+  if(typeof gInfraSuggest === 'function') for(const p of gInfraSuggest(D)){ const a = entryById(p.a), b = entryById(p.b); if(a && b) put(a, b, 'shares infrastructure with', p.score >= 0.85 ? 4 : 3, 'Live lookups: ' + pivotWhy(p.why), null, 'infra'); }
   return [...S.values()].sort((x, y) => y.score - x.score).slice(0, 80);
 }
 function acceptSugg(s, conf){ const c = theCase(); const l = {id:uid('l'), caseId:c.id, a:s.a.id, b:s.b.id, label:s.label, conf:conf || (s.top >= 4 ? 2 : 1), src:s.rec || '', auto:true, why:s.why.join(' · ')}; DB.links.push(l); return l; }
@@ -287,8 +289,11 @@ function gPanelHTML(){
   const row = (x, unit) => `<button class="gp-row" data-act="gFocus" data-id="${x.id}"><span>${nm(x.id)}</span><b>${unit === 'b' ? x.v.toFixed(1) : x.v}</b></button>`;
   return `<aside class="gpanel" aria-label="Graph insights"><header><b>${ico('radar','sm')}Insights</b><span style="flex:1"></span><button class="iconbtn" data-act="gPanel" data-v="" aria-label="Close">${ico('x','sm')}</button></header>
     ${!I ? `<div class="gp-empty">Add at least two connected entries.</div>` : `
-    ${I.next.length ? `<section><h5>Look at next <span class="t3">no verdict, touches malicious</span></h5>${I.next.map(x => row(x)).join('')}</section>` : ''}
-    <section><h5>Hubs <span class="t3">most connections</span></h5>${I.hubs.map(x => row(x)).join('') || '<p class="t3">—</p>'}</section>
+    ${(() => { if(typeof gRisk !== 'function') return ''; const R = [...gRisk()].filter(([id, x]) => !x.own && x.r >= 0.1 && !entryVerdict(entryById(id))).sort((a, b) => b[1].r - a[1].r).slice(0, 8);
+      return `<section><h5>At risk <span class="t3">no verdict, near malicious</span></h5><label class="chk" style="margin:0 0 8px"><span class="sw"><input type="checkbox" data-act="gRiskOn"${UI.graph.risk ? ' checked' : ''}><span></span></span>Colour by risk</label>
+        ${R.map(([id, x]) => `<button class="gp-row gp-rk" data-act="gFocus" data-id="${id}"><span>${nm(id)}<small>${esc(riskWhy(x))}</small></span><b style="color:${x.r >= 0.6 ? 'var(--red)' : 'var(--amber)'}">${Math.round(x.r * 100)}%</b></button>`).join('') || '<p class="t3">Nothing is linked to a malicious entry.</p>'}</section>`; })()}
+    ${(() => { const K = typeof gKeyNodes === 'function' ? gKeyNodes() : []; return K.length ? `<section><h5>Key nodes <span class="t3">PageRank, bridges, links</span></h5>${K.map(x => `<button class="gp-row gp-rk" data-act="gFocus" data-id="${x.id}"><span>${nm(x.id)}<small>${esc(x.why.join(' · '))}</small></span><b>${Math.round(x.s * 100)}</b></button>`).join('')}</section>`
+      : `<section><h5>Hubs <span class="t3">most connections</span></h5>${I.hubs.map(x => row(x)).join('') || '<p class="t3">—</p>'}</section>`; })()}
     <section><h5>Bridges <span class="t3">connect separate groups</span></h5>${I.bridges.map(x => row(x, 'b')).join('') || '<p class="t3">None — every node has another route.</p>'}</section>
     <section><h5>Clusters <span class="t3">${I.clusters.length}</span></h5><label class="chk" style="margin:0 0 8px"><span class="sw"><input type="checkbox" data-act="gClusters"${UI.graph.clusters ? ' checked' : ''}><span></span></span>Colour by cluster</label>
       ${I.clusters.slice(0, 6).map((g, i) => `<div class="gp-cl"><i style="background:${CLUSTER_COLS[i % CLUSTER_COLS.length]}"></i><span>${g.slice(0, 3).map(nm).join(', ')}${g.length > 3 ? ` +${g.length - 3}` : ''}</span></div>`).join('')}</section>
@@ -336,7 +341,8 @@ const REL_ACTS = {
   gPanel:(id, v) => { UI.graph.panel = v || null; renderMain(); },
   gExpand:id => expandNode(id),
   gFocus:id => { if(!cy) return; const n = cy.getElementById(id); if(!n.length) return; cy.animate({center:{eles:n}, zoom:Math.max(cy.zoom(), 1)}, {duration:250}); cy.nodes().unselect(); n.select(); selectEntry(id, true); },
-  gClusters:(id, v, t) => { UI.graph.clusters = t.checked; applyClusters(); },
+  gClusters:(id, v, t) => { UI.graph.clusters = t.checked; if(t.checked){ UI.graph.risk = false; applyRisk(); } applyClusters(); renderMain(); },
+  gRiskOn:(id, v, t) => { UI.graph.risk = t.checked; if(t.checked && UI.graph.clusters){ UI.graph.clusters = false; applyClusters(); } applyRisk(); renderMain(); },
   sgYes:(id, v) => { const s = UI.graph.sugg[+v]; if(!s) return; const l = acceptSugg(s); mutate('linked ' + primary(s.a) + ' — ' + s.label); renderAll();
     toast('Linked: ' + s.label, 'Undo', () => { DB.links = DB.links.filter(x => x !== l); mutate('undid link'); renderAll(); }); },
   sgNo:(id, v) => { const s = UI.graph.sugg[+v]; if(!s) return; const c = theCase(); (c.dismissed || (c.dismissed = {}))[s.pk] = Date.now(); mutate('dismissed suggestion'); renderMain(); },

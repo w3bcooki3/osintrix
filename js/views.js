@@ -198,6 +198,7 @@ function caseOverview(c, D){
   const beacon = [...D.ents.values()].map(e => ({e, b:E.beaconOf(e.recs.map(r => r.ts))})).find(x => x.b && x.b.regular && x.e.k === 'hostport');
   return `<div class="scroll"><div class="page">
     ${c.scope ? `<p style="margin:0 0 20px;max-width:880px;color:var(--text-2);font-size:calc(15.5px * var(--ts,1));line-height:1.65">${esc(c.scope)}</p>` : ''}
+    ${typeof cpCard === 'function' ? cpCard(c) : ''}
     <div class="stats">
       ${stat('layers','var(--accent)', D.entries.length, 'Vault entries', byGroup.slice(0, 2).map(([g, n]) => n + ' ' + GROUPS.find(x => x[0] === g)[1].toLowerCase()).join(' · '), caseHash(c.id,'vault'))}
       ${stat('clock','var(--amber)', D.recs.length, 'Evidence records', D.recs.filter(r => r.ts).length + ' on the timeline', caseHash(c.id,'timeline'))}

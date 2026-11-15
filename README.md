@@ -199,6 +199,9 @@ Press `Ctrl K` or `/`, or click the search bar, to search the whole app at once:
 ![Cloud field guide](docs/cloud.png)
 
 ### 🛡️ Intelligence
+- **Case copilot:** every case's Overview says what to do next and why, which with one click each, what is missing or contradicts itself, and writes the story so far from the case's own data. Optionally, new indicators in a case are checked online as evidence arrives.
+- **Graph intelligence:** risk spreads from malicious entries along your links, with the path that explains each score; key nodes; relationships hidden in your saved lookups; expand a node online.
+- **Smart search:** ask in plain words — `malicious IPs last week in TN-2026-014`, `domains registered this month`, `what talks to 203.0.113.47`, `unchecked hashes on DC01` — and see how it was understood.
 - **Watchlist:** watch any indicator. New evidence, log imports and news that mention it are flagged, with a notice, a Dashboard card and a list of sightings. Watched IPs, domains, URLs, hashes and CVEs can be re-checked online on a schedule, and changes — new ports, more detections, a worse verdict — are announced.
 - **Around this time:** every record shows what else happened within ±5 minutes, on any host, one click from a filtered timeline.
 - **Detections:** 405 built-in Sigma and YARA rules, common and advanced, across Windows, Linux, macOS, AWS, Azure, GCP, Kubernetes, M365, Okta, network and web. Write, keep and import your own.

@@ -115,6 +115,9 @@ function mountGraph(){
       {selector:'.later', style:{display:'none'}},
       {selector:'edge[auto = 1]', style:{'line-style':'solid', 'line-color':cssVar('--text-3'), 'target-arrow-color':cssVar('--text-3'), opacity:.7}},
       {selector:'edge[auto = 1][w < 2]', style:{'line-style':'dashed'}},
+      {selector:'node.rk1', style:{'underlay-color':cssVar('--amber'), 'underlay-opacity':.22, 'underlay-padding':8, 'underlay-shape':'ellipse'}},
+      {selector:'node.rk2', style:{'underlay-color':cssVar('--amber'), 'underlay-opacity':.45, 'underlay-padding':11, 'underlay-shape':'ellipse'}},
+      {selector:'node.rk3', style:{'underlay-color':cssVar('--red'), 'underlay-opacity':.45, 'underlay-padding':13, 'underlay-shape':'ellipse'}},
       {selector:'node.hit', style:{'underlay-color':cssVar('--amber'), 'underlay-opacity':.4, 'underlay-padding':10, 'underlay-shape':'ellipse'}},
     ]});
   if(!hasPos){ cy.nodes().forEach(n => { const e = entryById(n.id()); if(e) e.pos = {...n.position()}; }); save(); }
@@ -151,7 +154,7 @@ function mountGraph(){
   if(UI.graph.first){ const n = cy.getElementById(UI.graph.first); if(n.length) n.addClass('src'); }
   applyFind(); applyPath(); applyAsof();
   if(UI.graph.panel){ const gp = $('gpanel'); if(gp){ gp.innerHTML = gPanelHTML(); bindGPanel(gp); } }
-  applyClusters();
+  applyClusters(); if(typeof applyRisk === 'function') applyRisk();
   cy.edges('[?auto]').addClass('auto');
   const ga = $('gAsof'); if(ga) ga.oninput = () => { UI.graph.asof = +ga.value; $('gAsofL').textContent = asofLabel(derive()); applyAsof(); };
   const gf = $('gFind'); if(gf) gf.oninput = () => { UI.graph.find = gf.value; applyFind(); };
@@ -235,6 +238,7 @@ function nodeMenu(id, x, y){
     {label:e.starred ? 'Unstar' : 'Star', icon:'star', fn:() => { e.starred = !e.starred; mutate('star'); renderAll(); }},
     {sep:true},
     {label:'Expand from evidence', icon:'sparkles', disabled:!k, fn:() => expandNode(id)},
+    {label:'Expand online', icon:'globe', disabled:!k || typeof lkFor !== 'function' || !lkFor(entSplit(k).k).length, fn:() => expandOnline(id)},
     {label:isWatched(k) ? 'Stop watching' : 'Watch for new sightings', icon:'eye', disabled:!k, fn:() => toggleWatch(k)},
     {label:'Find path to…', icon:'route', fn:() => { UI.graph.mode = 'path'; UI.graph.first = id; UI.graph.path = null; renderMain(); }},
     {label:'Highlight neighbours', icon:'waypoints', fn:() => { const nb = cy.getElementById(id).closedNeighborhood(); cy.elements().removeClass('faded').not(nb).addClass('faded'); }},

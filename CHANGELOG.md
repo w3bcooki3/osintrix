@@ -2,6 +2,21 @@
 
 All notable changes to OSINTrix, newest first. The format is based on [Keep a Changelog](https://keepachangelog.com); this file is generated from `js/data/changelog.js` by `tools/changelog.py`.
 
+## [1.27] — Copilot, graph intelligence and smart search (2026-11-14)
+
+_Every case gets a copilot that reads it and says what to do next, what is missing and what the story so far is. The graph now shows risk spreading from malicious entries, its key nodes and links hidden in your lookups, and can expand a node online. Search understands plain questions such as "malicious IPs last week in TN-2026-014" or "what talks to 203.0.113.47"._
+
+### Added
+- Case copilot on the Overview: ranked next steps, each with its reason and one button. Steps include indicators in your threat feeds, ones flagged by live lookups, exploited CVEs, never-checked indicators, relationships to review, entries close to malicious infrastructure, the right playbook for the kind of case, watching and detection rules for malicious indicators, and open questions.
+- Copilot gaps: records without a time, times read in an assumed time zone, verdicts the live lookups disagree with, vault entries nothing supports or connects, and a missing scope.
+- The story so far: a plain-language summary built only from the case covering the time span and hosts, indicators and verdicts, what the evidence shows, ATT&CK techniques, malware, feed hits, exploited CVEs and open questions. Copy it or save it as a note.
+- Check new indicators online, per case and off by default. When it is on, new public indicators in that case are looked up with your switched-on sources as evidence arrives, and you are told if one looks malicious.
+- Graph risk: suspicion spreads from malicious entries along your links. It weakens with every hop, with weaker links, and for people, organisations and places, which are often victims. Benign entries stop it. Each score names the malicious entry it comes from and the path. Colour by risk shades the graph.
+- Graph key nodes: PageRank, bridges between groups and connections combined, with the reason for each.
+- Hidden links: saved live-lookup answers are compared, without new requests. Entries sharing a certificate, IP, favicon, name servers, JARM or registration day appear as suggested relationships.
+- Expand online: a node's live lookups bring back what it resolves to, its hostnames, certificate names, samples and subdomains as new linked entries, with Undo.
+- Smart search: plain questions are turned into filters and shown back as chips under "Understood as". Filters cover indicator kind, verdict, flagged or unchecked, watched, in your feeds, exploited, time seen (today, last 3 days, this month, September 2026…), case, host, port, country, network ("hosted on vultr", AS numbers), registration date, Tor, related to another indicator, and riskiest, most seen or newest first. They run over every case.
+
 ## [1.26] — Live investigation engine (2026-11-14)
 
 _Threat Intel now asks the services analysts use — Shodan, VirusTotal, AbuseIPDB, GreyNoise, OTX, urlscan, abuse.ch, RDAP, DNS, certificate logs and more — at the moment you investigate, and weighs every answer into one scored verdict with its reasons. A whole case can be checked at once and its indicators grouped by shared infrastructure. Bundled data is now only a fallback: KEV, ATT&CK and CVE records come live._

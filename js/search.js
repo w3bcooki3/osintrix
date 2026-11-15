@@ -95,7 +95,9 @@ function srchRun(){
   } else groups = [{k:scope, items:all.filter(x => x.it.kind === scope).slice(0, 80).map(x => x.it), total:counts[scope] || 0}];
   if(!q && scope === 'all') groups = [{k:'action', items:S.index.filter(x => x.kind === 'action' && x.w >= 2).slice(0, 18), total:0}];
   if(special.length) groups.unshift({k:'special', items:special, total:0});
-  return {groups, counts, total:all.length, P, scope};
+  const smart = q && (scope === 'all' || scope === 'ent') && typeof nlqGroup === 'function' ? nlqGroup(q) : null;
+  if(smart){ groups.unshift({k:'smart', items:smart.items, total:smart.total, N:smart.N}); counts.ent = (counts.ent || 0) + smart.total; }
+  return {groups, counts, total:all.length + (smart ? smart.total : 0), P, scope};
 }
 const KIND_LABEL = {special:'Best match', action:'Go to & actions', case:'Cases', entry:'Vault entries', record:'Evidence & questions', ent:'Indicators', note:'Notes', tool:'Tools', query:'Queries', rule:'Detections', playbook:'Playbooks', chal:'CTF challenges', feed:'News'};
 function srchPaint(){
@@ -103,7 +105,9 @@ function srchPaint(){
   $('srScopes').innerHTML = SCOPES.map(([k, l, i]) => { const n = k === 'all' ? R.total : R.counts[k] || 0;
     return `<button data-act="srScope" data-v="${k}" aria-pressed="${R.scope === k}"${k !== 'all' && S.q.trim() && !n ? ' class="zero"' : ''}>${ico(i,'sm')}${l}${S.q.trim() ? `<span>${n}</span>` : ''}</button>`; }).join('');
   for(const g of R.groups){
-    h += `<div class="sr-g"><span>${esc(KIND_LABEL[g.k] || g.k)}</span>${R.scope === 'all' && g.total > g.items.length ? `<button data-act="srScope" data-v="${g.k}">Show all ${g.total} ${ico('arrow-right','sm')}</button>` : ''}</div>`;
+    if(g.k === 'smart'){ h += `<div class="sr-g sr-nl"><span>${ico('sparkles','sm')}Understood as</span><span class="sr-chips">${g.N.chips.map(c => `<i>${esc(c.t)}</i>`).join('')}</span><b>${g.total ? g.total + ' match' + (g.total === 1 ? '' : 'es') + (g.total > g.items.length ? ' · first ' + g.items.length : '') : 'no matches'}</b></div>`;
+      if(!g.items.length) h += `<p class="sr-nl0">No indicator matches all of these. Remove a condition, or check more indicators online so registration, country and network are known.</p>`; }
+    else h += `<div class="sr-g"><span>${esc(KIND_LABEL[g.k] || g.k)}</span>${R.scope === 'all' && g.total > g.items.length ? `<button data-act="srScope" data-v="${g.k}">Show all ${g.total} ${ico('arrow-right','sm')}</button>` : ''}</div>`;
     for(const it of g.items){ const i = S.flat.length; S.flat.push(it);
       const c = it.caseId ? theCase(it.caseId) : null;
       h += `<button class="sr-it" data-sr="${i}" aria-selected="${i === S.at}" role="option"><span class="sr-ic"${it.color ? ` style="--c:${esc(it.color)}"` : it.tcolor ? ` style="--c:var(${it.tcolor})"` : ''}>${ico(it.icon || 'search','sm')}</span>
@@ -114,7 +118,7 @@ function srchPaint(){
   if(!S.q.trim() && S.scope === 'all'){ const rec = (DB.prefs.recentQ || []).slice(0, 8);
     h = (rec.length ? `<div class="sr-g"><span>Recent searches</span><button data-act="srClearRecent">Clear</button></div><div class="sr-recent">${rec.map(r => `<span class="sr-rq"><button data-act="srRecent" data-v="${esc(r)}">${ico('clock','sm')}${esc(r)}</button><button class="sr-rqx" data-act="srForget" data-v="${esc(r)}" aria-label="Forget the search ${esc(r)}" title="Forget">${ico('x','sm')}</button></span>`).join('')}</div>` : '')
       + `<div class="sr-tips"><div><b>Search everything</b><span>Cases, vault, evidence, indicators, notes, tools, queries, rules, playbooks, CTF and news.</span></div>
-        <div><code>in:tools shodan</code><code>case:TN-2026-014 dns</code><code>"lamp loader"</code><code>beacon -firewall</code><code>host:DC01 verdict:malicious</code><code>203.0.113.47</code></div></div>` + h; }
+        <div><code>malicious IPs last week</code><code>domains registered this month</code><code>what talks to 203.0.113.47</code><code>unchecked hashes</code><code>in:tools shodan</code><code>case:TN-2026-014 dns</code><code>"lamp loader"</code><code>beacon -firewall</code><code>host:DC01 verdict:malicious</code><code>203.0.113.47</code></div></div>` + h; }
   $('srList').innerHTML = h; srchPreview();
   const s = $('srList').querySelector('[aria-selected=true]'); if(s) s.scrollIntoView({block:'nearest'});
 }
