@@ -219,6 +219,10 @@ Press `Ctrl K` or `/`, or click the search bar, to search the whole app at once:
   - Filter by type, severity, platform and level; search title, technique and rule content.
   - Editor with syntax highlighting and a live structure check.
   - **Test a rule** against a case's evidence (Sigma and YARA) or against a file (YARA). The engines are subsets that run in the page; anything they cannot evaluate is reported, never silently passed.
+  - **Queries:** any Sigma rule as Splunk SPL, Microsoft Defender XDR / Sentinel KQL, Elastic ES|QL or QRadar AQL, with field names you can remap.
+  - **Tests:** events a rule must and must not fire on, kept with the rule and re-run on every save.
+  - **Evasion check:** a matching event is renamed, obfuscated (^, quotes, other dashes, short flags, extra spaces, environment variables, 8.3 paths) and re-tested; each change that slips past the rule comes with its fix.
+  - **Draft a rule from events:** select events in a timeline and get a Sigma rule from what they share, checked against the rest of your evidence.
   - Link a rule to a case, or generate starter rules from a case's malicious indicators.
 - **Threat Intel:** a working CTI desk, checked against every case. Each live source is off until you switch it on, and names the one host it contacts.
   - **Investigate:** paste an IP, domain, URL, hash, CVE or ASN and every lookup source you switched on is asked at once — Shodan, VirusTotal, AbuseIPDB, GreyNoise, AlienVault OTX, urlscan.io, abuse.ch, RDAP, DNS, certificate transparency, ipinfo, RIPEstat, Tor, the Wayback Machine, CVE.org and EPSS. The answers are weighed into **one scored verdict with its reasons** (by how trusted each source is, how strong and how recent its evidence, and whether independent sources agree), and the leads they reveal are one click away.
@@ -327,6 +331,7 @@ osintrix/
 │   ├── activity.js         ← "since you were last here" on each case
 │   ├── auto.js             ← automations: when this happens in a case, do that
 │   ├── tour.js             ← the guided tour of the demo case
+│   ├── detlab.js           ← detection lab: Sigma → SIEM queries, rule tests, evasion check, rules from events
 │   ├── map.js · ach.js     ← case places, hypothesis board
 │   ├── pcap.js · sqlite.js ← packet capture reader, SQLite viewer
 │   ├── validate.js         ← form checks, duplicate names

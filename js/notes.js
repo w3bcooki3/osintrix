@@ -18,19 +18,53 @@ const noteTasks = n => n.text.split('\n').map((l, i) => { const m = l.match(/^\s
 const noteCol = c => (NOTE_COLORS.find(x => x[0] === c) || NOTE_COLORS[0])[1];
 function noteCard(n, compact){
   const lines = n.text.split('\n'), tasks = noteTasks(n), done = tasks.filter(t => t.done).length, c = n.caseId ? theCase(n.caseId) : null;
-  const overdue = n.due && Date.parse(n.due + 'T23:59:59Z') < Date.parse('2026-09-26T12:00:00Z') && tasks.some(t => !t.done);
+  const overdue = n.due && Date.parse(n.due + 'T23:59:59Z') < Date.now() && tasks.some(t => !t.done);
   const body = lines.map((l, i) => { const t = tasks.find(x => x.i === i);
-    return t ? `<label class="ntask${t.done ? ' done' : ''}"><input type="checkbox" data-act="nTick" data-id="${n.id}" data-v="${i}" ${t.done ? 'checked' : ''}><span>${esc(t.t)}</span></label>` : (l.trim() ? `<p>${esc(l)}</p>` : ''); }).join('');
+    if(t) return `<label class="ntask${t.done ? ' done' : ''}"><input type="checkbox" data-act="nTick" data-id="${n.id}" data-v="${i}" ${t.done ? 'checked' : ''}><span>${noteInline(t.t)}</span></label>`;
+    if(!l.trim()) return ''; if(/^\s*---+\s*$/.test(l)) return '<hr>';
+    const h = l.match(/^\s*#{1,3}\s+(.*)$/); if(h) return `<h4>${noteInline(h[1])}</h4>`;
+    const b = l.match(/^\s*[-*•]\s+(.*)$/); if(b) return `<p class="nli">${noteInline(b[1])}</p>`;
+    const o = l.match(/^\s*(\d{1,3})[.)]\s+(.*)$/); if(o) return `<p class="nli num" data-n="${o[1]}.">${noteInline(o[2])}</p>`;
+    return `<p>${noteInline(l)}</p>`; }).join('');
   return `<article class="note-card${n.pinned ? ' npinned' : ''}" style="--nc:${noteCol(n.color)}">
     <div class="nhead">${n.pinned ? `<span class="npin">${ico('pin','sm')}</span>` : ''}${c && !compact ? `<a class="ncase" href="${caseHash(c.id)}" style="--cc:${esc(c.color)}">${esc(c.code)}</a>` : !c && !compact ? '<span class="ncase gen">General</span>' : ''}
       <span style="flex:1"></span><button class="nbtn" data-act="nEdit" data-id="${n.id}" aria-label="Edit note">${ico('pencil','sm')}</button><button class="nbtn" data-act="nMenu" data-id="${n.id}" aria-label="More">${ico('ellipsis','sm')}</button></div>
     <div class="nbody">${body}</div>
     ${tasks.length || n.due ? `<div class="nfoot">${tasks.length ? `<span class="nprog"><i style="width:${Math.round(done / tasks.length * 100)}%"></i></span><span>${done}/${tasks.length}</span>` : ''}${n.due ? `<span class="ndue${overdue ? ' late' : ''}">${ico('calendar-clock','sm')}${esc(n.due.slice(5))}</span>` : ''}</div>` : ''}</article>`;
 }
+/* **bold**, *italic*, `code` — escaped first, so nothing in a note can become markup */
+const noteInline = t => esc(t).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/(^|[\s(])\*([^*\s][^*]*)\*(?=[\s).,!?]|$)/g, '$1<i>$2</i>');
+/* the formatting bar above a note's text */
+const NOTE_FMT = [['todo','square-check','To-do item','[ ] '],['bullet','list','Bullet','- '],['num','list-ordered','Numbered item','1. '],['h','heading','Heading','# '],['b','bold','Bold  (Ctrl+B)','**'],['code','code','Code','`'],['date','calendar','Insert today\'s date',''],['hr','minus','Divider','---']];
+function noteTools(taId){ return `<div class="nfmt" role="toolbar" aria-label="Formatting">${NOTE_FMT.map(([k, i, l]) => `<button type="button" class="nbtn" data-act="nFmt" data-id="${taId}" data-v="${k}" title="${l}" aria-label="${l}">${ico(i,'sm')}</button>`).join('')}</div>`; }
+function noteFmt(ta, k){
+  if(!ta) return; const v = ta.value, s = ta.selectionStart, e = ta.selectionEnd, ls = v.lastIndexOf('\n', s - 1) + 1, le = (i => i < 0 ? v.length : i)(v.indexOf('\n', e));
+  const F = NOTE_FMT.find(x => x[0] === k); if(!F) return;
+  if(k === 'b' || k === 'code'){ const m = F[3], sel = v.slice(s, e) || (k === 'b' ? 'bold text' : 'code'); ta.setRangeText(m + sel + m, s, e, 'select'); if(s === e){ ta.selectionStart = s + m.length; ta.selectionEnd = s + m.length + sel.length; } }
+  else if(k === 'date'){ ta.setRangeText(new Date().toISOString().slice(0, 10), s, e, 'end'); }
+  else if(k === 'hr'){ ta.setRangeText((s > 0 && v[s - 1] !== '\n' ? '\n' : '') + '---\n', s, e, 'end'); }
+  else { /* line prefixes: applied to every selected line, or taken off if all already have it */
+    const pre = /^\s*(\[[ xX]\]|[-*•]|\d{1,3}[.)]|#{1,3})\s+/, lines = v.slice(ls, le).split('\n'), mine = {todo:/^\s*\[[ xX]\]\s+/, bullet:/^\s*[-*•]\s+/, num:/^\s*\d{1,3}[.)]\s+/, h:/^\s*#{1,3}\s+/}[k];
+    const off = lines.some(l => l.trim()) && lines.every(l => mine.test(l) || !l.trim());
+    const out = lines.map((l, i) => !l.trim() && lines.length > 1 ? l : off ? l.replace(mine, '') : (k === 'num' ? (i + 1) + '. ' : F[3]) + l.replace(pre, ''));
+    ta.setRangeText(out.join('\n'), ls, le, 'end'); }
+  ta.focus(); ta.dispatchEvent(new Event('input', {bubbles:true}));
+}
+/* Enter carries a list on; Enter on an empty item ends it. Ctrl+B for bold. */
+document.addEventListener('keydown', ev => {
+  const ta = ev.target; if(!ta || ta.tagName !== 'TEXTAREA' || !ta.classList.contains('ned')) return;
+  if((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'b'){ ev.preventDefault(); return noteFmt(ta, 'b'); }
+  if(ev.key !== 'Enter' || ev.shiftKey || ev.ctrlKey || ev.metaKey || ev.altKey || ta.selectionStart !== ta.selectionEnd) return;
+  const v = ta.value, s = ta.selectionStart, ls = v.lastIndexOf('\n', s - 1) + 1, line = v.slice(ls, s), m = line.match(/^(\s*)(\[[ xX]\]|[-*•]|(\d{1,3})([.)]))\s+/); if(!m) return;
+  ev.preventDefault();
+  if(!line.slice(m[0].length).trim()){ ta.setRangeText('', ls, s, 'end'); }   // an empty item ends the list
+  else { const next = m[3] ? (+m[3] + 1) + m[4] : /^\[/.test(m[2]) ? '[ ]' : m[2]; ta.setRangeText('\n' + m[1] + next + ' ', s, s, 'end'); }
+  ta.dispatchEvent(new Event('input', {bubbles:true}));
+});
 function quickNote(caseId){
   return `<form data-form="nQuick" data-case="${caseId || ''}" class="nquick"><label class="sr" for="nq-${caseId || 'g'}">New note</label>
-    <textarea id="nq-${caseId || 'g'}" rows="1" placeholder="Jot something down… start a line with [ ] for a to-do. Ctrl+Enter to add"></textarea>
-    <div class="nqbar"><div class="ncolors">${NOTE_COLORS.map(([k, col], i) => `<button type="button" data-act="nColorPick" data-v="${k}" style="--nc:${col}" aria-pressed="${(UI.ncolor || 'yellow') === k}" aria-label="${k}"></button>`).join('')}</div>
+    <textarea id="nq-${caseId || 'g'}" class="ned" rows="1" placeholder="Jot something down… Ctrl+Enter to add"></textarea>
+    <div class="nqbar">${noteTools('nq-' + (caseId || 'g'))}<span class="nqsep" aria-hidden="true"></span><div class="ncolors">${NOTE_COLORS.map(([k, col], i) => `<button type="button" data-act="nColorPick" data-v="${k}" style="--nc:${col}" aria-pressed="${(UI.ncolor || 'yellow') === k}" aria-label="${k}"></button>`).join('')}</div>
       <button class="btn sm primary" type="submit">${ico('plus','sm')}Add note</button></div></form>`;
 }
 function viewNotes(){
@@ -53,7 +87,7 @@ function viewNotes(){
 function noteDlg(id){
   const n = DB.notes.find(x => x.id === id); if(!n) return;
   openDlg(dhead('Edit note') + `<form data-form="note" data-id="${n.id}"><div class="in">
-    <div class="field"><label for="nText">Note</label><textarea id="nText" rows="8" autofocus>${esc(n.text)}</textarea><span class="hint">Lines starting with <span class="mono">[ ]</span> or <span class="mono">[x]</span> are to-dos.</span></div>
+    <div class="field"><label for="nText">Note</label>${noteTools('nText')}<textarea id="nText" class="ned" rows="8" autofocus>${esc(n.text)}</textarea><span class="hint">Use the buttons above, or type <span class="mono">[ ]</span> for a to-do, <span class="mono">-</span> for a bullet, <span class="mono">#</span> for a heading. Enter continues a list.</span></div>
     <div class="frow"><div class="field"><label for="nCase">Case</label><select id="nCase"><option value="">General (no case)</option>${DB.cases.map(c => `<option value="${c.id}"${n.caseId === c.id ? ' selected' : ''}>${esc(c.code + ' · ' + c.name.split(' — ')[0])}</option>`).join('')}</select></div>
       <div class="field"><label for="nDue">Due</label><input id="nDue" type="date" value="${esc(n.due || '')}"></div></div>
     <div class="field" style="margin:0"><span class="label">Colour</span><div class="ncolors big">${NOTE_COLORS.map(([k, col]) => `<button type="button" data-act="nColor" data-id="${n.id}" data-v="${k}" style="--nc:${col}" aria-pressed="${n.color === k}" aria-label="${k}"></button>`).join('')}</div></div>

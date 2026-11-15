@@ -208,3 +208,6 @@ function normAutos(L){
       when:{ev:['ind', 'tag', 'verdict'].includes(w.ev) ? w.ev : 'ind', kinds:(Array.isArray(w.kinds) ? w.kinds : []).filter(k => kinds.includes(k)), text:String(w.text || '').slice(0, 80), verdict:['malicious', 'suspicious'].includes(w.verdict) ? w.verdict : 'malicious'},
       scope:typeof R.scope === 'string' && /^[\w-]{1,60}$/.test(R.scope) ? R.scope : 'all',
       then:(Array.isArray(R.then) ? R.then : []).filter(t => t && acts.includes(t.a)).slice(0, 8).map(t => ({a:t.a, prio:['low', 'medium', 'high', 'critical'].includes(t.prio) ? t.prio : undefined, text:t.text ? String(t.text).slice(0, 200) : undefined, v:['malicious', 'suspicious', 'benign'].includes(t.v) ? t.v : undefined, id:typeof t.id === 'string' ? t.id.slice(0, 60) : undefined}))}; }); }
+
+/* sample events kept with a rule: plain text, capped */
+function normRuleTests(t){ return Array.isArray(t) ? t.filter(x => x && typeof x.text === 'string').slice(0, 50).map(x => ({id:typeof x.id === 'string' && /^[\w-]{1,60}$/.test(x.id) ? x.id : uid('t'), kind:x.kind === 'hit' ? 'hit' : 'miss', text:x.text.slice(0, 4000)})) : []; }

@@ -2,6 +2,23 @@
 
 All notable changes to OSINTrix, newest first. The format is based on [Keep a Changelog](https://keepachangelog.com); this file is generated from `js/data/changelog.js` by `tools/changelog.py`.
 
+## [1.35] — Detection lab and better notes (2026-11-15)
+
+_Build, test and harden detection rules inside OSINTrix — SIEM queries, rule tests, an evasion check and rules drafted from evidence — and a formatting bar for notes._
+
+### Added
+- Rule → Queries: any Sigma rule as Splunk SPL, Microsoft Defender XDR KQL, Microsoft Sentinel KQL (Sysmon), Elastic ES|QL and IBM QRadar AQL — including not, 1 of / all of, null, CIDR ranges and regular expressions. Field names can be remapped per product and are remembered.
+- Rule → Tests: events a rule must fire on and must not fire on, kept with the rule, run as you edit and again on every save — a save that breaks a test tells you. Add tests by pasting an event or from what the rule fires on in the current case. Tests travel with rule exports and backups.
+- Rule → Evasion: a matching event is changed the way attackers change it — renamed program, ^ and quotes in commands, / or en dashes for flags, shortened PowerShell parameters, extra spaces, environment variables, short paths, IPs written as numbers — and the rule is checked against each, with the fix (for example the OriginalFileName to add) and a one-click |windash.
+- Timeline → Select → Draft a rule: a Sigma rule from what the selected events share, checked against all your other evidence for noise, with the selected events saved as its tests.
+- Notes have a formatting bar: to-do, bullet, numbered item, heading, bold, code, today's date and a divider. Enter carries a list on, Enter on an empty item ends it, Ctrl+B makes bold. Notes now show headings, bullets, numbers, bold, italics and code.
+
+### Changed
+- The browser Sigma engine now understands |windash, |cidr, |base64 and |base64offset, and null values; regular expressions are no longer lower-cased before matching.
+
+### Fixed
+- A note's due date is marked overdue against today's date; the rule editor no longer fails when there are no cases.
+
 ## [1.34] — The engine works for you (2026-11-15)
 
 _Timeline patterns, picture intelligence, automations, a since-you-were-last-here feed, a guided tour, faster long lists and backup reminders — all running in the browser._

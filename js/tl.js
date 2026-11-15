@@ -28,7 +28,7 @@ function evWrap(r, html){ const on = UI.evPick && UI.evPick.has(r.id);
 function evBulkHTML(list){
   const n = UI.evPick ? UI.evPick.size : 0; if(!n) return '';
   return `<div class="tbulk evbulk"><b>${n} selected</b><button class="btn xs ghost" data-act="evAll">Select all ${list.length} shown</button><span style="flex:1"></span>
-    <button class="btn xs" data-act="evTag">${ico('tag','sm')}Tag…</button><button class="btn xs" data-act="evKey">${ico('star','sm')}Key evidence</button><button class="btn xs" data-act="evCsv">${ico('download','sm')}CSV</button>
+    <button class="btn xs" data-act="evTag">${ico('tag','sm')}Tag…</button><button class="btn xs" data-act="evKey">${ico('star','sm')}Key evidence</button><button class="btn xs" data-act="evCsv">${ico('download','sm')}CSV</button><button class="btn xs" data-act="evRule" title="Draft a Sigma rule from what these events share">${ico('shield-check','sm')}Draft a rule</button>
     <button class="btn xs dangerbtn" data-act="evDel">${ico('trash-2','sm')}Delete</button><button class="iconbtn" data-act="evNone" aria-label="Clear selection">${ico('x','sm')}</button></div>`;
 }
 const csvCell = v => { v = String(v == null ? '' : csvFormula(v)); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };

@@ -1376,6 +1376,10 @@ test('no serious accessibility problems on the newer screens (copilot, investiga
     media: () => { const r = DB.records.find(x => x.caseId === 'c-lantern'); r.att = [{ id: 'fx1', name: 'shot.png', type: 'image/png', size: 2048, sha256: 'a'.repeat(64), added: Date.now(), w: 10, h: 10 }, { id: 'fx2', name: 'clip.webm', type: 'video/webm', size: 4096, sha256: 'b'.repeat(64), added: Date.now(), dur: 12 }]; DB.records.push({ ...r, id: 'rbig', att: [], big: { name: 'huge.mp4', type: 'video/mp4', size: 6e7, sha256: '' } }); mutate('m'); location.hash = '#/case/c-lantern/media'; },
     mediaEmpty: () => { location.hash = '#/case/c-portal/media'; },
     patterns: () => { UI.tlMode = 'patterns'; location.hash = '#/case/c-lantern/timeline'; },
+    ruleEvasion: () => { ensureRules(); const r = DB.rules.find(x => x.title === 'PowerShell Encoded Command Execution'); UI.rule = r.id; UI.ropen = true; UI.rtab = 'evasion'; location.hash = '#/detections'; },
+    ruleQueries: () => { UI.rtab = 'queries'; location.hash = '#/detections'; },
+    ruleTests: () => { const r = DB.rules.find(x => x.id === UI.rule); r.tests = [{ id: 't1', kind: 'hit', text: 'CommandLine="powershell -enc AAA" Image="C:\\x\\powershell.exe"' }, { id: 't2', kind: 'miss', text: 'CommandLine="cmd"' }]; UI.rtab = 'tests'; location.hash = '#/detections'; },
+    notesBar: () => { location.hash = '#/notes'; },
     picInsights: () => { UI.mdV = 'pic'; location.hash = '#/case/c-lantern/media'; },
     automations: () => { autoEnsure(); if(!DB.autos.length){ DB.autos.push({ id: 'au1', name: 'Check new indicators', on: true, when: { ev: 'ind', kinds: ['ip'] }, scope: 'all', then: [{ a: 'store' }], runs: 2, last: Date.now() }); DB.autoLog.push({ at: Date.now(), rule: 'au1', name: 'Check new indicators', c: 'c-lantern', what: 'watching 203.0.113.47' }); } UI.pbTab = 'auto'; UI.pb = null; location.hash = '#/playbooks'; },
     activity: () => { location.hash = '#/home'; setTimeout(() => { DB.prefs.seen = DB.prefs.seen || {}; DB.prefs.seen['c-portal'] = Date.now() - 864e5 * 400; location.hash = '#/case/c-portal/overview'; }, 80); },
@@ -1842,5 +1846,61 @@ test('newer screens fit a phone: patterns, media, picture insights, automations,
   await page.evaluate(() => { UI.pbTab = 'auto'; go('#/playbooks'); }); await expect(page.locator('.au-intro')).toBeVisible(); expect(await fits()).toBe(true);
   await page.evaluate(() => tourStart()); await expect(page.locator('#tourCard')).toBeVisible();
   expect(await page.evaluate(() => { const r = $('tourCard').getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth; })).toBe(true);
+  noErrors(errors);
+});
+
+test('detection lab: Sigma to SIEM queries, tests kept with a rule, the evasion check and its fix, and a draft rule from selected events', async ({ page }) => {
+  const errors = await open(page, '#/detections');
+  const q = await page.evaluate(() => { ensureRules(); const r = DB.rules.find(x => x.title === 'PowerShell Encoded Command Execution'); const o = {}; for (const b of Object.keys(DL_BACK)) o[b] = sigmaToQuery(r.code, b).q; return o; });
+  expect(q.splunk).toContain('EventCode=1'); expect(q.splunk).toContain('CommandLine="*-enc*"');
+  expect(q.kql).toContain('DeviceProcessEvents'); expect(q.kql).toContain('ProcessCommandLine contains "-enc"');
+  expect(q.esql).toContain('process.command_line'); expect(q.aql).toContain(`"Process CommandLine" ILIKE '%-enc%'`);
+  // operators: not, 1 of, null, cidr, re
+  const q2 = await page.evaluate(() => sigmaToQuery(`logsource:\n    category: network_connection\n    product: windows\ndetection:\n    sel_a:\n        DestinationIp|cidr: 10.0.0.0/8\n    sel_b:\n        Image|re: '.*\\\\evil[0-9]+\\.exe'\n    filter:\n        User: null\n    condition: 1 of sel_* and not filter`, 'kql').q);
+  expect(q2).toContain('ipv4_is_in_range(RemoteIP, "10.0.0.0/8")'); expect(q2).toContain('matches regex'); expect(q2).toContain('not(isempty(AccountName))');
+  // field names can be remapped
+  await page.evaluate(() => { const r = DB.rules.find(x => x.title === 'PowerShell Encoded Command Execution'); UI.rule = r.id; UI.ropen = true; UI.rtab = 'queries'; UI.dlB = 'esql'; renderMain(); });
+  await page.locator('.dl-map summary').click(); await page.fill('#dlMap', 'CommandLine = process.args'); await page.click('[data-act=dlMapSave]');
+  await expect(page.locator('#dlQ')).toContainText('process.args');
+  // evasion check, then the one-click fix
+  await page.click('[data-rtab=evasion]');
+  await expect(page.locator('.dl-ev li.bad:has-text("Renamed the program")')).toContainText("OriginalFileName: 'PowerShell.EXE'");
+  await expect(page.locator('.dl-ev li.bad:has-text("Used / or an en dash")')).toBeVisible();
+  await page.locator('[data-act=dlFixDash]').first().click();
+  await expect(page.locator('.dl-ev li.ok:has-text("Used / or an en dash")')).toBeVisible();
+  // tests run in the editor and again on save
+  await page.click('[data-rtab=tests]');
+  await page.fill('#dlTestIn', 'Image="C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" CommandLine="powershell /enc SQBFAFgA"'); await page.click('[data-act=dlTestAdd][data-v=hit]');
+  await page.fill('#dlTestIn', 'Image="C:\\Windows\\System32\\cmd.exe" CommandLine="cmd /c dir"'); await page.click('[data-act=dlTestAdd][data-v=miss]');
+  await expect(page.locator('.dl-sum')).toContainText('All 2 tests pass');
+  await page.click('form.rx button[type=submit]'); await expect(page.locator('#toastMsg')).toContainText('Rule saved');
+  await page.evaluate(() => { const ta = $('rCode'); ta.value = ta.value.replace(/\|windash/g, ''); ta.dispatchEvent(new Event('input', { bubbles: true })); });
+  await page.click('form.rx button[type=submit]'); await expect(page.locator('#toastMsg')).toContainText('1 of 2 tests now fail');
+  // the engine: windash, base64offset, null
+  const eng = await page.evaluate(() => { const ev = (code, text) => sigmaEval(sigmaParse(code), recFields({ title: '', body: text, host: '', source: '', tags: [], ents: [] }));
+    return [ev("detection:\n    s:\n        CommandLine|windash|contains: ' -nop'\n    condition: s", 'CommandLine="powershell /nop x"'),
+      ev("detection:\n    s:\n        CommandLine|base64offset|contains: 'IEX'\n    condition: s", 'CommandLine="powershell -e SUVYIChOZXc="'),
+      ev("detection:\n    s:\n        Image|endswith: '\\\\cmd.exe'\n        User: null\n    condition: s", 'Image="C:\\Windows\\cmd.exe"')]; });
+  expect(eng).toEqual([true, true, true]);
+  // a draft rule from events in a timeline, with its tests
+  await page.evaluate(() => { const ids = DB.records.filter(r => r.caseId === 'c-lantern' && /powershell/i.test(r.body)).slice(0, 2).map(r => r.id); UI.evPick = new Set(ids); dlDraftFromPick(); });
+  await expect(page.locator('#toastMsg')).toContainText('Draft rule made');
+  expect(await page.evaluate(() => { const R = DB.rules[0]; return [/^detection:/m.test(R.code), R.tests.filter(t => t.kind === 'hit').length >= 1, dlRunTests(R).filter(x => x.t.kind === 'hit').every(x => x.ok)]; })).toEqual([true, true, true]);
+  noErrors(errors);
+});
+
+test('notes: a formatting bar for to-dos, bullets, headings and bold; Enter continues a list', async ({ page }) => {
+  const errors = await open(page, '#/notes');
+  await page.click('#nq-g'); await page.keyboard.type('Plan'); await page.keyboard.press('Shift+Enter');
+  await page.click('#nq-g + .nqbar [data-act=nFmt][data-v=todo]'); await page.keyboard.type('Pull proxy logs'); await page.keyboard.press('Enter'); await page.keyboard.type('Call the bank'); await page.keyboard.press('Enter'); await page.keyboard.press('Enter');
+  await page.click('#nq-g + .nqbar [data-act=nFmt][data-v=h]'); await page.keyboard.type('Later');
+  await page.keyboard.press('Shift+Enter'); await page.click('#nq-g + .nqbar [data-act=nFmt][data-v=bullet]'); await page.keyboard.type('a <b>tag</b> and '); await page.keyboard.press('Control+b'); await page.keyboard.type('bold');
+  expect(await page.inputValue('#nq-g')).toBe('Plan\n[ ] Pull proxy logs\n[ ] Call the bank\n# Later\n- a <b>tag</b> and **bold**');
+  await page.keyboard.press('Control+Enter');
+  const card = page.locator('.note-card:has-text("Call the bank")');
+  await expect(card.locator('.ntask')).toHaveCount(2); await expect(card.locator('h4')).toHaveText('Later'); await expect(card.locator('.nli b')).toHaveText('bold');
+  await expect(card.locator('.nli')).toContainText('a <b>tag</b> and');   // typed markup stays text
+  // the same bar in the edit dialog
+  await card.locator('[data-act=nEdit]').click(); await expect(page.locator('#dlg .nfmt')).toBeVisible();
   noErrors(errors);
 });

@@ -210,7 +210,7 @@ function sigmaParse(code){
   return {det, cond};
 }
 function recFields(r){
-  const f = {_raw:(r.title + ' ' + r.body).toLowerCase()}; const s = r.body || '';
+  const f = {_raw:(r.title + ' ' + r.body).toLowerCase(), _orig:r.title + ' ' + r.body}; const s = r.body || '';
   for(const m of s.matchAll(/(\w+)=("([^"]*)"|'([^']*)'|(\S+))/g)) f[m[1].toLowerCase()] = (m[3] ?? m[4] ?? m[5] ?? '').toLowerCase();
   const ev = s.match(/EventID[:= ]\s*(\d+)/i); if(ev) f.eventid = ev[1];
   if(r.host) f.computer = r.host.toLowerCase(); f.source = (r.source || '').toLowerCase();
@@ -223,13 +223,34 @@ function recFields(r){
   return f;
 }
 const sigWild = v => new RegExp('^' + v.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.') + '$', 'i');
+/* Sigma value modifiers: contains / startswith / endswith / all / re / windash / cidr / base64 / base64offset / cased, and null */
+const WINDASH = ['-', '/', '–', '—', '―'];
+function sigmaVals(vals, mods){
+  let V = vals.map(String);
+  if(mods.includes('windash')) V = V.flatMap(x => { const out = new Set([x]); for(const d of WINDASH) out.add(x.replace(/(^|\s)[-/–—―]/g, '$1' + d)); return [...out]; });
+  if(mods.includes('base64offset')) V = V.flatMap(x => { const u = new TextEncoder().encode(x), b = s => btoa(String.fromCharCode(...s)); const o = [];
+    for(let i = 0; i < 3; i++){ const pad = new Uint8Array(i + u.length); pad.set(u, i); const e = b(pad), start = [0, 2, 3][i], end = [0, -3, -2][(u.length + i) % 3]; o.push(e.slice(start, end || undefined)); } return o; });
+  else if(mods.includes('base64')) V = V.map(x => btoa(String.fromCharCode(...new TextEncoder().encode(x))));
+  return V;
+}
+function ipIn(ip, cidr){ const p = s => s.split('.').reduce((a, x) => a * 256 + (+x), 0), m = String(cidr).match(/^(\d+\.\d+\.\d+\.\d+)\/(\d+)$/); if(!m || !/^\d+\.\d+\.\d+\.\d+$/.test(ip)) return false;
+  const bits = +m[2], mask = bits ? 2 ** 32 - 2 ** (32 - bits) : 0; return (p(ip) & mask) >>> 0 === (p(m[1]) & mask) >>> 0; }
 function sigmaSel(sel, f){
   if(!sel.fields.length && !sel.keywords.length) return false;
-  if(sel.keywords.length && !sel.fields.length) return sel.keywords.some(k => f._raw.includes(k.toLowerCase().replace(/\*/g, '')));
+  if(sel.keywords.length && !sel.fields.length) return sel.keywords.some(k => /[*?]/.test(k) ? sigWild('*' + k.toLowerCase() + '*').test(f._raw) : f._raw.includes(k.toLowerCase()));
   return sel.fields.every(({f:key, vals}) => { const [name, ...mods] = key.split('|'), v = f[name.toLowerCase()];
-    if(v === undefined) return mods.includes('contains') ? vals.some(x => f._raw.includes(x.toLowerCase())) && false : false;
-    const test = x => { x = String(x).toLowerCase(); if(mods.includes('re')) return new RegExp(x, 'i').test(v); if(mods.includes('contains')) return v.includes(x.replace(/\*/g, '')); if(mods.includes('startswith')) return v.startsWith(x); if(mods.includes('endswith')) return v.endsWith(x); return /[*?]/.test(x) ? sigWild(x).test(v) : v === x; };
-    return mods.includes('all') ? vals.every(test) : vals.some(test); });
+    if(v === undefined || v === '') return vals.some(x => x === 'null' || x === '');   // "field: null" means missing or empty
+    const re = mods.includes('re'), b64 = mods.includes('base64') || mods.includes('base64offset');
+    const test = x => { if(x === 'null') return false;
+      if(re) return new RegExp(x, 'i').test(v);   // the pattern is used as written; values are compared without case
+      if(mods.includes('cidr')) return ipIn(v, x);
+      x = b64 ? x : x.toLowerCase(); const hay = b64 ? f._orig || v : v;   // base64 is case-sensitive, so it is looked for in the original text
+      if(mods.includes('contains') || b64) return /[*?]/.test(x) ? sigWild('*' + x + '*').test(hay) : (b64 ? hay.includes(x) || v.includes(x.toLowerCase()) : hay.includes(x));
+      if(mods.includes('startswith')) return /[*?]/.test(x) ? sigWild(x + '*').test(v) : v.startsWith(x);
+      if(mods.includes('endswith')) return /[*?]/.test(x) ? sigWild('*' + x).test(v) : v.endsWith(x);
+      return /[*?]/.test(x) ? sigWild(x).test(v) : v === x; };
+    const V = sigmaVals(vals, mods);
+    return mods.includes('all') ? vals.every(x => sigmaVals([x], mods).some(test)) : V.some(test); });
 }
 function sigmaEval(parsed, f){
   const toks = parsed.cond.match(/\(|\)|\band\b|\bor\b|\bnot\b|\b(?:1|all|any)\s+of\s+[\w*]+|[\w*]+/gi) || []; let i = 0;

@@ -4,6 +4,42 @@
    Each change has a type: "added" | "changed" | "fixed" | "removed". */
 const CHANGELOG_DATA = [
   {
+    "version": "1.35",
+    "name": "Detection lab and better notes",
+    "date": "2026-11-15",
+    "summary": "Build, test and harden detection rules inside OSINTrix — SIEM queries, rule tests, an evasion check and rules drafted from evidence — and a formatting bar for notes.",
+    "changes": [
+      {
+        "type": "added",
+        "text": "Rule → Queries: any Sigma rule as Splunk SPL, Microsoft Defender XDR KQL, Microsoft Sentinel KQL (Sysmon), Elastic ES|QL and IBM QRadar AQL — including not, 1 of / all of, null, CIDR ranges and regular expressions. Field names can be remapped per product and are remembered."
+      },
+      {
+        "type": "added",
+        "text": "Rule → Tests: events a rule must fire on and must not fire on, kept with the rule, run as you edit and again on every save — a save that breaks a test tells you. Add tests by pasting an event or from what the rule fires on in the current case. Tests travel with rule exports and backups."
+      },
+      {
+        "type": "added",
+        "text": "Rule → Evasion: a matching event is changed the way attackers change it — renamed program, ^ and quotes in commands, / or en dashes for flags, shortened PowerShell parameters, extra spaces, environment variables, short paths, IPs written as numbers — and the rule is checked against each, with the fix (for example the OriginalFileName to add) and a one-click |windash."
+      },
+      {
+        "type": "added",
+        "text": "Timeline → Select → Draft a rule: a Sigma rule from what the selected events share, checked against all your other evidence for noise, with the selected events saved as its tests."
+      },
+      {
+        "type": "changed",
+        "text": "The browser Sigma engine now understands |windash, |cidr, |base64 and |base64offset, and null values; regular expressions are no longer lower-cased before matching."
+      },
+      {
+        "type": "added",
+        "text": "Notes have a formatting bar: to-do, bullet, numbered item, heading, bold, code, today's date and a divider. Enter carries a list on, Enter on an empty item ends it, Ctrl+B makes bold. Notes now show headings, bullets, numbers, bold, italics and code."
+      },
+      {
+        "type": "fixed",
+        "text": "A note's due date is marked overdue against today's date; the rule editor no longer fails when there are no cases."
+      }
+    ]
+  },
+  {
     "version": "1.34",
     "name": "The engine works for you",
     "date": "2026-11-15",

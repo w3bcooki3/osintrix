@@ -122,6 +122,7 @@ document.addEventListener('click', ev => {
   if(typeof ACT_ACTS !== 'undefined' && ACT_ACTS[a]) return ACT_ACTS[a](id, v, t, ev);
   if(typeof AU_ACTS !== 'undefined' && AU_ACTS[a]) return AU_ACTS[a](id, v, t, ev);
   if(typeof TOUR_ACTS !== 'undefined' && TOUR_ACTS[a]) return TOUR_ACTS[a](id, v, t, ev);
+  if(typeof DL_ACTS !== 'undefined' && DL_ACTS[a]) return DL_ACTS[a](id, v, t, ev);
   if(NBX_ACTS[a]) return NBX_ACTS[a](id, v, t, ev);
   if(a === 'toolRun') return toolRunDlg(id);
   if(a === 'trPick'){ $('trV').value = v; return $('trV').focus(); }
@@ -269,7 +270,7 @@ document.addEventListener('click', ev => {
       { const errs = checkImport(d, 'backup'); if(errs.length) return importRefused('The backup', errs); }
       confirmDlg('Replace everything with this backup?', 'Your current cases, notes, tools and rules in this browser are replaced by the ' + d.cases.length + ' case' + (d.cases.length === 1 ? '' : 's') + ' in the file. You can undo right after.', 'Import backup', async () => {
         await snapshot('Before importing a backup'); if(d.files){ await rekeyFiles(d.files, d.records, d.trash); delete d.files; } const nbfiles = d.nbfiles; delete d.nbfiles;
-        d.records.forEach(normRecord); d.entries.forEach(normEntry); d.cases.forEach(normCase); (d.links || []).forEach(normLink); d.verdicts = normVerdicts(d.verdicts); d.autos = normAutos(d.autos); d.autoDone = {}; d.autoLog = [];
+        d.records.forEach(normRecord); d.entries.forEach(normEntry); d.cases.forEach(normCase); (d.links || []).forEach(normLink); d.verdicts = normVerdicts(d.verdicts); d.autos = normAutos(d.autos); (d.rules || []).forEach(r => { if(r && typeof r === 'object') r.tests = normRuleTests(r.tests); }); d.autoDone = {}; d.autoLog = [];
         if(typeof ctiLoad === 'function') await ctiLoad(); const prevIocs = typeof CTI !== 'undefined' && CTI.iocs ? CTI.iocs.slice() : null;
         const noFiles = d.filesLeftOut === true; delete d.filesLeftOut;
         const prev = DB, inIocs = Array.isArray(d.ctiIocs) ? d.ctiIocs.slice(0, CTI_IOC_MAX) : null; delete d.ctiIocs; DB = d; DB.recent = prev.recent; DB.work = prev.work; if(DB.intel && prev.intel) (DB.intel.sources || []).forEach(s => { const o = (prev.intel.sources || []).find(x => x.id === s.id); s.key = o ? o.key || '' : ''; }); importSafeIntel(prev); DB.security = prev.security;          /* trusted keys, signing key and auto-lock stay this browser's own */ if(inIocs){ await ctiLoad(); CTI.iocs = []; ctiIocIndex(); const iso = t => { const z = new Date(t); return t && !isNaN(z) ? z.toISOString() : ''; }; ctiAddIocs(inIocs.filter(x => x && typeof x === 'object').map(x => ({v:x.v, type:x.k, tags:x.tags, threat:x.threat, desc:x.desc, ref:x.ref, tlp:x.tlp, conf:x.conf, srcs:x.srcs, first:iso(x.first), last:iso(x.last), exp:iso(x.exp)})), 'Backup'); await ctiSaveIocs(); } DB.prefs = Object.assign({}, prev.prefs, d.prefs || {}); ensureTools(); ensurePlaybooks(); ensureIntel(); ensureQueries(); ensureRules(); ensureNotes(); if(DB.nb){ nbSanitize(); await nbRestoreFiles(nbfiles); } else ensureNB(); UI.nbView = 'lib'; UI.nbRev = null; if(!DB.cases.some(c => c.id === DB.active)) DB.active = DB.cases[0] && DB.cases[0].id;
@@ -340,7 +341,7 @@ document.addEventListener('click', ev => {
     case 'rDup': { const r = DB.rules.find(z => z.id === id); const c2 = {...r, builtin:false, id:uid('r'), title:copyName(r.title, DB.rules.map(x => x.title)), created:Date.now(), modified:Date.now(), starred:false}; DB.rules.unshift(c2); UI.rule = c2.id; mutate('duplicated rule'); return renderMain(); }
     case 'rCopy': { const r = DB.rules.find(z => z.id === id); return copyText(ruleText(r, $('rCode') ? $('rCode').value : r.code)); }
     case 'rExport': { const r = DB.rules.find(z => z.id === id); return download(slug(r.title) + (r.type === 'sigma' ? '.yml' : '.yar'), ruleText(r, $('rCode') ? $('rCode').value : r.code), 'text/plain'); }
-    case 'rExportAll': return download('osintrix-detections.json', JSON.stringify(DB.rules.map(r => ({type:r.type, title:r.title, description:r.desc, code:ruleText(r), severity:r.severity, category:r.category, technique:r.technique, author:r.author, platform:r.platform, tags:r.tags, refs:r.refs || [], starred:!!r.starred, caseId:r.caseId || null, created:r.created})), null, 2), 'application/json');
+    case 'rExportAll': return download('osintrix-detections.json', JSON.stringify(DB.rules.map(r => ({type:r.type, title:r.title, description:r.desc, code:ruleText(r), severity:r.severity, category:r.category, technique:r.technique, author:r.author, platform:r.platform, tags:r.tags, refs:r.refs || [], starred:!!r.starred, caseId:r.caseId || null, created:r.created, tests:r.tests && r.tests.length ? r.tests : undefined})), null, 2), 'application/json');
     case 'rImport': return importRules();
     case 'rFromCase': return ruleFromCase();
     /* notes */
@@ -356,6 +357,7 @@ document.addEventListener('click', ev => {
       {sep:true}, {label:'Delete', icon:'trash-2', danger:true, fn:() => clickAct('nDel', id)}]); }
     case 'nDel': { const n = DB.notes.find(z => z.id === id); DB.notes = DB.notes.filter(z => z.id !== id); const tx = trashPut('note', (n.text || '').split('\n')[0].replace(/^#+\s*/, '') || 'Note', {n}, n.caseId); closeDlg(); mutate('deleted note'); renderAll(); return toast('Note deleted', 'Undo', () => { DB.trash = DB.trash.filter(x => x !== tx); DB.notes.push(n); mutate('restored note'); renderAll(); }); }
     case 'nColor': document.querySelectorAll('.ncolors.big button').forEach(b => b.setAttribute('aria-pressed', String(b === t))); UI.noteColorEdit = v; return;
+    case 'nFmt': return noteFmt($(id), v);
     case 'nColorPick': UI.ncolor = v; t.parentElement.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === t))); return;
     /* graph */
     case 'gConnect': UI.graph.mode = UI.graph.mode === 'connect' ? null : 'connect'; UI.graph.first = null; return renderMain();
@@ -547,7 +549,7 @@ document.addEventListener('submit', ev => {
     if(!$('rCode').value.trim()) return fieldErr('rCode', 'The rule body is empty.');
     Object.assign(r, {title:rt, severity:$('rSev').value, technique:$('rTech').value.trim().toUpperCase(), caseId:$('rCase').value || null, desc:$('rDesc').value.trim(), code:$('rCode').value,
       platform:$('rPlat').value.trim(), author:$('rAuthor').value.trim(), tags:$('rTags').value.split(',').map(x => x.trim()).filter(Boolean).slice(0, 20), modified:Date.now()});
-    mutate('saved rule ' + r.title); renderAll(); const iss = validateRule(r.type, r.code, r.title); return toast(iss.length ? 'Saved — with ' + iss.length + ' structure warning' + (iss.length > 1 ? 's' : '') : 'Rule saved'); }
+    mutate('saved rule ' + r.title); renderAll(); if(typeof dlAfterSave === 'function' && dlAfterSave(r)) return; const iss = validateRule(r.type, r.code, r.title); return toast(iss.length ? 'Saved — with ' + iss.length + ' structure warning' + (iss.length > 1 ? 's' : '') : 'Rule saved'); }
   if(k === 'pb') return pbSubmit(f);
   if(k === 'chal') return ctfSubmit(f);
   if(k === 'wu') return wuSubmit(f);
