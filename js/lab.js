@@ -302,7 +302,7 @@ function labFile(){
   const q = (UI.strq || '').toLowerCase(), showAll = !!UI.strAll, st = r.strings.filter(s => (showAll || s[3]) && (!q || s[1].toLowerCase().includes(q))).slice(0, 500);
   const hashRow = (l, v) => v ? `<div class="kv"><span>${l}</span><code>${esc(v)}</code><button class="iconbtn" data-act="flagCopy" data-v="${esc(v)}" aria-label="Copy ${l}">${ico('copy','sm')}</button></div>` : '';
   const G = r.exif && r.exif.GPS, isImg = /^(png|jpg|gif|bmp|riff)$/.test(r.type.ext);
-  return `${flagBox(r.flags)}
+  return `${flagBox(r.flags)}${typeof triageCard === 'function' ? triageCard(r) : ''}
   <div class="fi-grid">
     <div class="fi-side">
     <section class="card fi-sum"><header><span class="fi-ic">${ico('file-digit')}</span><div style="min-width:0;flex:1"><h3>${esc(r.name)}</h3><p class="t3">${fmtBytes(r.size)} · modified ${esc(new Date(r.lastModified).toISOString().slice(0, 16).replace('T', ' '))} UTC</p></div>
@@ -366,7 +366,8 @@ async function labLoad(f, keep = true){
   renderMain();
 }
 function labSummary(r){
-  return [`File: ${r.name} (${fmtBytes(r.size)})`, `Type: ${r.type.name}${r.mismatch ? ' — extension .' + r.ext + ' does not match' : ''}`, `MD5: ${r.md5}`, `SHA1: ${r.sha1}`, `SHA256: ${r.sha256}`, `Entropy: ${r.entropy.toFixed(2)}`,
+  const T = typeof fileTriage === 'function' ? fileTriage(r) : null;
+  return [`File: ${r.name} (${fmtBytes(r.size)})`, T ? `Triage: ${TRI_NAME[T.band]} — ${T.score}/100` + (T.reasons.length ? '\n' + T.reasons.filter(x => x.w).map(x => '  - ' + x.t).join('\n') : '') : '', `Type: ${r.type.name}${r.mismatch ? ' — extension .' + r.ext + ' does not match' : ''}`, `MD5: ${r.md5}`, `SHA1: ${r.sha1}`, `SHA256: ${r.sha256}`, `Entropy: ${r.entropy.toFixed(2)}`,
     r.exif ? 'EXIF: ' + Object.entries(r.exif).filter(([k]) => k !== 'GPS').map(([k, v]) => k + '=' + v).join('; ') : '', r.exif && r.exif.GPS ? `GPS: ${r.exif.GPS.lat}, ${r.exif.GPS.lon}` : '',
     r.trailing ? `Appended data at offset 0x${r.trailing.toString(16)}: ${r.trailPreview.slice(0, 200).replace(/[^\x20-\x7e]/g, '.')}` : '', r.carve.length ? 'Embedded: ' + r.carve.map(([o, n]) => n + '@0x' + o.toString(16)).join(', ') : '',
     r.zip && r.zip.office ? 'Office: ' + Object.entries(r.zip.office).filter(([, v]) => v).map(([k, v]) => k + '=' + v).join('; ') : '', r.zip && r.zip.macros.length ? 'MACROS: ' + r.zip.macros.join(', ') : '', r.zip && r.zip.external.length ? 'External links: ' + r.zip.external.map(x => x[1]).join(' ') : '',

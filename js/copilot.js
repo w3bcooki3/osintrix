@@ -68,6 +68,8 @@ function copilot(caseId){
   if(unwatched.length) step(62, 'eye', 'Watch ' + plural(unwatched.length, 'malicious indicator'), 'You will hear when ' + listOf(unwatched.map(k => entSplit(k).v), 2) + ' shows up in new evidence, news or another case' + (lookOn ? ', and when its online picture changes.' : '.'), 'cpWatch', {label:'Watch'});
   if(mal.length && !(DB.rules || []).some(r => r.caseId === caseId)) step(58, 'file-code', 'Turn the malicious indicators into detections', 'A Sigma rule for the network indicators and a YARA rule for the hashes and strings, ready to review.', 'cpRules', {label:'Generate rules'});
 
+  if(typeof coverage === 'function'){ const caseT = new Set(); for(const x of obs) for(const m of x.o.t.match(/T\d{4}(?:\.\d{3})?/g) || []) caseT.add(m); for(const [key] of D.ents) if(key.startsWith('ttp:')) caseT.add(key.slice(4).toUpperCase());
+    if(caseT.size){ const G = coverage().gaps.filter(g => caseT.has(g.id) || [...caseT].some(t => t.split('.')[0] === g.id)); if(G.length) step(56, 'grid-3x3', plural(G.length, 'technique') + ' in this case with no detection rule', listOf(G.map(g => g.id + ' ' + g.name), 2) + '. Draft a rule so it is caught next time.', 'cpCov', {label:'See coverage'}); } }
   /* --- playbook and questions --- */
   const pk = cpKind(D, kinds, tags), pb = pk && (DB.playbooks || []).find(p => p.id === pk);
   if(pb && !pbProgress(pb, caseId).total) step(66, 'list-checks', 'Run the "' + pb.name + '" playbook', 'The evidence looks like this kind of case. Its ' + pb.steps.length + ' steps become questions here, so nothing standard is forgotten.', 'pbRun', {label:'Run playbook', id:pb.id});
@@ -155,6 +157,7 @@ const CP_ACTS = {
     LKV.bulk.corr = lkCorrelate(LKV.bulk.items.map(x => ({key:x.key, k:x.k, v:x.v, attrs:x.V.attrs}))); go('#/feeds'); },
   cpCve:(id, v) => { go('#/feeds'); setTimeout(() => ctiCveDlg(v), 60); },
   cpRisk:() => { if(UI.graph){ UI.graph.panel = 'ins'; UI.graph.risk = true; UI.graph.clusters = false; } go(caseHash(DB.active, 'graph')); },
+  cpCov:() => { UI.dview = 'coverage'; go('#/detections'); },
   cpGraph:() => { if(UI.graph) UI.graph.panel = 'sugg'; go(caseHash(DB.active, 'graph')); },
   cpWatch:() => { const D = derive(), I = cpIndicators(DB.active), L = [...new Set([...D.entries.filter(e => entryVerdict(e) === 'malicious').map(entryKey), ...I.filter(x => verdictOf(x.key) === 'malicious').map(x => x.key)].filter(k => k && !isWatched(k)))];
     DB.watch = DB.watch || {}; L.forEach(k => { DB.watch[k] = {at:Date.now()}; }); mutate('watching ' + L.length + ' indicators'); renderMain(); toast('Watching ' + plural(L.length, 'indicator'), 'Watchlist', () => go('#/watch')); },

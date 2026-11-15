@@ -2,6 +2,19 @@
 
 All notable changes to OSINTrix, newest first. The format is based on [Keep a Changelog](https://keepachangelog.com); this file is generated from `js/data/changelog.js` by `tools/changelog.py`.
 
+## [1.29] — Detection coverage, rule health and file triage (2026-11-15)
+
+_Detections now shows your rules on the ATT&CK tactics next to what your cases actually show, so the gaps that matter stand out and can be drafted as rules. A health check lints every rule and runs it over all your evidence to find noisy, broken and duplicate rules, with tuning suggestions. The file inspector opens with a triage verdict, its reasons and an entropy map._
+
+### Added
+- Detections → Coverage: techniques covered on each ATT&CK tactic, highlighted where your cases show them. "Gaps that matter" lists techniques your evidence shows with no rule, and Draft a rule writes a starter Sigma rule from the evidence that showed it.
+- Detections → Health: every rule is linted (undefined or unused selections, values too short or too common on their own, invalid regexes, missing level, false positives, id or technique, short YARA strings) and run over the evidence of every case.
+- Health finds rules that fired, noisy rules (firing on a large share of records or mostly on benign evidence), broken rules and duplicates that fire on the same records. YARA features the browser cannot run are marked as untestable, not broken.
+- Tuning suggestions: for a noisy Sigma rule, the field values most of its hits share become a ready filter block to copy into the rule.
+- The case copilot points out techniques in a case that no detection rule covers.
+- File triage: the file inspector opens with a score out of 100 and every reason. It weighs double extensions and hidden right-to-left names, wrong extensions, programs, shortcuts and scripts, macros and remote templates, active PDF content, packers, high-entropy sections, suspicious imports, impossible compile times, hidden appended data, programs embedded in files, near-random content, malicious strings (encoded PowerShell, download cradles, injection, shadow-copy deletion, ransom notes, Mimikatz, offensive frameworks), network addresses inside, indicators already known to be malicious, earlier verdicts and live lookups on the hash, and YARA matches.
+- Entropy map: a bar for each part of the file shows where packed or encrypted data sits. Mark the file malicious or suspicious from the triage card; the downloaded report and the evidence saved to the case include the triage.
+
 ## [1.28] — Report writer and OSINT research (2026-11-15)
 
 _Reports now write the parts analysts write last — a bottom line with a stated confidence, the attack path, recommendations with reasons, and the limitations — and export to Word. The Forensics kit gains look-alike domain hunting and identity pivots, and every indicator's details suggest the next steps worth taking._
