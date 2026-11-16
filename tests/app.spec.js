@@ -1814,7 +1814,7 @@ test('backup reminders: due after a week of own work, shown on the dashboard and
 test('guided tour walks through the demo case and can be left with Escape', async ({ page }) => {
   const errors = await open(page, '#/help');
   await page.click('[data-act=tourStart]');
-  for (let i = 0; i < 7; i++) { await expect(page.locator('#tourCard .tour-n')).toHaveText(`${i + 1} of 8`); await expect(page.locator('#tourRing')).toBeVisible(); await page.click('[data-act=tourNext]'); }
+  for (let i = 0; i < 9; i++) { await expect(page.locator('#tourCard .tour-n')).toHaveText(`${i + 1} of 10`); await expect(page.locator('#tourRing')).toBeVisible(); await page.click('[data-act=tourNext]'); }
   await expect(page.locator('#tourCard')).toContainText('Now your own case');
   await page.keyboard.press('Escape'); await expect(page.locator('#tourCard')).toHaveCount(0);
   noErrors(errors);

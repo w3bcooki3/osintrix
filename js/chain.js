@@ -32,8 +32,10 @@ function chainOf(c, D){
     for(const o of E.observations(r)){ const ids = o.t.match(/T\d{4}(?:\.\d{3})?/g) || []; ids.forEach(id => byTech(id, r)); if(!ids.length && typeof RW_TAG !== 'undefined' && RW_TAG[o.tag]) add(RW_TAG[o.tag][1], r, RW_TAG[o.tag][0]); }
     for(const e of r.ents || []) if(e.k === 'ttp') byTech(e.v.toUpperCase(), r);
     for(const tg of r.tags || []){ const m = CH_TAGS.find(([re]) => re.test(tg.toLowerCase())); if(m) add(m[1], r, 'tagged “' + tg + '”'); }
-    if(rules.length){ const f = recFields(r); for(const x of rules){ let hit = false; try{ hit = sigmaEval(x.p, f); }catch(e){} if(hit) for(const id of x.r.technique.match(/T\d{4}(?:\.\d{3})?/g)) byTech(id, r, 'rule “' + x.r.title + '”'); } }
   }
+  if(rules.length){ const F = ev.map(recFields), I = sigmaIndex(F);
+    for(const x of rules){ const C = sigmaCands(I, x.p), idx = C ? [...C].sort((a, b) => a - b) : F.map((_, i) => i);
+      for(const i of idx){ let hit = false; try{ hit = sigmaEval(x.p, F[i]); }catch(e){} if(hit) for(const id of x.r.technique.match(/T\d{4}(?:\.\d{3})?/g)) byTech(id, ev[i], 'rule “' + x.r.title + '”'); } } }
   const stages = ATTACK.tactics.map(([tid, short, name]) => { const L = at.get(short).sort((a, b) => (a.r.ts || 9e15) - (b.r.ts || 9e15)); return {tid, short, name, L, first:L.find(x => x.r.ts)}; });
   const seen = stages.filter(s => s.L.length), lastIdx = Math.max(-1, ...stages.map((s, i) => s.L.length ? i : -1)), firstIdx = stages.findIndex(s => s.L.length);
   /* stages in the middle of the chain with nothing: the likely blind spots */

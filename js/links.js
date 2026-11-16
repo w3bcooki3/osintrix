@@ -32,13 +32,13 @@ function caseLinks(caseId){
   const out = [];
   for(const [id, o] of X.per){ if(id === caseId) continue; const shared = [], near = []; let score = 0;
     for(const [k, x] of me.keys){ if(X.common.has(k) || !o.keys.has(k)) continue; const vd = x.kind === 'ind' ? (verdictOf(x.id) || '') : '';
-      const w = x.kind === 'vault' ? 4 : (CLK_W[vd] ?? 1); score += w; shared.push({...x, vd, w}); }
+      const age = vd && typeof verdictWeight === 'function' ? verdictWeight(x.id) : 1, w = x.kind === 'vault' ? 4 : 1 + ((CLK_W[vd] ?? 1) - 1) * age; score += w; shared.push({...x, vd, w, old:age < 0.5}); }
     for(const [k, x] of o.keys){ if(x.kind !== 'ind' || X.common.has(k) || me.keys.has(k)) continue;
       if(x.k === 'ipv4'){ const net = x.v.split('.').slice(0, 3).join('.'); if(myNet.has(net) && myNet.get(net) !== x.v){ near.push({why:'same /24 network', a:myNet.get(net), b:x.v}); score += 0.5; } }
       else if(x.k === 'domain'){ const r = lkRegDomain(x.v); if(r && myDom.has(r) && myDom.get(r) !== x.v){ near.push({why:'same registered domain ' + r, a:myDom.get(r), b:x.v}); score += 0.5; } } }
     if(!shared.length && !near.length) continue;
     shared.sort((a, b) => b.w - a.w || (a.kind === 'vault' ? -1 : 1));
-    const strength = shared.some(s => s.vd === 'malicious') || shared.filter(s => s.kind === 'vault').length >= 1 && shared.length >= 2 || score >= 8 ? 'strong' : shared.length ? 'some' : 'weak';
+    const strength = shared.some(s => s.vd === 'malicious' && !s.old) || shared.filter(s => s.kind === 'vault').length >= 1 && shared.length >= 2 || score >= 8 ? 'strong' : shared.length ? 'some' : 'weak';
     out.push({c:o.c, score, shared, near:near.slice(0, 4), strength}); }
   return out.sort((a, b) => ({strong:2, some:1, weak:0}[b.strength] - {strong:2, some:1, weak:0}[a.strength]) || b.score - a.score).slice(0, 8);
 }
@@ -46,11 +46,11 @@ function linksCard(c){
   const L = caseLinks(c.id); if(!L.length) return '';
   const lbl = {strong:['Strong link', 'red'], some:['Shares indicators', 'amber'], weak:['Related infrastructure', '']};
   const item = s => s.kind === 'vault' ? `<span class="lk-i"><span class="t3">${esc(TYPES[s.type] ? TYPES[s.type].label : s.type)}</span> <b>${esc(s.v)}</b> <span class="t3">in both vaults</span></span>`
-    : `<button class="lk-i" data-act="lkEnt" data-id="${esc(s.id)}"><span class="t3">${esc(E.LABEL[s.k] || s.k)}</span> <b class="mono">${esc(s.v)}</b>${s.vd ? ` <span class="chip sq ${s.vd === 'malicious' ? 'red' : 'amber'}">${esc(s.vd)}</span>` : ''}</button>`;
+    : `<button class="lk-i" data-act="lkEnt" data-id="${esc(s.id)}"><span class="t3">${esc(E.LABEL[s.k] || s.k)}</span> <b class="mono">${esc(s.v)}</b>${s.vd ? ` <span class="chip sq ${s.old ? '' : s.vd === 'malicious' ? 'red' : 'amber'}"${s.old ? ' title="Marked a long time ago — counts for less"' : ''}>${esc(s.vd)}${s.old ? ' · old' : ''}</span>` : ''}</button>`;
   return `<section class="card lk"><header><h3>${ico('link-2','sm')} Connected cases</h3><span class="t3">${L.length}</span></header><div class="body">
     ${L.map(x => `<div class="lk-c"><div class="lk-h"><a href="${caseHash(x.c.id, 'overview')}"><b class="mono">${esc(x.c.code)}</b> ${esc(x.c.name.split(' — ')[0])}</a><span class="chip sq ${lbl[x.strength][1]}">${lbl[x.strength][0]}</span></div>
-      ${x.shared.length ? `<p class="t2">${x.shared.length} thing${x.shared.length > 1 ? 's' : ''} in both${x.shared.some(s => s.vd === 'malicious') ? ', including what you marked malicious' : ''}:</p><div class="lk-l">${x.shared.slice(0, 6).map(item).join('')}${x.shared.length > 6 ? `<span class="t3">and ${x.shared.length - 6} more</span>` : ''}</div>` : ''}
+      ${x.shared.length ? `<p class="t2">${x.shared.length} thing${x.shared.length > 1 ? 's' : ''} in both${x.shared.some(s => s.vd === 'malicious' && !s.old) ? ', including what you marked malicious' : x.shared.some(s => s.vd === 'malicious') ? ', including indicators you marked malicious a long time ago' : ''}:</p><div class="lk-l">${x.shared.slice(0, 6).map(item).join('')}${x.shared.length > 6 ? `<span class="t3">and ${x.shared.length - 6} more</span>` : ''}</div>` : ''}
       ${x.near.length ? `<p class="t3 small">Nearby: ${x.near.map(n => `<span class="mono">${esc(n.a)}</span> here and <span class="mono">${esc(n.b)}</span> there — ${esc(n.why)}`).join('; ')}. Weaker: shared hosting is common.</p>` : ''}</div>`).join('')}
-    <p class="t3 small">Private addresses, things you marked benign, and anything in most of your cases are left out.</p></div></section>`;
+    <p class="t3 small">Private addresses, things you marked benign, and anything in most of your cases are left out; verdicts count for less as they age.</p></div></section>`;
 }
 const CLK_ACTS = { lkEnt:id => { if(typeof clickAct === 'function') clickAct('selEnt', id); } };

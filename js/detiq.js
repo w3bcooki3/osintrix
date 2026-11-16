@@ -95,9 +95,9 @@ async function ruleHealth(){
   const recs = DB.records.filter(r => r.type !== 'lead').slice(-5000), F = new Map(), id2 = new Map(recs.map((r, i) => [r.id, i]));
   const field = r => { let f = F.get(r.id); if(!f){ f = recFields(r); F.set(r.id, f); } return f; };
   const benign = r => (r.ents || []).length && r.ents.every(e => verdictOf(e.k + ':' + e.v) === 'benign');
-  const yaraOk = recs.length <= 2000, rows = [];
+  const yaraOk = recs.length <= 2000, rows = [], I = sigmaIndex(recs.map(field));
   for(let i = 0; i < DB.rules.length; i++){ const r = DB.rules[i]; let hits = [], err = '';
-    try{ if(r.type === 'sigma'){ const p = sigmaParse(r.code); if(p.cond && Object.keys(p.det).length) hits = recs.filter(x => { try{ return sigmaEval(p, field(x)); }catch(e){ err = e.message; return false; } }); }
+    try{ if(r.type === 'sigma'){ const p = sigmaParse(r.code); if(p.cond && Object.keys(p.det).length){ const C = sigmaCands(I, p); hits = (C ? [...C].sort((a, b) => a - b).map(i => recs[i]) : recs).filter(x => { try{ return sigmaEval(p, field(x)); }catch(e){ err = e.message; return false; } }); } }
       else if(yaraOk){ for(const x of recs){ const res = yaraScan(r.code, new TextEncoder().encode(x.title + '\n' + x.body)); if(res.some(z => z.error)){ err = res.find(z => z.error).error; break; } if(res.some(z => z.match)) hits.push(x); } } }
     catch(e){ err = e.message; }
     let unsup = ''; if(/Not supported in the browser engine/.test(err)){ unsup = err; err = ''; }

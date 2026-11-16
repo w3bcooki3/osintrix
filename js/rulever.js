@@ -42,7 +42,23 @@ function rvPane(r, code){
     <div class="rv-sum">${A === B ? 'Same version on both sides.' : `<b class="add">+${add}</b> <b class="del">−${del}</b> line${add + del === 1 ? '' : 's'} from ${A.now ? 'the editor' : esc(iAgo(A.at))} to ${B.now ? 'the editor' : esc(iAgo(B.at))}`}</div>
     ${meta ? `<ul class="rv-m">${meta}</ul>` : ''}${A !== B ? `<div class="rv-d" role="region" aria-label="Line changes">${add + del ? html : '<div class="rv-f">The rule text is the same.</div>'}</div>` : ''}`;
 }
+/* One line at the top of a rule: its tests, its history, where it has fired, and what Health found — each a click from the detail */
+function ruleSummary(r){
+  const items = [], btn = (tab, icon, html, tone) => `<button type="button" class="rsum-i${tone ? ' ' + tone : ''}" data-act="rsTab" data-v="${tab}">${ico(icon,'sm')}<span>${html}</span></button>`;
+  const T = typeof dlRunTests === 'function' && r.tests && r.tests.length ? dlRunTests(r) : [], bad = T.filter(x => !x.ok).length, tr = typeof dlTrend === 'function' ? dlTrend(r) : null;
+  items.push(T.length ? btn('tests', bad ? 'triangle-alert' : 'circle-check', bad ? `<b>${bad} of ${T.length}</b> tests fail${tr && tr.regressed ? ' — was passing' : ''}` : `${T.length} test${T.length > 1 ? 's' : ''} pass`, bad ? 'bad' : 'ok')
+    : btn('tests', 'circle-help', r.builtin ? 'No tests' : '<b>No tests</b> — add one', r.builtin ? '' : 'warn'));
+  const V = rvList(r); items.push(btn('history', 'history', V.length ? `${V.length} earlier version${V.length > 1 ? 's' : ''} · changed ${esc(iAgo(r.modified || r.created || Date.now()))}` : 'No earlier versions'));
+  const H = typeof DQ !== 'undefined' && DQ.health && DQ.health.rows ? DQ.health.rows.find(x => x.r.id === r.id) : null;
+  if(H){ items.push(`<span class="rsum-i${H.noisy ? ' warn' : ''}">${ico('activity','sm')}<span>${H.n ? `Fired on <b>${H.n}</b> event${H.n > 1 ? 's' : ''} in ${H.cases.size} case${H.cases.size > 1 ? 's' : ''}${H.noisy ? ' — noisy' : ''}` : 'Never fired on your evidence'} <span class="t3">· checked ${esc(iAgo(DQ.health.at))}</span></span></span>`);
+    const like = [...new Set([...(H.alike || []), ...(H.dups || [])])].filter(x => x.id !== r.id);
+    if(like.length) items.push(`<span class="rsum-i warn">${ico('copy','sm')}<span>Like ${like.slice(0, 2).map(x => `<button type="button" class="lnk" data-act="dqOpen" data-id="${esc(x.id)}">${esc(x.title)}</button>`).join(', ')}</span></span>`); }
+  else items.push(`<button type="button" class="rsum-i" data-act="rsHealth">${ico('activity','sm')}<span>Where it fires: <b>check all rules</b></span></button>`);
+  return `<div class="rsum" aria-label="Rule at a glance">${items.join('')}</div>`;
+}
 const RV_ACTS = {
+  rsTab:(id, v) => { const b = document.querySelector(`form.rx [data-rtab="${CSS.escape(v)}"]`); if(b) b.click(); },
+  rsHealth:() => { if(typeof ruleHealth === 'function') ruleHealth().then(() => renderMain()); },
   rvPick:(id, v) => { const [s, i] = String(v).split(':'); if(s === 'a') UI.rvA = +i; else UI.rvB = +i; dlPaneFill(); },
   rvUse:(id, v) => { const r = DB.rules.find(z => z.id === UI.rule); if(!r) return; const x = [...rvList(r)].reverse()[+v]; if(!x) return;
     const set = (el, val) => { const e = $(el); if(e && val != null){ e.value = val; e.dispatchEvent(new Event('input', {bubbles:true})); e.dispatchEvent(new Event('change', {bubbles:true})); } };

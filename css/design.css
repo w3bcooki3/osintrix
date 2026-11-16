@@ -2738,3 +2738,32 @@ span.lk-i{cursor:default}
 .rp .rp-l li{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:7px 0;border-bottom:1px solid var(--line)}
 .rp .rp-l li > div{flex:1;min-width:200px;display:flex;flex-direction:column}
 .rp .rp-l.plain li{gap:8px}
+/* rule at a glance */
+.rsum{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}
+.rsum-i{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--text-2);font:inherit;font-size:calc(12.5px * var(--ts,1));line-height:1.3}
+button.rsum-i{cursor:pointer}
+button.rsum-i:hover{background:var(--hover);color:var(--text)}
+.rsum-i b{color:var(--text);font-weight:600}
+.rsum-i.ok svg{color:var(--green, #16a34a)}
+.rsum-i.bad{border-color:color-mix(in srgb,var(--red) 45%,var(--line))}
+.rsum-i.bad svg,.rsum-i.bad b{color:var(--red)}
+.rsum-i.warn svg{color:var(--amber)}
+.rsum-i .lnk{font-size:inherit}
+.vd-age{display:flex;gap:6px;align-items:flex-start;margin:8px 0 0;color:var(--text-2);font-size:calc(12.5px * var(--ts,1))}
+.vd-age.stale svg{color:var(--amber)} .vd-age svg{flex:none;margin-top:2px}
+/* saved hunts */
+.hu-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 12px}
+.hu-top p{flex:1;min-width:240px;margin:0}
+.hu{margin-bottom:12px}
+.hu > header{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.hu > header h3{display:flex;gap:6px;align-items:center;margin:0}
+.hu .hu-c,.hu .hu-e{list-style:none;margin:0;padding:0}
+.hu .hu-c li,.hu .hu-e li{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:5px 0;border-bottom:1px solid var(--line)}
+.hu .hu-e li .cr-t{flex:1;min-width:200px}
+.hu .hu-h{margin:12px 0 4px;font-size:calc(13px * var(--ts,1))}
+.hu .cr-t{all:unset;cursor:pointer;font-weight:600;color:var(--text)} .hu .cr-t:hover{text-decoration:underline} .hu .cr-t:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+/* notes that cite events */
+.note-card .ncite{all:unset;cursor:pointer;color:var(--accent);font-weight:600;font-size:.9em}
+.note-card .ncite:hover{text-decoration:underline}
+.note-card .ncite:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-radius:3px}
+.note-card .ncites{display:inline-flex;gap:6px;align-items:center;margin-top:8px;padding:3px 8px;border:1px solid color-mix(in srgb,var(--nc) 60%,var(--line));border-radius:8px;background:transparent;color:var(--text-2);font:inherit;font-size:calc(12.5px * var(--ts,1));cursor:pointer}

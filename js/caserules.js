@@ -19,11 +19,11 @@ function crWhy(r){
 async function crRun(c){
   const sig = crSig(c.id); if(CR.run && CR.run.sig === sig) return; const me = {sig, done:0, total:DB.rules.length}; CR.run = me;
   const recs = DB.records.filter(r => r.caseId === c.id && r.type !== 'lead'), F = new Map(), field = r => { let f = F.get(r.id); if(!f){ f = recFields(r); F.set(r.id, f); } return f; };
-  const yaraOk = recs.length <= 2000, rows = [], caught = new Map(); let errs = 0;
+  const yaraOk = recs.length <= 2000, rows = [], caught = new Map(); let errs = 0; const I = sigmaIndex(recs.map(field));
   for(let i = 0; i < DB.rules.length; i++){
     if(CR.run !== me) return;                                                     // a newer run took over
     const r = DB.rules[i]; let hits = [];
-    try{ if(r.type === 'sigma'){ const p = sigmaParse(r.code); if(p.cond && Object.keys(p.det).length) hits = recs.filter(x => { try{ return sigmaEval(p, field(x)); }catch(e){ return false; } }); }
+    try{ if(r.type === 'sigma'){ const p = sigmaParse(r.code); if(p.cond && Object.keys(p.det).length){ const C = sigmaCands(I, p); hits = (C ? [...C].sort((a, b) => a - b).map(i => recs[i]) : recs).filter(x => { try{ return sigmaEval(p, field(x)); }catch(e){ return false; } }); } }
       else if(yaraOk && typeof yaraScan === 'function'){ for(const x of recs){ const res = yaraScan(r.code, new TextEncoder().encode(x.title + '\n' + x.body)); if(res.some(z => z.error)) break; if(res.some(z => z.match)) hits.push(x); } } }
     catch(e){ errs++; }
     if(hits.length){ rows.push({r, hits}); for(const h of hits){ if(!caught.has(h.id)) caught.set(h.id, []); caught.get(h.id).push(r); } }

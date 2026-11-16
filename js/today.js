@@ -25,6 +25,12 @@ function todayItems(){
   if(looked.length) add(3, 'radar', `${looked.length} indicator${looked.length > 1 ? 's' : ''} a lookup flagged, with no verdict from you`, looked.slice(0, 3).map(h => `${h.v} (${h.band} ${h.score ?? ''})`).join(' · '), {act:'selEnt', id:looked[0].k + ':' + looked[0].v, caseId:keysIn.get(looked[0].k + ':' + looked[0].v).id, l:'Judge the first'});
   if(typeof ctiIocHits === 'function' && typeof CTI !== 'undefined' && CTI.iocs){ const H = ctiIocHits().filter(h => keysIn.has(h.ioc.k + ':' + h.ioc.v) && !verdictOf(h.ioc.k + ':' + h.ioc.v));
     if(H.length) add(2, 'fingerprint', `${H.length} indicator${H.length > 1 ? 's' : ''} in your cases match the indicator store`, H.slice(0, 3).map(h => h.ioc.v + (h.ioc.threat ? ' — ' + h.ioc.threat : '')).join(' · '), {go:'#/feeds', itab:'iocs', l:'See them'}); }
+  /* saved hunts with new matches */
+  if(typeof huntList === 'function') for(const h of huntList()){ let R; try{ R = huntRun(h); }catch(e){ continue; } if(!R.fresh.length) continue;
+    add(2, 'crosshair', `Hunt “${h.name}”: ${R.fresh.length} new match${R.fresh.length > 1 ? 'es' : ''}`, [...new Set(R.fresh.map(r => (theCase(r.caseId) || {}).code).filter(Boolean))].slice(0, 4).join(' · ') + ' — ' + R.fresh[0].title.slice(0, 80), {act:'huOpen', l:'See them'}); }
+  /* verdicts that have aged past their half-life on indicators in open cases */
+  if(typeof verdictStale === 'function'){ const st = [...keysIn.keys()].filter(verdictStale);
+    if(st.length) add(1, 'clock-alert', `${st.length} malicious or suspicious verdict${st.length > 1 ? 's are' : ' is'} old`, st.slice(0, 3).map(k => entSplit(k).v + ' (' + iAgo(verdictAt(k)) + ')').join(' · ') + ' — addresses and domains change hands; check again before relying on them.', {act:'selEnt', id:st[0], caseId:keysIn.get(st[0]).id, l:'Check the first'}); }
   /* what arrived while a case was closed */
   if(typeof caseActivity === 'function'){ const S = DB.prefs.seen || {}; for(const c of cases){ if(!S[c.id] || c.id === SEEN.open) continue; const L = caseActivity(c, S[c.id]); if(!L.length) continue;
     add(L.some(x => x.tone === 'red') ? 2 : 1, 'history', `${c.code}: ${L.length} thing${L.length > 1 ? 's' : ''} since you last looked`, L.slice(0, 3).map(x => x.t).join(' · '), {go:caseHash(c.id, 'overview'), l:'Open the case'}); } }

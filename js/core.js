@@ -188,6 +188,7 @@ function passes(r){
   if(UI.pivot && !r.ents.some(e => entKey(e) === UI.pivot)) return false;
   if(UI.facet.slot && !slotPass(r)) return false;
   if(UI.facet.win && !winPass(r)) return false;
+  if(UI.facet.ids && !UI.facet.ids.includes(r.id)) return false;
   if(UI.ast){ const h = (r.title + ' ' + r.body + ' ' + r.host + ' ' + r.source + ' ' + r.tags.join(' ')).toLowerCase();
     if(!UI.ast.some(g => g.text.every(t => h.includes(t)) && g.neg.every(t => !h.includes(t)) && g.f.every(f => matchField(r, f) !== f.neg))) return false; }
   return true;

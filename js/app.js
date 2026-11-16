@@ -78,61 +78,21 @@ function promote(entId){
 }
 function slug(s){ return (s || 'case').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40); }
 
+/* Every feature's actions, in one registry. Built on the first click (all scripts have loaded by then) in this order; the first
+   map to define a name wins, as the old chain of checks did. actConflicts() lists names defined twice — a test keeps it empty. */
+const ACT_MAPS = ['LAYOUT_ACTS', 'SAFE_ACTS', 'TL_ACTS', 'REP_ACTS', 'CE_ACTS', 'REL_ACTS', 'WATCH_ACTS', 'PARSE_ACTS', 'MAP_ACTS', 'CTF2_ACTS', 'RS_ACTS', 'ACH_ACTS', 'PCAP_ACTS', 'SQL_ACTS', 'SEC_ACTS', 'CLOUD_ACTS', 'WN_ACTS', 'PAD_ACTS', 'NB_ACTS', 'STO_ACTS', 'FB_ACTS', 'CX_ACTS', 'RC_ACTS', 'CTI_ACTS', 'LK_ACTS', 'CP_ACTS', 'RW_ACTS', 'OS_ACTS', 'DQ_ACTS', 'TRI_ACTS', 'SH_ACTS', 'SU_ACTS', 'MD_ACTS', 'TLX_ACTS', 'PIC_ACTS', 'ACT_ACTS', 'AU_ACTS', 'TOUR_ACTS', 'DL_ACTS', 'CH_ACTS', 'TD_ACTS', 'DUP_ACTS', 'RB_ACTS', 'CR_ACTS', 'TX2_ACTS', 'CLK_ACTS', 'RV_ACTS', 'RP_ACTS', 'HU_ACTS', 'EVN_ACTS', 'NBX_ACTS'];
+const ACT_GET = {LAYOUT_ACTS:() => typeof LAYOUT_ACTS !== 'undefined' ? LAYOUT_ACTS : null, SAFE_ACTS:() => typeof SAFE_ACTS !== 'undefined' ? SAFE_ACTS : null, TL_ACTS:() => typeof TL_ACTS !== 'undefined' ? TL_ACTS : null, REP_ACTS:() => typeof REP_ACTS !== 'undefined' ? REP_ACTS : null, CE_ACTS:() => typeof CE_ACTS !== 'undefined' ? CE_ACTS : null, REL_ACTS:() => typeof REL_ACTS !== 'undefined' ? REL_ACTS : null, WATCH_ACTS:() => typeof WATCH_ACTS !== 'undefined' ? WATCH_ACTS : null, PARSE_ACTS:() => typeof PARSE_ACTS !== 'undefined' ? PARSE_ACTS : null, MAP_ACTS:() => typeof MAP_ACTS !== 'undefined' ? MAP_ACTS : null, CTF2_ACTS:() => typeof CTF2_ACTS !== 'undefined' ? CTF2_ACTS : null, RS_ACTS:() => typeof RS_ACTS !== 'undefined' ? RS_ACTS : null, ACH_ACTS:() => typeof ACH_ACTS !== 'undefined' ? ACH_ACTS : null, PCAP_ACTS:() => typeof PCAP_ACTS !== 'undefined' ? PCAP_ACTS : null, SQL_ACTS:() => typeof SQL_ACTS !== 'undefined' ? SQL_ACTS : null, SEC_ACTS:() => typeof SEC_ACTS !== 'undefined' ? SEC_ACTS : null, CLOUD_ACTS:() => typeof CLOUD_ACTS !== 'undefined' ? CLOUD_ACTS : null, WN_ACTS:() => typeof WN_ACTS !== 'undefined' ? WN_ACTS : null, PAD_ACTS:() => typeof PAD_ACTS !== 'undefined' ? PAD_ACTS : null, NB_ACTS:() => typeof NB_ACTS !== 'undefined' ? NB_ACTS : null, STO_ACTS:() => typeof STO_ACTS !== 'undefined' ? STO_ACTS : null, FB_ACTS:() => typeof FB_ACTS !== 'undefined' ? FB_ACTS : null, CX_ACTS:() => typeof CX_ACTS !== 'undefined' ? CX_ACTS : null, RC_ACTS:() => typeof RC_ACTS !== 'undefined' ? RC_ACTS : null, CTI_ACTS:() => typeof CTI_ACTS !== 'undefined' ? CTI_ACTS : null, LK_ACTS:() => typeof LK_ACTS !== 'undefined' ? LK_ACTS : null, CP_ACTS:() => typeof CP_ACTS !== 'undefined' ? CP_ACTS : null, RW_ACTS:() => typeof RW_ACTS !== 'undefined' ? RW_ACTS : null, OS_ACTS:() => typeof OS_ACTS !== 'undefined' ? OS_ACTS : null, DQ_ACTS:() => typeof DQ_ACTS !== 'undefined' ? DQ_ACTS : null, TRI_ACTS:() => typeof TRI_ACTS !== 'undefined' ? TRI_ACTS : null, SH_ACTS:() => typeof SH_ACTS !== 'undefined' ? SH_ACTS : null, SU_ACTS:() => typeof SU_ACTS !== 'undefined' ? SU_ACTS : null, MD_ACTS:() => typeof MD_ACTS !== 'undefined' ? MD_ACTS : null, TLX_ACTS:() => typeof TLX_ACTS !== 'undefined' ? TLX_ACTS : null, PIC_ACTS:() => typeof PIC_ACTS !== 'undefined' ? PIC_ACTS : null, ACT_ACTS:() => typeof ACT_ACTS !== 'undefined' ? ACT_ACTS : null, AU_ACTS:() => typeof AU_ACTS !== 'undefined' ? AU_ACTS : null, TOUR_ACTS:() => typeof TOUR_ACTS !== 'undefined' ? TOUR_ACTS : null, DL_ACTS:() => typeof DL_ACTS !== 'undefined' ? DL_ACTS : null, CH_ACTS:() => typeof CH_ACTS !== 'undefined' ? CH_ACTS : null, TD_ACTS:() => typeof TD_ACTS !== 'undefined' ? TD_ACTS : null, DUP_ACTS:() => typeof DUP_ACTS !== 'undefined' ? DUP_ACTS : null, RB_ACTS:() => typeof RB_ACTS !== 'undefined' ? RB_ACTS : null, CR_ACTS:() => typeof CR_ACTS !== 'undefined' ? CR_ACTS : null, TX2_ACTS:() => typeof TX2_ACTS !== 'undefined' ? TX2_ACTS : null, CLK_ACTS:() => typeof CLK_ACTS !== 'undefined' ? CLK_ACTS : null, RV_ACTS:() => typeof RV_ACTS !== 'undefined' ? RV_ACTS : null, RP_ACTS:() => typeof RP_ACTS !== 'undefined' ? RP_ACTS : null, HU_ACTS:() => typeof HU_ACTS !== 'undefined' ? HU_ACTS : null, EVN_ACTS:() => typeof EVN_ACTS !== 'undefined' ? EVN_ACTS : null, NBX_ACTS:() => typeof NBX_ACTS !== 'undefined' ? NBX_ACTS : null};
+let ACT_IDX = null;
+function actIndex(){ if(ACT_IDX) return ACT_IDX; ACT_IDX = new Map(); for(const n of ACT_MAPS){ const m = ACT_GET[n](); if(m) for(const k of Object.keys(m)) if(!ACT_IDX.has(k)) ACT_IDX.set(k, m[k]); } return ACT_IDX; }
+const actFor = a => actIndex().get(a) || null;
+function actConflicts(){ const seen = new Map(), out = []; for(const n of ACT_MAPS){ const m = ACT_GET[n](); if(m) for(const k of Object.keys(m)){ if(seen.has(k)) out.push(k + ' in ' + seen.get(k) + ' and ' + n); else seen.set(k, n); } } return out; }
 document.addEventListener('click', ev => {
   if($('side').classList.contains('open') && !ev.target.closest('#side') && !ev.target.closest('[data-act=navToggle]')){ $('side').classList.remove('open'); return; }
   const t = ev.target.closest('[data-act]'); if(!t) return;
   const a = t.dataset.act, id = t.dataset.id, v = t.dataset.v;
   const needs = ['caseMenu','qDelAsk','rMenu','nMenu','nEdit','nColor','nColorPick','qStar','qEng','rStar','deleteCaseDlg','gLegend','gHide','star','toolPin','casePin','toolStar','toolEdit','pickType','pickColor','pickIcon','gExport','flagToChal','chStatus','pbIcon','pbMenu','iocMenu','printReport','linkFrom','gZoom','gFit','gConnect','gEdit','gDelete','gCo','gPng'];
   if(needs.includes(a)) ev.preventDefault();
-  if(LAYOUT_ACTS[a]) return LAYOUT_ACTS[a](id, v, t, ev);
-  if(SAFE_ACTS[a]) return SAFE_ACTS[a](id, v, t, ev);
-  if(TL_ACTS[a]) return TL_ACTS[a](id, v, t, ev);
-  if(REP_ACTS[a]) return REP_ACTS[a](id, v, t, ev);
-  if(CE_ACTS[a]) return CE_ACTS[a](id, v, t, ev);
-  if(REL_ACTS[a]) return REL_ACTS[a](id, v, t, ev);
-  if(WATCH_ACTS[a]) return WATCH_ACTS[a](id, v, t, ev);
-  if(PARSE_ACTS[a]) return PARSE_ACTS[a](id, v, t, ev);
-  if(MAP_ACTS[a]) return MAP_ACTS[a](id, v, t, ev);
-  if(typeof CTF2_ACTS !== 'undefined' && CTF2_ACTS[a]) return CTF2_ACTS[a](id, v, t, ev);
-  if(RS_ACTS[a]) return RS_ACTS[a](id, v, t, ev);
-  if(ACH_ACTS[a]) return ACH_ACTS[a](id, v, t, ev);
-  if(PCAP_ACTS[a]) return PCAP_ACTS[a](id, v, t, ev);
-  if(SQL_ACTS[a]) return SQL_ACTS[a](id, v, t, ev);
-  if(SEC_ACTS[a]) return SEC_ACTS[a](id, v, t, ev);
-  if(CLOUD_ACTS[a]) return CLOUD_ACTS[a](id, v, t, ev);
-  if(WN_ACTS[a]) return WN_ACTS[a](id, v, t, ev);
-  if(PAD_ACTS[a]) return PAD_ACTS[a](id, v, t, ev);
-  if(NB_ACTS[a]) return NB_ACTS[a](id, v, t, ev);
-  if(STO_ACTS[a]) return STO_ACTS[a](id, v, t, ev);
-  if(FB_ACTS[a]) return FB_ACTS[a](id, v, t, ev);
-  if(CX_ACTS[a]) return CX_ACTS[a](id, v, t, ev);
-  if(typeof RC_ACTS !== 'undefined' && RC_ACTS[a]) return RC_ACTS[a](id, v, t, ev);
-  if(typeof CTI_ACTS !== 'undefined' && CTI_ACTS[a]) return CTI_ACTS[a](id, v, t, ev);
-  if(typeof LK_ACTS !== 'undefined' && LK_ACTS[a]) return LK_ACTS[a](id, v, t, ev);
-  if(typeof CP_ACTS !== 'undefined' && CP_ACTS[a]) return CP_ACTS[a](id, v, t, ev);
-  if(typeof RW_ACTS !== 'undefined' && RW_ACTS[a]) return RW_ACTS[a](id, v, t, ev);
-  if(typeof OS_ACTS !== 'undefined' && OS_ACTS[a]) return OS_ACTS[a](id, v, t, ev);
-  if(typeof DQ_ACTS !== 'undefined' && DQ_ACTS[a]) return DQ_ACTS[a](id, v, t, ev);
-  if(typeof TRI_ACTS !== 'undefined' && TRI_ACTS[a]) return TRI_ACTS[a](id, v, t, ev);
-  if(typeof SH_ACTS !== 'undefined' && SH_ACTS[a]) return SH_ACTS[a](id, v, t, ev);
-  if(typeof SU_ACTS !== 'undefined' && SU_ACTS[a]) return SU_ACTS[a](id, v, t, ev);
-  if(typeof MD_ACTS !== 'undefined' && MD_ACTS[a]) return MD_ACTS[a](id, v, t, ev);
-  if(typeof TLX_ACTS !== 'undefined' && TLX_ACTS[a]) return TLX_ACTS[a](id, v, t, ev);
-  if(typeof PIC_ACTS !== 'undefined' && PIC_ACTS[a]) return PIC_ACTS[a](id, v, t, ev);
-  if(typeof ACT_ACTS !== 'undefined' && ACT_ACTS[a]) return ACT_ACTS[a](id, v, t, ev);
-  if(typeof AU_ACTS !== 'undefined' && AU_ACTS[a]) return AU_ACTS[a](id, v, t, ev);
-  if(typeof TOUR_ACTS !== 'undefined' && TOUR_ACTS[a]) return TOUR_ACTS[a](id, v, t, ev);
-  if(typeof DL_ACTS !== 'undefined' && DL_ACTS[a]) return DL_ACTS[a](id, v, t, ev);
-  if(typeof CH_ACTS !== 'undefined' && CH_ACTS[a]) return CH_ACTS[a](id, v, t, ev);
-  if(typeof TD_ACTS !== 'undefined' && TD_ACTS[a]) return TD_ACTS[a](id, v, t, ev);
-  if(typeof DUP_ACTS !== 'undefined' && DUP_ACTS[a]) return DUP_ACTS[a](id, v, t, ev);
-  if(typeof RB_ACTS !== 'undefined' && RB_ACTS[a]) return RB_ACTS[a](id, v, t, ev);
-  if(typeof CR_ACTS !== 'undefined' && CR_ACTS[a]) return CR_ACTS[a](id, v, t, ev);
-  if(typeof TX2_ACTS !== 'undefined' && TX2_ACTS[a]) return TX2_ACTS[a](id, v, t, ev);
-  if(typeof CLK_ACTS !== 'undefined' && CLK_ACTS[a]) return CLK_ACTS[a](id, v, t, ev);
-  if(typeof RV_ACTS !== 'undefined' && RV_ACTS[a]) return RV_ACTS[a](id, v, t, ev);
-  if(typeof RP_ACTS !== 'undefined' && RP_ACTS[a]) return RP_ACTS[a](id, v, t, ev);
-  if(NBX_ACTS[a]) return NBX_ACTS[a](id, v, t, ev);
+  const fn = actFor(a); if(fn) return fn(id, v, t, ev);
   if(a === 'toolRun') return toolRunDlg(id);
   if(a === 'trPick'){ $('trV').value = v; return $('trV').focus(); }
   switch(a){
@@ -575,6 +535,7 @@ document.addEventListener('submit', ev => {
     if(vals.flagRe && !checkRegex('evR', vals.flagRe)) return; if(vals.url && !E.safeUrl(vals.url)) return fieldErr('evU', 'Enter a full address starting with http:// or https://.');
     if(f.dataset.id) Object.assign(DB.ctf.events.find(e => e.id === f.dataset.id), vals); else { const ev = {id:uid('ev'), ...vals, created:Date.now()}; DB.ctf.events.push(ev); UI.ctfEv = ev.id; }
     mutate('saved event'); closeDlg(); return renderAll(); }
+  if(k === 'hunt') return huntSubmit();
   if(k === 'nQuick'){ const ta = f.querySelector('textarea'), ti = f.querySelector('[data-nq=title]'), text = ta.value.trim(), title = ntClean(ti ? ti.value : ''), cid = f.dataset.case || null;
     if(!text && !title) return; if(text.length > 4000) return fieldErr(ta, `Notes can be up to 4,000 characters — this one is ${text.length.toLocaleString()}.`);
     if(title.length > NT_MAX) return fieldErr(ti, `Titles can be up to ${NT_MAX} characters — this one is ${title.length}.`);
@@ -722,6 +683,7 @@ async function bootRest(unlocked){
   if(window.innerWidth <= 760) $('gq').placeholder = 'Search everything';
   $('gq').addEventListener('focus', () => { $('gq').blur(); srchOpen(); }); $('gq').addEventListener('mousedown', ev => { ev.preventDefault(); srchOpen(); });
   if(typeof lazyWatch === 'function') lazyWatch();
+  if(typeof vdStamp === 'function') vdStamp();                       // verdict dates: what is here now is the baseline
   ensureTools(); ensureToolTpl(); ensurePlaybooks(); ensureIntel(); if(typeof ctiLoad === 'function') ctiLoad(); if(typeof watchMonitor === 'function'){ lkLoad(); watchMonitor(); } ensureQueries(); ensureRules(); ensureNotes(); ensureSample(); ensureCTF(); ensureNB(); ensureAchDemo(); applyPrefs(); storageCheck(); await hashRecords(); migrateFieldEnts(); ensurePositions(); flush(); onRoute(); nbFlushMedia(); fbInit();
   let seen = false; try{ seen = !!localStorage.getItem('osintrix:welcomed'); }catch(e){}
   if(!unlocked) setTimeout(() => { $('splash').classList.add('out'); setTimeout(() => $('splash').remove(), 320); if(!seen) showWelcome(); }, 350);

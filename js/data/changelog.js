@@ -4,6 +4,42 @@
    Each change has a type: "added" | "changed" | "fixed" | "removed". */
 const CHANGELOG_DATA = [
   {
+    "version": "1.42",
+    "name": "Hunts, ageing verdicts, faster at scale",
+    "date": "2026-11-16",
+    "summary": "Saved hunts across every case, verdicts that fade with age, notes written from selected events, a rule at a glance — and the rule-heavy screens several times faster on big workspaces.",
+    "changes": [
+      {
+        "type": "added",
+        "text": "Detections → Hunts: a search (the timeline filter's language) or one of your Sigma rules, run across every case. What it finds when saved counts as seen; new matches are flagged on the hunt and on Today until you mark them seen. Save a timeline filter as a hunt with the crosshair next to the filter box."
+      },
+      {
+        "type": "added",
+        "text": "Verdicts age. The date is kept when you set one, however it is set; its weight halves every 90 days for IPs, four months for URLs, six for domains and a year for emails, handles and wallets — hashes never fade. The entity panel says how old a verdict is and when to check it again, Connected cases count old verdicts for less, and Today lists stale ones in open cases."
+      },
+      {
+        "type": "added",
+        "text": "Timeline → Select → Write a note: a short summary in plain words (events, hosts, time span, attack stages, malicious indicators, what stands out) and the chronology, each line ending in a citation like [3] that opens that event. Show the cited events filters the timeline to them; citations follow the events when a case is exported and imported."
+      },
+      {
+        "type": "added",
+        "text": "A line at the top of every rule sums it up — tests and whether they pass, earlier versions, where it fires and whether it is noisy, look-alike rules — each opening its detail."
+      },
+      {
+        "type": "changed",
+        "text": "Big workspaces: with 50,000 events and 2,000 rules the attack chain went from 5.2 s to 0.6 s, Timeline → Rules from 6 s to 1.8 s and Health from 8.3 s to 2.4 s. Rules now only look at events that could hold their values (an index of three-letter pieces); a test checks this finds exactly what evaluating every rule on every event finds."
+      },
+      {
+        "type": "changed",
+        "text": "Help and the guided tour cover the newer features: rules against a case, rule history and packs, hunts, connected cases, ageing verdicts, sessions and clock correction, and notes from events. The tour is ten stops."
+      },
+      {
+        "type": "changed",
+        "text": "Under the hood: every feature's actions are in one registry, with a test that no two features claim the same action."
+      }
+    ]
+  },
+  {
     "version": "1.41",
     "name": "Connected cases, rule history, cloud logs",
     "date": "2026-11-15",

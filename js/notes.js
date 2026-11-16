@@ -34,11 +34,11 @@ function noteCard(n, compact){
     const h = l.match(/^\s*#{1,3}\s+(.*)$/); if(h) return `<h4>${noteInline(h[1])}</h4>`;
     const b = l.match(/^\s*[-*•]\s+(.*)$/); if(b) return `<p class="nli">${noteInline(b[1])}</p>`;
     const o = l.match(/^\s*(\d{1,3})[.)]\s+(.*)$/); if(o) return `<p class="nli num" data-n="${o[1]}.">${noteInline(o[2])}</p>`;
-    return `<p>${noteInline(l)}</p>`; }).join('');
+    return `<p>${noteInline(l)}</p>`; }).join(''), cites = typeof noteRefs === 'function' ? noteRefs(n).length : 0;
   return `<article class="note-card${n.pinned ? ' npinned' : ''}" style="--nc:${noteCol(n.color)}">
     <div class="nhead">${n.pinned ? `<span class="npin">${ico('pin','sm')}</span>` : ''}${c && !compact ? `<a class="ncase" href="${caseHash(c.id)}" style="--cc:${esc(c.color)}">${esc(c.code)}</a>` : ''}${!c && !compact ? '<span class="ncase gen">General</span>' : ''}
       <span style="flex:1"></span><button class="nbtn" data-act="nEdit" data-id="${n.id}" aria-label="Edit note">${ico('pencil','sm')}</button><button class="nbtn" data-act="nMenu" data-id="${n.id}" aria-label="More">${ico('ellipsis','sm')}</button></div>
-    ${tt ? `<h3 class="ntitle">${esc(tt)}</h3>` : ''}<div class="nbody">${body}</div>
+    ${tt ? `<h3 class="ntitle">${esc(tt)}</h3>` : ''}<div class="nbody">${typeof noteCiteHtml === 'function' ? noteCiteHtml(n, body) : body}</div>${cites && !compact ? `<button class="ncites" data-act="nCiteAll" data-id="${n.id}">${ico('list-filter','sm')}Show the ${cites} cited event${cites > 1 ? 's' : ''}</button>` : ''}
     ${tasks.length || n.due ? `<div class="nfoot">${tasks.length ? `<span class="nprog"><i style="width:${Math.round(done / tasks.length * 100)}%"></i></span><span>${done}/${tasks.length}</span>` : ''}${n.due ? `<span class="ndue${overdue ? ' late' : ''}">${ico('calendar-clock','sm')}${esc(n.due.slice(5))}</span>` : ''}</div>` : ''}</article>`;
 }
 /* **bold**, *italic*, `code` — escaped first, so nothing in a note can become markup */

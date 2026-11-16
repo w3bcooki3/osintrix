@@ -7,8 +7,10 @@
 const TOUR = {i:-1};
 const TOUR_STEPS = [
   {go:() => caseHash('c-lantern', 'overview'), sel:'.cp', t:'Your copilot', d:'Every case has one. It reads the evidence and suggests the next steps, writes the story so far, and points out what is missing. Nothing here is sent anywhere.'},
+  {go:() => caseHash('c-lantern', 'overview'), sel:'.lk, .cp', t:'Connected cases', d:'Cases that share indicators, accounts or infrastructure with this one are listed with what they share and how strongly — fresh malicious verdicts count most, old ones fade.'},
   {go:() => caseHash('c-lantern', 'timeline'), pre:() => { UI.tlMode = 'events'; }, sel:'#tlV .ev', t:'The timeline', d:'Every piece of evidence in time order, in your time zone. Click an event for its details; press J and K to move through them.'},
   {go:() => caseHash('c-lantern', 'timeline'), pre:() => { UI.tlMode = 'patterns'; }, sel:'.tlx-c.red', t:'Patterns', d:'OSINTrix finds the likely first sign of compromise, bursts of activity, quiet periods, cleared logs and time zone mix-ups — with the reasons, so you can check them.'},
+  {go:() => caseHash('c-lantern', 'timeline'), pre:() => { UI.tlMode = 'rules'; UI.crf = 'blind'; }, sel:'.cr-sum, #crProg', t:'Your rules, against this case', d:'Every rule runs over the case: what fired, what looks suspicious but nothing caught — grouped, one click from a draft rule — and which rules are too noisy here.'},
   {go:() => caseHash('c-lantern', 'entities'), sel:'.ce-t', t:'Indicators come out on their own', d:'IPs, domains, hashes, emails and more are pulled from everything you add. Give each a verdict once and it applies in every case.'},
   {go:() => caseHash('c-lantern', 'graph'), sel:'#cy', t:'The link graph', d:'People, accounts, infrastructure and files, and how they connect. Ask it for the shortest path between two things, or what is most central.'},
   {go:() => caseHash('c-lantern', 'media'), pre:() => { UI.mdV = 'files'; }, sel:'.md-head', t:'Pictures, videos and web pages', d:'Drop them anywhere on a case or paste a screenshot. Originals are kept with their fingerprint, and Picture insights compares them across every case.'},

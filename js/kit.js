@@ -209,6 +209,45 @@ function sigmaParse(code){
   }
   return {det, cond};
 }
+/* A quick, safe pre-check before evaluating a Sigma rule on an event: a rule can only match if at least one value it looks for
+   appears somewhere in the event's fields. Rules where that is not guaranteed (a "not", regex, CIDR, null, base64, numeric
+   or windash checks, or values too short to mean anything) always get the full evaluation. 50,000 events × 2,000 rules: seconds → fractions. */
+const SIG_NOHINT = /^(re|cidr|null|base64|base64offset|exists|lt|lte|gt|gte|windash|expand|fieldref|utf16|utf16le|utf16be|wide)$/;
+function sigmaNeedles(p){
+  if(p.__nd !== undefined) return p.__nd; let out = [];
+  const piece = v => String(v).toLowerCase().split(/[*?]/).sort((a, b) => b.length - a.length)[0] || '';
+  /* "selection and not filter": the negated parts only ever remove matches, so the needles come from the rest. A "not" that could
+     produce a match by itself (a leading "not", "or not", "not (…)") turns the pre-check off. */
+  const cond = String(p.cond || ''), neg = [];
+  if(/\bnot\b/i.test(cond)){ if(/^\s*\(?\s*not\b/i.test(cond) || /\bor\s+not\b/i.test(cond) || /\bnot\s*\(/i.test(cond)) out = null;
+    else for(const m of cond.matchAll(/\bnot\s+(?:(?:1|all|any)\s+of\s+)?([\w*]+)/gi)) neg.push(new RegExp('^' + m[1].replace(/\*/g, '.*') + '$', 'i')); }
+  try{ if(out === null || !Object.keys(p.det || {}).length) out = null;
+    else for(const [name, sel] of Object.entries(p.det)){ if(!out) break; if(neg.some(re => re.test(name))) continue;
+      for(const k of sel.keywords || []){ const x = piece(k); if(x.length < 2){ out = null; break; } out.push(x); }
+      for(const fd of sel.fields || []){ if(!out) break; const mods = String(fd.f).split('|').slice(1); if(mods.some(m => SIG_NOHINT.test(m)) || !fd.vals.length){ out = null; break; }
+        for(const v of fd.vals){ const x = piece(v); if(v === '' || /^null$/i.test(v) || x.length < 2){ out = null; break; } out.push(x); } } } }
+  catch(e){ out = null; }
+  Object.defineProperty(p, '__nd', {value:out && out.length ? [...new Set(out)] : null, enumerable:false}); return p.__nd;
+}
+const SIG_HAY = new WeakMap();
+function sigmaMay(p, f){ const N = sigmaNeedles(p); if(!N) return true; const h = sigHay(f); for(const n of N) if(h.includes(n)) return true; return false; }
+/* Index of events by three-letter pieces, so a rule only looks at events that could hold its values: for each value, the
+   events containing its rarest piece. Necessary, not sufficient — every candidate still gets the full evaluation. Events with
+   very long text are always candidates. */
+const sigHay = f => { let h = SIG_HAY.get(f); if(h == null){ h = Object.entries(f).filter(([k]) => k !== '_orig').map(([, v]) => String(v).toLowerCase()).join('\u0001'); SIG_HAY.set(f, h); } return h; };
+function sigmaIndex(F){
+  const tri = new Map(), long = [];
+  F.forEach((f, i) => { const h = sigHay(f); if(h.length > 20000){ long.push(i); return; } const seen = new Set();
+    for(let k = 0; k + 3 <= h.length; k++){ const t = h.substr(k, 3); if(seen.has(t)) continue; seen.add(t); let L = tri.get(t); if(!L){ L = []; tri.set(t, L); } L.push(i); } });
+  return {tri, long, n:F.length};
+}
+function sigmaCands(I, p){
+  const N = sigmaNeedles(p); if(!N || N.some(x => x.length < 3)) return null;
+  const out = new Set(I.long);
+  for(const nd of N){ let best = null; for(let k = 0; k + 3 <= nd.length; k++){ const L = I.tri.get(nd.substr(k, 3)); if(!L){ best = []; break; } if(!best || L.length < best.length) best = L; }
+    for(const i of best) out.add(i); }
+  return out;
+}
 function recFields(r){
   const f = {_raw:(r.title + ' ' + r.body).toLowerCase(), _orig:r.title + ' ' + r.body}; const s = r.body || '';
   /* key=value pairs; the key starts at a word boundary and is at most 64 long, so a long unbroken line stays linear (it was quadratic: 3.5 s on 200 KB) */
