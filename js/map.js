@@ -41,8 +41,9 @@ function mapData(caseId){
     if(e.type === 'phone'){ const n = ccCountry(E.norm('phone', e.fields.number || '')); if(n) addC(n, 'phone country code', {kind:'entry', id:e.id}); }
   }
   for(const r of D.recs){
-    for(const x of r.ents){ if(x.k === 'coords'){ const [la, lo] = x.v.split(','); addPt(la, lo, {rec:r, label:r.title.replace(/^(Photo|Screenshot|Image): /, '').slice(0, 60), src:/EXIF GPS/i.test(r.body) ? 'Photo GPS' : 'In evidence'}); }
+    for(const x of r.ents){ if(x.k === 'coords'){ const [la, lo] = x.v.split(','); addPt(la, lo, {rec:r, label:r.title.replace(/^(Photo|Screenshot|Image): /, '').slice(0, 60), src:/EXIF GPS/i.test(r.body) ? 'Photo GPS' : /Video GPS/i.test(r.body) ? 'Video GPS' : /File GPS/i.test(r.body) ? 'File GPS' : 'In evidence'}); }
       if(x.k === 'phone'){ const n = ccCountry(x.v); if(n) addC(n, 'phone country code', {kind:'rec', id:r.id}); } }
+    if(r.geo && typeof geoOf === 'function') for(const g of geoOf(r).cands) if(g.verdict === 'confirmed') addPt(g.lat, g.lon, {rec:r, label:g.name || r.title.replace(/^(Photo|Screenshot|Image|Video): /, '').slice(0, 60), src:'Geolocated'});
     const P = r.body && r.body.length < 20000 ? parseLog(r.body.split('\n')[0]) : null;
     if(P) for(const [k, v] of Object.entries(P.fields)) if(/country/i.test(k) && v && !/^(reserved|unknown|-|n\/a)$/i.test(v)) addC(v, 'log field ' + k, {kind:'rec', id:r.id});
   }

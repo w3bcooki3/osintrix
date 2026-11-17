@@ -94,6 +94,7 @@ function tlxView(D){
       <div class="wrap">${F.before.length ? show(F.r.ts - 36e5, F.r.ts, 'hour before the first sign') : ''}${show(F.r.ts, F.r.ts + 36e5, 'hour after the first sign')}</div>
       <p class="t3 small">Chosen as the earliest event carrying a malicious indicator, an initial-access technique or a delivery tag. Change a verdict and this updates.</p>`)); }
   if(more.sess) parts.push(more.sess);
+  if(typeof rareCard === 'function'){ const rc = rareCard(D, card); if(rc) parts.push(rc); }
   if(A.cleared.length) parts.push(card('eraser', 'red', 'Logs were cleared', `<ul class="tlx-l">${A.cleared.slice(0, 6).map(r => `<li><div><span class="mono">${r.ts ? f(r.ts) : 'no time'}</span>${r.host ? ' · <b class="mono">' + esc(r.host) + '</b>' : ''} — ${recBtn(r)}</div></li>`).join('')}</ul>
     <p class="t2">Clearing logs hides what came before. Treat the time just before each as missing evidence and look for other sources (EDR, network, backups).</p>`));
   if(A.bursts.length) parts.push(card('zap', 'amber', 'Bursts of activity', `<ul class="tlx-l">${A.bursts.map(b => `<li><div><b>${b.n} events</b> in ${g(b.to - b.from)}${b.x && b.x > 1 ? ` <span class="chip sq amber">${b.x}× the usual rate</span>` : ''}${b.bad ? ` <span class="chip sq red">${b.bad} suspicious</span>` : ''}</div>

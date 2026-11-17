@@ -407,22 +407,53 @@ function parseUA(ua){
 }
 
 /* ---------- generators ---------- */
-function usernameVariants(full, extra){
-  const clean = t => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9 ]/g, '');
-  const p = clean(full).split(/\s+/).filter(Boolean); if(!p.length) return [];
-  const f = p[0], l = p.length > 1 ? p[p.length - 1] : '', m = p.length > 2 ? p[1] : '', fi = f[0], li = l[0] || '', nums = String(extra || '').split(/[\s,]+/).filter(Boolean);
-  const base = l ? [f + l, f + '.' + l, f + '_' + l, f + '-' + l, fi + l, fi + '.' + l, fi + '_' + l, f + li, f + '.' + li, l + f, l + '.' + f, l + '_' + f, l + fi, l + '.' + fi, f, l, fi + li, (m ? f + m[0] + l : ''), (m ? fi + m[0] + l : ''), f + l.slice(0, 3), l.slice(0, 5) + fi]
-    : [f, f + '_', 'the' + f, f + 'official', 'real' + f, f + 'x'];
-  const set = new Set(base.filter(Boolean));
-  for(const b of [...set].slice(0, 12)) for(const n of nums){ set.add(b + n); set.add(b + '_' + n); set.add(b + n.slice(-2)); }
-  return [...set].slice(0, 120);
+/* Name → the usernames and email addresses a person most likely uses, ranked.
+   Handles accents (José → jose), apostrophes (O'Neil → oneil), double-barrelled and
+   particle surnames (Smith-Jones, van der Berg), middle names, nicknames and known
+   handles, years (1992 → 1992 and 92) and other numbers. */
+const GEN_PROVIDERS = ['gmail.com', 'outlook.com', 'hotmail.com', 'yahoo.com', 'icloud.com', 'proton.me', 'protonmail.com', 'gmx.com', 'aol.com', 'yandex.ru', 'mail.ru', 'qq.com'];
+const genClean = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ß/g, 'ss').replace(/[æ]/gi, 'ae').replace(/[ø]/gi, 'o').replace(/[łŁ]/g, 'l').toLowerCase().replace(/['’`]/g, '');
+function genName(full){
+  const words = genClean(full).replace(/[^a-z0-9\s,;.-]/g, ' ').split(/[\s,;]+/).map(w => w.replace(/^[.-]+|[.-]+$/g, '')).filter(Boolean);
+  if(!words.length) return null;
+  const PART = /^(van|von|der|den|de|del|della|da|di|du|la|le|dos|das|bin|ibn|al|el|mac|st)$/;
+  let first = words[0].replace(/[.-]/g, ''), rest = words.slice(1);
+  /* the surname: the last word with any particles before it (van der Berg → vanderberg, berg) */
+  let li = rest.length - 1; while(li > 0 && PART.test(rest[li - 1])) li--;
+  const lastParts = rest.slice(li), middle = rest.slice(0, li).filter(w => !PART.test(w)).map(w => w.replace(/[.-]/g, ''));
+  const lastJoined = lastParts.join('').replace(/[.-]/g, ''), core = (lastParts[lastParts.length - 1] || '').split('-');
+  const lasts = [...new Set([lastJoined, core.join(''), ...(core.length > 1 ? core : []), lastParts.length > 1 ? lastParts[lastParts.length - 1].replace(/-/g, '') : ''].filter(Boolean))];
+  return {first, middle, lasts, last:lastJoined};
 }
-function emailVariants(full, domain){
-  const d = String(domain || '').trim().toLowerCase().replace(/^@/, ''); if(!d) return [];
-  const p = full.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z ]/g, '').split(/\s+/).filter(Boolean); if(!p.length) return [];
-  const f = p[0], l = p[p.length - 1], fi = f[0], li = l[0];
-  return [...new Set([`${f}.${l}`, `${f}${l}`, `${fi}${l}`, `${fi}.${l}`, `${f}`, `${f}_${l}`, `${f}-${l}`, `${l}.${f}`, `${l}${f}`, `${l}${fi}`, `${f}${li}`, `${f}.${li}`, `${l}`, `${fi}${li}`].filter(x => x.length > 1))].map(x => x + '@' + d);
+function genBuild(o){
+  const N = genName(o.name), nums = String(o.nums || '').split(/[\s,;]+/).map(x => x.replace(/\D/g, '')).filter(Boolean), nicks = String(o.nicks || '').split(/[\s,;]+/).map(x => genClean(x).replace(/^@/, '').replace(/[^a-z0-9._-]/g, '')).filter(x => x.length >= 2);
+  if(!N && !nicks.length) return null;
+  const seps = o.seps && o.seps.length ? o.seps : ['', '.', '_'], out = new Map(), add = (v, tier, why) => { v = String(v).replace(/^[._-]+|[._-]+$/g, ''); if(v.length < 3 || v.length > 30 || out.has(v)) return; out.set(v, {v, tier, why}); };
+  if(N){ const f = N.first, fi = f[0], m = N.middle[0] || '', mi = m[0] || '';
+    for(const l of N.lasts.length ? N.lasts : ['']){ const L = l, Li = l[0] || '';
+      if(L){ for(const s of seps){ add(f + s + L, 1, 'first' + (s || '') + 'last'); add(fi + s + L, 1, 'f' + (s || '') + 'last'); }
+        for(const s of seps){ add(f + s + Li, 2, 'first' + (s || '') + 'l'); add(L + s + f, 2, 'last' + (s || '') + 'first'); add(L + s + fi, 2, 'last' + (s || '') + 'f'); }
+        if(m) for(const s of seps){ add(f + s + mi + s + L, 2, 'first m last'); add(fi + mi + s + L, 2, 'fm last'); add(f + s + m + s + L, 3, 'first middle last'); }
+        add(fi + Li, 3, 'initials'); if(m) add(fi + mi + Li, 3, 'initials'); add(f + L.slice(0, 3), 3, 'first + 3 of last'); add(f.slice(0, 3) + L.slice(0, 3), 3, '3 + 3'); add(L.slice(0, 5) + fi, 3, '5 of last + f'); add(L, 3, 'last'); }
+      add(f, 2, 'first'); }
+    for(const x of ['the', 'real', 'its', 'iam', 'im']) add(x + f + (N.last || ''), 4, 'prefix'); for(const x of ['official', 'x', 'xo', 'hq']) add(f + (N.last || '') + x, 4, 'suffix'); }
+  for(const n of nicks){ add(n, 1, 'known handle'); for(const s of ['_', '.', '']) for(const x of ['official', 'real', 'x']) add(x === 'real' ? x + s + n : n + s + x, 4, 'handle variant'); }
+  /* numbers: as given, and years also as two digits */
+  const nn = [...new Set(nums.flatMap(n => /^(19|20)\d{2}$/.test(n) ? [n, n.slice(2)] : [n]))];
+  const top = [...out.values()].filter(x => x.tier <= 2).slice(0, 14);
+  for(const b of top) for(const n of nn) for(const s of ['', '_', '.']) add(b.v + s + n, b.tier + 2, 'with ' + n);
+  const users = [...out.values()].sort((a, b) => a.tier - b.tier).slice(0, 400);
+  /* email: corporate formats in the order companies use them; personal: the likeliest names at the big providers */
+  const doms = String(o.domains || '').split(/[\s,;]+/).map(d => d.trim().toLowerCase().replace(/^@/, '').replace(/^https?:\/\//, '').replace(/\/.*$/, '')).filter(d => /^[a-z0-9.-]+\.[a-z]{2,}$/.test(d));
+  const corp = [];
+  if(N && N.last){ const f = N.first, fi = f[0], L = N.last, Li = L[0], F = [[f + '.' + L, 'first.last'], [fi + L, 'flast'], [f, 'first'], [f + L, 'firstlast'], [f + Li, 'firstl'], [fi + '.' + L, 'f.last'], [f + '_' + L, 'first_last'], [L + '.' + f, 'last.first'], [L + fi, 'lastf'], [f + '-' + L, 'first-last'], [L, 'last'], [fi + Li, 'fl'], [L + f, 'lastfirst'], [f + '.' + Li, 'first.l']];
+    for(const d of doms) F.forEach(([u, how], i) => corp.push({v:u + '@' + d, tier:i < 4 ? 1 : 2, why:how})); }
+  const personal = o.personal ? users.filter(u => u.tier <= 2).slice(0, 8).flatMap(u => GEN_PROVIDERS.slice(0, o.allProviders ? 12 : 6).map(p => ({v:u.v + '@' + p, tier:u.tier, why:p}))) : [];
+  return {users, corp, personal, name:N};
 }
+/* kept for older callers */
+const usernameVariants = (full, extra) => { const R = genBuild({name:full, nums:extra}); return R ? R.users.map(x => x.v).slice(0, 120) : []; };
+const emailVariants = (full, domain) => { const R = genBuild({name:full, domains:domain}); return R ? R.corp.map(x => x.v) : []; };
 
 /* ---------- image tools ---------- */
 async function loadImageData(file){

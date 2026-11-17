@@ -118,7 +118,7 @@ test('hypothesis board ranks by evidence against', async ({ page }) => {
 
 test('reads a packet capture: DNS, HTTP, TLS SNI/JA3, cleartext logins, beacons', async ({ page }) => {
   const errors = await open(page, '#/lab');
-  await page.click('[data-act=labTab][data-v=pcap]');
+  await page.click('.lt-cat[data-v="0"]'); await page.click('.lt-pop [data-act=labTab][data-v=pcap]');
   for (const f of ['sample.pcap', 'sample.pcapng']) {
     await page.setInputFiles('#pcIn', fixture(f));
     await expect.poll(() => page.evaluate(() => !!(UI.pcap && UI.pcap.flows))).toBe(true);
@@ -140,7 +140,7 @@ test('reads a packet capture: DNS, HTTP, TLS SNI/JA3, cleartext logins, beacons'
 
 test('opens a Chrome history database with decoded times and deleted-row recovery', async ({ page }) => {
   const errors = await open(page, '#/lab');
-  await page.click('[data-act=labTab][data-v=sqlite]');
+  await page.click('.lt-cat[data-v="0"]'); await page.click('.lt-pop [data-act=labTab][data-v=sqlite]');
   await page.setInputFiles('#sqIn', fixture('History'));
   await expect.poll(() => page.evaluate(() => !!(UI.sql && UI.sql.db)), { timeout: 15000 }).toBe(true);
   const S = await page.evaluate(() => ({ arts: UI.sql.arts.map(a => a.id), free: UI.sql.free.found.some(x => /harbour warehouse/.test(x.text)) }));
@@ -1289,7 +1289,7 @@ test('OSINT: look-alike domains are generated and checked through DNS only when 
   await page.route('https://dns.google/**', r => { const u = new URL(r.request().url()), n = u.searchParams.get('name'), t = u.searchParams.get('type'); hits.push(n);
     const reg = { 'paypa1.com': { A: '45.77.10.20', MX: '10 mx.paypa1.com.' }, 'paypal.com': { A: '64.4.250.36' }, 'paypal.net': { A: '64.4.250.36' } }[n];
     r.fulfill({ headers: { 'access-control-allow-origin': '*', 'content-type': 'application/json' }, body: JSON.stringify(reg ? { Status: 0, Answer: reg[t] ? [{ type: t === 'A' ? 1 : t === 'MX' ? 15 : 2, data: reg[t] }] : [] } : { Status: 3 }) }); });
-  await page.click('[data-act=labTab][data-v=twist]'); await page.fill('#twD', 'https://www.paypal.com/signin'); await page.press('#twD', 'Enter');
+  await page.click('.lt-cat[data-v="2"]'); await page.click('.lt-pop [data-act=labTab][data-v=twist]'); await page.fill('#twD', 'https://www.paypal.com/signin'); await page.press('#twD', 'Enter');
   await expect(page.locator('[data-act=twCheck]')).toBeDisabled(); expect(hits).toEqual([]);                 // nothing is sent until DNS lookups are allowed
   await page.click('[data-act=twDnsOn]'); await page.click('[data-act=twCheck]');
   await expect(page.locator('.tw-tbl')).toContainText('paypa1.com', { timeout: 30000 });
@@ -1297,7 +1297,7 @@ test('OSINT: look-alike domains are generated and checked through DNS only when 
   const rows = await page.evaluate(() => UI.tw.list.filter(x => x.exists).map(x => [x.d, twRisk(x, UI.tw.orig).s]));
   expect(rows.find(r => r[0] === 'paypa1.com')[1]).toBeGreaterThan(rows.find(r => r[0] === 'paypal.net')[1]);                 // mail-capable look-alike outranks one on the original's servers
   // identity
-  await page.click('[data-act=labTab][data-v=ident]'); await page.fill('#idQ', 'Jordan.Okafor1992+shop@GoogleMail.com'); await page.press('#idQ', 'Enter');
+  await page.click('.lt-cat[data-v="2"]'); await page.click('.lt-pop [data-act=labTab][data-v=ident]'); await page.fill('#idQ', 'Jordan.Okafor1992+shop@GoogleMail.com'); await page.press('#idQ', 'Enter');
   await expect(page.locator('.id-dl')).toContainText('Jordan Okafor'); await expect(page.locator('.labgrid')).toContainText('Delivers to jordanokafor1992@gmail.com');
   await expect(page.locator('.labgrid')).toContainText('1992');
   await page.fill('#idQ', '+44 20 7946 0000'); await page.press('#idQ', 'Enter'); await expect(page.locator('.id-dl')).toContainText('United Kingdom');

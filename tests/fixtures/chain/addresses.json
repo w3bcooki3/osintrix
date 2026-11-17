@@ -1,0 +1,27 @@
+{
+ "S1": "bc1qqk6ykfsk8wy3rkddzq2m3pm00wnhyha9wegr4q",
+ "S2": "bc1q8upttz7zpj8x86drcf3ul8ch0e3yc6cgkvhafy",
+ "S3": "bc1q8cmrtvnqxfwgex9lz49yuadc0a20wpqjhevu7s",
+ "P": [
+  "bc1qqz50vm8y9emupsagtp6y4tysv4urrnx9c9vtma",
+  "bc1qtux00kspzj577dragh5tcsy0ya2d0x4c59wy6r",
+  "bc1qp0027xx6rk5gttd8wwtnhddcjnc9a9yh6tc3qr"
+ ],
+ "X": "bc1qsansu28n0xr9q5nfwxvssveedsy5k9mz9me9nf",
+ "V": [
+  "bc1qpprlnggqdhpz3vwrhjptsj9y8ttr9wycvrpa5u",
+  "bc1q6rm6496yyd4dwda3znava89nz4fd68yez5lfs3",
+  "bc1qr4e26dz0xw45k5rzuclne3958ssdgwk898rczu",
+  "bc1qcf3c9yqqdg9c936wz7yywrgc7cx3tqmh7zx3cm",
+  "bc1qq6c6yd4j94n4r9282szlgxwsu5wr5pg6g465uz",
+  "bc1q64nlj75algv7rvxzyycy202reg8e9lyx47klxd"
+ ],
+ "E1": "0x97ee13f539badf506807c28f82ae6de4f9166a85",
+ "E2": "0x466066eeb5699dddf555e00dc3186b393c8a291e",
+ "EX": "0xde1fd44cc43e67d5b6f12342bec395f311670c14",
+ "VA": "0xd1f46c8c4f2d0d5b5b3c3280f6ed2a8f2a36beda",
+ "VB": "0xef990033ccff13cc6e6d2a78b2536716a6ffd6d3",
+ "VC": "0x5290aeb0308c061c7945e5578fde25ab629ba7de",
+ "T1": "TbVnG8JkHyEKx3SkTqvSrJEE7M4YhtPSD2",
+ "TX": "T1Q72dP9SHmBgLzGt4KxBQeukDLwf7nTgu"
+}

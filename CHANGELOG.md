@@ -2,6 +2,65 @@
 
 All notable changes to OSINTrix, newest first. The format is based on [Keep a Changelog](https://keepachangelog.com); this file is generated from `js/data/changelog.js` by `tools/changelog.py`.
 
+## [1.46] — Money, accounts, phones and pictures (2026-11-17)
+
+_Where the money went, when each account was made, what a phone number is, and the same picture found again after it was cropped or mirrored — plus a new Infrastructure tab for all of it._
+
+### Added
+- A case tab, Infrastructure, for what a case pivots on: Domains & addresses (moved from Analysis), Money and Accounts. Analysis keeps questions, hypotheses and sources.
+- Infrastructure → Money: paste transactions from Blockstream or mempool.space, blockchain.com, BlockCypher, Etherscan (JSON or CSV, coins and tokens), Tronscan or TronGrid. Who paid whom as a picture and a table; Bitcoin addresses spent together grouped as one owner (not in CoinJoin-looking transactions); change and failed transactions left out; collection points, pass-through wallets, distribution and peel chains pointed out; the case's wallets that appear in other cases.
+- Infrastructure → Accounts: when each account was made (GitHub, Reddit, Mastodon, X/Twitter, YouTube and Bluesky profile data, and “Joined March 2019”-style text in pages), when it shows up in your evidence, and its earlier names — by account number across two pastes, or a page that says “formerly @…”. Accounts made shortly before they appear, and accounts made within days of each other, are pointed out.
+- Phone numbers, offline: country, mobile / landline / VoIP / premium / personal number, whether the number is valid in its plan, ranges reserved for films and TV, and one standard form — so 07911 123456, +44 7911 123456 and 0044-7911-123-456 are one number, matched across cases. Set the country for numbers written without a code.
+
+### Changed
+- The same picture elsewhere is found after cropping (up to 30 %), mirroring, framing in a screenshot, text over it, greyscale and small rotations — tested on 18 real photos and their edited copies, with no false matches between different photos. Matches show in the evidence panel with how the copy was changed, with links to reverse image search sites.
+- Generators: name handling for accents, apostrophes, double-barrelled and particle surnames, middle names, known handles and years; usernames and work and personal email ranked by how common the pattern is; copy each one, a group, or all; filter; choose separators; save as a text file.
+- Forensics kit: the tools sit on one line in three groups — Analyse files, Decode, Investigate — each showing the tool in use — none hidden off the side of the screen.
+
+### Fixed
+- Phone numbers written as 0044-… with more groups are no longer cut short when read from text.
+
+## [1.45] — OSINT: metadata, geolocation, infrastructure, sources (2026-11-16)
+
+_What a file says about itself, a workbench for where a picture was taken, what domains and addresses share, and how far to trust each source — all worked out in this browser._
+
+### Added
+- File metadata, read from the bytes: HEIC, JPEG, PNG, WebP and TIFF pictures (camera, serial, the time zone it was taken in, GPS with the direction the camera faced, place names, author, the editing program and its history, AI-generation marks, Content Credentials), MP4/MOV/3GP video (recording time and GPS from iPhone and Android), MP3 tags, PDFs (including information kept in compressed object streams) and Word/Excel/PowerPoint (author, last saved by, program, revision). Shown in the evidence panel with what stands out first; GPS goes on the map, the event takes the moment it was taken, and files too big to store still have their video metadata read.
+- When a picture has no time zone, the GPS clock gives it (14:05 on the camera, 13:05 UTC: UTC+01:00). iOS 8's day-of-year GPS dates are read correctly.
+- Where was this taken? — a geolocation workbench for any picture or video: write down what you see, add the places it could be (coordinates in any format or a map link), mark which clues fit each place, and see the sun's direction, height and shadow length at each place at the moment the file was made. Confirmed places go on the case's map and into the vault.
+- Analysis → Infrastructure: paste WHOIS (any registry), RDAP, dig output, passive DNS (VirusTotal, CIRCL, DNSDB, CSV), crt.sh, Shodan or Censys results. Each paste is kept as evidence, and what the domains and addresses share — registrant, certificate, site-verification token, favicon, TLS fingerprint, address, name servers, same-day registration — is listed by how much it means. Privacy services, big DNS providers and CDN addresses are set aside as not links.
+- Analysis → Sources: rate each source A–F once (it applies in every case) and each piece of evidence 1–6, the Admiralty grading. What is backed by several independent sources, and what you marked or vaulted on the strength of one weak source, is shown; an indicator's panel says how many independent sources mention it.
+
+### Fixed
+- GPS longitudes written both negative and with W are no longer flipped back east; Windows XP author and title tags in pictures are read.
+
+## [1.44] — Endpoint evidence, read like an analyst (2026-11-16)
+
+_Process trees, decoded command lines, the rare things across all your evidence, and a map of how an attacker moved between hosts — built from the Windows and Sysmon logs you already import._
+
+### Added
+- Timeline → Processes: parent → child trees per host from Sysmon 1 and Windows 4688. Joined by process GUID, then process ID (hex IDs from 4688 included, reused IDs handled), then the parent's path. A parent missing from the evidence is shown with a question mark, and one started by an earlier process's own command line (cmd /c powershell …) hangs under it. Suspicious processes — Office starting a shell, a shell under services.exe, system names in the wrong folder, programs in folders anyone can write to, obfuscated command lines — are marked, and by default only the branches that lead to them are shown.
+- Command lines are decoded where they sit: -EncodedCommand in any of its short forms, FromBase64String, [char] codes, joined strings, backtick obfuscation and plain Base64, several layers deep. The decoded text shows in the evidence panel and the process tree, and the addresses, domains and files it names become indicators of the event.
+- Timeline → Movement: host → host from network and RDP logons (4624 types 3 and 10), explicit-credential logons (4648), PsExec-style services (7045), RDP connection records (1149), WinRM and SMB/RDP/WinRM connections. Addresses are named from logons and the hosts' own connections; a diagram in the order hosts were reached and a table with times, accounts and the events behind each move.
+- Timeline → Patterns → Rare things: programs, services, scheduled tasks and domains seen on one host once or twice across all your cases. Per-user install paths count as the same program.
+
+### Fixed
+- "System binary name running from outside System32" no longer fires on every process whose parent is explorer.exe (it lives in C:\Windows); it is judged per binary, on the binary's own path.
+- A LOLBin next to a loopback or link-local address is no longer called a download from an external address.
+
+## [1.43] — Certificates: everything up front (2026-11-16)
+
+_Expiry, the full serial and the thumbprints are now the first thing you see for a certificate or signing request — on the Certificates page and in a case's evidence._
+
+### Added
+- Certificates → Key facts, right under the header: status and days left, valid from and expires (exact UTC), lifetime, the full serial number and its size, SHA-256 and SHA-1 thumbprints (the SHA-1 is the “Thumbprint” Windows shows), public-key SHA-256 and pin, key, signature algorithm and OID, version, subject, issuer, names, key usage, extended key usage, basic constraints, key identifiers, OCSP and issuer URLs and revocation lists — each with a copy button that copies plain hex.
+- Signing requests show their own SHA-256 and SHA-1, every part of the subject on its own line, the public key's SHA-256 and pin, the version, every requested extension, and the challenge password in full (it is kept in the clear inside the request) instead of cut short.
+- A certificate or signing request pasted into a case is decoded in the evidence panel with the same key facts — several in one paste each get their own — and Open in Certificates takes it to the full decoder.
+- Certificates in a case's evidence give the case indicators: the SHA-256 and SHA-1 thumbprints (what crt.sh, VirusTotal, Censys and Shodan search by) and the names and addresses they cover — so they show in Entities, search, hunts and connected cases. Certificates already in your cases are read once in the background.
+
+### Fixed
+- The serial number is no longer cut short in Subject and issuer.
+
 ## [1.42] — Hunts, ageing verdicts, faster at scale (2026-11-16)
 
 _Saved hunts across every case, verdicts that fade with age, notes written from selected events, a rule at a glance — and the rule-heavy screens several times faster on big workspaces._
@@ -704,4 +763,4 @@ _The road to 1.0: renamed to OSINTrix, the editable graph, the vault model, Thre
 
 ---
 
-_Generated 2026-11-16 from `js/data/changelog.js`. Do not edit this file by hand — edit the data file and run `python tools/changelog.py`._
+_Generated 2026-11-17 from `js/data/changelog.js`. Do not edit this file by hand — edit the data file and run `python tools/changelog.py`._

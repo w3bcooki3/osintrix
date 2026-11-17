@@ -23,6 +23,49 @@ function dhashOf(src){
 const hamming = (a, b) => { let n = 0, x = BigInt('0x' + a) ^ BigInt('0x' + b); while(x){ n += Number(x & 1n); x >>= 1n; } return n; };
 async function dhashBlob(blob){ try{ const bmp = await createImageBitmap(blob), sc = Math.min(1, 512 / Math.max(bmp.width, bmp.height)), c = document.createElement('canvas'); c.width = Math.max(1, Math.round(bmp.width * sc)); c.height = Math.max(1, Math.round(bmp.height * sc));
   const x = c.getContext('2d', {willReadFrequently:true}); x.drawImage(bmp, 0, 0, c.width, c.height); return dhashOf(x.getImageData(0, 0, c.width, c.height)); }catch(e){ return null; } }
+/* A fuller visual signature, so a picture is still found when it was cropped, mirrored, framed in a screenshot
+   or had text put over it: the whole picture, its mirror image, the picture with plain borders trimmed off, and
+   ~100 windows of it (90, 80 and 70 % of each side, at the corners, edges and centre). Two pictures match when the
+   whole of one is close to the whole, the mirror, or a window of the other. 64 bits each, kept as hex. */
+function picHash(src, sx, sy, px, py, flip, box){
+  const b = box || [0, 0, src.width, src.height], c = document.createElement('canvas'); c.width = 9; c.height = 8; const x = c.getContext('2d', {willReadFrequently:true}); x.imageSmoothingQuality = 'high';
+  if(flip){ x.translate(9, 0); x.scale(-1, 1); } x.drawImage(src, b[0] + px * b[2] * (1 - sx), b[1] + py * b[3] * (1 - sy), b[2] * sx, b[3] * sy, 0, 0, 9, 8);
+  const p = x.getImageData(0, 0, 9, 8).data, g = i => p[i] * .299 + p[i + 1] * .587 + p[i + 2] * .114; let h = '';
+  for(let y = 0; y < 8; y++){ let n = 0; for(let xx = 0; xx < 8; xx++){ const i = (y * 9 + xx) * 4; n = n << 1 | (g(i) > g(i + 4) ? 1 : 0); } h += n.toString(16).padStart(2, '0'); } return h;
+}
+/* plain bands around a picture (a phone's status bar, the white of a post, letterboxing) */
+function picTrim(c){
+  const w = Math.min(160, c.width), h = Math.max(1, Math.round(c.height * w / c.width)), t = document.createElement('canvas'); t.width = w; t.height = h; const x = t.getContext('2d', {willReadFrequently:true}); x.drawImage(c, 0, 0, w, h);
+  const d = x.getImageData(0, 0, w, h).data, L = (i) => d[i] * .299 + d[i + 1] * .587 + d[i + 2] * .114;
+  /* a band is frame when most of it is near-white or near-black (a post's background, a status bar, letterboxing) — a caption line on white still counts; a photo's blue sky does not */
+  const flat = (a0, n, step) => { const v = []; for(let k = 0; k < n; k++) v.push(L(a0 + k * step)); const m = [...v].sort((x, y) => x - y)[n >> 1]; if(m > 45 && m < 210) return false; let off = 0; for(const x of v) if(Math.abs(x - m) > 24) off++; return off / n <= .3; };
+  let top = 0, bot = h - 1, lft = 0, rgt = w - 1;
+  while(top < bot - 4 && flat(top * w * 4, w, 4)) top++; while(bot > top + 4 && flat(bot * w * 4, w, 4)) bot--;
+  while(lft < rgt - 4 && flat(lft * 4 + top * w * 4, bot - top + 1, w * 4)) lft++; while(rgt > lft + 4 && flat(rgt * 4 + top * w * 4, bot - top + 1, w * 4)) rgt--;
+  const k = c.width / w; return top || lft || bot < h - 1 || rgt < w - 1 ? [lft * k, top * k, (rgt - lft + 1) * k, (bot - top + 1) * k] : null;
+}
+async function picSigBlob(blob){
+  try{ const bm = await createImageBitmap(blob), sc = Math.min(1, 512 / Math.max(bm.width, bm.height)), c = document.createElement('canvas'); c.width = Math.max(1, Math.round(bm.width * sc)); c.height = Math.max(1, Math.round(bm.height * sc)); c.getContext('2d').drawImage(bm, 0, 0, c.width, c.height);
+    const S = [1, .9, .8, .7], P = s => s < 1 ? [0, .5, 1] : [0], w = [];
+    for(const sx of S) for(const sy of S) if(sx < 1 || sy < 1) for(const px of P(sx)) for(const py of P(sy)) w.push(picHash(c, sx, sy, px, py));
+    const box = picTrim(c); return [picHash(c, 1, 1, 0, 0), picHash(c, 1, 1, 0, 0, true), box ? picHash(c, 1, 1, 0, 0, false, box) : '', w.join('')].join(','); }catch(e){ return null; } }
+const picPc = n => { n = n - ((n >>> 1) & 0x55555555); n = (n & 0x33333333) + ((n >>> 2) & 0x33333333); return (((n + (n >>> 4)) & 0x0f0f0f0f) * 0x01010101) >>> 24; };
+const PIC_SIG_C = new Map();
+function picSigParse(s){ let v = PIC_SIG_C.get(s); if(v) return v; const [f, m, t, w] = String(s).split(','), h = x => [parseInt(x.slice(0, 8), 16) >>> 0, parseInt(x.slice(8, 16), 16) >>> 0], W = [];
+  for(let i = 0; i + 16 <= (w || '').length; i += 16) W.push(h(w.slice(i, i + 16))); v = {f:h(f), m:h(m), t:t ? h(t) : null, w:W}; if(PIC_SIG_C.size > 20000) PIC_SIG_C.clear(); PIC_SIG_C.set(s, v); return v; }
+const picHd = (u, v) => picPc(u[0] ^ v[0]) + picPc(u[1] ^ v[1]);
+/* how alike two pictures are, and how: the same picture, mirrored, a crop of the other, or the other inside it */
+function picDist(sa, sb){
+  const A = picSigParse(sa), B = picSigParse(sb); let best = picHd(A.f, B.f), how = 'same';
+  const t = (d, k) => { if(d < best){ best = d; how = k; } };
+  t(picHd(A.m, B.f), 'mirrored'); if(A.t) t(picHd(A.t, B.f), 'framed'); if(B.t) t(picHd(A.f, B.t), 'framed in');
+  if(best > 2){ for(const w of B.w){ t(picHd(A.f, w), 'crop'); t(picHd(A.m, w), 'mirrored crop'); } for(const w of A.w){ t(picHd(w, B.f), 'contains'); t(picHd(w, B.m), 'contains mirrored'); } }
+  return {d:best, how};
+}
+/* the thresholds: tested on real photos and edited copies of them — no different photo pair came closer than 9 */
+const picMatch = (sa, sb) => { const r = picDist(sa, sb); return r.d <= (r.how === 'same' || r.how === 'mirrored' ? 10 : 8) ? r : null; };
+/* said from the first picture's side: what it is, compared with the second */
+const PIC_HOW = {same:'the same picture, resized or re-saved', mirrored:'the same picture, mirrored', framed:'this picture inside a frame or screenshot', 'framed in':'the picture inside this frame or screenshot', crop:'cropped from this picture', 'mirrored crop':'cropped from this picture and mirrored', contains:'this picture is cropped from it', 'contains mirrored':'this picture is a mirrored crop of it'};
 /* fingerprint every image attachment once, then compare */
 async function evidenceImages(){
   const out = []; let changed = false;

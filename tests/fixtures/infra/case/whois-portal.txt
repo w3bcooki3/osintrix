@@ -1,0 +1,21 @@
+   Domain Name: HARBOUR-LINE-PORTAL.TEST
+   Registry Domain ID: 2840119331_DOMAIN_COM-VRSN
+   Registrar WHOIS Server: whois.nicenic.net
+   Registrar URL: http://www.nicenic.net
+   Updated Date: 2024-03-02T08:11:40Z
+   Creation Date: 2024-02-27T14:02:11Z
+   Registry Expiry Date: 2025-02-27T14:02:11Z
+   Registrar: NICENIC INTERNATIONAL GROUP CO., LIMITED
+   Registrar IANA ID: 3765
+   Domain Status: clientTransferProhibited https://icann.org/epp#clientTransferProhibited
+   Registrant Name: Karl Voss
+   Registrant Organization:
+   Registrant Street: 14 Kade Str
+   Registrant Country: NL
+   Registrant Phone: +31.612345678
+   Registrant Email: k.voss.reg@mailbox.example
+   Admin Email: k.voss.reg@mailbox.example
+   Name Server: NS1.BULLETDNS.TEST
+   Name Server: NS2.BULLETDNS.TEST
+   DNSSEC: unsigned
+>>> Last update of WHOIS database: 2024-03-10T10:00:00Z <<<

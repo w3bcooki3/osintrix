@@ -84,9 +84,12 @@ async function roomNote(){ await storageEstimate(); if(!STORE.quota) return ''; 
 /* ---------- files too big to keep: recorded with their fingerprint ---------- */
 async function bigFileRecord(f, cid){
   let sha = ''; if(f.size <= MEDIA_HASH_MAX){ try{ sha = await sha256Hex(await f.arrayBuffer()); }catch(e){} }
+  let meta = null; if(typeof metaReadFile === 'function'){ try{ meta = metaKeep(await metaReadFile(f)); }catch(e){} }
   const k = mediaKind(f), body = `Large file — not stored in this browser (over 50 MB).\nName: ${f.name}\nType: ${f.type || 'unknown'}\nSize: ${f.size} bytes\n${sha ? 'SHA-256: ' + sha : 'SHA-256: not calculated (over ' + fmtBytes(MEDIA_HASH_MAX) + ')'}\nKeep the original safe on your computer or evidence store; this fingerprint proves later that it is the same file.`;
-  return {id:uid('r'), caseId:cid, type:'evidence', title:'Large file (not stored): ' + f.name, body, tsRaw:new Date(f.lastModified || Date.now()).toISOString(), tsZone:'explicit', ts:f.lastModified || Date.now(), source:'attachment', host:'', tags:['file', 'not-stored'], ents:E.extract(body).filter(e => e.k !== 'file'), answer:'', addedBy:'You', added:Date.now(),
-    big:{name:String(f.name || 'file').slice(0, 300), type:String(f.type || '').slice(0, 120), size:f.size, sha256:sha, modified:f.lastModified || 0}};
+  const made = meta && meta.taken != null && isFinite(meta.taken) ? meta.taken : null, ml = meta && typeof metaLines === 'function' ? metaLines(meta) : '';
+  const text = body + (meta && meta.gps ? `\n${k === 'video' ? 'Video' : k === 'image' ? 'EXIF' : 'File'} GPS: ${meta.gps.lat.toFixed(6)}, ${meta.gps.lon.toFixed(6)}` : '') + (ml ? '\n— Metadata —\n' + ml : '');
+  return {id:uid('r'), caseId:cid, type:'evidence', title:'Large file (not stored): ' + f.name, body:text, tsRaw:new Date(made ?? (f.lastModified || Date.now())).toISOString(), tsZone:made != null && meta.tz === 'assumed' ? 'UTC' : 'explicit', ts:made ?? (f.lastModified || Date.now()), source:'attachment', host:'', tags:['file', 'not-stored'], ents:E.extract(text).filter(e => e.k !== 'file'), answer:'', addedBy:'You', added:Date.now(),
+    big:{name:String(f.name || 'file').slice(0, 300), type:String(f.type || '').slice(0, 120), size:f.size, sha256:sha, modified:f.lastModified || 0, meta}};
 }
 
 /* ---------- the Media tab ---------- */

@@ -1,0 +1,18 @@
+; <<>> DiG 9.18.24 <<>> harbour-line-portal.test ANY
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 40213
+;; ANSWER SECTION:
+harbour-line-portal.test. 300	IN	A	198.51.100.23
+harbour-line-portal.test. 3600	IN	NS	ns1.bulletdns.test.
+harbour-line-portal.test. 3600	IN	SOA	ns1.bulletdns.test. hostmaster.bulletdns.test. 2024022701 7200 3600 1209600 300
+harbour-line-portal.test. 300	IN	TXT	"google-site-verification=Qm3x9Kc2ZtT8wVvq4hXJ0bPzR1aLsN7eYdF5gHjKl0A"
+harbour-line-portal.test. 300	IN	TXT	"v=spf1 include:_spf.mailhost.test ~all"
+harbour-line-portal.test. 300	IN	MX	10 mail.harbour-line-portal.test.
+
+;; Query time: 31 msec
+hl-invoices.test.	300	IN	A	198.51.100.23
+hl-invoices.test.	300	IN	TXT	"google-site-verification=Qm3x9Kc2ZtT8wVvq4hXJ0bPzR1aLsN7eYdF5gHjKl0A"
+hl-invoices.test.	3600	IN	SOA	ns1.bulletdns.test. hostmaster.bulletdns.test. 2024022702 7200 3600 1209600 300
+harbourline-billing.test. 300	IN	A	104.21.3.4
+blog-unrelated.test.	300	IN	A	104.21.3.4

@@ -157,10 +157,16 @@ async function storeFile(f){
   if(!await IDB.set('file:' + id, await sealBlob(blob))) throw new Error('idb');
   let gps = null, cam = '', ex = null; if(/jpe?g|tiff|heic/i.test(f.type || f.name || '')){ try{ ex = exif(new Uint8Array(buf)); if(ex){ if(ex.GPS) gps = ex.GPS; cam = [ex.Make, ex.Model].filter(Boolean).join(' '); } }catch(e){} }
   const dhash = /^image\//.test(f.type || '') ? await dhashBlob(blob) : null;
+  const psig = /^image\//.test(f.type || '') && typeof picSigBlob === 'function' ? await picSigBlob(blob) : null;
   /* picture size, length and a small preview for pictures, videos and audio */
   const kind = typeof mediaKind === 'function' ? mediaKind({type:f.type, name:f.name}) : '', P = kind === 'image' || kind === 'video' || kind === 'audio' ? await mediaProbe(blob, kind) : {};
   if(P.prev) await IDB.set('file:' + id + '.p', await sealBlob(P.prev));
+  /* everything the file says about itself: camera, place, time, author, programs (HEIC, PNG, WebP, video, PDF, Office too) */
+  let meta = null; if(typeof metaRead === 'function'){ try{ meta = metaKeep(await metaRead(new Uint8Array(buf), f.name || '', type)); }catch(e){} }
+  if(meta && !gps && meta.gps) gps = {lat:meta.gps.lat, lon:meta.gps.lon, alt:meta.gps.alt};
+  if(meta && !cam){ const v = k => (meta.fields.find(x => x.k === k) || {}).v || ''; cam = [v('Make'), v('Model')].filter(Boolean).join(' ').replace(/^(\w+) \1 /i, '$1 '); }
   const m = {id, name:f.name || 'pasted-image.png', type:f.type || '', size:f.size, sha256:sha, modified:f.lastModified || Date.now(), added:Date.now(), gps, cam, dhash};
+  if(meta) m.meta = meta; if(psig) m.psig = psig;
   if(P.w){ m.w = P.w; m.h = P.h; } if(P.dur) m.dur = P.dur; if(kind === 'image' && typeof picMeta === 'function') m.x = picMeta(ex); return m;
 }
 async function fileBlob(fid){ return await openBlob(await IDB.get('file:' + fid)); }
@@ -171,8 +177,9 @@ new MutationObserver(() => { if(document.querySelector('img[data-fid]:not([src])
 function fileRecord(m, cid){
   const k = typeof mediaKind === 'function' ? mediaKind(m) : /^image\//.test(m.type) ? 'image' : 'other';
   const what = k === 'image' ? (m.cam || m.gps ? 'Photo' : /png/i.test(m.type) ? 'Screenshot' : 'Image') : k === 'video' ? 'Video' : k === 'audio' ? 'Audio' : 'File';
-  const body = `${what}: ${m.name}\nType: ${m.type || 'unknown'}\nSize: ${m.size} bytes${m.w ? '\nPicture size: ' + m.w + ' × ' + m.h : ''}${m.dur ? '\nLength: ' + fmtDur(m.dur) : ''}\nSHA-256: ${m.sha256}${m.cam ? '\nCamera: ' + m.cam : ''}${m.gps ? '\nEXIF GPS: ' + m.gps.lat.toFixed(6) + ', ' + m.gps.lon.toFixed(6) : ''}`;
-  return {id:uid('r'), caseId:cid, type:'evidence', title:what + ': ' + m.name, body, tsRaw:new Date(m.modified).toISOString(), tsZone:'explicit', ts:m.modified, source:'attachment', host:'', tags:[k === 'image' ? 'screenshot' : k === 'video' || k === 'audio' ? k : 'file'], ents:E.extract(body).filter(e => e.k !== 'file'), answer:'', addedBy:'You', addedAt:Date.now(), hash:'', att:[m]}; }
+  const body = `${what}: ${m.name}\nType: ${m.type || 'unknown'}\nSize: ${m.size} bytes${m.w ? '\nPicture size: ' + m.w + ' × ' + m.h : ''}${m.dur ? '\nLength: ' + fmtDur(m.dur) : ''}\nSHA-256: ${m.sha256}${m.cam ? '\nCamera: ' + m.cam : ''}${m.gps ? '\n' + (k === 'video' ? 'Video' : k === 'image' ? 'EXIF' : 'File') + ' GPS: ' + m.gps.lat.toFixed(6) + ', ' + m.gps.lon.toFixed(6) : ''}${m.meta && typeof metaLines === 'function' && metaLines(m.meta) ? '\nFile modified: ' + new Date(m.modified).toISOString() + '\n— Metadata —\n' + metaLines(m.meta) : ''}`;
+  const made = m.meta && m.meta.taken != null && isFinite(m.meta.taken) ? m.meta.taken : null;
+  return {id:uid('r'), caseId:cid, type:'evidence', title:what + ': ' + m.name, body, tsRaw:new Date(made ?? m.modified).toISOString(), tsZone:made != null && m.meta.tz === 'assumed' ? 'UTC' : 'explicit', ts:made ?? m.modified, source:'attachment', host:'', tags:[k === 'image' ? 'screenshot' : k === 'video' || k === 'audio' ? k : 'file'], ents:E.extract(body).filter(e => e.k !== 'file'), answer:'', addedBy:'You', addedAt:Date.now(), hash:'', att:[m]}; }
 async function attachFiles(files, recId){
   files = [...files].filter(f => f && f.size != null); if(!files.length) return;
   if(!recId){ const pages = files.filter(isWebPage); if(pages.length){ files = files.filter(f => !isWebPage(f)); await importWebPages(pages); if(!files.length) return; } }

@@ -1,0 +1,13 @@
+Domain Name: harbourline-billing.test
+Registry Domain ID: D503300000040403495-LROR
+Registrar WHOIS Server: whois.nicenic.net
+Updated Date: 2024-02-27T15:40:02Z
+Creation Date: 2024-02-27T15:39:58Z
+Registrar Registration Expiration Date: 2025-02-27T15:39:58Z
+Registrar: NICENIC INTERNATIONAL GROUP CO., LIMITED
+Registrant Name: REDACTED FOR PRIVACY
+Registrant Organization: Privacy service provided by Withheld for Privacy ehf
+Registrant Email: Please query the RDDS service of the Registrar of Record identified in this output for information on how to contact the Registrant
+Registrant Phone: REDACTED FOR PRIVACY
+Name Server: amy.ns.cloudflare.com
+Name Server: rob.ns.cloudflare.com

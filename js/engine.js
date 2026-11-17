@@ -87,7 +87,7 @@ const PATTERNS = [
   ['url',/\bhttps?:\/\/[^\s"'<>()\[\]]+/gi],
   ['mac',/\b(?:[0-9a-f]{2}[:-]){5}[0-9a-f]{2}\b|\b(?:[0-9a-f]{4}\.){2}[0-9a-f]{4}\b/gi],
   ['ipv6',/(?<![\w:.])(?:[0-9a-f]{1,4}:(?::?[0-9a-f]{1,4}){0,7}::?|::)(?:[0-9a-f]{1,4}(?::[0-9a-f]{1,4}){0,7})?(?![\w:.])/gi],
-  ['phone',/(?:\btel:|(?:\b(?:phone|tel|mobile|cell|whats\s?app|call|fax|contact)\b[^\d+\n]{0,12}))?\+\d{1,3}[\s.-]?\(?\d{1,4}\)?(?:[\s.-]?\d{2,5}){1,4}\b|\b(?:phone|tel|mobile|cell|whats\s?app|call(?: me)?|fax)\b[^\d\n]{0,12}\(?\d{2,4}\)?[\s.-]?\d{3,4}[\s.-]?\d{3,5}\b/gi],
+  ['phone',/(?:\btel:|(?:\b(?:phone|tel|mobile|cell|whats\s?app|call|fax|contact)\b[^\d+\n]{0,12}))?\+\d{1,3}[\s.-]?\(?\d{1,4}\)?(?:[\s.-]?\d{2,5}){1,4}\b|\b(?:phone|tel|mobile|cell|whats\s?app|call(?: me)?|fax)\b[^\d\n]{0,12}\(?\d{2,5}\)?(?:[\s.-]?\d{2,5}){1,4}\b/gi],
   ['coords',/(?<![\d.])(-?\d{1,2}\.\d{3,})\s*,\s*(-?\d{1,3}\.\d{3,})(?![\d.])/g],
   ['email',/\b[\w.+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+\b/gi],
   ['handle',/(?:^|[\s(,;:])@([A-Za-z0-9_]{3,30})\b/g,1],
@@ -319,9 +319,12 @@ function observations0(rec){
   const lol = files.filter(f => LOLBINS[f.toLowerCase()]);
   const userW = paths.filter(p => HOTPATH.some(([re]) => re.test(p)));
   const eids = val('eventid').map(Number);
-  if(sysbin.length && paths.length && paths.every(p => !/\\windows\\system32|\\windows\\syswow64/i.test(p)))
-    add('masquerade', 'System binary name ('+sysbin.join(', ')+') running from outside System32 — T1036.005.');
-  if(lol.length && (val('url').length || val('ipv4').some(v => ipClass(v) !== 'Private — RFC 1918')))
+  /* a system binary's name on a path where Windows does not keep it — judged per binary, so explorer.exe in C:\\Windows (its real home) or as the parent of something else is not a disguise */
+  const sysOk = (p, b) => /\\windows\\(system32|syswow64|winsxs|servicing)\\/i.test(p) || /^(explorer|hh|regedit|notepad|bfsvc|splwow64|winhlp32|write)\.exe$/i.test(b) && /^([a-z]:)?\\windows\\[^\\]+$/i.test(p);
+  const masq = sysbin.filter(b => { const ps = paths.filter(p => p.toLowerCase().split(/[\\/]/).pop() === b.toLowerCase()); return ps.length && ps.every(p => !sysOk(p, b)); });
+  if(masq.length)
+    add('masquerade', 'System binary name ('+[...new Set(masq)].join(', ')+') running from outside System32 — T1036.005.');
+  if(lol.length && (val('url').length || val('ipv4').some(v => !/^(Private|Loopback|Link-local|This network|Multicast|Carrier-grade)/.test(ipClass(v)))))
     add('download', 'A LOLBin ('+lol.join(', ')+') alongside an external address — living-off-the-land download, T1105.');
   if(/-enc(odedcommand)?\b|-e\s+[A-Za-z0-9+/=]{20,}/i.test(body)) add('encoded', 'Encoded PowerShell command — decode it, it is usually the whole answer.');
   if(eids.some(n => n === 1102 || n === 104)) add('anti-forensics', 'Event log cleared — what came before is missing on purpose, T1070.001.');

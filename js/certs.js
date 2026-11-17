@@ -79,13 +79,72 @@ function cxHistory(){
   UI.rcExtraFn = extra; recentDlg('certs', extra());
 }
 const cxFindings = c => (c._F = c._F || X5.findings(c));
-function cxRecParse(r){ const k = r.id + ':' + (r.hash || r.body.length); if(CX_REC.has(k)) return CX_REC.get(k); const R = X5.read(r.body); CX_REC.set(k, R); return R; }
+function cxRecParse(r){ const k = r.id + ':' + (r.hash || r.body.length); if(CX_REC.has(k)) return CX_REC.get(k); const R = X5.read(r.body); CX_REC.set(k, R);
+  /* thumbprints are computed with the browser's crypto, which is asynchronous: the evidence panel redraws when they are in */
+  Promise.all([...(R.certs || []), ...(R.csrs || [])].map(c => X5.prints(c))).then(() => { R.printed = true; if(UI.sel && UI.sel.id === r.id && typeof renderInsp === 'function') renderInsp(); }).catch(() => {});
+  return R; }
 /* crt.sh JSON (or anything shaped like it) pasted instead of a certificate */
 const cxLooksCt = t => /^\s*[[{]/.test(t) && /"(name_value|common_name|issuer_name)"/.test(t.slice(0, 4000));
 function cxIngest(text, opts = {}){
   if(cxLooksCt(text)){ const A = ctParse(text); if(A){ const S = cxS(); S.ct = A; S.ctF = ''; S.ctDom = S.ctDom || A.dom; S.tab = 'ct'; cxKeep('crt.sh · ' + (A.dom || 'names'), text, 'ct'); return cxPaint(); } return toast('That JSON is not a crt.sh result list'); }
   const S = cxS(); if(!opts.cmp){ S.input = text; S.rec = null; } return cxLoad(text, Object.assign({src:'Pasted'}, opts));
 }
+
+/* ---------- key facts: what people look for first, all copyable ---------- */
+const cxHexU = h => String(h || '').replace(/[^0-9a-f]/gi, '').toUpperCase();
+const cxColon = h => cxHexU(h).replace(/(..)(?=.)/g, '$1:');
+function cxFacts(c, opts = {}){
+  const row = (label, val, copy, cls, note) => `<div class="cxf-r"><span class="cxf-l">${label}</span><span class="cxf-v${cls ? ' ' + cls : ''}">${val}${note ? `<small>${note}</small>` : ''}</span><span class="cxf-cc">${copy ? `<button type="button" class="iconbtn cxf-c" data-act="cxCopy" data-v="${esc(copy)}" aria-label="Copy ${esc(String(label).replace(/<[^>]+>/g, ''))}">${ico('copy','sm')}</button>` : ''}</span></div>`;
+  const fp = c.fp || {}, R = [], when = t => `${esc(new Date(t).toISOString().replace('T', ' ').slice(0, 19))} UTC`;
+  if(c.kind !== 'csr'){
+    const now = Date.now(), exp = now > c.notAfter, pre = now < c.notBefore, days = Math.round((c.notAfter - now) / 864e5), life = Math.round((c.notAfter - c.notBefore) / 864e5);
+    R.push(row('Status', exp ? `<b class="cxbad">Expired</b> ${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'} ago` : pre ? `<b class="cxwarn">Not valid yet</b> — starts in ${Math.ceil((c.notBefore - now) / 864e5)} days` : `<b class="cxok">Valid</b> — ${days} day${days === 1 ? '' : 's'} left`));
+    R.push(row('Valid from', when(c.notBefore), new Date(c.notBefore).toISOString()), row('Expires', when(c.notAfter), new Date(c.notAfter).toISOString(), exp ? 'cxbad' : days <= 30 ? 'cxwarn' : '', `${life} days in all`));
+    R.push(row('Serial number', `<span class="mono">${esc(cxColon(c.serialHex || c.serial))}</span>`, cxHexU(c.serialHex || c.serial), '', `${c.serialBits || cxHexU(c.serialHex || c.serial).length * 4} bits${c.serialNeg ? ' · negative (not allowed)' : ''}`));
+  }
+  if(!fp.sha256 && !c.fp) R.push(row('Thumbprints', '<span class="t3">working them out…</span>'));
+  if(fp.sha256) R.push(row(c.kind === 'csr' ? 'Request SHA-256' : 'Thumbprint SHA-256', `<span class="mono">${esc(cxColon(fp.sha256))}</span>`, cxHexU(fp.sha256)));
+  if(fp.sha1) R.push(row(c.kind === 'csr' ? 'Request SHA-1' : 'Thumbprint SHA-1', `<span class="mono">${esc(cxHexU(fp.sha1))}</span>`, cxHexU(fp.sha1), '', c.kind === 'csr' ? '' : 'the “Thumbprint” Windows shows'));
+  if(fp.spki256) R.push(row('Public key SHA-256', `<span class="mono">${esc(fp.spki256)}</span>`, fp.spki256, '', 'the same for every certificate made from this key'));
+  if(fp.pin) R.push(row('Key pin', `<span class="mono">pin-sha256="${esc(fp.pin)}"</span>`, fp.pin));
+  R.push(row('Public key', esc(c.key.label) + (c.key.e ? ' · exponent ' + esc(String(c.key.e)) : '') + (c.key.detail && !String(c.key.detail).includes('e =') ? ' · ' + esc(c.key.detail) : '')));
+  R.push(row('Signed with', esc(c.sigAlg.name) + (c.sigAlg.oid ? ` <span class="t3 mono">${esc(c.sigAlg.oid)}</span>` : '')));
+  R.push(row('Version', esc(c.kind === 'csr' ? 'PKCS#10 v' + c.version : 'X.509 v' + (c.version || 3))));
+  R.push(row('Subject', `<span class="mono">${esc(c.subject.text || '(empty)')}</span>`, c.subject.text || ''));
+  if(c.kind === 'csr' && c.subject.parts && c.subject.parts.length > 1) for(const [k, v] of c.subject.parts) R.push(row('&nbsp;&nbsp;' + esc(k === 'CN' ? 'Common name' : X5L(k)), esc(v), v));
+  if(c.kind !== 'csr') R.push(row('Issuer', `<span class="mono">${esc(c.issuer.text || '(empty)')}</span>`, c.issuer.text || '', '', c.selfIssued ? 'itself — self-signed' : ''));
+  if(c.san && c.san.length) R.push(row(c.kind === 'csr' ? 'Asks for' : 'Names', `<span class="mono">${esc(c.san.map(s => s.v).join(', '))}</span>`, c.san.map(s => s.v).join('\n'), '', c.san.length + ' name' + (c.san.length > 1 ? 's' : '')));
+  if(c.ku && c.ku.length) R.push(row('Key usage', esc((c.ku.names || c.ku).join ? (c.ku.names || c.ku).join(', ') : String(c.ku))));
+  if(c.eku && c.eku.length) R.push(row('Extended key usage', esc(c.eku.map(e => e.name).join(', '))));
+  if(c.kind !== 'csr' && c.bc) R.push(row('Basic constraints', c.bc.ca ? 'Certificate authority' + (c.bc.pathLen != null ? ' · path length ' + c.bc.pathLen : '') : 'Not a CA'));
+  if(c.ski) R.push(row('Subject key ID', `<span class="mono">${esc(c.ski)}</span>`, c.ski));
+  if(c.aki) R.push(row('Authority key ID', `<span class="mono">${esc(typeof c.aki === 'string' ? c.aki : c.aki.keyId || '')}</span>`, typeof c.aki === 'string' ? c.aki : c.aki.keyId || ''));
+  if(c.aia && c.aia.length) R.push(row('OCSP / issuer', c.aia.map(a => esc((a.how || a.method || a.name || '') + ' ' + (a.url || a.v || a))).join('<br>')));
+  if(c.crl && c.crl.length) R.push(row('Revocation list', c.crl.map(u => esc(u.url || u)).join('<br>')));
+  if(c.kind === 'csr'){ for(const a of c.attrs || []) R.push(row(esc(a.name), `<span class="mono">${esc(a.value)}</span>`, a.value, a.oid === '1.2.840.113549.1.9.7' ? 'cxwarn' : '', a.oid === '1.2.840.113549.1.9.7' ? 'kept in the clear inside the request' : ''));
+    const other = (c.exts || []).filter(e => !['2.5.29.17', '2.5.29.37', '2.5.29.15'].includes(e.oid)); if(other.length) R.push(row('Other requested extensions', other.map(e => esc(e.name || e.oid) + (e.critical ? ' <span class="t3">(critical)</span>' : '')).join(', '))); }
+  return `<section class="card cxf${opts.compact ? ' compact' : ''}"${opts.compact ? '' : ' aria-label="Key facts"'}>${opts.compact ? '' : `<h3>${ico('fingerprint','sm')}Key facts</h3>`}<div class="cxf-g">${R.join('')}</div></section>`;
+}
+/* a certificate or request inside a case record: decoded in the evidence panel */
+function cxInRecord(r){
+  if(!r || !/-----BEGIN (?:NEW )?CERTIFICATE(?: REQUEST)?-----/.test(r.body || '')) return '';
+  let R; try{ R = cxRecParse(r); }catch(e){ return ''; } const L = [...(R.certs || []), ...(R.csrs || [])]; if(!L.length) return '';
+  return `<div class="cx-rec">${L.slice(0, 4).map(c => `<div class="cx-rec-h">${ico(c.kind === 'csr' ? 'file-text' : 'scroll-text','sm')}<b>${c.kind === 'csr' ? 'Signing request' : c.isCA ? (c.selfIssued ? 'Root CA certificate' : 'CA certificate') : 'Certificate'}</b><span class="mono">${esc(c.title)}</span></div>${cxFacts(c, {compact:true})}`).join('')}
+    ${L.length > 4 ? `<p class="t3 small">and ${L.length - 4} more</p>` : ''}<button class="btn sm" data-act="cxDecodeRec" data-id="${esc(r.id)}">${ico('shield-check','sm')}Open in Certificates</button></div>`;
+}
+
+/* Certificates and requests pasted into a case give it indicators: the certificate's SHA-256 and SHA-1 thumbprints (what crt.sh,
+   VirusTotal, Censys and Shodan search by) and the names and addresses it covers. Each record is read once, in the background. */
+let CX_SCAN = null;
+function cxScanRecords(){ clearTimeout(CX_SCAN); CX_SCAN = setTimeout(async () => {
+  const L = DB.records.filter(r => !r.certX && /-----BEGIN (?:NEW )?CERTIFICATE(?: REQUEST)?-----/.test(r.body || '')).slice(0, 200); if(!L.length) return; let n = 0;
+  for(const r of L){ let R; try{ R = cxRecParse(r); await Promise.all([...R.certs, ...R.csrs].map(c => X5.prints(c))); }catch(e){ r.certX = 1; continue; }
+    const have = new Set((r.ents || []).map(e => e.k + ':' + String(e.v).toLowerCase())), add = (k, v) => { v = String(v || '').toLowerCase(); if(v && !have.has(k + ':' + v)){ have.add(k + ':' + v); (r.ents = r.ents || []).push({k, v}); n++; } };
+    for(const c of R.certs){ if(c.fp){ add('sha256', c.fp.sha256); add('sha1', c.fp.sha1); } for(const s of c.san || []){ if(s.t === 'DNS') add('domain', s.v.replace(/^\*\./, '')); else if(s.t === 'IP') add(/:/.test(s.v) ? 'ipv6' : 'ipv4', s.v); else if(s.t === 'email') add('email', s.v); } }
+    for(const q of R.csrs) for(const s of q.san || []) if(s.t === 'DNS') add('domain', s.v.replace(/^\*\./, ''));
+    r.certX = 1; }
+  if(n){ rev++; cache = {}; save(); if(UI.route && /case|entities/.test(UI.route.area)) renderMain(); } else save();
+}, 400); }
 
 /* ---------- view ---------- */
 function viewCerts(){
@@ -169,9 +228,10 @@ function cxDecoder(){
           <span class="crt-pill">${esc(c.key.label)}</span><span class="crt-pill">${esc(c.sigAlg.name)}</span>${c.selfIssued ? `<span class="crt-pill">Self-signed${c.selfOk === true ? ' ✓' : ''}</span>` : ''}
           ${bad ? `<span class="crt-pill red">${ico('triangle-alert','sm')}${bad} red flag${bad > 1 ? 's' : ''}</span>` : ''}${reuse.length ? `<span class="crt-pill blue">${ico('key-round','sm')}Key shared with ${reuse.length}</span>` : ''}</div></div>
       <div class="crt-ha">${S.rec ? `<span class="crt-pill green">${ico('check','sm')}Saved</span>` : `<button class="btn sm primary" data-act="cxSave">${ico('plus','sm')}Save to case</button>`}<button class="btn sm" data-act="cxCopyPem">${ico('copy','sm')}Copy PEM</button><button class="btn sm ghost" data-act="cxExport" aria-haspopup="menu">${ico('download','sm')}Export${ico('chevron-down','sm')}</button></div></section>
+    ${cxFacts(c)}
     ${cxAssessCard(c, R, F, reuse, inds, seen)}
     <div class="crt-2">
-      <section class="card crt-s"><h3>${ico('user','sm')}Subject and issuer</h3><div class="crt-kv">${kv || '<span>Subject</span><b>(empty)</b>'}<span>Issuer</span><b>${esc(c.issuer.text)}</b><span>Serial</span><b class="mono">${esc(c.serial.length > 30 ? c.serial.slice(0, 29) + '…' : c.serial)}</b></div>
+      <section class="card crt-s"><h3>${ico('user','sm')}Subject and issuer</h3><div class="crt-kv">${kv || '<span>Subject</span><b>(empty)</b>'}<span>Issuer</span><b>${esc(c.issuer.text)}</b><span>Serial</span><b class="mono" style="overflow-wrap:anywhere">${esc(c.serial)}</b></div>
         <div class="crt-life"><div class="crt-bar" role="img" aria-label="${Math.round(life)}% of its lifetime used"><i style="width:${life}%"></i>${!exp && !pre ? `<em style="left:${life}%"></em>` : ''}</div>
           <div class="crt-lg"><span>From ${esc(cxDate(c.notBefore))}</span><span>To ${esc(cxDate(c.notAfter))}</span></div></div></section>
       <section class="card crt-s"><h3>${ico('globe','sm')}Names it covers${c.san.length ? `<span class="crt-n">${c.san.length}</span>` : ''}</h3>
@@ -442,9 +502,7 @@ function cxCsr(){
     const keyOk = !(q.key.type === 'RSA' && q.key.bits < 2048);
     return `<section class="card crt-csr"><div class="crt-ch"><span class="crt-big inf">${ico('file-text')}</span><div><h2>Signing request · ${esc(q.title)}</h2><p>A request for a certificate — nothing has been issued yet</p></div>
         <div class="crt-ha">${S.rec ? `<span class="crt-pill green">${ico('check','sm')}Saved</span>` : `<button class="btn sm primary" data-act="cxSave">${ico('plus','sm')}Save to case</button>`}<button class="btn sm" data-act="cxCopyPem">${ico('copy','sm')}Copy</button></div></div>
-      <div class="crt-kv"><span>Subject</span><b>${esc(q.subject.text || '(empty)')}</b><span>Asks for</span><b class="mono">${esc(q.san.map(s => s.v).join(', ') || '— no SAN extension')}</b><span>Key</span><b>${esc(q.key.label)}${q.key.detail ? ' · ' + esc(q.key.detail) : ''}</b><span>Signed with</span><b>${esc(q.sigAlg.name)}</b>
-        ${q.eku ? `<span>Usage</span><b>${esc(q.eku.map(e => e.name).join(', '))}</b>` : ''}${q.attrs.map(a => `<span>${esc(a.name)}</span><b>${esc(a.oid === '1.2.840.113549.1.9.7' ? a.value.slice(0, 3) + '…' : a.value)}</b>`).join('')}
-        ${q.fp ? `<span>Key SHA-256</span><b class="mono">${esc(q.fp.spki256)}</b>` : ''}</div>
+      ${cxFacts(q)}
       <div class="crt-checks">
         ${q.selfOk === undefined ? chk('inf', 'Checking the signature…', '') : q.selfOk ? chk('ok', 'Signature is valid', 'The request was not changed after it was made, and the requester holds the private key') : q.selfOk === false ? chk('bad', 'Signature does not verify', 'The request was altered, or is broken') : chk('inf', 'Signature type can’t be checked in the browser', esc(q.sigAlg.name))}
         ${chk(keyOk ? 'ok' : 'bad', keyOk ? 'Key is strong enough' : 'Key is too weak', keyOk ? esc(q.key.label) + ' meets the CA/Browser Forum minimum' : 'RSA under 2048 bits will be refused')}
@@ -751,6 +809,7 @@ const CX_ACTS = {
   cxRec:id => { const r = DB.records.find(x => x.id === id); if(!r) return; const S = cxS(); S.input = ''; cxLoad(r.body, {rec:id, tab:'decoder'}); },
   cxSave:() => cxSave(),
   cxCopy:(id, v) => copyText(v),
+  cxDecodeRec:id => { const r = recById(id); if(!r) return; closeDlg(); go('#/certs'); setTimeout(() => { const S = cxS(); S.input = r.body; S.rec = r.id; cxLoad(r.body, {src:'From the case'}); renderMain(); }, 60); },
   cxCopyPem:() => { const R = cxS().R; if(!R) return; copyText(R.certs.length && cxS().tab === 'decoder' ? X5.toPem(cxCur().der) : R.csrs.map(q => X5.toPem(q.der, 'CERTIFICATE REQUEST')).join('') || R.certs.map(c => X5.toPem(c.der)).join('')); },
   cxCopyNames:() => { const c = cxCur(); if(c) copyText(c.san.map(s => s.v).join('\n')); },
   cxDl:() => { const c = cxCur(); if(c) download(nbSlug(c.title) + '.pem', X5.toPem(c.der), 'application/x-pem-file'); },

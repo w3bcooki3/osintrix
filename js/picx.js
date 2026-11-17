@@ -24,10 +24,10 @@ function picAll(){
 }
 /* read fingerprints and metadata for pictures that do not have them yet (older files) */
 async function picScan(onStep){
-  if(PIC.busy) return; const todo = picAll().filter(x => !x.a.dhash || x.a.x == null); if(!todo.length) return;
+  if(PIC.busy) return; const todo = picAll().filter(x => !x.a.dhash || !x.a.psig || x.a.x == null); if(!todo.length) return;
   PIC.busy = true; PIC.done = 0; PIC.total = todo.length;
   try{ for(const {a} of todo){ const b = await fileBlob(a.id);
-      if(b){ if(!a.dhash) a.dhash = await dhashBlob(b);
+      if(b){ if(!a.dhash) a.dhash = await dhashBlob(b); if(!a.psig && typeof picSigBlob === 'function') a.psig = await picSigBlob(b) || '';
         if(a.x == null){ let x = null; if(/jpe?g|tiff|heic/i.test(a.type || a.name)){ try{ x = exif(new Uint8Array(await b.slice(0, 256 * 1024).arrayBuffer())); }catch(e){} } a.x = picMeta(x);
           if(x && x.GPS && !a.gps) a.gps = x.GPS; if(x && !a.cam) a.cam = [x.Make, x.Model].filter(Boolean).join(' '); } }
       else a.x = a.x || {missing:true};
@@ -38,7 +38,8 @@ async function picScan(onStep){
 /* union-find over visual fingerprints */
 function picGroups(all){
   const L = all.filter(x => x.a.dhash), P = L.map((_, i) => i), f = i => P[i] === i ? i : (P[i] = f(P[i]));
-  for(let i = 0; i < L.length; i++) for(let j = i + 1; j < L.length; j++){ const d = L[i].a.id === L[j].a.id ? 0 : hamming(L[i].a.dhash, L[j].a.dhash); if(d <= 10){ P[f(i)] = f(j); } }
+  for(let i = 0; i < L.length; i++) for(let j = i + 1; j < L.length; j++){ const A = L[i].a, B = L[j].a;
+    const ok = A.id === B.id || A.sha256 === B.sha256 || (A.psig && B.psig && typeof picMatch === 'function' ? !!picMatch(A.psig, B.psig) : hamming(A.dhash, B.dhash) <= 10); if(ok){ P[f(i)] = f(j); } }
   const G = new Map(); L.forEach((x, i) => { const k = f(i); if(!G.has(k)) G.set(k, []); G.get(k).push(x); });
   return [...G.values()].filter(g => new Set(g.map(x => x.a.sha256)).size > 1 || new Set(g.map(x => x.r.id)).size > 1);
 }
@@ -90,3 +91,22 @@ const PIC_ACTS = {
   picEla:async (id, v) => { const b = await fileBlob(v), r = recById(id), a = r && (r.att || []).find(x => x.id === v); if(!b || !a) return toast('That picture is missing from this browser');
     UI.labTab = 'image'; go('#/lab'); setTimeout(() => imgLoad(new File([b], a.name, {type:a.type})), 80); },
 };
+
+/* in the evidence panel: where else this picture is — cropped, mirrored, framed, re-saved — in any case */
+function picSameSection(r){
+  const own = (r.att || []).filter(a => typeof mediaKind === 'function' && mediaKind(a) === 'image'); if(!own.length) return '';
+  const all = picAll(), rows = [];
+  for(const a of own){ for(const y of all){ if(y.a.id === a.id) continue; let m = null;
+      if(y.a.sha256 && y.a.sha256 === a.sha256) m = {d:0, how:'exact'}; else if(a.psig && y.a.psig && typeof picMatch === 'function') m = picMatch(y.a.psig, a.psig);   /* said from the other picture's side */ else if(a.dhash && y.a.dhash && hamming(a.dhash, y.a.dhash) <= 10) m = {d:hamming(a.dhash, y.a.dhash), how:'same'};
+      if(m) rows.push({a, y, m}); } }
+  rows.sort((p, q) => (q.y.r.caseId !== r.caseId) - (p.y.r.caseId !== r.caseId) || p.m.d - q.m.d);
+  const pending = own.some(a => !a.psig);
+  if(pending && !PIC.busy) setTimeout(() => picScan().then(() => { if(typeof renderInsp === 'function') renderInsp(); }), 0);
+  const how = m => m.how === 'exact' ? 'the identical file' : (PIC_HOW[m.how] || m.how);
+  return `<div class="isec"><h4>The same picture elsewhere ${rows.length ? `<span class="t3">${rows.length}</span>` : ''}</h4>
+    ${rows.length ? `<ul class="ps-l">${rows.slice(0, 12).map(x => `<li><button class="md-th ps-th" data-act="selRec" data-id="${x.y.r.id}" aria-label="Open ${esc(x.y.a.name)}"><img data-pid="${esc(x.y.a.id)}" data-pk="image" alt=""></button>
+      <div><button class="lnk" data-act="selRec" data-id="${x.y.r.id}">${esc(x.y.a.name)}</button><div class="t3 small">${x.y.r.caseId === r.caseId ? 'this case' : esc(((x.y.c || {}).code || 'another case') + ' · ' + ((x.y.c || {}).name || '').split(' — ')[0])} · ${esc(how(x.m))}</div></div></li>`).join('')}</ul>`
+      : `<p class="t3 small" style="margin:0 0 8px">${pending ? 'Fingerprinting this picture…' : 'Not in any other evidence — cropped, mirrored, framed in a screenshot or re-saved copies would show here.'}</p>`}
+    <div class="t3 small" style="margin:8px 0 4px">Look for it on the web — opens the site; drop the picture in yourself:</div>
+    <div class="pivots">${[['Google Lens', 'https://lens.google.com/'], ['Bing Visual Search', 'https://www.bing.com/visualsearch'], ['Yandex Images', 'https://yandex.com/images/'], ['TinEye', 'https://tineye.com/']].map(([l, u]) => `<a class="btn xs" href="${u}" target="_blank" rel="noopener noreferrer">${esc(l)}</a>`).join('')}</div></div>`;
+}

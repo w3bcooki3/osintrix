@@ -178,7 +178,7 @@ function bindCases(){
 function viewCase(tab){
   const c = theCase(), D = derive();
   const counts = {vault:D.entries.length, entities:caseEntList(c.id).length, timeline:D.recs.filter(r => r.ts).length, questions:D.recs.filter(r => r.type === 'lead' && !r.answer).length || null, media:D.recs.reduce((n, r) => n + (r.att ? r.att.length : 0) + (r.big ? 1 : 0), 0) || null};
-  const body = {map:caseMapView, media:caseMedia, overview:caseOverview, vault:caseVault, entities:caseEntities, timeline:caseTimeline, graph:caseGraph, questions:caseQuestions, report:caseReport}[tab] || caseOverview;
+  const body = {map:caseMapView, media:caseMedia, overview:caseOverview, vault:caseVault, entities:caseEntities, timeline:caseTimeline, graph:caseGraph, questions:caseQuestions, infra:caseInfra, report:caseReport}[tab] || caseOverview;
   return `<div class="chead${tab === 'graph' ? ' g' : ''}" style="--cc:${esc(c.color)}"><div class="crumb"><a href="#/cases">Cases</a>${ico('chevron-right','sm')}<span>${esc(c.code)}</span></div>
     <div class="row1"><span class="cicon" style="--cc:${esc(c.color)}">${ico(c.icon)}</span>
       <div style="flex:1;min-width:0"><h1>${esc(c.name)}</h1><div class="meta">${statusTag(c.status)}<span>${ico('calendar','sm')}Opened ${esc(E.fmtDate(c.created, tz()))}</span><span>${ico('user','sm')}${esc(c.owner)}</span></div></div>
@@ -317,7 +317,7 @@ function dayOf(ts){ const z = tz(), k = z + '|' + Math.floor(ts / 9e5); let v = 
 function caseTimeline(c, D){
   const list = D.recs.filter(passes);
   const hosts = countBy(D.recs, r => r.host);
-  const bar = `<div class="tlbar"><div class="seg" role="group" aria-label="View"><button data-act="tlMode" data-v="events" aria-pressed="${UI.tlMode === 'events'}">${ico('clock','sm')}Events</button><button data-act="tlMode" data-v="story" aria-pressed="${UI.tlMode === 'story'}">${ico('book-open','sm')}Story</button><button data-act="tlMode" data-v="patterns" aria-pressed="${UI.tlMode === 'patterns'}">${ico('activity','sm')}Patterns</button><button data-act="tlMode" data-v="chain" aria-pressed="${UI.tlMode === 'chain'}">${ico('route','sm')}Attack chain</button><button data-act="tlMode" data-v="rules" aria-pressed="${UI.tlMode === 'rules'}">${ico('shield-check','sm')}Rules</button></div>
+  const bar = `<div class="tlbar"><div class="seg" role="group" aria-label="View"><button data-act="tlMode" data-v="events" aria-pressed="${UI.tlMode === 'events'}">${ico('clock','sm')}Events</button><button data-act="tlMode" data-v="story" aria-pressed="${UI.tlMode === 'story'}">${ico('book-open','sm')}Story</button><button data-act="tlMode" data-v="patterns" aria-pressed="${UI.tlMode === 'patterns'}">${ico('activity','sm')}Patterns</button><button data-act="tlMode" data-v="chain" aria-pressed="${UI.tlMode === 'chain'}">${ico('route','sm')}Attack chain</button><button data-act="tlMode" data-v="procs" aria-pressed="${UI.tlMode === 'procs'}">${ico('git-branch','sm')}Processes</button><button data-act="tlMode" data-v="moves" aria-pressed="${UI.tlMode === 'moves'}">${ico('waypoints','sm')}Movement</button><button data-act="tlMode" data-v="rules" aria-pressed="${UI.tlMode === 'rules'}">${ico('shield-check','sm')}Rules</button></div>
     ${UI.tlMode === 'events' ? `<div class="search-in tlq">${ico('filter')}<label class="sr" for="tlq">Filter the timeline</label><input id="tlq" class="inp" placeholder="Filter — host:DC01 verdict:malicious 4624" value="${esc(UI.q || '')}" autocomplete="off" spellcheck="false"></div>${UI.q && typeof HU_ACTS !== 'undefined' ? `<button class="iconbtn" data-act="huSave" aria-label="Save this filter as a hunt across all cases" title="Save as a hunt across all cases">${ico('crosshair','sm')}</button>` : ''}<span class="t3" style="font-size:calc(13.5px * var(--ts,1))">${list.length} of ${D.recs.length}</span>
     ${hosts.slice(0, 5).map(([h, n]) => `<button class="chip" data-act="facet" data-f="host" data-v="${esc(h)}" aria-pressed="${UI.facet.host === h}">${esc(h)}<span class="n">${n}</span></button>`).join('')}
     ${UI.pivot ? `<span class="chip accent">Pivot: ${esc(entSplit(UI.pivot).v)} <button data-act="pivotOff" aria-label="Exit pivot">${ico('x','sm')}</button></span>` : ''}
@@ -330,6 +330,8 @@ function caseTimeline(c, D){
   if(UI.tlMode === 'patterns') return `<div class="scroll">${bar}${tlxView(D)}</div>`;
   if(UI.tlMode === 'chain') return `<div class="scroll">${bar}${chainView(c, D)}</div>`;
   if(UI.tlMode === 'rules') return `<div class="scroll">${bar}${caseRulesView(c)}</div>`;
+  if(UI.tlMode === 'procs') return `<div class="scroll">${bar}${procView(c, D)}</div>`;
+  if(UI.tlMode === 'moves') return `<div class="scroll">${bar}${moveView(c, D)}</div>`;
   /* every matching event is in the list; only the ones near the screen are drawn (vlist.js) */
   const items = [], dayN = new Map(); let lastDay = null, prev = null;
   for(const r of list) if(r.ts){ const d = dayOf(r.ts); dayN.set(d, (dayN.get(d) || 0) + 1); }
@@ -377,6 +379,13 @@ function storyHTML(D){
 }
 
 /* ---------- questions ---------- */
+/* Infrastructure: what the case pivots on — domains and addresses, money, accounts */
+function caseInfra(c, D){
+  const v = ['dom', 'money', 'acc'].includes(UI.ivView) ? UI.ivView : 'dom';
+  const seg = `<div class="seg qseg" role="group" aria-label="View"><button data-act="ivView" data-v="dom" aria-pressed="${v === 'dom'}">${ico('network','sm')}Domains &amp; addresses</button><button data-act="ivView" data-v="money" aria-pressed="${v === 'money'}">${ico('bitcoin','sm')}Money</button><button data-act="ivView" data-v="acc" aria-pressed="${v === 'acc'}">${ico('history','sm')}Accounts</button></div>`;
+  const body = v === 'money' ? walletView(c) : v === 'acc' ? footView(c) : infraView(c);
+  return `<div class="scroll"><div class="page wide">${seg}${body}</div></div>`;
+}
 function caseQuestions(c, D){
   ensurePlaybooks();
   const leads = D.recs.filter(r => r.type === 'lead'), pbOf = r => ((r.tags || []).find(t => t.startsWith('playbook:')) || '').slice(9);
@@ -387,9 +396,10 @@ function caseQuestions(c, D){
   for(const l of leads){ const k = pbOf(l); if(!k) continue; let g = groups.find(x => x.id === k); if(!g){ const p = DB.playbooks.find(x => x.id === k); g = {id:k, name:p ? p.name : 'Playbook', icon:p ? p.icon : 'list-checks', items:[], pb:true}; groups.push(g); } g.items.push(l); }
   const sec = g => { const d = g.items.filter(l => l.answer).length; return `<section class="card qsec"><header><span class="qsec-ic">${ico(g.icon,'sm')}</span><h3>${esc(g.name)}${g.pb ? ' <span class="pill" style="--c:#8b5cf6">Playbook</span>' : ''}</h3><span style="flex:1"></span><span class="pb-prog"><i style="width:${g.items.length ? Math.round(d / g.items.length * 100) : 0}%"></i></span><span class="t3 mono">${d}/${g.items.length}</span></header>
     <div class="body flush">${g.items.map(row).join('')}</div></section>`; };
-  const qv = UI.qView === 'hyp' ? 'hyp' : 'q', A = c.ach || {hyps:[]};
-  const seg = `<div class="seg qseg" role="group" aria-label="Show"><button data-act="qView" data-v="q" aria-pressed="${qv === 'q'}">${ico('list-checks','sm')}Open questions <span class="segn">${leads.length - done}</span></button><button data-act="qView" data-v="hyp" aria-pressed="${qv === 'hyp'}">${ico('scale','sm')}Hypotheses <span class="segn">${A.hyps.length}</span></button></div>`;
+  const qv = ['hyp', 'src'].includes(UI.qView) ? UI.qView : 'q', A = c.ach || {hyps:[]};
+  const seg = `<div class="seg qseg" role="group" aria-label="Show"><button data-act="qView" data-v="q" aria-pressed="${qv === 'q'}">${ico('list-checks','sm')}Open questions <span class="segn">${leads.length - done}</span></button><button data-act="qView" data-v="hyp" aria-pressed="${qv === 'hyp'}">${ico('scale','sm')}Hypotheses <span class="segn">${A.hyps.length}</span></button>${typeof srcView === 'function' ? `<button data-act="qView" data-v="src" aria-pressed="${qv === 'src'}">${ico('badge-check','sm')}Sources</button>` : ''}</div>`;
   if(qv === 'hyp') return `<div class="scroll"><div class="page">${seg}${achHTML(c, D)}</div></div>`;
+  if(qv === 'src') return `<div class="scroll"><div class="page wide">${seg}${srcView(c)}</div></div>`;
   return `<div class="scroll"><div class="page narrow">${seg}
     <div class="qtop card"><div class="qring" style="--p:${pct}"><b>${pct}%</b></div><div style="flex:1;min-width:0"><h3>${done} of ${leads.length} questions answered</h3><p class="t3">Every open question is something the case does not know yet.</p></div>
       <button class="btn" data-act="pbMenu">${ico('list-checks','sm')}Run a playbook</button></div>

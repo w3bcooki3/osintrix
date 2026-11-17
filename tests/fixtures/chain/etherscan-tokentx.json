@@ -1,0 +1,27 @@
+{
+ "status": "1",
+ "message": "OK",
+ "result": [
+  {
+   "blockNumber": "19351000",
+   "timeStamp": "1710165600",
+   "hash": "0xf69883cf44356dfc8008b1c04fba928db8ee17f2111880d94022190ce8bd5db1",
+   "nonce": "7",
+   "blockHash": "0x04548134b20665e794612f783120886f29e94de2b70b82b6da1b0eb4b1b887b9",
+   "from": "0x5290aeb0308c061c7945e5578fde25ab629ba7de",
+   "contractAddress": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+   "to": "0x97ee13f539badf506807c28f82ae6de4f9166a85",
+   "value": "5000000000",
+   "tokenName": "Tether USD",
+   "tokenSymbol": "USDT",
+   "tokenDecimal": "6",
+   "transactionIndex": "12",
+   "gas": "65000",
+   "gasPrice": "30000000000",
+   "gasUsed": "46000",
+   "cumulativeGasUsed": "900000",
+   "input": "deprecated",
+   "confirmations": "1690000"
+  }
+ ]
+}

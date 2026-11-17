@@ -147,14 +147,21 @@ function ctfWriteups(){
 }
 
 /* ---------- forensics kit ---------- */
-const LAB_TABS = [['file','File inspector','file-search'], ['logs','Log parser','scan-text'], ['pcap','PCAP','network'], ['sqlite','SQLite','database'], ['image','Image','image'], ['email','Email headers','mail'], ['time','Time & IDs','clock-3'], ['hash','Hashes','fingerprint'], ['geo','Coordinates','compass'], ['net','Network','network'], ['gen','Generators','users'], ['twist','Look-alikes','copy'], ['ident','Identity','fingerprint']];
+const LAB_TABS = [['file','File inspector','file-search'], ['logs','Log parser','scan-text'], ['pcap','PCAP','network'], ['sqlite','SQLite','database'], ['image','Image','image'], ['email','Email headers','mail'], ['time','Time & IDs','clock-3'], ['hash','Hashes','fingerprint'], ['geo','Coordinates','compass'], ['net','Network','network'], ['gen','Generators','users'], ['twist','Look-alikes','copy'], ['ident','Identity','user']];
+/* the tools in three groups, all visible at any width (the bar wraps instead of hiding tools off to the side) */
+const LAB_GROUPS = [['Analyse files', ['file', 'logs', 'pcap', 'sqlite', 'image']], ['Decode', ['email', 'time', 'hash']], ['Investigate', ['geo', 'net', 'gen', 'twist', 'ident']]];
+/* one line: a button per group showing the tool in use; its tools drop down under it */
+document.addEventListener('click', ev => { if(UI.ltOpen == null || ev.target.closest('.lt-c')) return; UI.ltOpen = null; document.querySelectorAll('.lt-pop').forEach(x => x.hidden = true); document.querySelectorAll('.lt-cat').forEach(b => b.setAttribute('aria-expanded', 'false')); });
+document.addEventListener('keydown', ev => { if(ev.key === 'Escape' && UI.ltOpen != null){ const b = document.querySelector(`.lt-cat[data-v="${UI.ltOpen}"]`); UI.ltOpen = null; document.querySelectorAll('.lt-pop').forEach(x => x.hidden = true); if(b){ b.setAttribute('aria-expanded', 'false'); b.focus(); } } });
 function viewLab(){
   const t = LAB_TABS.some(x => x[0] === UI.labTab) ? UI.labTab : 'file';
   const body = {file:labFile, logs:labParse, pcap:labPcap, sqlite:labSql, image:labImage, email:labEmail, time:labTime, hash:labHash, geo:labGeo, net:labNet, gen:labGen, twist:labTwist, ident:labIdent}[t]();
   return `<div class="scroll"><div class="page wide">
     ${libHead('Forensics kit', 'Inspect files and images, read email headers, decode timestamps and IDs, identify hashes, find look-alike domains and pivot on identities. Files never leave your browser; online checks use only the sources you switched on.', '', '')}
     <div class="mpick"><label for="labSel" class="ix">Tool</label><select id="labSel" class="gsel bord">${LAB_TABS.map(([k, l]) => `<option value="${k}"${t === k ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
-    <nav class="labtabs" role="tablist">${LAB_TABS.map(([k, l, i]) => `<button role="tab" data-act="labTab" data-v="${k}" aria-selected="${t === k}">${ico(i,'sm')}${l}</button>`).join('')}</nav>
+    <nav class="labtabs lt-one" aria-label="Tools">${LAB_GROUPS.map(([g, ks], gi) => { const T = ks.map(k => LAB_TABS.find(x => x[0] === k)).filter(Boolean), cur = T.find(x => x[0] === t), open = UI.ltOpen === gi;
+      return `<div class="lt-c${cur ? ' on' : ''}"><button class="lt-cat" data-act="ltCat" data-v="${gi}" aria-expanded="${open}" aria-haspopup="true">${ico(cur ? cur[2] : T[0][2],'sm')}<span class="lt-cl">${g}</span>${cur ? `<span class="lt-cur">${cur[1]}</span>` : `<span class="lt-n">${T.length}</span>`}${ico('chevron-down','sm')}</button>
+        <div class="lt-pop" role="menu"${open ? '' : ' hidden'}>${T.map(([k, l, i]) => `<button role="menuitemradio" data-act="labTab" data-v="${k}" aria-checked="${t === k}">${ico(i,'sm')}${l}</button>`).join('')}</div></div>`; }).join('')}</nav>
     ${body}</div></div>`;
 }
 /* file inspector */
@@ -199,22 +206,30 @@ function exif(b){
 }
 function parseTiff(b, t){
   const le = b[t] === 0x49, u16 = p => le ? b[p] | (b[p + 1] << 8) : (b[p] << 8) | b[p + 1], u32 = p => (le ? (b[p] | (b[p + 1] << 8) | (b[p + 2] << 16) | (b[p + 3] << 24)) : ((b[p] << 24) | (b[p + 1] << 16) | (b[p + 2] << 8) | b[p + 3])) >>> 0;
-  const NAMES = {0x10e:'Description',0x10f:'Make',0x110:'Model',0x112:'Orientation',0x131:'Software',0x132:'Modified',0x13b:'Artist',0x8298:'Copyright',0x9003:'Taken',0x9004:'Digitized',0xa434:'Lens',0xa430:'Owner',0xa431:'Body serial',0x9286:'User comment',0xa002:'Width',0xa003:'Height'};
-  const GPSN = {1:'LatRef',2:'Lat',3:'LonRef',4:'Lon',5:'AltRef',6:'Alt',7:'GPSTime',0x1d:'GPSDate'};
+  const NAMES = {0x10e:'Description',0x10f:'Make',0x110:'Model',0x112:'Orientation',0x131:'Software',0x132:'Modified',0x13b:'Artist',0x8298:'Copyright',0x9003:'Taken',0x9004:'Digitized',0xa434:'Lens',0xa430:'Owner',0xa431:'Body serial',0x9286:'User comment',0xa002:'Width',0xa003:'Height',0x13c:'Host computer',0x9010:'Modified offset',0x9011:'Taken offset',0xa420:'Image ID',0xa433:'Lens make',0x9c9b:'XP title',0x9c9c:'XP comment',0x9c9d:'XP author',0x9c9e:'XP keywords',0x9c9f:'XP subject'};
+  const GPSN = {1:'LatRef',2:'Lat',3:'LonRef',4:'Lon',5:'AltRef',6:'Alt',7:'GPSTime',0xc:'SpeedRef',0xd:'Speed',0x10:'DirRef',0x11:'Dir',0x1f:'HErr',0x1d:'GPSDate'};
   const out = {}, gps = {};
   const val = (type, cnt, p) => { const sz = {1:1,2:1,3:2,4:4,5:8,7:1,9:4,10:8}[type] || 1, total = sz * cnt, at = total > 4 ? t + u32(p) : p;
     if(type === 2) return String.fromCharCode(...b.slice(at, at + cnt)).replace(/\0+$/, '').trim();
     if(type === 3) return cnt === 1 ? u16(at) : Array.from({length:cnt}, (_, i) => u16(at + i * 2));
-    if(type === 4 || type === 9) return u32(at);
-    if(type === 5 || type === 10){ const r = Array.from({length:cnt}, (_, i) => { const n = u32(at + i * 8), d = u32(at + i * 8 + 4); return d ? n / d : 0; }); return cnt === 1 ? r[0] : r; }
+    if(type === 4) return u32(at); if(type === 9) return u32(at) | 0;
+    if(type === 5 || type === 10){ const sg = x => type === 10 ? x | 0 : x, r = Array.from({length:cnt}, (_, i) => { const n = sg(u32(at + i * 8)), d = sg(u32(at + i * 8 + 4)); return d ? n / d : 0; }); return cnt === 1 ? r[0] : r; }
+    if(type === 1 && cnt > 2 && /^0x9c9/.test('0x' + u16(p - 8).toString(16))) return new TextDecoder('utf-16le').decode(b.slice(at, at + cnt)).replace(/\0+$/, '').trim();   /* Windows XP* tags: UTF-16 in bytes */
     if(type === 7) return String.fromCharCode(...b.slice(at, at + Math.min(cnt, 200))).replace(/[^\x20-\x7e]/g, '').trim();
     return b[at]; };
   const ifd = (p, names, into, depth) => { if(p <= t || p >= b.length - 2 || depth > 3) return; const n = u16(p); if(n > 400) return;
     for(let i = 0; i < n; i++){ const e = p + 2 + i * 12; if(e + 12 > b.length) break; const tag = u16(e), type = u16(e + 2), cnt = u32(e + 4);
       try{ if(tag === 0x8769) ifd(t + u32(e + 8), names, into, depth + 1); else if(tag === 0x8825) ifd(t + u32(e + 8), GPSN, gps, depth + 1); else if(names[tag]) into[names[tag]] = val(type, cnt, e + 8); }catch(x){} } };
   ifd(t + u32(t + 4), NAMES, out, 0);
-  if(Array.isArray(gps.Lat) && Array.isArray(gps.Lon)){ const d = a => a[0] + a[1] / 60 + a[2] / 3600; let la = d(gps.Lat), lo = d(gps.Lon); if(gps.LatRef === 'S') la = -la; if(gps.LonRef === 'W') lo = -lo; out.GPS = {lat:+la.toFixed(6), lon:+lo.toFixed(6), alt:typeof gps.Alt === 'number' ? Math.round(gps.Alt) : null}; }
-  if(gps.GPSDate) out['GPS date'] = gps.GPSDate;
+  if(Array.isArray(gps.Lat) && Array.isArray(gps.Lon)){ /* some writers store a negative degree as well as S/W — the sign is applied once */
+    const d = a => Math.abs(a[0]) + Math.abs(a[1] || 0) / 60 + Math.abs(a[2] || 0) / 3600, neg = (a, ref, r) => /^[SW]/i.test(ref || '') || a.some(x => x < 0) ? -1 : 1;
+    let la = d(gps.Lat) * neg(gps.Lat, gps.LatRef), lo = d(gps.Lon) * neg(gps.Lon, gps.LonRef);
+    if(Math.abs(la) <= 90 && Math.abs(lo) <= 180 && !(la === 0 && lo === 0)) out.GPS = {lat:+la.toFixed(6), lon:+lo.toFixed(6), alt:typeof gps.Alt === 'number' ? Math.round(gps.Alt * (gps.AltRef === 1 ? -1 : 1)) : null,
+      dir:typeof gps.Dir === 'number' ? Math.round(gps.Dir) % 360 : null, dirRef:gps.DirRef === 'M' ? 'magnetic' : gps.DirRef === 'T' ? 'true' : '', err:typeof gps.HErr === 'number' ? Math.round(gps.HErr) : null,
+      speed:typeof gps.Speed === 'number' ? +gps.Speed.toFixed(1) + ' ' + ({K:'km/h', M:'mph', N:'knots'}[gps.SpeedRef] || '') : null}; }
+  if(Array.isArray(gps.GPSTime) && gps.GPSTime.length === 3 && gps.GPSTime.every(isFinite)){ const [h, m, sec] = gps.GPSTime, z = n => String(Math.floor(n)).padStart(2, '0'); if(h < 24 && m < 60 && sec < 61) out['GPS time'] = z(h) + ':' + z(m) + ':' + z(sec); }
+  /* iOS 8 wrote the GPS date with the day of the year in place of the day ("2014:09:259"): read it as that */
+  if(gps.GPSDate){ const doy = String(gps.GPSDate).match(/^(\d{4}):\d{2}:(\d{3})$/); out['GPS date'] = doy ? new Date(Date.UTC(+doy[1], 0, +doy[2])).toISOString().slice(0, 10).replace(/-/g, ':') : gps.GPSDate; }
   return Object.keys(out).length ? out : null;
 }
 function pngInfo(b){
@@ -352,7 +367,7 @@ function bindLab(){
   deb('cidrIn', v => { UI.cidrIn = v; $('cidrOut').innerHTML = cidrOut(v); }, 60);
   deb('uaIn', v => { UI.uaIn = v; $('uaOut').innerHTML = uaOut(v); }, 60);
   deb('macIn', v => { UI.macIn = v; macOut(v); }, 150);
-  deb('genName', v => { UI.genName = v; $('genOut').innerHTML = genOut(); }, 100); deb('genNums', v => { UI.genNums = v; $('genOut').innerHTML = genOut(); }, 100); deb('genDom', v => { UI.genDom = v; $('genOut').innerHTML = genOut(); }, 100);
+  deb('genName', v => { UI.genName = v; $('genOut').innerHTML = genOut(); }, 100); deb('genNicks', v => { UI.genNicks = v; $('genOut').innerHTML = genOut(); }, 100); deb('genQ', v => { UI.genQ = v; $('genOut').innerHTML = genOut(); }, 80); for(const [id, k] of [['genPers', 'genPers'], ['genAllP', 'genAllP']]){ const x = $(id); if(x) x.onchange = () => { UI[k] = x.checked; $('genOut').innerHTML = genOut(); }; } deb('genNums', v => { UI.genNums = v; $('genOut').innerHTML = genOut(); }, 100); deb('genDom', v => { UI.genDom = v; $('genOut').innerHTML = genOut(); }, 100);
   if(UI.macIn) macOut(UI.macIn);
   const sq = $('strq'); if(sq) sq.oninput = () => { UI.strq = sq.value; clearTimeout(bindLab.s); bindLab.s = setTimeout(() => { renderMain(); const x = $('strq'); if(x){ x.focus(); x.setSelectionRange(x.value.length, x.value.length); } }, 200); };
   bindImage(); bindParse(); bindPcap(); bindSql();
@@ -558,17 +573,33 @@ function labNet(){
 
 /* ---------- generators ---------- */
 function genOut(){
-  const n = UI.genName || '', u = usernameVariants(n, UI.genNums || ''), e = emailVariants(n, UI.genDom || '');
-  if(!n.trim()) return '<p class="t3">Type a full name to generate likely usernames and email addresses.</p>';
-  const list = (items, kind) => `<div class="genlist">${items.map(x => `<span><code>${esc(x)}</code>${kind === 'u' ? `<a href="https://whatsmyname.app/?q=${encodeURIComponent(x)}" target="_blank" rel="noopener noreferrer" title="Check on WhatsMyName">${ico('arrow-up-right','sm')}</a>` : ''}</span>`).join('')}</div>`;
-  return `<div class="genres"><section><div class="genh"><h4>Usernames <span class="t3">${u.length}</span></h4><button class="btn xs" data-act="flagCopy" data-v="${esc(u.join('\n'))}">${ico('copy','sm')}Copy all</button></div>${list(u, 'u')}</section>
-    ${e.length ? `<section><div class="genh"><h4>Email formats <span class="t3">${e.length}</span></h4><button class="btn xs" data-act="flagCopy" data-v="${esc(e.join('\n'))}">${ico('copy','sm')}Copy all</button></div>${list(e, 'e')}
-      <p class="t3" style="font-size:calc(12.5px * var(--ts,1));margin:10px 0 0">The first four formats cover most companies. Confirm one real address before trusting the pattern.</p></section>` : ''}</div>`;
+  const R = genBuild({name:UI.genName || '', nums:UI.genNums || '', nicks:UI.genNicks || '', domains:UI.genDom || '', personal:UI.genPers !== false, allProviders:!!UI.genAllP, seps:UI.genSeps || ['', '.', '_']});
+  if(!R) return '<p class="t3">Type a name — “Jordan Alex Okafor”, “José van der Berg”, or a handle you already know.</p>';
+  const q = String(UI.genQ || '').toLowerCase(), f = L => q ? L.filter(x => x.v.includes(q)) : L;
+  const item = (x, kind) => `<li class="gen-i t${Math.min(x.tier, 4)}"><code title="${esc(x.why)}">${esc(x.v)}</code><span class="gen-a"><button class="iconbtn sm" data-act="flagCopy" data-v="${esc(x.v)}" aria-label="Copy ${esc(x.v)}">${ico('copy','sm')}</button>${kind === 'u' ? `<a class="iconbtn sm" href="https://whatsmyname.app/?q=${encodeURIComponent(x.v)}" target="_blank" rel="noopener noreferrer" aria-label="Look for ${esc(x.v)} on WhatsMyName" title="Look for it on WhatsMyName">${ico('arrow-up-right','sm')}</a>` : ''}</span></li>`;
+  const block = (title, L, kind, note) => { const all = f(L), groups = [[1, 'Most likely'], [2, 'Also common'], [3, 'Less common'], [4, 'With numbers and extras']].map(([t, l]) => [l, all.filter(x => Math.min(x.tier, 4) === t)]).filter(g => g[1].length);
+    return all.length ? `<section class="gen-s"><div class="genh"><h4>${title} <span class="t3">${all.length}</span></h4><div class="gen-tools"><button class="btn xs" data-act="flagCopy" data-v="${esc(all.map(x => x.v).join('\n'))}">${ico('copy','sm')}Copy all</button><button class="btn xs" data-act="genSave" data-v="${kind}">${ico('download','sm')}.txt</button></div></div>
+      ${groups.map(([l, G]) => `<div class="gen-g"><div class="gen-gh"><span>${l}</span><button class="lnk small" data-act="flagCopy" data-v="${esc(G.map(x => x.v).join('\n'))}">copy these ${G.length}</button></div><ul class="gen-l">${G.map(x => item(x, kind)).join('')}</ul></div>`).join('')}${note ? `<p class="t3 small" style="margin:8px 0 0">${note}</p>` : ''}</section>` : ''; };
+  return `<div class="gen-res">${block('Usernames', R.users, 'u')}${block('Work email', R.corp, 'c', 'Most companies use one of the first four formats. Find one real address of the company (its website, a signature, a press release) and use the format it shows.')}${block('Personal email', R.personal, 'p', 'The likeliest names at the big providers. Checking whether an address exists is up to you — this list is only what is worth trying.')}</div>`;
 }
 function labGen(){
   return `<div class="labgrid one wide"><section class="card"><header><h3>${ico('users','sm')} Username & email permutations</h3></header><div class="body">
-    <div class="frow3"><div class="field"><label for="genName">Full name</label><input id="genName" value="${esc(UI.genName || '')}" placeholder="Jordan Okafor" autocomplete="off"></div>
-      <div class="field"><label for="genNums">Numbers (years, favourites)</label><input id="genNums" value="${esc(UI.genNums || '')}" placeholder="1992, 7" autocomplete="off"></div>
-      <div class="field"><label for="genDom">Company domain</label><input id="genDom" value="${esc(UI.genDom || '')}" placeholder="corp.example" autocomplete="off"></div></div>
+    <div class="gen-in"><div class="field"><label for="genName">Name</label><input id="genName" value="${esc(UI.genName || '')}" placeholder="Jordan Alex Okafor" autocomplete="off" spellcheck="false"></div>
+      <div class="field"><label for="genNicks">Known handles or nicknames <span class="t3">optional</span></label><input id="genNicks" value="${esc(UI.genNicks || '')}" placeholder="jokafor, jo_k" autocomplete="off" spellcheck="false"></div>
+      <div class="field"><label for="genNums">Numbers <span class="t3">birth year, favourites</span></label><input id="genNums" value="${esc(UI.genNums || '')}" placeholder="1992, 7" autocomplete="off"></div>
+      <div class="field"><label for="genDom">Company domains <span class="t3">optional</span></label><input id="genDom" value="${esc(UI.genDom || '')}" placeholder="corp.example, corp.co.uk" autocomplete="off" spellcheck="false"></div></div>
+    <div class="gen-opts"><div class="seg" role="group" aria-label="Separators">${[['', 'none'], ['.', '.'], ['_', '_'], ['-', '-']].map(([s, l]) => `<button data-act="genSep" data-v="${esc(s)}" aria-pressed="${(UI.genSeps || ['', '.', '_']).includes(s)}">${l === 'none' ? 'joined' : 'with ' + l}</button>`).join('')}</div>
+      <label class="chk"><input type="checkbox" id="genPers"${UI.genPers !== false ? ' checked' : ''}> Personal email</label><label class="chk"><input type="checkbox" id="genAllP"${UI.genAllP ? ' checked' : ''}> All 12 providers</label>
+      <label class="sr" for="genQ">Filter the results</label><input id="genQ" class="inp gen-q" value="${esc(UI.genQ || '')}" placeholder="Filter results" autocomplete="off" spellcheck="false"></div>
     <div id="genOut">${genOut()}</div></div></section></div>`;
 }
+
+const GEN_ACTS = {
+  ltCat:(id, v) => { const i = +v, was = UI.ltOpen === i; UI.ltOpen = was ? null : i; document.querySelectorAll('.lt-c').forEach((c, j) => { c.querySelector('.lt-pop').hidden = j !== UI.ltOpen; c.querySelector('.lt-cat').setAttribute('aria-expanded', String(j === UI.ltOpen)); });
+    if(!was){ const f = document.querySelector(`.lt-c:nth-child(${i + 1}) .lt-pop [aria-checked=true]`) || document.querySelector(`.lt-c:nth-child(${i + 1}) .lt-pop button`); if(f) f.focus(); } },
+  genSep:(id, v) => { const S = new Set(UI.genSeps || ['', '.', '_']); if(S.has(v)){ if(S.size > 1) S.delete(v); } else S.add(v); UI.genSeps = ['', '.', '_', '-'].filter(x => S.has(x));
+    document.querySelectorAll('[data-act=genSep]').forEach(b => b.setAttribute('aria-pressed', String(S.has(b.dataset.v)))); $('genOut').innerHTML = genOut(); },
+  genSave:(id, v) => { const R = genBuild({name:UI.genName || '', nums:UI.genNums || '', nicks:UI.genNicks || '', domains:UI.genDom || '', personal:UI.genPers !== false, allProviders:!!UI.genAllP, seps:UI.genSeps || ['', '.', '_']}); if(!R) return;
+    const L = (v === 'u' ? R.users : v === 'c' ? R.corp : R.personal).map(x => x.v), a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([L.join('\n') + '\n'], {type:'text/plain'}));
+    a.download = ((UI.genName || 'names').trim().replace(/[^\w-]+/g, '-').toLowerCase() || 'names') + '-' + ({u:'usernames', c:'work-email', p:'personal-email'}[v]) + '.txt'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); },
+};

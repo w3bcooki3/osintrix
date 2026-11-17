@@ -1,0 +1,2 @@
+{"meta":{"count":2},"data":[{"attributes":{"date":1709047200,"host_name":"harbourline-billing.test","resolver":"VirusTotal","ip_address":"104.21.3.4","host_name_last_analysis_stats":{"harmless":60,"malicious":3}},"type":"resolution","id":"104.21.3.4harbourline-billing.test"},
+ {"attributes":{"date":1709133600,"host_name":"harbourline-billing.test","resolver":"VirusTotal","ip_address":"203.0.113.80"},"type":"resolution","id":"203.0.113.80harbourline-billing.test"}],"links":{"self":"https://www.virustotal.com/api/v3/domains/harbourline-billing.test/resolutions"}}

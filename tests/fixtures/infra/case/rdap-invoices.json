@@ -1,0 +1,7 @@
+{"objectClassName":"domain","handle":"2840119555_DOMAIN_COM-VRSN","ldhName":"HL-INVOICES.TEST","status":["client transfer prohibited"],
+ "entities":[{"objectClassName":"entity","handle":"3765","roles":["registrar"],"vcardArray":["vcard",[["version",{},"text","4.0"],["fn",{},"text","NICENIC INTERNATIONAL GROUP CO., LIMITED"]]],
+   "entities":[{"objectClassName":"entity","roles":["abuse"],"vcardArray":["vcard",[["version",{},"text","4.0"],["fn",{},"text","Abuse Contact"],["email",{},"text","abuse@nicenic.net"]]]}]},
+  {"objectClassName":"entity","roles":["registrant"],"vcardArray":["vcard",[["version",{},"text","4.0"],["fn",{},"text","Karl Voss"],["org",{},"text",""],["email",{},"text","K.Voss.Reg@mailbox.example"],["tel",{"type":"voice"},"uri","tel:+31.612345678"]]]}],
+ "events":[{"eventAction":"registration","eventDate":"2024-02-27T16:20:03Z"},{"eventAction":"expiration","eventDate":"2025-02-27T16:20:03Z"},{"eventAction":"last update of RDAP database","eventDate":"2024-03-10T10:01:00Z"}],
+ "nameservers":[{"objectClassName":"nameserver","ldhName":"NS1.BULLETDNS.TEST"},{"objectClassName":"nameserver","ldhName":"NS2.BULLETDNS.TEST"}],
+ "secureDNS":{"delegationSigned":false},"rdapConformance":["rdap_level_0"]}

@@ -15,10 +15,12 @@ const CLK_TLD2 = /^(co|com|org|net|ac|gov|edu|ltd|plc|me|ne|or|go)$/;
 function lkRegDomain(d){ const p = String(d).toLowerCase().replace(/\.$/, '').split('.'); if(p.length < 2) return ''; return (p.length >= 3 && CLK_TLD2.test(p[p.length - 2]) && p[p.length - 1].length === 2 ? p.slice(-3) : p.slice(-2)).join('.'); }
 const CLK_W = {malicious:6, suspicious:3, '':1};
 function lkIndex(){
-  const sig = rev + ':' + DB.cases.length + ':' + Object.keys(DB.verdicts || {}).length; if(CLK_C.sig === sig) return CLK_C.v;
+  const sig = rev + ':' + DB.cases.length + ':' + Object.keys(DB.verdicts || {}).length + ':' + (typeof libphonenumber !== 'undefined') + ':' + (DB.phoneCC || ''); if(CLK_C.sig === sig) return CLK_C.v;
   const cases = DB.cases.filter(c => !c.sample || DB.cases.every(x => x.sample)), per = new Map(), seen = new Map();
   for(const c of cases){ const D = derive(c.id), keys = new Map();
-    for(const e of D.ents.values()){ if(e.k === 'ttp') continue; if((e.k === 'ipv4' || e.k === 'ipv6') && lkPrivate(e.v)) continue; if(verdictOf(e.id) === 'benign') continue; keys.set('e|' + e.id, {kind:'ind', k:e.k, v:e.v, id:e.id, n:e.recs.length}); }
+    for(const e of D.ents.values()){ if(e.k === 'ttp') continue; if((e.k === 'ipv4' || e.k === 'ipv6') && lkPrivate(e.v)) continue; if(verdictOf(e.id) === 'benign') continue;
+      /* a phone number counts by its standard form, so 07700 900123 here and +44 7700 900123 there are one number */
+      const pi = e.k === 'phone' && typeof phoneInfo === 'function' ? phoneInfo(e.v) : null; keys.set('e|' + (pi && pi.ok && pi.valid ? 'phone:' + pi.e164 : e.id), {kind:'ind', k:e.k, v:pi && pi.ok && pi.valid ? pi.e164 : e.v, id:e.id, n:e.recs.length}); }
     for(const en of D.entries){ const n = typeof dupNorm === 'function' ? dupNorm(en) : ''; if(!n || n.length < 4) continue; keys.set('v|' + en.type + '|' + n, {kind:'vault', type:en.type, v:primary(en), id:en.id}); }
     per.set(c.id, {c, keys}); for(const k of keys.keys()) seen.set(k, (seen.get(k) || 0) + 1); }
   /* things in most cases are background (a webmail domain, a public resolver), not a link */
