@@ -178,7 +178,17 @@ function claimWriter(steal){
   if(!navigator.locks) return Promise.resolve(TABS.writer = true);
   return new Promise(res => {
     navigator.locks.request('osintrix-workspace', steal ? {steal:true} : {ifAvailable:true}, lock => {
-      if(!lock){ TABS.writer = false; res(false); paintReadOnly(); return; }
+      if(!lock){ TABS.writer = false; res(false);
+        /* Taken: either another tab has the workspace, or this is a refresh and the page before it is
+           still letting go. Wait in line and take over the moment it is free — a refresh never leaves
+           the new page read-only. The notice shows only if the wait is a real other tab. */
+        setTimeout(() => { if(!TABS.writer) paintReadOnly(); }, 1500);
+        navigator.locks.request('osintrix-workspace', async () => {
+          if(!TABS.writer){
+            if(performance.now() > 5000){ try{ const d = await loadAll(); if(d && !d.__locked && !d.__bad && usable(d)){ DB = normStored(d); cache = {}; } }catch(e){} }   // another tab closed: start from what it saved
+            TABS.writer = true; paintReadOnly(); if(typeof save === 'function' && DB) save(); if(typeof renderAll === 'function' && DB) renderAll(); }
+          return new Promise(() => {}); }).catch(() => {});
+        return; }
       TABS.writer = true; res(true); paintReadOnly();
       return new Promise(() => {});                         // held for the life of the tab
     }).catch(() => { TABS.writer = false; paintReadOnly(); if(typeof paintSaved === 'function') paintSaved(); });   // another tab took it over
@@ -191,13 +201,13 @@ function paintReadOnly(){
   b.innerHTML = `${ico('lock','sm')}<span><b>Read-only.</b> This workspace is open in another tab, so changes here are not saved.</span><button class="btn sm" id="rotabGo" type="button">Use it in this tab</button>`;
   $('rotabGo').onclick = async () => { const go = $('rotabGo'); if(go) go.disabled = true;
     await claimWriter(true);                                   // the other tab turns read-only
-    try{ const d = await loadAll(); if(d && !d.__locked && !d.__bad && usable(d)){ DB = d; cache = {}; renderAll(); } else location.reload(); }catch(e){ location.reload(); }
+    try{ const d = await loadAll(); if(d && !d.__locked && !d.__bad && usable(d)){ DB = normStored(d); cache = {}; renderAll(); } else location.reload(); }catch(e){ location.reload(); }
     if(typeof paintSaved === 'function') paintSaved(); toast('This tab now saves the workspace'); };
 }
 function tabSaved(){ try{ TABS.ch && TABS.ch.postMessage({t:'saved', at:Date.now()}); }catch(e){} }
 if(TABS.ch) TABS.ch.onmessage = async ev => {
   if(TABS.writer || !ev.data || ev.data.t !== 'saved' || !DB || SEC.key || SEC.locked) return;
-  clearTimeout(TABS.rt); TABS.rt = setTimeout(async () => { const d = await loadAll(); if(d && !d.__locked && !d.__bad && usable(d)){ const prefs = DB.prefs; DB = d; DB.prefs = prefs; cache = {}; renderAll(); } }, 300);
+  clearTimeout(TABS.rt); TABS.rt = setTimeout(async () => { const d = await loadAll(); if(d && !d.__locked && !d.__bad && usable(d)){ const prefs = DB.prefs; DB = normStored(d); DB.prefs = prefs; cache = {}; renderAll(); } }, 300);
 };
 
 /* automations from a backup arrive switched off and checked field by field: a file must never start acting on its own */
@@ -211,3 +221,37 @@ function normAutos(L){
 
 /* sample events kept with a rule: plain text, capped */
 function normRuleTests(t){ return Array.isArray(t) ? t.filter(x => x && typeof x.text === 'string').slice(0, 50).map(x => ({id:typeof x.id === 'string' && /^[\w-]{1,60}$/.test(x.id) ? x.id : uid('t'), kind:x.kind === 'hit' ? 'hit' : 'miss', text:x.text.slice(0, 4000)})) : []; }
+
+/* Stored data in the wrong shape — from an old version, a hand-edited backup or a damaged copy —
+   is put right on every load and every import, so no page has to guard against it. Only shapes
+   are fixed: a value of the right kind is never changed. */
+function normStored(d){
+  if(!isObj(d)) return d; const objs = v => Array.isArray(v) ? v.filter(isObj) : [], str = v => typeof v === 'string' ? v : v == null ? '' : typeof v === 'number' ? String(v) : '';
+  for(const k of ['cases', 'records', 'entries', 'links', 'notes', 'tools', 'queries', 'rules', 'playbooks', 'trash']) if(d[k] != null && !Array.isArray(d[k])) d[k] = []; else if(d[k]) d[k] = objs(d[k]);
+  if(d.hunts != null && !Array.isArray(d.hunts)) d.hunts = [];
+  for(const r of d.records || []){
+    if(typeof r.title !== 'string') r.title = str(r.title) || 'Untitled record'; if(typeof r.body !== 'string') r.body = str(r.body);
+    if(typeof r.host !== 'string') r.host = str(r.host); if(typeof r.source !== 'string') r.source = str(r.source);
+    r.tags = Array.isArray(r.tags) ? r.tags.filter(t => typeof t === 'string' || typeof t === 'number').map(String) : [];
+    if(!Array.isArray(r.ents)) r.ents = []; else r.ents = r.ents.filter(e => isObj(e) && typeof e.k === 'string' && typeof e.v === 'string');
+    if(r.ts != null && (typeof r.ts !== 'number' || !isFinite(r.ts))) r.ts = null;
+    if(r.tsShift != null && (typeof r.tsShift !== 'number' || !isFinite(r.tsShift))) delete r.tsShift;
+    r.att = objs(r.att).filter(a => typeof a.id === 'string');
+    for(const a of r.att){ a.name = str(a.name) || 'file'; a.type = str(a.type); if(typeof a.size !== 'number' || !isFinite(a.size)) a.size = 0; if(a.meta != null && !isObj(a.meta)) delete a.meta; if(a.psig != null && typeof a.psig !== 'string') delete a.psig; if(a.dhash != null && typeof a.dhash !== 'string') delete a.dhash; }
+    if(r.title.length > 2000) r.title = r.title.slice(0, 2000); if(r.tags.length > 200 || r.tags.some(t => t.length > 200)) r.tags = r.tags.slice(0, 200).map(t => t.slice(0, 200));   // limits: far past anything typed
+    if(r.geo != null && !isObj(r.geo)) delete r.geo; if(r.cred != null && !/^[1-6]$/.test(String(r.cred))) delete r.cred; }
+  for(const k of ['cases', 'records', 'entries', 'notes', 'tools', 'queries', 'rules', 'playbooks']) if(d[k]) d[k] = d[k].filter(x => typeof x.id === 'string' && x.id);
+  if(d.links) d.links = d.links.filter(l => typeof l.a === 'string' && typeof l.b === 'string');
+  /* an entry of a kind this version does not know is kept as a document, its kind written on it as a tag */
+  for(const e of d.entries || []) if(typeof TYPES !== 'undefined' && !TYPES[e.type]){ const was = typeof e.type === 'string' ? e.type.slice(0, 30) : ''; e.type = 'document'; e.tags = (Array.isArray(e.tags) ? e.tags : []).concat(was ? ['was ' + was] : []); }
+  for(const e of d.entries || []){ if(!isObj(e.fields)) e.fields = {}; for(const [k, v] of Object.entries(e.fields)) if(typeof v !== 'string') e.fields[k] = str(v);
+    if(!Array.isArray(e.tags)) e.tags = []; else e.tags = e.tags.filter(t => typeof t === 'string' || typeof t === 'number').map(String); if(e.notes != null && typeof e.notes !== 'string') e.notes = str(e.notes); }
+  for(const e of d.entries || []){ for(const [k, v] of Object.entries(e.fields)) if(v.length > 100000) e.fields[k] = v.slice(0, 100000); if(e.tags.length > 200) e.tags = e.tags.slice(0, 200); }
+  for(const c of d.cases || []){ if(typeof c.name !== 'string') c.name = str(c.name) || 'Untitled case'; if(typeof c.code !== 'string') c.code = str(c.code) || 'CASE'; if(c.name.length > 500) c.name = c.name.slice(0, 500); if(c.code.length > 40) c.code = c.code.slice(0, 40); }
+  d.trash = (d.trash || []).filter(x => typeof x.id === 'string' && typeof x.kind === 'string' && isObj(x.data)).map(x => { x.label = str(x.label); if(typeof x.at !== 'number' || !isFinite(x.at)) x.at = Date.now(); return x; });
+  if(d.srcRel != null){ const o = {}; if(isObj(d.srcRel)) for(const [k, v] of Object.entries(d.srcRel)) if(isObj(v) && /^[A-F]$/.test(v.rel)) o[k] = v; d.srcRel = o; }
+  if(d.phoneCC != null && !(typeof d.phoneCC === 'string' && /^[A-Z]{2}$|^$/.test(d.phoneCC))) d.phoneCC = '';
+  if(d.autoDone != null && !isObj(d.autoDone)) d.autoDone = {}; if(d.autoLog != null && !Array.isArray(d.autoLog)) d.autoLog = [];
+  if(d.verdicts != null && !isObj(d.verdicts)) d.verdicts = {}; if(d.prefs != null && !isObj(d.prefs)) d.prefs = {};
+  return d;
+}

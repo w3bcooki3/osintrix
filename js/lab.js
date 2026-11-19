@@ -455,10 +455,12 @@ function labHash(){
 /* coordinates */
 function parseCoords(s){
   s = String(s || '').trim(); if(!s) return null;
+  /* a long paste (exiftool output, a whole page): keep the lines that can hold a position */
+  if(s.length > 4000) s = (s.split(/\r?\n/).filter(l => /gps|lat|lon|position|coord|°|maps|@-?\d/i.test(l)).join('\n') || s).slice(0, 4000);
   const at = s.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) || s.match(/[?&](?:q|ll|query)=(-?\d+\.\d+)(?:,|%2C)\s*(-?\d+\.\d+)/i); if(at) return [+at[1], +at[2]];
-  const dms = [...s.matchAll(/(-?\d+(?:\.\d+)?)\s*(?:°|deg|d|\s)\s*(?:(\d+(?:\.\d+)?)\s*(?:'|′|m|min|\s)\s*)?(?:(\d+(?:\.\d+)?)\s*(?:"|″|''|s|sec)?\s*)?([NSEW])?/gi)].filter(m => m[0].trim());
+  const dms = [...s.matchAll(/(?<![\d.])(-?\d+(?:\.\d+)?)\s*(?:°|deg|d|\s)\s*(?:(\d+(?:\.\d+)?)\s*(?:'|′|m|min|\s)\s*)?(?:(\d+(?:\.\d+)?)\s*(?:"|″|''|s|sec)?\s*)?([NSEW])?/gi)].filter(m => m[0].trim());
   if(dms.length >= 2 && /[°'′"NSEWd]/i.test(s)){ const v = m => { let x = Math.abs(+m[1]) + (+m[2] || 0) / 60 + (+m[3] || 0) / 3600; if(+m[1] < 0 || /[SW]/i.test(m[4] || '')) x = -x; return x; }; return [v(dms[0]), v(dms[1])]; }
-  const dec = s.match(/(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)/); if(dec) return [+dec[1], +dec[2]];
+  const dec = s.match(/(?<![\d.])(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)/); if(dec) return [+dec[1], +dec[2]];
   return null;
 }
 const toDMS = (v, pos, neg) => { const a = Math.abs(v), d = Math.floor(a), mf = (a - d) * 60, m = Math.floor(mf), s = ((mf - m) * 60).toFixed(2); return `${d}°${String(m).padStart(2, '0')}′${String(s).padStart(5, '0')}″${v < 0 ? neg : pos}`; };

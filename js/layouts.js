@@ -41,7 +41,7 @@ function layoutNav(nv, cur){
       ${cases.slice(0, 8).map(caseLink).join('')}${nv('cases','folder-open', cases.length > 8 ? 'All ' + cases.length + ' cases' : 'All cases')}</div>
     ${group('kit', 'Kit', [['toolbox','wrench','Toolbox', DB.tools.length],['queries','scan-search','Query library'],['lab','file-search','Forensics kit'],['decoder','binary','Decoder'],['certs','shield-check','Certificates'],['cloud','cloud','Cloud'],['ctf','flag','CTF'],['reference','book-open','Reference'],['playbooks','list-checks','Playbooks']])}
     ${group('intel', 'Intelligence', [['feeds','rss','Threat Intel', DB.feed.length || null],['watch','eye','Watchlist', watchHits().length || null],['detections','file-code','Detections'],['entities','fingerprint','Entities']])}
-    <div class="navg navfoot">${(DB.trash || []).length ? nv('trash','trash-2','Trash', DB.trash.length) : ''}${nv('security', SEC.key ? 'lock' : 'shield-check', 'Security')}${nv('whatsnew','sparkles',"What's new")}${nv('help','circle-help','Help')}${nv('settings','settings','Settings')}</div>`;
+    <div class="navg navfoot">${nv('trash','trash-2','Trash', (DB.trash || []).length || null)}${nv('security', SEC.key ? 'lock' : 'shield-check', 'Security')}${nv('whatsnew','sparkles',"What's new")}${nv('help','circle-help','Help')}${nv('settings','settings','Settings')}</div>`;
 }
 
 /* ---------- indicators marked inside the evidence text ---------- */

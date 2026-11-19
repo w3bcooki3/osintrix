@@ -36,7 +36,7 @@ async function rpRead(files){
       /* the JSON bundle first: it carries tests and history; the loose files then repeat it and are folded in */
       const names = Z.names.filter(n => /\.(json|ya?ml|yara?|txt)$/i.test(n) && !/(^|\/)(__MACOSX|\.)/.test(n)).sort((a, b) => /\.json$/i.test(b) - /\.json$/i.test(a)).slice(0, 2000);
       for(const n of names){ try{ const u = await Z.get(n); if(u && u.length <= 1048576 * 5) C.push(...rpParse(n.split('/').pop(), new TextDecoder().decode(u))); }catch(e){} } }
-    else C.push(...rpParse(f.name, await f.text())); }
+    else C.push(...rpParse(f.name, await fileText(f))); }
   return C;
 }
 /* what each candidate would do */

@@ -84,7 +84,8 @@ const PATTERNS = [
   ['iban',/\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]{4}){2,7}(?: ?[A-Z0-9]{1,4})?\b/g],
   ['sid',/\bS-1-(?:\d{1,10}-){1,14}\d{1,10}\b/g],
   ['social',/\b(?:https?:\/\/)?(?:www\.|m\.|mobile\.|old\.)?(?:twitter\.com|x\.com|instagram\.com|facebook\.com|fb\.com|tiktok\.com|github\.com|gitlab\.com|t\.me|telegram\.me|reddit\.com|linkedin\.com|youtube\.com|threads\.net|pinterest\.com|medium\.com|twitch\.tv|vk\.com|keybase\.io|bsky\.app|snapchat\.com|soundcloud\.com|steamcommunity\.com|hackerone\.com|patreon\.com|onlyfans\.com)\/[^\s"'<>()\[\]]+/gi],
-  ['url',/\bhttps?:\/\/[^\s"'<>()\[\]]+/gi],
+  /* a URL may hold balanced brackets (Wikipedia pages: /wiki/Foo_(bar)) and an IPv6 host in square brackets; an ellipsis ends it */
+  ['url',/\bhttps?:\/\/(?:\[[0-9a-f:.]+\](?::\d{1,5})?(?:\/(?:[^\s"'<>()\[\]…]|\([^\s"'<>()\[\]…]*\))*)?|(?:[^\s"'<>()\[\]…]|\([^\s"'<>()\[\]…]*\))+)/gi],
   ['mac',/\b(?:[0-9a-f]{2}[:-]){5}[0-9a-f]{2}\b|\b(?:[0-9a-f]{4}\.){2}[0-9a-f]{4}\b/gi],
   ['ipv6',/(?<![\w:.])(?:[0-9a-f]{1,4}:(?::?[0-9a-f]{1,4}){0,7}::?|::)(?:[0-9a-f]{1,4}(?::[0-9a-f]{1,4}){0,7})?(?![\w:.])/gi],
   ['phone',/(?:\btel:|(?:\b(?:phone|tel|mobile|cell|whats\s?app|call|fax|contact)\b[^\d+\n]{0,12}))?\+\d{1,3}[\s.-]?\(?\d{1,4}\)?(?:[\s.-]?\d{2,5}){1,4}\b|\b(?:phone|tel|mobile|cell|whats\s?app|call(?: me)?|fax)\b[^\d\n]{0,12}\(?\d{2,5}\)?(?:[\s.-]?\d{2,5}){1,4}\b/gi],
@@ -98,7 +99,7 @@ const PATTERNS = [
   ['uname',/(?:\b(?:user(?:\s?name)?|login|handle|alias|nick(?:name)?|screen[_ ]?name)\s*[:=]\s*@?|\b(?:a\.k\.a\.?|aka|also known as|goes by|alias)\s+@?(?=[A-Za-z0-9_.-]*[_\d])|(?<![\w/])u\/)([A-Za-z][A-Za-z0-9_.-]{2,29})(?![\w@.-])/gi,1],
   ['asn',/\bAS\s?(\d{2,10})\b/g],
   ['file',/\b[\w][\w.\-()]{0,60}\.(?:exe|dll|sys|ps1|bat|cmd|vbs|js|hta|scr|jar|lnk|iso|zip|rar|7z|docm|xlsm|msi|evtx|pcap)\b/gi],
-  ['ipv4',/\b(?:\d{1,3}\.){3}\d{1,3}\b/g],
+  ['ipv4',/(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?!\w|\.\d)/g],
   /* internationalised domains written in other scripts (раураl.com): kept whole, so a look-alike is not cut down to "l.com" */
   ['domain',/(?<![\w\u00C0-\uFFFF-])(?=[\w-]*[\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF])[\w\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF-]{1,63}(?:\.[\w\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF-]{1,63})*\.[a-z\u0400-\u04FF]{2,24}\b/gi],
   ['domain',/\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:[a-z]{2,24})\b/gi],
@@ -113,7 +114,10 @@ const LABEL = {ipv6:'IPv6',mac:'MAC address',asn:'ASN',social:'Social profile',p
   regkey:'Reg key',account:'Account',sid:'SID',eventid:'Event ID',cve:'CVE',custom:'Custom'};
 const LOWER = /^(ipv4|ipv6|hostport|domain|url|email|md5|sha1|sha256|sha512|file|handle)$/;
 const validIP = s => s.split('.').every(o => o.length < 4 && +o <= 255);
-const trimEdge = s => String(s).replace(/[.,;:!?)\]}'"]+$/,'').replace(/^[('"[{]+/,'');
+/* punctuation around a value is not part of it — but a closing bracket that closes one opened inside it is */
+const trimEdge = s => { let v = String(s).replace(/^[('"[{]+/,''), p;
+  do { p = v; v = v.replace(/[.,;:!?'"]+$/, ''); const c = v.slice(-1), o = {')':'(', ']':'[', '}':'{'}[c]; if(o && v.split(o).length >= v.split(c).length) {} else if(o) v = v.slice(0, -1); } while(v !== p);
+  return v; };
 /* A dotted word is only a domain if its TLD is plausible: any 2-letter ccTLD, or a common gTLD.
    Keeps "Net.WebClient" and "System.IO" out of the entity list. */
 const GTLDS = new Set(('com net org info biz edu gov mil int io co ai app dev xyz top site online store shop tech cloud live news blog club vip win bid '+
@@ -167,6 +171,7 @@ function extract(text){
       if(kind === 'path'){ const b = v.split(/[\\/]/).pop(); if(b && /\.[a-z0-9]{1,5}$/i.test(b)) push('file', b); }
       if(kind === 'hostport'){ const h = v.slice(0, v.lastIndexOf(':')); push(/^[\d.]+$/.test(h) ? 'ipv4' : 'domain', h); }
       if(kind === 'url'){
+        const v6 = v.match(/^https?:\/\/\[([0-9a-f:.]+)\]/i); if(v6 && validIPv6(v6[1])) push('ipv6', v6[1]);
         const u = v.match(/^https?:\/\/(?:[^/@\s]*@)?([^/:?#\s]+)/i);
         if(u){ const h = u[1]; if(/^(?:\d{1,3}\.){3}\d{1,3}$/.test(h)){ if(validIP(h)) push('ipv4', h); } else if(plausibleTLD(h)) push('domain', h); }
       }
@@ -207,9 +212,22 @@ function parseTime(raw, tz){
       return wallToEpoch(+m[3], mo, +m[1], +m[4], +m[5], +m[6], tz); } }
   if(/^\d{10}(\.\d{1,9})?$/.test(s)) return Math.round(parseFloat(s) * 1000);
   if(/^\d{13}$/.test(s)) return +s;
+  if(/^1\d{15}$/.test(s)) return Math.round(+s / 1000);                       // microseconds since 1970 (Chrome history is not this: see below)
+  if(/^1\d{18}$/.test(s)) return Math.round(+s / 1e6);                        // nanoseconds since 1970 (Go, Elastic, Zeek)
+  if(/^1[2-6]\d{16}$/.test(s)) return Math.round(+s / 1e4 - 11644473600000);  // Windows FILETIME: 100 ns since 1601
+  m = s.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(?:[.,](\d{1,9}))?(Z|[+-]\d{2}:?\d{2})?$/i);   // ISO 8601 basic form
+  if(m){ const ms = m[7] ? Math.round(+('0.' + m[7]) * 1000) : 0; if(m[8]){ const z = m[8].toUpperCase() === 'Z' ? 0 : (m[8][0] === '-' ? -1 : 1) * (+m[8].slice(1, 3) * 60 + +m[8].slice(-2)) * 60000; return Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) + ms - z; }
+    return wallToEpoch(+m[1], +m[2], +m[3], +m[4], +m[5], +m[6], tz) + ms; }
+  if(/\d:\d{2}:\d{2},\d/.test(s)) return parseTime(s.replace(/(\d:\d{2}:\d{2}),(\d)/, '$1.$2'), tz);   // log4j / Python logging: a comma before the milliseconds
+  /* day, month and year in numbers: dots are always day-first; a first number over 12 is a day; otherwise month-first, as US logs write it */
+  m = s.match(/^(\d{1,2})([./-])(\d{1,2})\2(\d{4}|\d{2})(?:[T ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?(?:[.,](\d{1,9}))?\s*([AP]M)?)?(\s*(?:Z|UTC|GMT|[+-]\d{2}:?\d{2}))?$/i);
+  if(m){ let a = +m[1], b = +m[3], y = +m[4]; if(m[4].length === 2) y += y < 70 ? 2000 : 1900; const dayFirst = m[2] === '.' || (a > 12 && b <= 12); const d = dayFirst ? a : b, mo = dayFirst ? b : a;
+    if(mo >= 1 && mo <= 12 && d >= 1 && d <= 31){ let h = +(m[5] || 0); if(m[9]){ const pm = /p/i.test(m[9]); if(h === 12) h = pm ? 12 : 0; else if(pm) h += 12; } const ms = m[8] ? Math.round(+('0.' + m[8]) * 1000) : 0;
+      if(m[10]){ const zs = m[10].trim(), z = /^(Z|UTC|GMT)$/i.test(zs) ? 0 : (zs[0] === '-' ? -1 : 1) * (+zs.slice(1, 3) * 60 + +zs.slice(-2)) * 60000; return Date.UTC(y, mo - 1, d, h, +(m[6] || 0), +(m[7] || 0)) + ms - z; }
+      return wallToEpoch(y, mo, d, h, +(m[6] || 0), +(m[7] || 0), tz) + ms; } }
   if(carriesZone(s)){ const v = Date.parse(s.replace(/\b(UTC|GMT)\b/i,'Z').replace(/(\d)\s+Z$/,'$1Z').replace(/^(\d{4}-\d{2}-\d{2}) /,'$1T')); if(!isNaN(v)) return v; }
-  m = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})[T ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
-  if(m) return wallToEpoch(+m[1], +m[2], +m[3], +m[4], +m[5], +(m[6] || 0), tz);
+  m = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})[T ,]+(\d{1,2}):(\d{2})(?::(\d{2})(?:[.,](\d{1,9}))?)?/);
+  if(m) return wallToEpoch(+m[1], +m[2], +m[3], +m[4], +m[5], +(m[6] || 0), tz) + (m[7] ? Math.round(+('0.' + m[7]) * 1000) : 0);
   m = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
   if(m) return wallToEpoch(+m[1], +m[2], +m[3], 0, 0, 0, tz);
   m = s.match(/^([a-z]{3})\s+(\d{1,2})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?/i);
@@ -388,7 +406,7 @@ function parseGroup(q){
   return ast;
 }
 function parseQuery(q){
-  const parts = String(q || '').split(/\s+(?:OR|\|\|?)\s+/i).map(x => x.trim()).filter(Boolean);
+  const parts = String(q || '').split(/(?<!\s)\s+(?:OR|\|\|?)\s+/i).map(x => x.trim()).filter(Boolean);
   return parts.length ? parts.map(parseGroup) : null;
 }
 

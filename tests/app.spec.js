@@ -604,8 +604,9 @@ test('storage: real usage, early warnings, refusing files that do not fit, and c
   await expect(page.locator('#storage')).toContainText('Leftover files nothing uses (2)');
   await page.click('[data-act=stoOrphans]'); await page.click('[data-act=confirmOk]');
   await expect.poll(() => page.evaluate(async () => (await IDB.keys()).filter(k => /orphan/.test(k)).length)).toBe(0);
-  await page.evaluate(async () => { storageEstimate = async () => { STORE.quota = 500e6; STORE.usage = 450e6; return STORE; }; await storageCheck(); });
-  await expect(page.locator('#saved')).toContainText('Storage 90% full');
+  // a real measurement already under way can land after the stand-in, so check again until the stand-in's numbers are the ones shown
+  await page.evaluate(() => { storageEstimate = async () => { STORE.quota = 500e6; STORE.usage = 450e6; return STORE; }; });
+  await expect.poll(async () => { await page.evaluate(() => storageCheck()); return page.locator('#saved').textContent(); }).toContain('Storage 90% full');
   expect(await page.evaluate(() => nbRoomFor(80e6))).toBe(false);
   await page.evaluate(() => { storageOK = false; paintSaved(); }); await expect(page.locator('#saved')).toContainText('Not saved');
   noErrors(errors);

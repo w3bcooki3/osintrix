@@ -299,7 +299,7 @@ function importFeedFile(){
 }
 function pickFile(accept, cb){
   const i = document.createElement('input'); i.type = 'file'; i.accept = accept;
-  i.onchange = () => { const f = i.files && i.files[0]; if(!f) return; if(f.size > 209715200) return toast('That file is over 200 MB'); const r = new FileReader(); r.onload = () => cb(String(r.result), f.name); r.readAsText(f); };
+  i.onchange = () => { const f = i.files && i.files[0]; if(!f) return; if(f.size > 209715200) return toast('That file is over 200 MB'); fileText(f).then(t => cb(t, f.name), e => toast('Could not read ' + f.name + ': ' + e.message)); };
   i.click();
 }
 

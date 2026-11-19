@@ -148,7 +148,7 @@ function cloudRunLogs(text, name, keep = true){
 }
 function cloudReadFile(file, cb){
   if(!file) return; if(file.size > 52428800) return toast('That file is over 50 MB');
-  const r = new FileReader(); r.onload = () => cb(String(r.result), file.name); r.readAsText(file);
+  fileText(file).then(t => cb(t, file.name), e => toast('Could not read ' + file.name + ': ' + e.message));
 }
 function cloudFindingsToCase(){
   const R = UI.cloudScan; if(!R || !R.findings.length) return; const cid = DB.active && theCase() ? DB.active : (DB.cases[0] && DB.cases[0].id); if(!cid) return toast('Create a case first');

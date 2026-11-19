@@ -224,8 +224,8 @@ document.addEventListener('click', ev => {
     case 'toolStar': { const x = DB.tools.find(z => z.id === id); x.starred = !x.starred; mutate((x.starred ? 'starred ' : 'unstarred ') + x.name); return renderMain(); }
     case 'toolEdit': return toolDlg(id);
     case 'toolAdd': return toolDlg();
-    case 'toolDel': { const x = DB.tools.find(z => z.id === id); if(!x) return; DB.tools = DB.tools.filter(z => z.id !== id); if(x.seed) (DB.deletedSeed || (DB.deletedSeed = [])).push(x.url); if(UI.tpick) UI.tpick.delete(id); closeDlg(); mutate('deleted tool ' + x.name); renderAll();
-      return toast('Deleted ' + x.name, 'Undo', () => { DB.tools.push(x); if(DB.deletedSeed) DB.deletedSeed = DB.deletedSeed.filter(u => u !== x.url); mutate('restored tool'); renderAll(); }); }
+    case 'toolDel': { const x = DB.tools.find(z => z.id === id); if(!x) return; DB.tools = DB.tools.filter(z => z.id !== id); if(x.seed) (DB.deletedSeed || (DB.deletedSeed = [])).push(x.url); if(UI.tpick) UI.tpick.delete(id); const tx = trashPut('tool', x.name, {t:x}); closeDlg(); mutate('deleted tool ' + x.name); renderAll();
+      return toast('Deleted ' + x.name + ' — it is in the trash', 'Undo', () => { trashUndo(tx); DB.tools.push(x); if(DB.deletedSeed) DB.deletedSeed = DB.deletedSeed.filter(u => u !== x.url); mutate('restored tool'); renderAll(); }); }
     case 'toolDelAsk': { const x = DB.tools.find(z => z.id === id); return confirmDlg('Delete ' + x.name + '?', x.seed ? 'It is a pre-added tool. It stays deleted, even when the app updates its tool list. You can undo right after.' : 'It will be removed from your toolbox. You can undo right after.', 'Delete tool', () => clickAct('toolDel', id)); }
     case 'toolPick': { const s = UI.tpick || (UI.tpick = new Set()); t.checked ? s.add(id) : s.delete(id); const c = t.closest('[data-pick]'); if(c) c.classList.toggle(c.tagName === 'TR' ? 'sel' : 'picked', t.checked); return paintBulk(); }
     case 'tqClear': UI.tq = ''; return renderMain();
@@ -235,14 +235,14 @@ document.addEventListener('click', ev => {
     case 'bulkStar': case 'bulkPin': { const k = a === 'bulkStar' ? 'starred' : 'pinned', xs = DB.tools.filter(z => UI.tpick.has(z.id)), on = !xs.every(z => z[k]); xs.forEach(z => z[k] = on); mutate((on ? '' : 'un') + k + ' ' + xs.length + ' tools'); renderAll(); return toast(xs.length + ' tool' + (xs.length > 1 ? 's ' : ' ') + (on ? (k === 'starred' ? 'starred' : 'added to quick launch') : (k === 'starred' ? 'unstarred' : 'removed from quick launch'))); }
     case 'bulkExport': { const xs = DB.tools.filter(z => UI.tpick.has(z.id)); return download('osintrix-tools.json', JSON.stringify(xs.map(z => ({name:z.name, url:z.url, parentCategory:z.cat, childCategory:z.sub, description:z.desc, tags:z.tags})), null, 2), 'application/json'); }
     case 'bulkDel': { const xs = DB.tools.filter(z => UI.tpick.has(z.id)); return confirmDlg('Delete ' + xs.length + ' tool' + (xs.length > 1 ? 's' : '') + '?', 'They will be removed from your toolbox. You can undo right after.', 'Delete ' + xs.length, () => {
-      const prev = DB.tools.slice(), prevGone = (DB.deletedSeed || []).slice(); DB.tools = DB.tools.filter(z => !UI.tpick.has(z.id)); DB.deletedSeed = prevGone.concat(xs.filter(z => z.seed).map(z => z.url)); UI.tpick = new Set(); mutate('deleted ' + xs.length + ' tools'); renderAll();
-      toast(xs.length + ' tools deleted', 'Undo', () => { DB.tools = prev; DB.deletedSeed = prevGone; mutate('restored tools'); renderAll(); }); }); }
+      const prev = DB.tools.slice(), prevGone = (DB.deletedSeed || []).slice(); DB.tools = DB.tools.filter(z => !UI.tpick.has(z.id)); DB.deletedSeed = prevGone.concat(xs.filter(z => z.seed).map(z => z.url)); UI.tpick = new Set(); const txs = xs.map(z => trashPut('tool', z.name, {t:z})); mutate('deleted ' + xs.length + ' tools'); renderAll();
+      toast(xs.length + ' tools deleted — they are in the trash', 'Undo', () => { txs.forEach(trashUndo); DB.tools = prev; DB.deletedSeed = prevGone; mutate('restored tools'); renderAll(); }); }); }
     case 'importAll': return pickFile('.json,application/json', raw => maybeDecrypt(raw, txt => { let d; try{ d = JSON.parse(txt); }catch(e){ return toast('That file is not JSON'); }
       if(!d || !Array.isArray(d.cases) || !Array.isArray(d.entries) || !Array.isArray(d.records)) return toast('Not an OSINTrix backup — use a file from “Export everything”');
       { const errs = checkImport(d, 'backup'); if(errs.length) return importRefused('The backup', errs); }
       confirmDlg('Replace everything with this backup?', 'Your current cases, notes, tools and rules in this browser are replaced by the ' + d.cases.length + ' case' + (d.cases.length === 1 ? '' : 's') + ' in the file. You can undo right after.', 'Import backup', async () => {
         await snapshot('Before importing a backup'); if(d.files){ await rekeyFiles(d.files, d.records, d.trash); delete d.files; } const nbfiles = d.nbfiles; delete d.nbfiles;
-        d.records.forEach(normRecord); d.entries.forEach(normEntry); d.cases.forEach(normCase); (d.links || []).forEach(normLink); d.verdicts = normVerdicts(d.verdicts); d.autos = normAutos(d.autos); (d.rules || []).forEach(r => { if(r && typeof r === 'object') r.tests = normRuleTests(r.tests); }); d.autoDone = {}; d.autoLog = [];
+        normStored(d); d.records.forEach(normRecord); d.entries.forEach(normEntry); d.cases.forEach(normCase); (d.links || []).forEach(normLink); d.verdicts = normVerdicts(d.verdicts); d.autos = normAutos(d.autos); (d.rules || []).forEach(r => { if(r && typeof r === 'object') r.tests = normRuleTests(r.tests); }); d.autoDone = {}; d.autoLog = [];
         if(typeof ctiLoad === 'function') await ctiLoad(); const prevIocs = typeof CTI !== 'undefined' && CTI.iocs ? CTI.iocs.slice() : null;
         const noFiles = d.filesLeftOut === true; delete d.filesLeftOut;
         const prev = DB, inIocs = Array.isArray(d.ctiIocs) ? d.ctiIocs.slice(0, CTI_IOC_MAX) : null; delete d.ctiIocs; DB = d; DB.recent = prev.recent; DB.work = prev.work; if(DB.intel && prev.intel) (DB.intel.sources || []).forEach(s => { const o = (prev.intel.sources || []).find(x => x.id === s.id); s.key = o ? o.key || '' : ''; }); importSafeIntel(prev); DB.security = prev.security;          /* trusted keys, signing key and auto-lock stay this browser's own */ if(inIocs){ await ctiLoad(); CTI.iocs = []; ctiIocIndex(); const iso = t => { const z = new Date(t); return t && !isNaN(z) ? z.toISOString() : ''; }; ctiAddIocs(inIocs.filter(x => x && typeof x === 'object').map(x => ({v:x.v, type:x.k, tags:x.tags, threat:x.threat, desc:x.desc, ref:x.ref, tlp:x.tlp, conf:x.conf, srcs:x.srcs, first:iso(x.first), last:iso(x.last), exp:iso(x.exp)})), 'Backup'); await ctiSaveIocs(); } DB.prefs = Object.assign({}, prev.prefs, d.prefs || {}); ensureTools(); ensurePlaybooks(); ensureIntel(); ensureQueries(); ensureRules(); ensureNotes(); if(DB.nb){ nbSanitize(); await nbRestoreFiles(nbfiles); } else ensureNB(); UI.nbView = 'lib'; UI.nbRev = null; if(!DB.cases.some(c => c.id === DB.active)) DB.active = DB.cases[0] && DB.cases[0].id;
@@ -274,7 +274,7 @@ document.addEventListener('click', ev => {
     case 'qDelAsk': return confirmDlg('Delete this query?', 'It will be removed from your library. You can undo right after.', 'Delete query', () => clickAct('qDel', id));
     case 'qNew': return queryDlg();
     case 'qEdit': return queryDlg(id);
-    case 'qDel': { const x = DB.queries.find(z => z.id === id); DB.queries = DB.queries.filter(z => z.id !== id); closeDlg(); mutate('deleted query'); renderAll(); return toast('Deleted “' + x.name + '”', 'Undo', () => { DB.queries.push(x); mutate('restored query'); renderAll(); }); }
+    case 'qDel': { const x = DB.queries.find(z => z.id === id); if(!x) return; DB.queries = DB.queries.filter(z => z.id !== id); const tx = trashPut('query', x.name, {q:x}); closeDlg(); mutate('deleted query'); renderAll(); return toast('Deleted “' + x.name + '” — it is in the trash', 'Undo', () => { trashUndo(tx); DB.queries.push(x); mutate('restored query'); renderAll(); }); }
     case 'qEng': UI.runEng = v; document.querySelectorAll('.eng').forEach(b => { b.classList.toggle('on', b.dataset.v === v); b.setAttribute('aria-pressed', String(b.dataset.v === v)); }); return syncRun();
     case 'qCopy': return copyText($('qPrev').value);
     case 'qGo': { if(t.getAttribute('aria-disabled') === 'true' || !t.href){ ev.preventDefault(); return toast($('qRunHint').textContent || 'Fill the blanks first'); }
@@ -308,8 +308,8 @@ document.addEventListener('click', ev => {
       {sep:true}, {label:'Delete rule', icon:'trash-2', danger:true, fn:() => confirmDlg('Delete “' + r.title + '”?', 'The rule is removed from your library. You can undo right after.', 'Delete rule', () => clickAct('rDel', id))}], 'Rule'); }
     case 'dMore': UI.dlim = (UI.dlim || 120) + 200; return renderMain();
     case 'rStar': { const r = DB.rules.find(z => z.id === id); r.starred = !r.starred; mutate('star rule'); return renderMain(); }
-    case 'rDel': { const r = DB.rules.find(z => z.id === id); if(!r) return; DB.rules = DB.rules.filter(z => z.id !== id); if(r.builtin) DB.deletedRules = [...new Set([...(DB.deletedRules || []), r.id])]; UI.rule = null; mutate('deleted rule'); renderAll();
-      return toast('Deleted “' + r.title + '”', 'Undo', () => { DB.rules.unshift(r); if(DB.deletedRules) DB.deletedRules = DB.deletedRules.filter(x => x !== r.id); UI.rule = r.id; mutate('restored rule'); renderAll(); }); }
+    case 'rDel': { const r = DB.rules.find(z => z.id === id); if(!r) return; DB.rules = DB.rules.filter(z => z.id !== id); if(r.builtin) DB.deletedRules = [...new Set([...(DB.deletedRules || []), r.id])]; const tx = trashPut('rule', r.title, {r}); UI.rule = null; mutate('deleted rule'); renderAll();
+      return toast('Deleted “' + r.title + '” — it is in the trash', 'Undo', () => { trashUndo(tx); DB.rules.unshift(r); if(DB.deletedRules) DB.deletedRules = DB.deletedRules.filter(x => x !== r.id); UI.rule = r.id; mutate('restored rule'); renderAll(); }); }
     case 'rDup': { const r = DB.rules.find(z => z.id === id); const c2 = {...r, builtin:false, id:uid('r'), title:copyName(r.title, DB.rules.map(x => x.title)), created:Date.now(), modified:Date.now(), starred:false}; DB.rules.unshift(c2); UI.rule = c2.id; UI.ropen = true; UI.dview = 'rules'; mutate('duplicated rule'); return renderMain(); }
     case 'rCopy': { const r = DB.rules.find(z => z.id === id); return copyText(ruleText(r, $('rCode') ? $('rCode').value : r.code)); }
     case 'rExport': { const r = DB.rules.find(z => z.id === id); return download(slug(r.title) + (r.type === 'sigma' ? '.yml' : '.yar'), ruleText(r, $('rCode') ? $('rCode').value : r.code), 'text/plain'); }
@@ -428,8 +428,8 @@ document.addEventListener('click', ev => {
     case 'pbIcon': window.__pbIcon = v; document.querySelectorAll('#pbI button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === v))); return;
     case 'pbDup': { const p = DB.playbooks.find(x => x.id === id); const c2 = {...JSON.parse(JSON.stringify(p)), id:uid('pb'), name:copyName(p.name, DB.playbooks.map(x => x.name)), custom:true, created:Date.now()}; DB.playbooks.unshift(c2); UI.pb = c2.id; mutate('duplicated playbook'); renderAll(); return toast('Duplicated — edit it to make it yours'); }
     case 'pbDelAsk': { const p = DB.playbooks.find(x => x.id === id); return confirmDlg('Delete “' + p.name + '”?', 'Questions it already added to cases stay. You can undo right after.', 'Delete playbook', () => {
-      const i = DB.playbooks.indexOf(p); DB.playbooks.splice(i, 1); if(!p.custom) (DB.deletedPb || (DB.deletedPb = [])).push(p.id); UI.pb = null; mutate('deleted playbook'); renderAll();
-      toast('Playbook deleted', 'Undo', () => { DB.playbooks.splice(i, 0, p); if(DB.deletedPb) DB.deletedPb = DB.deletedPb.filter(x => x !== p.id); mutate('restored playbook'); renderAll(); }); }); }
+      const i = DB.playbooks.indexOf(p); DB.playbooks.splice(i, 1); if(!p.custom) (DB.deletedPb || (DB.deletedPb = [])).push(p.id); const tx = trashPut('playbook', p.name, {p}); UI.pb = null; mutate('deleted playbook'); renderAll();
+      toast('Playbook deleted — it is in the trash', 'Undo', () => { trashUndo(tx); DB.playbooks.splice(i, 0, p); if(DB.deletedPb) DB.deletedPb = DB.deletedPb.filter(x => x !== p.id); mutate('restored playbook'); renderAll(); }); }); }
     case 'pbImport': return pbImport();
     case 'pbExport': return download('osintrix-playbooks.json', JSON.stringify(DB.playbooks.map(({id, custom, created, ...p}) => p), null, 2), 'application/json');
     case 'pbMenu': { ensurePlaybooks(); const r0 = t.getBoundingClientRect(); return showMenu(Math.max(8, Math.min(r0.left, innerWidth - 300)), r0.bottom + 6, DB.playbooks.slice(0, 12).map(p => ({label:p.name, icon:p.icon || 'list-checks', fn:() => runPlaybook(p.id, DB.active)})).concat([{sep:true}, {label:'Browse all playbooks…', icon:'arrow-right', fn:() => { UI.pb = null; go('#/playbooks'); }}]), 'Run on ' + theCase().code); }
@@ -678,9 +678,9 @@ function closeWelcome(){ const w = $('welcome'); w.hidden = true; w.classList.re
   try{ const th = localStorage.getItem('osintrix:theme'); if(th) document.documentElement.dataset.theme = th; document.documentElement.dataset.layout = 'pinboard'; document.documentElement.classList.add('ds'); document.documentElement.classList.toggle('nav-rail', localStorage.getItem('osintrix:navRail') !== '0'); }catch(e){}
   await claimWriter(false);
   const loaded = await loadAll();
-  if(loaded && loaded.__locked){ $('splash').classList.add('out'); setTimeout(() => $('splash').remove(), 320); return lockScreen(loaded.env, d => { DB = d; SEC.locked = false; bootRest(true); }); }
+  if(loaded && loaded.__locked){ $('splash').classList.add('out'); setTimeout(() => $('splash').remove(), 320); return lockScreen(loaded.env, d => { DB = normStored(d); SEC.locked = false; bootRest(true); }); }
   if(loaded && loaded.__bad){ $('splash').classList.add('out'); return recoveryScreen(loaded.copies); }
-  DB = loaded || seedDB(); bootRest(false);
+  DB = loaded ? normStored(loaded) : seedDB(); bootRest(false);
 })();
 async function bootRest(unlocked){
   UI.inspOpen = false; UI.graph.legendMin = window.innerWidth < 1100;

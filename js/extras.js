@@ -195,7 +195,7 @@ async function decodeOnce(t){
   const B = bytesOf(tt);
   if(B){ let [nm, by] = B; const z = await inflateAny(by); if(z){ nm += ' → ' + z[0]; by = z[1]; } const [txt, enc] = textOf(by); if(txt != null) add(nm + enc, txt); }
   if(/^[A-Z2-7]+=*$/.test(tt.replace(/\s/g, '')) && tt.replace(/\s|=/g, '').length >= 8) try{ add('Base32', TX.b32d[2](tt)); }catch(e){}
-  if(/^[1-9A-HJ-NP-Za-km-z]{8,}$/.test(tt)) try{ add('Base58', TX.b58d[2](tt)); }catch(e){}
+  if(tt.length <= 1000 && /^[1-9A-HJ-NP-Za-km-z]{8,}$/.test(tt)) try{ add('Base58', TX.b58d[2](tt)); }catch(e){}
   if(/^[A-Za-z0-9+/]{8,}={0,2}$/.test(tt.split('').reverse().join('')) && /^=/.test(tt)) { const r = bytesOf(tt.split('').reverse().join('')); if(r){ const [x] = textOf(r[1]); if(x != null) add('Reversed → Base64', x); } }
   const r13 = TX.rot13[2](tt); if(findFlags(r13).length > findFlags(tt).length) add('ROT13', r13);
   /* best candidate: readable, and looks like language or data */

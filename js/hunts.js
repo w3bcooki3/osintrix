@@ -66,7 +66,7 @@ const HU_ACTS = {
   huNew:() => huntDlg(), huSave:() => huntDlg({q:UI.q || '', name:''}),
   huKind:(id, v) => { UI.huKind = v; document.querySelectorAll('#dlg [data-act=huKind]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === v))); document.querySelectorAll('#dlg [data-hk]').forEach(x => x.hidden = x.dataset.hk !== v); },
   huSeen:id => { const h = huntList().find(x => x.id === id); if(!h) return; h.seen = huntRun(h).matches.map(r => r.id).slice(-5000); h.lastAt = Date.now(); HU_C.delete(id); mutate('marked hunt matches seen'); renderMain(); },
-  huDel:id => { const L = huntList(), h = L.find(x => x.id === id); if(!h) return; DB.hunts = L.filter(x => x.id !== id); mutate('deleted hunt ' + h.name); renderMain(); toast('Hunt deleted', 'Undo', () => { DB.hunts = [...huntList(), h]; mutate('restored hunt'); renderMain(); }); },
+  huDel:id => { const L = huntList(), h = L.find(x => x.id === id); if(!h) return; DB.hunts = L.filter(x => x.id !== id); const tx = trashPut('hunt', h.name, {h}); mutate('deleted hunt ' + h.name); renderMain(); toast('Hunt deleted — it is in the trash', 'Undo', () => { trashUndo(tx); DB.hunts = [...huntList(), h]; mutate('restored hunt'); renderMain(); }); },
   huCase:(id, v) => { const h = huntList().find(x => x.id === id); if(!h) return; DB.active = v; if(h.kind === 'query'){ UI.q = h.q; UI.ast = E.parseQuery(h.q); UI.tlMode = 'events'; } else { UI.tlMode = 'rules'; UI.crf = 'caught'; } go(caseHash(v, 'timeline')); },
   huRec:id => { const r = recById(id); if(!r) return; DB.active = r.caseId; UI.sel = {kind:'rec', id}; UI.tlMode = 'events'; UI.q = ''; UI.ast = null; go(caseHash(r.caseId, 'timeline')); },
   huOpen:() => { UI.dview = 'hunts'; go('#/detections'); },

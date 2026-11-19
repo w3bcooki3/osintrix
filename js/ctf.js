@@ -188,7 +188,7 @@ function wuImport(){
   const i = document.createElement('input'); i.type = 'file'; i.accept = '.md,.markdown,.txt,text/markdown,text/plain'; i.multiple = true;
   i.onchange = async () => { let n = 0;
     for(const f of [...i.files].slice(0, 50)){ if(f.size > 1e6){ toast(f.name + ' is larger than 1 MB — skipped'); continue; }
-      const txt = (await f.text()).replace(/\r/g, ''), h = txt.match(/^#\s+(.+)$/m), flag = (txt.match(FLAG_RE) || [])[0] || ''; FLAG_RE.lastIndex = 0;
+      const txt = (await fileText(f)).replace(/\r/g, ''), h = txt.match(/^#\s+(.+)$/m), flag = (txt.match(FLAG_RE) || [])[0] || ''; FLAG_RE.lastIndex = 0;
       const low = txt.toLowerCase(), cat = Object.keys(CTF_CATS).find(k => new RegExp('\\b' + ctfCat(k)[0].toLowerCase() + '\\b').test(low.slice(0, 600))) || 'misc';
       DB.ctf.writeups.unshift(wuMake({title:(h ? h[1] : f.name.replace(/\.\w+$/, '')).trim().slice(0, 160), body:(h ? txt.replace(h[0], '') : txt).trim().slice(0, 100000), cat, flag, source:'imported'})); n++; }
     if(n){ UI.wuSel = DB.ctf.writeups[0].id; mutate('imported ' + n + ' write-ups'); renderMain(); toast(n + ' write-up' + (n > 1 ? 's' : '') + ' imported'); } };

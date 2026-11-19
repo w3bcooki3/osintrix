@@ -4,6 +4,58 @@
    Each change has a type: "added" | "changed" | "fixed" | "removed". */
 const CHANGELOG_DATA = [
   {
+    "version": "1.47",
+    "name": "Sturdier underneath",
+    "date": "2026-11-19",
+    "summary": "The trash is back for everything, nothing typed is lost on a refresh, every parser was put through junk, huge and hostile input, and text files from Windows tools read correctly.",
+    "changes": [
+      {
+        "type": "fixed",
+        "text": "The trash is always in the sidebar, and deleting a detection rule, saved query, hunt, playbook, tool or automation now puts it there too (before, only cases, records, vault entries, notes and links did). Each comes back with Restore, also after a refresh."
+      },
+      {
+        "type": "fixed",
+        "text": "A change made just before refreshing or closing the tab could be lost: a finished action is now written at once instead of a quarter-second later."
+      },
+      {
+        "type": "fixed",
+        "text": "With the workspace open in two tabs, closing the one that saves now hands saving to the other by itself — it no longer stays read-only until you click. A page opened by a refresh takes over the moment the old one lets go."
+      },
+      {
+        "type": "fixed",
+        "text": "Deleting an automation that had never run stopped with an error."
+      },
+      {
+        "type": "added",
+        "text": "Text files saved by Windows tools are read the way they were written: UTF-16 (PowerShell “> file”, Excel “Unicode text”, many event-log exports), UTF-8 with or without a byte-order mark, and the old Windows-1252 code page — in log imports, rule packs, notebook imports, threat-intel and cloud files."
+      },
+      {
+        "type": "added",
+        "text": "More time formats read exactly: Windows FILETIME, micro- and nanosecond epochs, ISO 8601 basic form (20261102T081530Z), milliseconds after a comma (log4j, Python logging), dates with dots read day-first (02.11.2026), and day-first dates whenever the first number is over 12 (25/11/2026), with AM/PM and a time zone."
+      },
+      {
+        "type": "fixed",
+        "text": "Indicators: a link with brackets in it (Wikipedia pages) is kept whole, a trailing “…” is no longer part of a link, a link to an IPv6 address in square brackets is found along with the address, and dotted numbers with five parts are no longer read as an IP address."
+      },
+      {
+        "type": "added",
+        "text": "Every text field has a length cap: 4,096 characters for one-line fields, 5 million for text areas (big pasted logs and exports), 2 million for a notebook page; short notes keep their smaller caps. A paste that goes over is cut and says so. Saved names, titles and tags far past any cap are trimmed when the workspace loads."
+      },
+      {
+        "type": "fixed",
+        "text": "Three inputs could freeze the page for a minute or more: a very long run of digits in the coordinate reader, a very long run of spaces in a search, and a long Base58-looking string in the decoder. Each is now instant."
+      },
+      {
+        "type": "changed",
+        "text": "Stored data in the wrong shape — from an old version, a hand-edited backup or a damaged copy — is put right on every load and import, so no page can break on it; an entry of a kind this version does not know is kept as a document with its kind as a tag. A damaged trash item says so instead of coming back broken."
+      },
+      {
+        "type": "added",
+        "text": "New checks: every parser fed empty, binary, 2 MB, deeply nested, mis-encoded, right-to-left and pathological input; hostile markup, quotes, script links, control characters and formulas put in every field and file name, then every page, case tab, panel and dialog opened before and after a refresh; and every kind of saved data through a refresh and a backup."
+      }
+    ]
+  },
+  {
     "version": "1.46",
     "name": "Money, accounts, phones and pictures",
     "date": "2026-11-17",

@@ -140,8 +140,8 @@ const AU_ACTS = {
   pbTab:(id, v) => { UI.pbTab = v; renderMain(); },
   auNew:() => autoDlg(null), auEdit:id => autoDlg(DB.autos.find(R => R.id === id)),
   auOn:(id, v, t) => { const R = DB.autos.find(x => x.id === id); if(!R) return; R.on = t.checked; mutate((R.on ? 'switched on ' : 'paused ') + 'automation ' + R.name); renderMain(); if(R.on) autoSchedule(); },
-  auDel:id => { const R = DB.autos.find(x => x.id === id); if(!R) return; DB.autos = DB.autos.filter(x => x !== R); const done = DB.autoDone[R.id]; delete DB.autoDone[R.id]; mutate('deleted automation ' + R.name); renderMain();
-    toast('Automation deleted', 'Undo', () => { DB.autos.push(R); if(done) DB.autoDone[R.id] = done; mutate('restored automation ' + R.name); renderMain(); }); },
+  auDel:id => { const R = DB.autos.find(x => x.id === id); if(!R) return; DB.autos = DB.autos.filter(x => x !== R); const done = (DB.autoDone || {})[R.id]; if(DB.autoDone) delete DB.autoDone[R.id]; const tx = trashPut('auto', R.name, {a:R, done}); mutate('deleted automation ' + R.name); renderMain();
+    toast('Automation deleted — it is in the trash', 'Undo', () => { trashUndo(tx); DB.autos.push(R); if(done) DB.autoDone[R.id] = done; mutate('restored automation ' + R.name); renderMain(); }); },
   auTpl:id => { const T = AUTO_TPL.find(x => x.id === id); if(!T) return; autoEnsure(); const R = {id:uid('au'), tpl:T.id, name:T.name, on:true, when:JSON.parse(JSON.stringify(T.when)), scope:'all', then:JSON.parse(JSON.stringify(T.then)), runs:0, made:Date.now()};
     if(R.then.some(t => t.a === 'playbook') && !(DB.playbooks || []).some(p => p.id === R.then.find(t => t.a === 'playbook').id)){ const p = (DB.playbooks || []).find(p => /phish/i.test(p.name)); if(p) R.then.find(t => t.a === 'playbook').id = p.id; }
     DB.autos.push(R); autoBaseline(R); mutate('added automation ' + R.name); renderMain(); toast('“' + R.name + '” is on — it acts on what arrives from now on'); },

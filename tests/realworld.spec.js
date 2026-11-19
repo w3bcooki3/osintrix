@@ -1426,3 +1426,26 @@ test('generators: real-world names (accents, apostrophes, particles, double-barr
   expect(dl.suggestedFilename()).toBe('jordan-okafor-work-email.txt');
   noErrors(errors);
 });
+
+// hardening: trash, saving, hostile input, parsers
+test('trash: always in the sidebar; deleting a rule, saved query, hunt, playbook, tool, automation, note, record and vault entry puts each there, and each comes back — also after a refresh', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  await expect(page.locator('.nav [data-nav=trash], nav a[href="#/trash"]').first()).toBeVisible();
+  const before = await page.evaluate(() => {
+    DB.trash = []; const r0 = DB.rules.find(r => !r.builtin) || DB.rules[0], q0 = (DB.queries || [])[0], pb = DB.playbooks[0], t0 = DB.tools[0];
+    DB.hunts = [{ id: 'h-tr', name: 'C2 again', kind: 'query', q: '203.0.113.47', seen: [], created: Date.now() }]; DB.autos = DB.autos || []; DB.autos.push({ id: 'au-tr', name: 'Tag phish', on: true, when: {}, then: [], scope: 'all', runs: 0, made: Date.now() });
+    mutate('setup'); return { rule: r0.id, query: q0 && q0.id, pb: pb.id, tool: t0.id, note: DB.notes[0].id, rec: DB.records.find(r => r.type !== 'lead').id, ent: DB.entries[0].id, counts: { rules: DB.rules.length, tools: DB.tools.length, pbs: DB.playbooks.length, notes: DB.notes.length, recs: DB.records.length, ents: DB.entries.length } }; });
+  await page.evaluate(async b => { const dismiss = () => { const y = document.querySelector('#dlg [data-act=confirmOk]'); if(y) y.click(); };
+    clickAct('rDel', b.rule); if(b.query) clickAct('qDel', b.query); HU_ACTS.huDel('h-tr'); AU_ACTS.auDel('au-tr'); clickAct('toolDel', b.tool); clickAct('nDel', b.note); delRecord(b.rec); clickAct('delEntry', b.ent);
+    clickAct('pbDelAsk', b.pb); await new Promise(r => setTimeout(r, 50)); dismiss(); }, before);
+  const kinds = await page.evaluate(() => DB.trash.map(x => x.kind).sort());
+  expect(kinds).toEqual(['auto', 'entry', 'hunt', 'note', 'playbook', 'query', 'record', 'rule', 'tool'].filter(k => k !== 'query' || before.query));
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => typeof DB !== 'undefined' && !!DB && !!document.querySelector('#sidenav .nv') && Array.isArray(DB.trash) ? DB.trash.length : -1), { timeout: 15000 }).toBe(kinds.length);   // the trash survives a refresh                               // the trash survives a refresh
+  await page.evaluate(() => go('#/trash'));
+  await expect(page.locator('.binrow')).toHaveCount(kinds.length);
+  for(let i = 0; i < kinds.length; i++) await page.locator('.binrow [data-act=trRestore]').first().click();
+  const after = await page.evaluate(() => ({ rules: DB.rules.length, tools: DB.tools.length, pbs: DB.playbooks.length, notes: DB.notes.length, recs: DB.records.length, ents: DB.entries.length, hunt: DB.hunts.some(h => h.id === 'h-tr'), auto: DB.autos.some(a => a.id === 'au-tr'), trash: DB.trash.length }));
+  expect(after).toEqual({ ...before.counts, hunt: true, auto: true, trash: 0 });
+  noErrors(errors);
+});

@@ -646,7 +646,7 @@ function nbImport(){
     for(const f of files){ try{ if(f.size > 30 * 1024 * 1024) throw new Error('too large');
         const ext = (f.name.match(/\.(\w+)$/) || [])[1] || ''; let title = f.name.replace(/\.\w+$/, ''), html;
         if(/^docx$/i.test(ext)){ const r = await nbFromDocx(new Uint8Array(await f.arrayBuffer())); html = r.html; title = r.title || title; }
-        else { const txt = await f.text();
+        else { const txt = await fileText(f);
           if(/^html?$/i.test(ext)){ const d = new DOMParser().parseFromString(txt, 'text/html'); const h1 = d.querySelector('h1'); title = (d.title || (h1 && h1.textContent) || title).trim(); if(h1 && h1.textContent.trim() === title) h1.remove(); d.querySelectorAll('.nbx-meta').forEach(x => x.remove()); d.querySelectorAll('.nbx-call').forEach(x => x.className = 'nb-call'); html = nbClean(nbCardsFromTables(d.body.innerHTML), {media:true}); }
           else if(/^(md|markdown)$/i.test(ext)){ const m = txt.match(/^\s*#\s+(.+)\n/); if(m) title = m[1].trim(); html = nbClean(mdLite(m ? txt.slice(m[0].length) : txt), {media:true}); }
           else html = txt.split(/\n{2,}/).map(t => `<p>${esc(t).replace(/\n/g, '<br>')}</p>`).join(''); }

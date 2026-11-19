@@ -7,7 +7,8 @@ const ago = t => E.fmtAgo(Math.max(0, Date.now() - t));
 
 /* ---------- trash ---------- */
 const TRASH_DAYS = 30;
-const TRASH_KIND = {case:['folder-open','Case'], entry:['layers','Vault entry'], record:['file-text','Evidence record'], note:['sticky-note','Note'], link:['waypoints','Relationship']};
+const TRASH_KIND = {case:['folder-open','Case'], entry:['layers','Vault entry'], record:['file-text','Evidence record'], note:['sticky-note','Note'], link:['waypoints','Relationship'], rule:['shield-check','Detection rule'], query:['search','Saved query'], hunt:['crosshair','Hunt'], playbook:['list-checks','Playbook'], tool:['wrench','Tool'], auto:['workflow','Automation']};
+const trashUndo = x => { DB.trash = (DB.trash || []).filter(z => z !== x); };
 function trashPut(kind, label, data, caseId){ DB.trash = DB.trash || []; const x = {id:uid('x'), kind, label:String(label || '').slice(0, 140), caseId:caseId || null, at:Date.now(), data}; DB.trash.unshift(x); return x; }
 function trashPurge(){
   if(!DB.trash || !DB.trash.length) return; const cut = Date.now() - TRASH_DAYS * 864e5, old = DB.trash.filter(x => x.at < cut);
@@ -18,6 +19,14 @@ function dropFilesOf(x){ for(const fid of filesOfItem(x)) if(!fileInUse(fid)) bl
 function fileInUse(fid){ return DB.records.some(r => (r.att || []).some(a => a.id === fid)); }
 function trashRestore(id){
   const x = (DB.trash || []).find(z => z.id === id); if(!x) return; const d = x.data;
+  /* what each kind must hold to come back; an item damaged in storage or in a backup is explained, not restored */
+  const ob = v => v && typeof v === 'object' && !Array.isArray(v), hasId = v => ob(v) && typeof v.id === 'string' && v.id !== '';
+  const SHAPE = {case:() => hasId(d.c), entry:() => hasId(d.e) && typeof d.e.type === 'string' && typeof TYPES !== 'undefined' && !!TYPES[d.e.type], record:() => hasId(d.r), note:() => hasId(d.n), rule:() => hasId(d.r), query:() => hasId(d.q),
+    hunt:() => hasId(d.h), playbook:() => hasId(d.p), tool:() => hasId(d.t) && typeof d.t.url === 'string', auto:() => hasId(d.a), link:() => ob(d.l) && typeof d.l.a === 'string' && typeof d.l.b === 'string'};
+  if(!ob(d) || !SHAPE[x.kind]) return toast('That item cannot be restored'); if(!SHAPE[x.kind]()) return toast('That item is damaged and cannot be restored — you can delete it for good');
+  if(x.kind === 'case') for(const k of ['entries', 'links', 'records', 'notes']) d[k] = Array.isArray(d[k]) ? d[k].filter(ob) : [];
+  if(x.kind === 'entry' && typeof normEntry === 'function') normEntry(d.e); if(x.kind === 'record' && typeof normRecord === 'function') normRecord(d.r);
+  if(x.kind === 'case' && typeof normEntry === 'function'){ d.entries.forEach(normEntry); d.records.forEach(normRecord); }
   const caseOk = cid => DB.cases.some(c => c.id === cid);
   switch(x.kind){
     case 'case': if(caseOk(d.c.id)) return toast('That case already exists');
@@ -27,6 +36,13 @@ function trashRestore(id){
       for(const l of d.links || []){ if(entryById(l.a) && entryById(l.b)){ if(!DB.links.some(z => z.id === l.id)) DB.links.push(l); continue; } trashKeepLink(l, x); } break; }
     case 'record': { const r = d.r; if(!caseOk(r.caseId)) r.caseId = DB.active; DB.records.push(r); break; }
     case 'note': DB.notes = DB.notes || []; DB.notes.push(d.n); break;
+    case 'rule': if(DB.rules.some(z => z.id === d.r.id)) return toast('That rule is already back'); DB.rules.unshift(d.r); if(DB.deletedRules) DB.deletedRules = DB.deletedRules.filter(z => z !== d.r.id); break;
+    case 'query': DB.queries = DB.queries || []; if(!DB.queries.some(z => z.id === d.q.id)) DB.queries.push(d.q); break;
+    case 'hunt': DB.hunts = Array.isArray(DB.hunts) ? DB.hunts : []; if(!DB.hunts.some(z => z.id === d.h.id)) DB.hunts.push(d.h); break;
+    case 'playbook': if(!DB.playbooks.some(z => z.id === d.p.id)) DB.playbooks.push(d.p); if(DB.deletedPb) DB.deletedPb = DB.deletedPb.filter(z => z !== d.p.id); break;
+    case 'tool': if(!DB.tools.some(z => z.id === d.t.id)) DB.tools.push(d.t); if(DB.deletedSeed) DB.deletedSeed = DB.deletedSeed.filter(u => u !== d.t.url); break;
+    case 'auto': DB.autos = DB.autos || []; if(!DB.autos.some(z => z.id === d.a.id)) DB.autos.push(d.a); if(d.done){ DB.autoDone = DB.autoDone || {}; DB.autoDone[d.a.id] = d.done; } break;
+    default: return toast('That item cannot be restored')
     case 'link': if(entryById(d.l.a) && entryById(d.l.b)) DB.links.push(d.l); else if(!trashKeepLink(d.l, x)) return toast('Both ends of that relationship are gone'); else { DB.trash = DB.trash.filter(z => z !== x); mutate('restored ' + x.label); renderAll(); return toast('That relationship comes back when its entry is restored from the trash'); } break;
   }
   DB.trash = DB.trash.filter(z => z !== x); mutate('restored ' + x.label); renderAll(); toast('Restored ' + x.label);
@@ -110,7 +126,7 @@ function viewTrash(){
   const S2 = SNAPS || [];
   return `<div class="scroll"><div class="page narrow"><div class="ph"><div><h1>Trash &amp; restore points</h1><div class="sub">Deleted items wait here for ${TRASH_DAYS} days. Restore points are full copies of your workspace made before big changes.</div></div></div>
     <section class="card" style="margin-bottom:18px"><header><h3>Trash <span class="t3">${T.length}</span></h3>${T.length ? `<button class="btn xs danger" data-act="trEmpty">${ico('trash-2','sm')}Empty trash</button>` : ''}</header>
-      <div class="body flush">${T.length ? T.map(row).join('') : `<p class="t3" style="padding:18px 20px;margin:0">Nothing in the trash. Deleted cases, vault entries, evidence records, relationships and notes land here.</p>`}</div></section>
+      <div class="body flush">${T.length ? T.map(row).join('') : `<p class="t3" style="padding:18px 20px;margin:0">Nothing in the trash. Deleted cases, vault entries, evidence, relationships, notes, rules, saved queries, hunts, playbooks, tools and automations land here.</p>`}</div></section>
     <section class="card"><header><h3>Restore points <span class="t3">${S2.length} of ${SNAP_MAX}</span></h3><button class="btn xs" data-act="snapNow">${ico('save','sm')}Make one now</button></header>
       <div class="body flush">${S2.length ? S2.map(s => `<div class="binrow"><span class="binic">${ico('history')}</span><div class="main2"><b>${esc(s.why)}</b><small>${esc(E.fmtFull(s.at, tz()).slice(0, 16))} · ${s.cases} cases · ${s.records} records · ${fmtBytes(s.size * 2)}</small></div>
         <button class="btn xs" data-act="snapRestore" data-id="${s.at}">${ico('undo-2','sm')}Restore</button><button class="iconbtn" data-act="snapDl" data-id="${s.at}" title="Download as a backup file" aria-label="Download">${ico('download','sm')}</button><button class="iconbtn" data-act="snapDel" data-id="${s.at}" title="Delete this restore point" aria-label="Delete this restore point">${ico('trash-2','sm')}</button></div>`).join('')
@@ -329,10 +345,9 @@ let LOGIMP = null;
 function logImportFile(f){
   if(/\.evtx$/i.test(f.name)) return evtxImportFile(f);
   if(f.size > 25 * 1048576) return toast('Log files over 25 MB are too big for one import — split it first');
-  const fr = new FileReader(); fr.onload = () => { const P = logParse(String(fr.result), f.name); if(!P.rows.length) return toast('No rows found in that file');
+  fileText(f).then(txt => { const P = logParse(txt, f.name); if(!P.rows.length) return toast('No rows found in that file');
     const cols = [...new Set(P.rows.slice(0, 200).flatMap(r => Object.keys(r)))];
-    LOGIMP = {caseId:capCase(), name:f.name, fmt:P.fmt, rows:P.rows, cols, map:{time:logGuess(cols, 'time'), title:logGuess(cols, 'title'), host:logGuess(cols, 'host'), source:logGuess(cols, 'source')}}; logImportDlg(); };
-  fr.readAsText(f);
+    LOGIMP = {caseId:capCase(), name:f.name, fmt:P.fmt, rows:P.rows, cols, map:{time:logGuess(cols, 'time'), title:logGuess(cols, 'title'), host:logGuess(cols, 'host'), source:logGuess(cols, 'source')}}; logImportDlg(); }).catch(e => toast('Could not read ' + f.name + ': ' + e.message));
 }
 function logRec(row, M, name){
   let tsRaw = M.time ? row[M.time] : '', ts = logTime(tsRaw);

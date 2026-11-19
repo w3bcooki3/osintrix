@@ -247,8 +247,8 @@ const RB_ACTS = {
     confirmDlg('Delete ' + xs.length + ' rule' + (xs.length > 1 ? 's' : '') + '?', (bi ? bi + ' of them came with OSINTrix and stay deleted when the app updates its rules. ' : '') + 'You can undo right after.', 'Delete ' + xs.length, () => {
       const prev = DB.rules.slice(), prevGone = (DB.deletedRules || []).slice(), gone = new Set(xs.map(r => r.id));
       DB.rules = DB.rules.filter(r => !gone.has(r.id)); if(bi) DB.deletedRules = [...new Set([...prevGone, ...xs.filter(r => r.builtin).map(r => r.id)])];
-      if(gone.has(UI.rule)){ UI.rule = null; UI.ropen = false; } UI.rpick = new Set(); closeDlg(); mutate('deleted ' + xs.length + ' rules'); renderAll();
-      toast('Deleted ' + xs.length + ' rule' + (xs.length > 1 ? 's' : ''), 'Undo', () => { DB.rules = prev; DB.deletedRules = prevGone; mutate('restored ' + xs.length + ' rules'); renderAll(); }); }); },
+      if(gone.has(UI.rule)){ UI.rule = null; UI.ropen = false; } UI.rpick = new Set(); const txs = xs.map(r => trashPut('rule', r.title, {r})); closeDlg(); mutate('deleted ' + xs.length + ' rules'); renderAll();
+      toast('Deleted ' + xs.length + ' rule' + (xs.length > 1 ? 's' : '') + ' — in the trash', 'Undo', () => { txs.forEach(trashUndo); DB.rules = prev; DB.deletedRules = prevGone; mutate('restored ' + xs.length + ' rules'); renderAll(); }); }); },
 };
 const ruleDirty = () => { const f = document.querySelector('form.rx'); return !!(f && f.classList.contains('dirty')); };
 function ruleFromCase(){

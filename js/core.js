@@ -90,6 +90,9 @@ let paintT = null;
 function markChanged(){ STORE.gen++; STORE.changedAt = Date.now(); clearTimeout(paintT); paintT = setTimeout(paintSaved, 900); }
 function markSafe(g){ if(g > STORE.safeGen) STORE.safeGen = g; paintSaved(); }
 function save(){ markChanged(); clearTimeout(saveT); saveT = setTimeout(flush, 250); }
+/* a finished action (delete, add, restore…) is written at once, not after the typing pause: a refresh or a closed tab
+   straight after it must not lose it — a write made while the page is going away can arrive too late for the next page */
+function saveSoon(){ markChanged(); clearTimeout(saveT); saveT = setTimeout(flush, 0); }
 /* editors with typing still waiting to be committed (the notebook) register here, so every save — including the one on closing the tab — includes it */
 const BEFORE_SAVE = [];
 function flush(){ clearTimeout(saveT); if(!DB || SEC.locked) return; for(const f of BEFORE_SAVE) try{ f(); }catch(e){ console.error(e); } clearTimeout(saveT); if(!TABS.writer){ paintSaved(); return; } DB.savedAt = Math.max(Date.now(), (DB.savedAt || 0) + 1);   // never a tie between two copies
@@ -105,7 +108,7 @@ function flush(){ clearTimeout(saveT); if(!DB || SEC.locked) return; for(const f
 function paintSaved(){ const s = $('saved'); if(s && TABS.writer && storageOK && isDirty() && Date.now() - STORE.changedAt > 800){ s.innerHTML = '<i class="pulse" style="background:var(--text-3)"></i><span>Saving…</span>'; s.title = 'Writing your latest change to this browser'; return; } if(s && !TABS.writer){ s.innerHTML = '<i style="background:var(--amber)"></i><span>Read-only in this tab</span>'; s.title = 'This workspace is open in another tab'; return; } if(s) s.innerHTML = storageOK ? '<i></i><span>Saved in this browser</span>' : '<i style="background:var(--red)"></i><span>Not saved</span>'; s.title = storageOK ? 'Saved in this browser' : 'Not saved — this browser blocks storage'; }
 window.addEventListener('pagehide', flush); document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'hidden') flush(); });
 let rev = 0, cache = {};
-function mutate(what){ rev++; cache = {}; auditAdd(what); DB.log.unshift({at:Date.now(), what}); DB.log.length = Math.min(DB.log.length, 200); save(); if(typeof onMutate === 'function') onMutate(what); }
+function mutate(what){ rev++; cache = {}; auditAdd(what); DB.log.unshift({at:Date.now(), what}); DB.log.length = Math.min(DB.log.length, 200); saveSoon(); if(typeof onMutate === 'function') onMutate(what); }
 
 /* ---------- lookups ---------- */
 const tz = () => DB.prefs.tz || 'UTC';
