@@ -1302,7 +1302,7 @@ test('OSINT: look-alike domains are generated and checked through DNS only when 
   await expect(page.locator('.id-dl')).toContainText('Jordan Okafor'); await expect(page.locator('.labgrid')).toContainText('Delivers to jordanokafor1992@gmail.com');
   await expect(page.locator('.labgrid')).toContainText('1992');
   await page.fill('#idQ', '+44 20 7946 0000'); await page.press('#idQ', 'Enter'); await expect(page.locator('.id-dl')).toContainText('United Kingdom');
-  await page.fill('#idQ', '@n1ghtlamp'); await page.press('#idQ', 'Enter'); await expect(page.locator('.id-grid a[href="https://github.com/n1ghtlamp"]')).toHaveCount(1);
+  await page.fill('#idQ', '@n1ghtlamp'); await page.press('#idQ', 'Enter'); await expect(page.locator('.ck-n > a[href="https://github.com/n1ghtlamp"]')).toHaveCount(1);
   expect(await page.evaluate(() => [idEmail('ops@mailinator.com').disposable, idEmail('admin@corp.example').role])).toEqual([true, true]);
   // the inspector suggests next steps for a domain
   expect(await page.evaluate(() => pivotPlan('domain', 'lantern-invoice.example').map(p => p.act))).toContain('osTwist');
@@ -1815,7 +1815,7 @@ test('backup reminders: due after a week of own work, shown on the dashboard and
 test('guided tour walks through the demo case and can be left with Escape', async ({ page }) => {
   const errors = await open(page, '#/help');
   await page.click('[data-act=tourStart]');
-  for (let i = 0; i < 9; i++) { await expect(page.locator('#tourCard .tour-n')).toHaveText(`${i + 1} of 10`); await expect(page.locator('#tourRing')).toBeVisible(); await page.click('[data-act=tourNext]'); }
+  for (let i = 0; i < 10; i++) { await expect(page.locator('#tourCard .tour-n')).toHaveText(`${i + 1} of 11`); await expect(page.locator('#tourRing')).toBeVisible(); await page.click('[data-act=tourNext]'); }
   await expect(page.locator('#tourCard')).toContainText('Now your own case');
   await page.keyboard.press('Escape'); await expect(page.locator('#tourCard')).toHaveCount(0);
   noErrors(errors);

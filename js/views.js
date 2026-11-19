@@ -297,7 +297,7 @@ function caseVault(c, D){
     <div class="vmain">
       <div class="toolbar"><div class="search-in">${ico('search')}<label class="sr" for="vq">Search this vault</label><input id="vq" class="inp" placeholder="Search entries, fields, tags…" value="${esc(UI.vq)}"></div>
         <span class="t3" style="font-size:calc(13.5px * var(--ts,1))">${list.length} entries</span><span style="flex:1"></span>${(n => n ? `<button class="btn sm" data-act="dupOpen">${ico('merge','sm')}${n} possible duplicate${n > 1 ? 's' : ''}</button>` : '')(typeof dupGroups === 'function' ? dupGroups(c.id).length : 0)}${layoutSeg('vLay', DB.prefs.vLay || 'cards', [['cards','layout-grid','Cards'],['list','rows-3','List']])}
-        <button class="btn primary" data-act="addEntry">${ico('plus','sm')}Add entry</button></div>
+        ${DB.entries.some(e => e.type === 'person' || e.type === 'organization') ? `<button class="btn sm" data-act="idpList">${ico('users','sm')}Identity profiles</button>` : ''}<button class="btn primary" data-act="addEntry">${ico('plus','sm')}Add entry</button></div>
       ${list.length && DB.prefs.vLay === 'list' ? entryRows(list) : list.length ? (groups ? groups.map(([g, l, i, col]) => { const gl = list.filter(e => TYPES[e.type].group === g);
           return `<div class="vgroup"><span class="tb sm" style="--c:var(${col})">${ico(i)}</span><h3>${l}</h3><span class="t3">${gl.length}</span></div><div class="egrid">${gl.map(entryCard).join('')}</div>`; }).join('')
         : `<div class="egrid">${list.map(entryCard).join('')}</div>`)
@@ -381,9 +381,9 @@ function storyHTML(D){
 /* ---------- questions ---------- */
 /* Infrastructure: what the case pivots on — domains and addresses, money, accounts */
 function caseInfra(c, D){
-  const v = ['dom', 'money', 'acc'].includes(UI.ivView) ? UI.ivView : 'dom';
-  const seg = `<div class="seg qseg" role="group" aria-label="View"><button data-act="ivView" data-v="dom" aria-pressed="${v === 'dom'}">${ico('network','sm')}Domains &amp; addresses</button><button data-act="ivView" data-v="money" aria-pressed="${v === 'money'}">${ico('bitcoin','sm')}Money</button><button data-act="ivView" data-v="acc" aria-pressed="${v === 'acc'}">${ico('history','sm')}Accounts</button></div>`;
-  const body = v === 'money' ? walletView(c) : v === 'acc' ? footView(c) : infraView(c);
+  const v = ['dom', 'money', 'acc', 'hours'].includes(UI.ivView) ? UI.ivView : 'dom';
+  const seg = `<div class="seg qseg" role="group" aria-label="View"><button data-act="ivView" data-v="dom" aria-pressed="${v === 'dom'}">${ico('network','sm')}Domains &amp; addresses</button><button data-act="ivView" data-v="money" aria-pressed="${v === 'money'}">${ico('bitcoin','sm')}Money</button><button data-act="ivView" data-v="acc" aria-pressed="${v === 'acc'}">${ico('history','sm')}Accounts</button><button data-act="ivView" data-v="hours" aria-pressed="${v === 'hours'}">${ico('clock-3','sm')}Active hours</button></div>`;
+  const body = v === 'money' ? walletView(c) : v === 'acc' ? footView(c) : v === 'hours' ? hrView(c) : infraView(c);
   return `<div class="scroll"><div class="page wide">${seg}${body}</div></div>`;
 }
 function caseQuestions(c, D){

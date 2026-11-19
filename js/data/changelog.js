@@ -4,6 +4,38 @@
    Each change has a type: "added" | "changed" | "fixed" | "removed". */
 const CHANGELOG_DATA = [
   {
+    "version": "1.48",
+    "name": "People, hours and what changed",
+    "date": "2026-11-19",
+    "summary": "When the people behind accounts are awake and where that puts them, one profile per person across cases, a complete checklist for every username, email and phone, what changed between two saves of a page, and metadata from old Office files.",
+    "changes": [
+      {
+        "type": "added",
+        "text": "Infrastructure → Active hours: paste or import post times — Telegram and Discord chat exports, Reddit, Mastodon and X data, any JSON list or CSV with times, or one time per line — and see each person's week, their likely time zone from when they sleep, their weekend (Saturday–Sunday or Friday–Saturday), whether their clock changes for summer, and which accounts keep the same week. Accounts that post at every hour are flagged as automated or shared. Only who and when is kept, so a large chat export stays small."
+      },
+      {
+        "type": "added",
+        "text": "Identity profiles: open a Person in the vault, or Vault → Identity profiles. One profile per person: their identifiers with how sure each link is, how much evidence names each and when it was last seen, the same person in other cases (a shared email, phone or wallet confirms; a shared username only makes it likely), where the cases disagree, a map of how it all connects, and the gaps still to close."
+      },
+      {
+        "type": "changed",
+        "text": "Forensics kit → Identity pivots is now a full checklist for a username, email address or phone number: profiles, breach and leak searches, search queries, messaging apps and archived copies. Mark each place there, not there or private, add a note, save a found profile to the case, filter what is left to check, and copy a summary. Kept per value across cases, also after a refresh."
+      },
+      {
+        "type": "added",
+        "text": "Infrastructure → Accounts → Changes over time: a page or profile saved more than once, each version against the one before — text added and removed, links and email addresses, and every profile field with how much counts such as followers moved. Compare any two records by hand too."
+      },
+      {
+        "type": "added",
+        "text": "Metadata from old Word, Excel and PowerPoint files (.doc, .xls, .ppt) and OpenDocument (.odt, .ods, .odp): who made it and who saved it last, when, how many times and for how long it was edited, the program, template, company, custom fields, and whether it holds macros — checked against an independent reader. Damaged or crafted files read as empty instead of hanging."
+      },
+      {
+        "type": "changed",
+        "text": "Help answers the new features, and the guided tour has a stop on the Infrastructure tab."
+      }
+    ]
+  },
+  {
     "version": "1.47",
     "name": "Sturdier underneath",
     "date": "2026-11-19",

@@ -210,6 +210,8 @@ async function metaRead(b, name, type){
     else if(h.slice(4, 8) === 'ftyp'){ mtIso(b, add, st); const br = mtStr(b, 8, 12); fmt = /hei|mif1|msf1|hevc/.test(br) ? 'HEIC picture' : /avi[fs]/.test(br) ? 'AVIF picture' : /^qt/.test(br) ? 'QuickTime video' : /^3g/.test(br) ? '3GP video' : /M4A|M4B/.test(br) ? 'MP4 audio' : 'MP4 video'; }
     else if(h.startsWith('ID3')){ fmt = 'MP3 audio'; mtId3(b, add, st); }
     else if(h.startsWith('%PDF')){ fmt = 'PDF document'; await mtPdf(b, add, st); }
+    else if(typeof isCfb === 'function' && isCfb(b)){ fmt = mtCfb(b, add, st) || 'Office file'; }
+    else if(h.startsWith('PK\x03\x04') && typeof mtOdf === 'function' && (mtStr(b, 30, 38) === 'mimetype' && /opendocument/.test(mtStr(b, 38, 90)) || /\.(odt|ods|odp|odg|ott|ots|otp)$/i.test(name || '') || /opendocument/.test(type || ''))){ fmt = await mtOdf(b, add, st); }
     else if(h.startsWith('PK\x03\x04') && /\.(docx|docm|xlsx|xlsm|pptx|pptm|dotx|dotm)$/i.test(name || '') || h.startsWith('PK\x03\x04') && /officedocument|ms-word|ms-excel|ms-powerpoint/.test(type || '')){ fmt = 'Office document'; await mtOffice(b, add, st); }
   }catch(e){ if(!fmt) fmt = ''; }
   /* what stands out */
