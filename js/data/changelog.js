@@ -4,6 +4,30 @@
    Each change has a type: "added" | "changed" | "fixed" | "removed". */
 const CHANGELOG_DATA = [
   {
+    "version": "1.49",
+    "name": "A sample case for the OSINT tools",
+    "date": "2026-11-19",
+    "summary": "A new sample case, Harbourline refund scam, shows every Infrastructure view and an identity profile on realistic data — and the account timeline is fixed.",
+    "changes": [
+      {
+        "type": "added",
+        "text": "Sample case “Harbourline refund scam”: WHOIS, RDAP, dig, certificate, passive DNS, Shodan and Censys results; victim payments on Bitcoin, Ethereum and TRON; profiles on X, Reddit, GitHub and Mastodon, two of them renamed; the shop’s About page saved twice; post times from a Telegram group, Reddit, Discord and a bot; and Jan Harbour in the vault, joined to J. Haven in Customer portal by a shared email. Added once to workspaces that keep the sample data; Settings → remove sample data takes it out with the others."
+      },
+      {
+        "type": "fixed",
+        "text": "Account timeline: it now fills its card instead of stopping at a fixed width, long account names are shortened in the middle instead of cut off on the left, and the dates along the top show months and years."
+      },
+      {
+        "type": "fixed",
+        "text": "Accounts: a profile link written without https:// is now matched to its account and platform (an old GitHub name showed as a separate account), API addresses such as api.github.com/users no longer show as accounts named “users”, the platform comes from the profile data when there is some, and what stands out is listed in the order the accounts were made."
+      },
+      {
+        "type": "fixed",
+        "text": "Domains & addresses: long values on the right of the picture no longer run past its edge, and the picture fills its card."
+      }
+    ]
+  },
+  {
     "version": "1.48",
     "name": "People, hours and what changed",
     "date": "2026-11-19",

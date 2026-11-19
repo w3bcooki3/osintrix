@@ -41,6 +41,10 @@ function parseWebPage(raw){
   return {url, host, title:title.trim().replace(/\s+/g, ' '), desc:meta('description') || meta('og:description'), author:meta('author') || meta('article:author'), site:meta('og:site_name'),
     published:meta('article:published_time') || ((doc.querySelector('time[datetime]') || {}).getAttribute ? doc.querySelector('time[datetime]').getAttribute('datetime') : '') || '', saved:(M && M.date) || '', text:pageText(doc).slice(0, 40000), links:links.size, ext, mails, images:doc.images.length, html};
 }
+/* the evidence text of a saved page: where it came from, then its text, links and email addresses */
+function webPageBody(P, savedTs, att){ return [`URL: ${P.url || '(not recorded in the file)'}`, `Title: ${P.title}`, P.site ? `Site: ${P.site}` : '', P.author ? `Author: ${P.author}` : '', P.published ? `Published: ${P.published}` : '', `Saved: ${new Date(savedTs).toISOString()}`,
+      P.desc ? `Description: ${P.desc}` : '', att ? `SHA-256 of saved file: ${att.sha256}` : '', '', P.text,
+      P.ext.length ? `\n\nLinks to other sites (${P.ext.length}):\n` + P.ext.slice(0, 150).map(([u, t]) => (t ? t + ' — ' : '') + u).join('\n') : '', P.mails.length ? '\n\nEmail links:\n' + P.mails.join('\n') : ''].filter(x => x !== '').join('\n'); }
 async function importWebPages(files){
   const cid = capCase(), made = [];
   for(const f of files){
@@ -48,9 +52,7 @@ async function importWebPages(files){
     const raw = await f.text(), P = parseWebPage(raw); if(!P){ toast('Could not read ' + f.name + ' as a web page'); continue; }
     let att = null; try{ att = await storeFile(f); }catch(e){}
     const savedTs = P.saved && !isNaN(Date.parse(P.saved)) ? Date.parse(P.saved) : f.lastModified || Date.now();
-    const body = [`URL: ${P.url || '(not recorded in the file)'}`, `Title: ${P.title}`, P.site ? `Site: ${P.site}` : '', P.author ? `Author: ${P.author}` : '', P.published ? `Published: ${P.published}` : '', `Saved: ${new Date(savedTs).toISOString()}`,
-      P.desc ? `Description: ${P.desc}` : '', att ? `SHA-256 of saved file: ${att.sha256}` : '', '', P.text,
-      P.ext.length ? `\n\nLinks to other sites (${P.ext.length}):\n` + P.ext.slice(0, 150).map(([u, t]) => (t ? t + ' — ' : '') + u).join('\n') : '', P.mails.length ? '\n\nEmail links:\n' + P.mails.join('\n') : ''].filter(x => x !== '').join('\n');
+    const body = webPageBody(P, savedTs, att);
     made.push({id:uid('r'), caseId:cid, type:'evidence', title:'Web page: ' + (P.title || P.host || f.name).slice(0, 90), body, tsRaw:new Date(savedTs).toISOString(), tsZone:'explicit', ts:savedTs, source:'web page' + (P.host ? ' · ' + P.host : ''), host:'', tags:['web', 'archived'], ents:extractRich(body), answer:'', addedBy:'You', addedAt:Date.now(), hash:'', pv:1, att:att ? [att] : [], page:{url:P.url, links:P.links, images:P.images}});
   }
   if(!made.length) return;

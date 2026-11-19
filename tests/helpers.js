@@ -4,11 +4,13 @@ const { expect } = require('@playwright/test');
 const APP = 'file://' + path.resolve(__dirname, '..', 'index.html');
 const fixture = name => path.resolve(__dirname, 'fixtures', name);
 
-async function open(page, hash = '#/home') {
+async function open(page, hash = '#/home', opt = {}) {
   const errors = [];
   page.on('pageerror', e => errors.push('pageerror: ' + e.message));
   page.on('console', m => { if (m.type() === 'error' && !/localStorage.*sandboxed|Blocked script execution in 'about:(srcdoc|blank)'|Refused to load the image 'https:|Loading the image 'https:[^']*' violates/.test(m.text())) errors.push('console: ' + m.text()); });
   await page.addInitScript(() => { try { localStorage.setItem('osintrix:welcomed', '1'); } catch (e) {} });
+  // most tests are written against the original demo cases; the OSINT sample case is added only where a test asks for it
+  if (!opt.osintSample) await page.context().addInitScript(() => { window.__noOsintSample = true; });
   await page.goto(APP + hash);
   // the app's Content Security Policy blocks eval, so poll with plain evaluate calls instead of waitForFunction
   await expect.poll(() => page.evaluate(() => typeof DB !== 'undefined' && !!DB && !!document.querySelector('#sidenav .nv')), { timeout: 15000 }).toBe(true);

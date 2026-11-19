@@ -179,12 +179,12 @@ const IF_C = {sig:'', v:null};
 /* the picture: what you investigated on the left, what they share on the right */
 function infraSvg(X){
   const S = X.shared.filter(g => g.strength !== 'none').slice(0, 14); if(!S.length) return '';
-  const subs = [...new Set(S.flatMap(g => g.subs.map(s => s.v)))].slice(0, 24), H = Math.max(S.length, subs.length) * 34 + 30, W = 940, ly = i => 24 + i * ((H - 40) / Math.max(1, subs.length - 1 || 1)), ry = i => 24 + i * ((H - 40) / Math.max(1, S.length - 1 || 1));
+  const subs = [...new Set(S.flatMap(g => g.subs.map(s => s.v)))].slice(0, 24), H = Math.max(S.length, subs.length) * 34 + 30, W = 1120, ly = i => 24 + i * ((H - 40) / Math.max(1, subs.length - 1 || 1)), ry = i => 24 + i * ((H - 40) / Math.max(1, S.length - 1 || 1));
   const col = {strong:'var(--red,#dc2626)', medium:'var(--amber,#d97706)', weak:'var(--text-3)'};
   const lines = S.flatMap((g, j) => g.subs.filter(s => subs.includes(s.v)).map(s => `<path d="M230,${ly(subs.indexOf(s.v))} C380,${ly(subs.indexOf(s.v))} 380,${ry(j)} 520,${ry(j)}" class="if-e ${g.strength}" style="stroke:${col[g.strength]}"></path>`)).join('');
-  return `<div class="if-svg" role="img" aria-label="Domains and addresses on the left, joined to what they share on the right"><svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${lines}
+  return `<div class="if-svg" role="img" aria-label="Domains and addresses on the left, joined to what they share on the right"><svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMinYMin meet">${lines}
     ${subs.map((s, i) => `<text x="222" y="${ly(i) + 4}" text-anchor="end" class="if-l">${esc(s.length > 30 ? s.slice(0, 28) + '…' : s)}</text><circle cx="230" cy="${ly(i)}" r="4" class="if-n"></circle>`).join('')}
-    ${S.map((g, j) => `<circle cx="520" cy="${ry(j)}" r="5" class="if-n" style="fill:${col[g.strength]}"></circle><text x="530" y="${ry(j) + 4}" class="if-l"><tspan class="if-rel">${esc(g.rel)}</tspan> ${esc(g.v.length > 44 ? g.v.slice(0, 42) + "…" : g.v)}</text>`).join('')}</svg></div>`;
+    ${S.map((g, j) => `<circle cx="520" cy="${ry(j)}" r="5" class="if-n" style="fill:${col[g.strength]}"></circle><text x="530" y="${ry(j) + 4}" class="if-l"><title>${esc(g.rel + ' ' + g.v)}</title><tspan class="if-rel">${esc(g.rel)}</tspan> ${esc((m => g.v.length > m ? g.v.slice(0, m - 2) + '…' : g.v)(Math.max(16, 70 - g.rel.length)))}</text>`).join('')}</svg></div>`;
 }
 function infraView(c){
   const X = infraIndex(c.id), when = ms => ms ? E.fmtFull(ms, tz()).slice(0, 10) : '';

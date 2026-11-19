@@ -42,19 +42,21 @@ function ftParseJson(t){ if(!/^\s*[\[{]/.test(t)) return []; let o = null; try{ 
 /* what captured pages say about when an account began, and what it was called */
 const FT_JOIN = /\b(?:joined(?: on)?|member since|account created(?: on)?|registered(?: on)?|date joined|created(?: on)?|on (?:twitter|x|instagram|tiktok|telegram|reddit|github) since|cake day)\s*[:\-–]?\s*((?:\d{1,2} )?[A-Z][a-z]{2,8}\.?(?: \d{1,2})?,? \d{4}|\d{4}-\d{2}-\d{2}|\d{1,2}[./]\d{1,2}[./]\d{4}|\d{4})\b/gi;
 const FT_RENAME = [/\b(?:formerly|previously|aka|a\.k\.a\.|formerly known as|previously known as|old (?:user)?name)\s*:?\s*@?([A-Za-z0-9_.]{3,40})/gi, /\bchanged (?:(?:his|her|their|the) )?(?:user ?name|handle|name) from @?([A-Za-z0-9_.]{3,40}) to @?([A-Za-z0-9_.]{3,40})/gi];
-const ftKey = (k, v) => { v = String(v || '').trim(); if(k === 'social'){ const m = v.match(/^https?:\/\/(?:www\.|m\.|mobile\.)?([^/]+)\/(?:@|user\/|u\/|in\/)?([^/?#]+)/i); return m ? m[2].replace(/^@/, '').toLowerCase() : v.toLowerCase(); } return v.replace(/^@/, '').toLowerCase(); };
-const ftPlat = v => { const h = (String(v).match(/^https?:\/\/(?:www\.|m\.|mobile\.)?([^/]+)/i) || [])[1] || ''; return ({'github.com':'GitHub', 'reddit.com':'Reddit', 'x.com':'X / Twitter', 'twitter.com':'X / Twitter', 'instagram.com':'Instagram', 'tiktok.com':'TikTok', 't.me':'Telegram', 'youtube.com':'YouTube', 'facebook.com':'Facebook', 'linkedin.com':'LinkedIn', 'bsky.app':'Bluesky', 'mastodon.social':'Mastodon'})[h.toLowerCase()] || h; };
+/* a profile link, with or without https:// → the account name; site pages and API addresses (github.com/users, x.com/i/…) are not accounts */
+const FT_NOT_ACC = /^(users|orgs|repos|search|settings|login|signup|home|explore|i|intent|share|hashtag|about|help|privacy|terms|search|r|user|u|watch|channel|c|p|reel|stories|groups|pages|events|marketplace|notifications|messages|status|api|v1|v2)$/i;
+const ftKey = (k, v) => { v = String(v || '').trim(); if(k === 'social'){ const m = v.match(/^(?:https?:\/\/)?(?:www\.|m\.|mobile\.)?([^/\s]+)\/(?:@|user\/|u\/|in\/)?([^/?#]+)/i); if(!m || /^api\./i.test(m[1]) || FT_NOT_ACC.test(m[2])) return ''; return m[2].replace(/^@/, '').toLowerCase(); } return v.replace(/^@/, '').toLowerCase(); };
+const ftPlat = v => { const h = (String(v).match(/^(?:https?:\/\/)?(?:www\.|m\.|mobile\.)?([^/\s]+)/i) || [])[1] || ''; return ({'github.com':'GitHub', 'reddit.com':'Reddit', 'x.com':'X / Twitter', 'twitter.com':'X / Twitter', 'instagram.com':'Instagram', 'tiktok.com':'TikTok', 't.me':'Telegram', 'youtube.com':'YouTube', 'facebook.com':'Facebook', 'linkedin.com':'LinkedIn', 'bsky.app':'Bluesky', 'mastodon.social':'Mastodon'})[h.toLowerCase()] || h; };
 function footIndex(caseId){
   const sig = caseId + ':' + rev; if(FT_C.sig === sig) return FT_C.v;
   const D = derive(caseId), A = new Map();
   const acc = (key, base) => { let a = A.get(key); if(!a){ a = {key, handle:base.handle, platform:base.platform || '', kind:base.kind || 'handle', ids:new Set(), names:[], created:null, createdSrc:null, active:null, activeWhat:'', seen:[], ents:new Set(), extra:[]}; A.set(key, a); } if(base.platform && !a.platform) a.platform = base.platform; return a; };
   /* the accounts the evidence names */
-  for(const e of D.ents.values()){ if(!/^(handle|social|email)$/.test(e.k)) continue; const k = ftKey(e.k, e.v); if(!k || k.length < 3) continue;
+  for(const e of D.ents.values()){ if(!/^(handle|social|email)$/.test(e.k)) continue; const k = ftKey(e.k, e.v); if(!k || k.length < 3 || (e.k !== 'email' && FT_NOT_ACC.test(k))) continue;
     const a = acc(k, {handle:e.k === 'social' ? k : e.v.replace(/^@/, ''), platform:e.k === 'social' ? ftPlat(e.v) : e.k === 'email' ? 'Email' : '', kind:e.k}); a.ents.add(e.id); for(const r of e.recs) if(r.ts && r.type !== 'lead') a.seen.push({ts:r.ts, rec:r.id}); }
   /* profiles pasted as JSON; dates and old names written in pages */
   const byId = new Map(), alias = new Map();   /* an old name points to the account it became */
   for(const r of D.recs){ if(r.type === 'lead' || !r.body) continue; const body = String(r.body).slice(0, 400000);
-    for(const p of ftParseJson(body)){ const a = acc(p.handle.toLowerCase(), {handle:p.handle, platform:p.platform}); if(p.id) a.ids.add(p.platform + ':' + p.id);
+    for(const p of ftParseJson(body)){ const a = acc(p.handle.toLowerCase(), {handle:p.handle, platform:p.platform}); a.platform = p.platform; if(p.id) a.ids.add(p.platform + ':' + p.id);
       if(p.created && ftEarlier(p.created, a.created)){ a.created = p.created; a.createdSrc = {rec:r.id, how:p.platform + ' profile data'}; }
       if(p.active && (!a.active || p.active.ms > a.active.ms)){ a.active = p.active; a.activeWhat = p.activeWhat; } if(p.name && !a.names.some(n => n.v === p.name && n.display)) a.names.push({v:p.name, display:true, rec:r.id});
       for(const x of p.extra || []) if(!a.extra.includes(x)) a.extra.push(x); if(r.ts) a.seen.push({ts:r.ts, rec:r.id});
@@ -71,7 +73,8 @@ function footIndex(caseId){
     for(const x of sorted.slice(0, -1)) if(x.a !== cur && A.get(x.a.key) === x.a){ for(const s of x.a.seen) cur.seen.push(s); if(x.a.created && (!cur.created || x.a.created.ms < cur.created.ms)){ cur.created = x.a.created; cur.createdSrc = x.a.createdSrc; } A.delete(x.a.key); } }
   for(const [old, cur] of alias){ const o = A.get(old); if(o && o !== cur){ for(const x of o.seen) cur.seen.push(x); if(o.created && ftEarlier(o.created, cur.created) && !o.createdSrc){ cur.created = o.created; } A.delete(old); } }
   const L = [...A.values()].filter(a => a.created || a.seen.length || a.names.length).map(a => { const s = a.seen.map(x => x.ts).filter(Boolean).sort((x, y) => x - y); return {...a, first:s[0] || null, last:s[s.length - 1] || null, n:new Set(a.seen.map(x => x.rec)).size}; });
-  /* what stands out */
+  /* what stands out — in the order the accounts were made */
+  L.sort((x, y) => ((x.created && x.created.ms) || x.first || 9e15) - ((y.created && y.created.ms) || y.first || 9e15));
   const notes = [];
   for(const a of L){ if(a.created && a.first && a.first >= a.created.ms){ const d = (a.first - a.created.ms) / 864e5; if(d <= 30 && a.created.exact) notes.push({a, kind:'new', t:`${a.handle} was made ${d < 1 ? 'the same day' : Math.round(d) + ' day' + (Math.round(d) === 1 ? '' : 's')} before it first appears in your evidence`}); }
     if(a.names.some(n => n.old)) notes.push({a, kind:'renamed', t:`${a.handle} was called ${a.names.filter(n => n.old).map(n => n.v).join(', ')} before`}); }
@@ -83,15 +86,20 @@ const FT_C = {sig:'', v:null};
 const ftWhen = d => !d ? '—' : d.year ? String(new Date(d.ms).getUTCFullYear()) : d.month ? new Date(d.ms).toLocaleString('en', {month:'long', year:'numeric', timeZone:'UTC'}) : E.fmtFull(d.ms, tz()).slice(0, 10);
 function footSvg(X){
   const L = X.accounts.filter(a => a.created || a.first).slice(0, 40); if(!L.length) return '';
-  const ts = L.flatMap(a => [a.created && a.created.ms, a.first, a.last, ...a.seen.map(s => s.ts)]).filter(Boolean), t0 = Math.min(...ts), t1 = Math.max(...ts, t0 + 864e5), W = 960, lw = 210, H = L.length * 30 + 44, x = t => lw + 10 + (t - t0) / (t1 - t0) * (W - lw - 30);
+  /* labels: platform and handle, long ones shortened in the middle so both ends stay readable; the label column is as wide as the longest one needs */
+  const lab = a => { const s = (a.platform ? a.platform + ' · ' : '') + a.handle; return s.length > 40 ? s.slice(0, 22) + '…' + s.slice(-15) : s; };
+  const ts = L.flatMap(a => [a.created && a.created.ms, a.first, a.last, ...a.seen.map(s => s.ts)]).filter(Boolean), pad = 864e5 * 10, t0 = Math.min(...ts) - pad, t1 = Math.max(...ts, t0 + 864e5) + pad;
+  const W = 1200, lw = Math.min(330, Math.max(120, Math.max(...L.map(a => lab(a).length)) * 7.4 + 16)), H = L.length * 30 + 44, x = t => lw + 14 + (t - t0) / (t1 - t0) * (W - lw - 34);
   const yr0 = new Date(t0).getUTCFullYear(), yr1 = new Date(t1).getUTCFullYear(), step = Math.max(1, Math.ceil((yr1 - yr0 + 1) / 10)), ticks = [];
-  if(yr1 > yr0) for(let y = yr0 + 1; y <= yr1; y += step) ticks.push([Date.UTC(y, 0, 1), String(y)]); else for(let mo = 0; mo < 12; mo++){ const t = Date.UTC(yr0, mo, 1); if(t > t0 && t < t1) ticks.push([t, new Date(t).toLocaleString('en', {month:'short', timeZone:'UTC'})]); }
+  /* years when the span crosses one, else months; with only a year or two, months in between too */
+  if(yr1 - yr0 >= 3) for(let y = yr0 + 1; y <= yr1; y += step) ticks.push([Date.UTC(y, 0, 1), String(y)]);
+  else { const span = (t1 - t0) / (30 * 864e5), every = span > 18 ? 3 : span > 8 ? 2 : 1; for(let y = yr0; y <= yr1; y++) for(let mo = 0; mo < 12; mo += every){ const t = Date.UTC(y, mo, 1); if(t > t0 && t < t1) ticks.push([t, mo === 0 || !ticks.length ? new Date(t).toLocaleString('en', {month:'short', year:'numeric', timeZone:'UTC'}) : new Date(t).toLocaleString('en', {month:'short', timeZone:'UTC'})]); } }
   const rows = L.map((a, i) => { const y = 34 + i * 30, c = a.created ? a.created.ms : null, f = a.first, l = a.last || f;
-    return `<text x="${lw}" y="${y + 4}" text-anchor="end" class="ft-l">${esc((a.platform ? a.platform + ' · ' : '') + (a.handle.length > 26 ? a.handle.slice(0, 24) + '…' : a.handle))}</text>
+    return `<text x="${lw}" y="${y + 4}" text-anchor="end" class="ft-l"><title>${esc((a.platform ? a.platform + ' · ' : '') + a.handle)}</title>${esc(lab(a))}</text>
       ${c != null && f != null && f > c ? `<line x1="${x(c)}" y1="${y}" x2="${x(f)}" y2="${y}" class="ft-pre"></line>` : ''}${f != null ? `<line x1="${x(f)}" y1="${y}" x2="${x(Math.max(l, f))}" y2="${y}" class="ft-on"></line>` : ''}
       ${a.seen.slice(0, 200).map(s => `<circle cx="${x(s.ts)}" cy="${y}" r="3" class="ft-d"></circle>`).join('')}
       ${c != null ? `<path d="M${x(c)},${y - 7} l7,7 l-7,7 l-7,-7z" class="ft-c${a.created.exact ? '' : ' approx'}"><title>${esc('Made ' + ftWhen(a.created))}</title></path>` : ''}`; }).join('');
-  return `<div class="ft-svg" role="img" aria-label="One line per account: a diamond where it was made, dots where it appears in the evidence"><svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
+  return `<div class="ft-svg" role="img" aria-label="One line per account: a diamond where it was made, dots where it appears in the evidence"><svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMinYMin meet">
     ${ticks.map(([t, l]) => `<line x1="${x(t)}" y1="16" x2="${x(t)}" y2="${H - 8}" class="ft-g"></line><text x="${x(t) + 3}" y="12" class="ft-t">${esc(l)}</text>`).join('')}${rows}</svg></div>`;
 }
 function footView(c){

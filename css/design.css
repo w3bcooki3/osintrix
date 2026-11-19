@@ -3019,3 +3019,5 @@ button.rsum-i:hover{background:var(--hover);color:var(--text)}
 @media (max-width:900px){.ds .idp-grid{grid-template-columns:1fr}.ds .idp-side{border-left:0;padding-left:0;border-top:1px solid var(--border-soft)}.ds .idp-stats{grid-template-columns:repeat(3,minmax(0,1fr))}.ds .idp-stats>div:nth-child(3){border-right:0}.ds .idp-stats>div:nth-child(-n+3){border-bottom:1px solid var(--border-soft)}.ds .idp-hd{flex-wrap:wrap}.ds .idp-cases{max-width:none;justify-content:flex-start;width:100%}}
 .ds .idp-tb td.mono,.ds .idp-tb td .idp-cs{white-space:nowrap;flex-wrap:nowrap}.ds .idp-gaps li span{overflow-wrap:anywhere;min-width:0}.ds .idp-map svg{max-height:340px}
 @media (max-width:600px){.ds .idp-tb th:nth-child(2),.ds .idp-tb td:nth-child(2),.ds .idp-tb th:nth-child(4),.ds .idp-tb td:nth-child(4),.ds .idp-tb th:nth-child(5),.ds .idp-tb td:nth-child(5){display:none}.ds .idp-stats b{font-size:calc(15px * var(--ts,1))}.ds .idp-tb td .idp-cs{flex-wrap:wrap}}
+.ds .ft-svg svg{min-width:720px}
+.ds .idp-kf dd .t3{white-space:nowrap}.ds .if-svg svg{min-width:760px;display:block}

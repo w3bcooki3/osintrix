@@ -177,6 +177,7 @@ test('length limits: every text field has a cap, an oversized paste is cut with 
     ed.dispatchEvent(t); ed.dispatchEvent(d); const r = [t.defaultPrevented, d.defaultPrevented]; ed.textContent = 'ok'; return r; })).toEqual([true, false]);
   // stored values far past any cap are trimmed when the workspace loads
   await page.evaluate(() => { const r = DB.records[0]; r.title = 'T'.repeat(50000); r.tags = Array.from({ length: 1000 }, (_, i) => 'tag' + i); DB.cases[0].name = 'N'.repeat(9000); mutate('huge'); });
+  await page.waitForTimeout(400);   // let the save land in both stores before the refresh, as a person's would
   await page.reload(); await expect.poll(() => page.evaluate(() => typeof DB !== 'undefined' && !!document.querySelector('#sidenav .nv'))).toBe(true);
   expect(await page.evaluate(() => [DB.records[0].title.length, DB.records[0].tags.length, DB.cases[0].name.length])).toEqual([2000, 200, 500]);
   noErrors(errs);

@@ -5,7 +5,7 @@
    ========================================================================== */
 
 /* ---------- sample data ---------- */
-const SAMPLE_CASES = ['c-lantern', 'c-portal', 'c-lab', 'c-empty'];
+const SAMPLE_CASES = ['c-lantern', 'c-portal', 'c-lab', 'c-empty', 'c-harbour'];
 function ensureSample(){
   if(DB.sample === undefined) DB.sample = DB.cases.some(c => SAMPLE_CASES.includes(c.id));
   for(const c of DB.cases) if(SAMPLE_CASES.includes(c.id)) c.sample = true;
@@ -20,6 +20,25 @@ function ensureSample(){
       DB.entries.push(...s.entries.filter(x => x.caseId === 'c-lab')); DB.records.push(...s.records.filter(x => x.caseId === 'c-lab')); DB.links.push(...s.links.filter(x => x.caseId === 'c-lab').map(l => ({...l, id:uid('l')})));
       if(!DB.cases.some(c => c.id === DB.active)) DB.active = DB.cases[0].id; }
   }
+}
+/* the OSINT sample case — infrastructure, money, accounts, page changes, active hours and identities on one
+   made-up refund scam; added once to workspaces that keep the sample data, from a file loaded only for this */
+async function sampleOsintAdd(){
+  if(!DB || !DB.sample || DB.osintSample || window.__noOsintSample || DB.cases.some(c => c.id === 'c-harbour')) return;   /* (the test suite turns it off where tests expect only the original demo cases) */
+  if(typeof lazyNeed !== 'function' || !(await lazyNeed('sample')) || typeof SAMPLE_OSINT === 'undefined') return;
+  if(DB.osintSample || DB.cases.some(c => c.id === 'c-harbour')) return;
+  const S = SAMPLE_OSINT, cid = S.case.id, iso = t => new Date(t).toISOString();
+  const R = (o, extra) => Object.assign({id:uid('r'), caseId:cid, type:'evidence', title:o.title, body:o.body, ts:o.ts, tsRaw:iso(o.ts), tsZone:'explicit', source:o.source, host:'', tags:o.tags || [], ents:extractRich(String(o.body).slice(0, 200000)).slice(0, 2000), answer:'', addedBy:'You', addedAt:o.ts, hash:''}, extra || {});
+  const recs = S.records.map(o => R(o));
+  for(const p of S.pages){ const P = typeof parseWebPage === 'function' ? parseWebPage(p.html) : null; if(!P) continue;
+    recs.push(R({title:'Web page: ' + (P.title || P.host || p.name).slice(0, 90), body:webPageBody(P, p.saved, null), ts:p.saved, source:'web page' + (P.host ? ' · ' + P.host : ''), tags:['web', 'archived']}, {page:{url:P.url, links:P.links, images:P.images}})); }
+  for(const h of S.hours){ const n = h.t.length, ts = Date.parse(h.ts); recs.push(R({title:h.title, body:`${h.fmt}: ${n.toLocaleString()} post times (UTC).\n` + h.who.join('\n'), ts, source:'posts:' + h.fmt, tags:['post-times']}, {hours:{fmt:h.fmt, who:h.who, t:h.t, unzoned:0}})); }
+  const ent = (caseId, [id, type, fields]) => ({id, caseId, type, fields, tags:[], notes:'', priority:type === 'person' ? 'high' : 'medium', starred:type === 'person', created:S.case.created, src:''});
+  const link = (caseId, [a, b, conf, label]) => ({id:uid('l'), caseId, a, b, conf, label, src:''});
+  DB.cases.push({...S.case, status:'active', owner:'You', updated:Date.now(), sample:true});
+  DB.records.push(...recs); DB.entries.push(...S.entries.map(e => ent(cid, e))); DB.links.push(...S.links.map(l => link(cid, l)));
+  const O = S.elsewhere; if(O && DB.cases.some(c => c.id === O.case) && !DB.entries.some(e => e.id === O.entries[0][0])){ DB.entries.push(...O.entries.map(e => ent(O.case, e))); DB.links.push(...O.links.map(l => link(O.case, l))); }
+  DB.osintSample = 1; mutate('added the OSINT sample case'); if(typeof hashRecords === 'function') hashRecords(); if(typeof ensurePositions === 'function') ensurePositions(); renderAll();
 }
 function removeSample(){
   const ids = new Set(DB.cases.filter(c => c.sample).map(c => c.id));

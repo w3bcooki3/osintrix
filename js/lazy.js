@@ -23,6 +23,7 @@ const LZ = {
   oui:{f:'oui-vendors.js', has:() => typeof OUI_B64 !== 'undefined', only:true},
   enrich:{f:'enrich-data.js', has:() => typeof ENRICH_B64 !== 'undefined', only:true},
   qr:{f:'jsqr.min.js', has:() => typeof jsQR === 'function', only:true},
+  sample:{f:'sample-osint.js', has:() => typeof SAMPLE_OSINT !== 'undefined', only:true},
   phone:{f:'libphonenumber-max.js', has:() => typeof libphonenumber !== 'undefined' && typeof libphonenumber.parsePhoneNumberFromString === 'function', only:true},
 };
 const lzHas = k => { try{ return !!(LZ[k] && LZ[k].has()); }catch(e){ return false; } };

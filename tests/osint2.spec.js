@@ -216,3 +216,26 @@ test('old Office and OpenDocument metadata: .doc, .xls and .ppt (Compound File) 
   await page.evaluate(() => { UI.labTab = 'file'; go('#/lab'); });
   noErrors(errors);
 });
+
+test('sample case: “Harbourline refund scam” is added to a workspace with sample data and fills every Infrastructure view and an identity profile; the account timeline fits its card and shows every label whole', async ({ page }) => {
+  const errors = await open(page, '#/home', { osintSample: true });
+  await expect.poll(() => page.evaluate(() => DB.cases.some(c => c.id === 'c-harbour')), { timeout: 15000 }).toBe(true);
+  const X = await page.evaluate(() => { const I = infraIndex('c-harbour'), W = walletIndex('c-harbour'), F = footIndex('c-harbour'), C = chIndex('c-harbour'), H = hrIndex('c-harbour'), P = idpBuild('sp-jan');
+    return { infra: I && (I.facts || I.rows || []).length, links: I && (I.links || I.groups || []).length, money: W && (W.flows || W.edges || []).length, acc: F.accounts.length, renamed: F.accounts.filter(a => a.names.some(n => n.old)).length,
+      changes: C.groups.map(g => g.label).sort(), hours: H.people.map(p => p.who).sort(), same: H.pairs.map(q => [q.a.who, q.b.who].sort().join(' ~ ')), people: P.people.map(p => p.e.id), ids: P.ids.length, conflicts: P.conflicts.length }; });
+  expect(X.infra).toBeGreaterThan(10); expect(X.money).toBeGreaterThan(3); expect(X.acc).toBeGreaterThan(4); expect(X.renamed).toBeGreaterThanOrEqual(2);
+  expect(X.changes.some(l => /harbourline-deals\.shop\/about/.test(l))).toBe(true); expect(X.changes.some(l => /^Mastodon/.test(l))).toBe(true);
+  expect(X.hours).toEqual(['@harbour_deals', 'Faisal', 'jake_nyc', 'newsbot_24', 'u/north_wind_77']); expect(X.same).toContain('@harbour_deals ~ u/north_wind_77');
+  expect(X.people).toEqual(['sp-jan', 'sp-haven']); expect(X.ids).toBeGreaterThanOrEqual(6); expect(X.conflicts).toBe(2);
+  // every view draws without an error
+  await page.evaluate(() => { DB.active = 'c-harbour'; go(caseHash('c-harbour', 'infra')); });
+  for(const v of ['dom', 'money', 'acc', 'hours']){ await page.evaluate(v => { UI.ivView = v; renderAll(); }, v); await page.waitForTimeout(200); await expect(page.locator('#main .empty')).toHaveCount(0); }
+  // the account timeline: as wide as its card, and no label cut off on the left
+  await page.evaluate(() => { UI.ivView = 'acc'; renderAll(); });
+  const geo = await page.evaluate(() => { const box = document.querySelector('.ft-svg'), svg = box.querySelector('svg'), b = box.getBoundingClientRect(), s = svg.getBoundingClientRect();
+    const cut = [...svg.querySelectorAll('text.ft-l')].filter(t => t.getBoundingClientRect().left < b.left - 1).map(t => t.textContent); return { fill: s.width / b.width, cut }; });
+  expect(geo.fill).toBeGreaterThan(0.97); expect(geo.cut).toEqual([]);
+  // removing the sample data removes it too
+  await page.evaluate(() => removeSample ? 0 : 0);
+  noErrors(errors);
+});

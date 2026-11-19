@@ -726,7 +726,7 @@ test('a note from selected events: a plain-words summary, the chronology with ci
   const card = page.locator('.note-card', { has: page.locator('.ncite') }).first();
   await expect(card.locator('.ncite')).toHaveCount(4);
   await card.locator('.ncite').nth(1).click();
-  expect(await page.evaluate(i => [UI.route.tab, UI.sel && UI.sel.id], ids[1])).toEqual(['timeline', ids[1]]);
+  await expect.poll(() => page.evaluate(() => [UI.route.tab, UI.sel && UI.sel.id])).toEqual(['timeline', ids[1]]);   // the page changes on the next tick
   // all cited events, as a timeline filter that can be cleared
   await page.evaluate(() => go('#/notes')); await page.locator('.note-card [data-act=nCiteAll]').first().click();
   await expect(page.locator('.tlbar')).toContainText('4 events a note cites');
