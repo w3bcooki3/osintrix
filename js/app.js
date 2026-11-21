@@ -543,6 +543,7 @@ document.addEventListener('submit', ev => {
   if(k === 'hrPaste') return hrSubmit();
   if(k === 'chPick') return chPickSubmit();
   if(k === 'rxName') return rxNameSubmit();
+  if(k === 'rxTestAdd') return rxTestAdd('match');
   if(k === 'nQuick'){ const ta = f.querySelector('textarea'), ti = f.querySelector('[data-nq=title]'), text = ta.value.trim(), title = ntClean(ti ? ti.value : ''), cid = f.dataset.case || null;
     if(!text && !title) return; if(text.length > 4000) return fieldErr(ta, `Notes can be up to 4,000 characters — this one is ${text.length.toLocaleString()}.`);
     if(title.length > NT_MAX) return fieldErr(ti, `Titles can be up to ${NT_MAX} characters — this one is ${title.length}.`);
@@ -618,6 +619,7 @@ document.addEventListener('keydown', ev => {
   if(typing || ev.ctrlKey || ev.metaKey || ev.altKey) return;
   if(ev.key === 'n' || ev.key === 'N'){ ev.preventDefault(); return openCapture(); }
   if(ev.key === 'e'){ ev.preventDefault(); return entryDlg(); }
+  if(ev.key === '/' && UI.route.area === 'regex' && UI.rx && UI.rx.lines.length) return;   /* the Regex builder uses / for its pattern */
   if(ev.key === '/'){ ev.preventDefault(); const lq = $('tq') || $('hxq') || $('refQ'); if(lq){ lq.focus(); lq.select(); return; } return srchOpen(); }
   if((ev.key === 'Delete' || ev.key === 'Backspace') && UI.route.tab === 'graph' && UI.sel){ ev.preventDefault(); document.querySelector('[data-act=gDelete]').click(); }
   if(/^[1-8]$/.test(ev.key) && UI.route.area === 'case') return go(caseHash(DB.active, caseTabs()[+ev.key - 1][0]));

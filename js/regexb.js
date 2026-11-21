@@ -268,7 +268,7 @@ function rxAllPatterns(){ const S = RX(); return S.fmts.map((F, fi) => { const s
   /* the first that matches wins, so the most specific go first: those with the most fixed words (a catch-all "message" pattern last) */
   .sort((a, b) => rxFixed(b.src) - rxFixed(a.src)); }
 const rxFixed = src => src.replace(/\(\?<\w+>/g, '(').replace(/\[(?:\\.|[^\]])*\]/g, '').replace(/\\./g, '').replace(/[^A-Za-z]/g, '').length;
-const RX_TABS = [['match', 'Match'], ['explain', 'Explain'], ['fields', 'Fields'], ['speed', 'Speed'], ['export', 'Export']];
+const RX_TABS = [['match', 'Match'], ['explain', 'Explain'], ['fields', 'Fields'], ['tests', 'Tests'], ['speed', 'Speed'], ['export', 'Export']];
 /* ---------- reading a pattern ---------- */
 /* the top-level pieces of a pattern: a group with all that is in it, or one atom */
 function rxPieces(src){ const A = rxAtoms(src), out = []; let d = 0, cur = '';
@@ -287,6 +287,7 @@ function rxHl(src, col){ let out = '', i = 0; const st = [];
     if((m = /^\\[dDsSwWbBnrt]/.exec(r))){ out += `<span class="rx-sc">${m[0]}</span>`; i += 2; continue; }
     if((m = /^(?:[+*?]|\{\d+(?:,\d*)?\})[?+]?/.exec(r))){ out += `<span class="rx-sq">${esc(m[0])}</span>`; i += m[0].length; continue; }
     if(r[0] === '|'){ out += '<span class="rx-sp">|</span>'; i++; continue; }
+    if(r.startsWith(' +')){ out += '<span class="rx-ws" title="one or more spaces"> +</span>'; i += 2; continue; }
     if(r[0] === '.'){ out += '<span class="rx-sc">.</span>'; i++; continue; }
     if(r[0] === '^' || r[0] === '$'){ out += `<span class="rx-sa">${r[0]}</span>`; i++; continue; }
     if((m = /^\\./.exec(r))){ out += esc(m[0]); i += 2; continue; }
@@ -321,6 +322,33 @@ const rxLoose = x => x.replace(/\(\?:([^()]*)\)\?/g, (m, a) => { const L = rxLit
 function rxWhy(src, line){ const P = rxPieces(src); let best = null;
   for(let k = P.length - 1; k >= 1; k--){ let re; try{ re = new RegExp(P.slice(0, k).join('')); }catch(e){ continue; } const m = re.exec(line); if(m){ let nx = P[k], j = k + 1; if(rxLit(nx) != null) while(j < P.length && rxLit(P[j]) != null && j - k < 12) nx += P[j++]; best = {at:m.index + m[0].length, from:m.index, next:nx, k}; break; } }
   return best || {at:0, from:0, next:P[0] || '', k:0}; }
+/* ---------- tests pinned to a pattern ---------- */
+/* each: {text, want:'match'|'none', expect:{field:value}|null, fmt} — run on every change, so a fix cannot quietly break an older line */
+function rxTestRun(src, T){ let re; try{ re = new RegExp(src); }catch(e){ return T.map(() => ({ok:false, why:'the pattern is not valid'})); }
+  return T.map(t => { const m = re.exec(t.text);
+    if(t.want === 'none') return m ? {ok:false, why:'it matches, and must not'} : {ok:true};
+    if(!m) return {ok:false, why:'it does not match any more'};
+    if(t.expect){ const g = m.groups || {}, bad = Object.keys(t.expect).filter(k => (g[k] ?? null) !== t.expect[k]); if(bad.length) return {ok:false, why:bad.slice(0, 2).map(k => `${k} is ${g[k] == null ? 'empty' : '“' + g[k] + '”'}, was “${t.expect[k] ?? ''}”`).join('; ')}; }
+    return {ok:true}; }); }
+/* ---------- what each tool can run ---------- */
+/* KQL runs RE2 (no lookaround, no back-references); Python needs (?P<name>) and fixed-width lookbehind; the rest take this pattern as it is */
+const RX_FLAVOR = {js:'JavaScript', pcre:'PCRE', python:'Python re', grok:'Oniguruma (Logstash, Elastic)', splunk:'PCRE (Splunk)', kql:'RE2 (KQL, Sentinel, Defender)'};
+function rxCompat(src, kind, lines){
+  const look = /\(\?[=!]|\(\?<[=!]/.test(src), back = /\\[1-9]|\\k</.test(src), atomic = /\(\?>|[*+?}]\+/.test(src);
+  if(kind === 'kql' && (look || back)){
+    /* a fixed word checked first, or a lookahead that only says where a lazy field stops: taken out, and kept only if every line still gives the same values */
+    let fix = src.replace(/^\^\(\?=\[\^\\n\]\*\?(?:\\.|[^()\\])*\)/, '^').replace(/\(\?=(?:[^()]|\((?!\?<)[^()]*\))*\)/g, '');
+    if(/\(\?[=!]|\(\?<[=!]|\\[1-9]|\\k</.test(fix)) return {level:'bad', note:`${RX_FLAVOR.kql} has no ${back ? 'back-references' : 'lookahead or lookbehind'}, and this pattern cannot do without it.`};
+    const same = rxSame(src, fix, lines);
+    return same ? {level:'fixed', src:fix, note:`${RX_FLAVOR.kql} has no lookahead: written without it — the same values on all your lines.`}
+      : {level:'warn', src:fix, note:`${RX_FLAVOR.kql} has no lookahead: written without it, but some of your lines then give different values — check the results in your tool.`}; }
+  if(kind === 'python' && /\(\?<[=!][^)]*[*+{]/.test(src)) return {level:'bad', note:'Python lookbehind must have a fixed width.'};
+  if(kind === 'js' && atomic) return {level:'bad', note:'JavaScript has no atomic groups or possessive quantifiers.'};
+  return {level:'ok', note:`Runs as it is in ${RX_FLAVOR[kind] || kind}.`}; }
+/* ---------- undo and redo of field changes ---------- */
+function rxSnap(){ const S = RX(); (S.hist = S.hist || []).push(JSON.stringify({f:S.fields, t:S.types, c:S.custom})); if(S.hist.length > 80) S.hist.shift(); S.fut = []; }
+function rxUndo(redo){ const S = RX(), from = redo ? S.fut : S.hist, to = redo ? S.hist : S.fut; if(!from || !from.length) return toast(redo ? 'Nothing to redo' : 'Nothing to undo');
+  (to || (redo ? S.hist = [] : S.fut = [])).push(JSON.stringify({f:S.fields, t:S.types, c:S.custom})); const x = JSON.parse(from.pop()); S.fields = x.f; S.types = x.t; S.custom = x.c; S.manual = null; S.opt = null; S.pend = null; rxRender(); }
 /* ---------- the page ---------- */
 function labRegex(){
   const S = RX();
@@ -334,12 +362,14 @@ function labRegex(){
   const names = [...new Set((C.ok && !C.manual ? groups.map(g => g.name) : C.ok ? groups.map(g => g.name) : []).concat(V.fields.map(f => f.name)))], allNames = [...new Set(S.fields.map(f => f.name).concat(names))], col = nm => Math.max(0, allNames.indexOf(nm)) % 8;
   const total = V.idx.length, rec = S.ml && !S.mlOff, unit = rec ? ['record', 'records'] : ['line', 'lines'], U = k => k === 1 ? unit[0] : unit[1];
   const inView = new Set(V.idx), every = S.show === 'every';
-  const pool = every ? S.lines.map((_, i) => i) : V.idx, shown = pool.filter(i => !ok || every || S.show === 'all' || (S.show === 'hit' ? R.M[i] : !R.M[i])).slice(0, RX_SHOW);
+  const FL = S.filter && ok ? S.filter : null;
+  const pool = every ? S.lines.map((_, i) => i) : V.idx, shown = pool.filter(i => (!FL || (R.M[i] && R.M[i].g[FL.f] === FL.v)) && (!ok || every || S.show === 'all' || (S.show === 'hit' ? R.M[i] : !R.M[i]))).slice(0, RX_SHOW);
+  UI.rxShown = shown;
   if(S.cur == null || !S.lines[S.cur] || (!every && !inView.has(S.cur))) S.cur = (ok && V.idx.find(i => R.M[i])) ?? V.idx[0];
   const misses = ok ? total - n : 0;
   const lineHtml = i => { const l = S.lines[i], ex = S.fields.filter(f => f.line === i).sort((a, b) => a.s - b.s), m = ok && R.M[i], other = !inView.has(i);
     const spans = (m ? Object.entries(m.ix).filter(([, v]) => v).map(([k, v]) => [v[0], v[1], k, false]) : []).concat(ex.map(f => [f.s, f.e, f.name, true])).sort((a, b) => a[0] - b[0] || b[3] - a[3]);
-    let h = '', at = 0; for(const [s, e, nm, sel] of spans){ if(s < at) continue; h += esc(l.slice(at, s)) + `<mark class="rx-m c${col(nm)}${sel ? ' sel' : ''}" data-f="${esc(nm)}" title="${esc(nm)}${sel ? ' · example' : ''}">${esc(l.slice(s, e))}</mark>`; at = e; } h += esc(l.slice(at));
+    let h = '', at = 0; for(const [s, e, nm, sel] of spans){ if(s < at) continue; h += esc(l.slice(at, s)) + `<mark class="rx-m c${col(nm)}${sel ? ' sel' : ''}" data-f="${esc(nm)}" data-tip="${esc(nm)}${sel ? ' · your example' : ''}">${esc(l.slice(s, e))}</mark>`; at = e; } h += esc(l.slice(at));
     /* a missed line shows where the pattern stops */
     let why = '';
     if(ok && !m && !other && i === S.cur){ const w = rxWhy(C.src, l); why = `<div class="rx-why">${ico('corner-down-right','sm')}<span>Matches up to column ${w.at + 1}${w.at < l.length ? ` (“${esc(l.slice(Math.max(w.from, w.at - 14), w.at))}”)` : ''}, then expects <code class="rx-src-in mono">${rxHl(w.next, col)}</code>${w.at < l.length ? ` but finds <code class="mono">${esc(l.slice(w.at, w.at + 18))}</code>` : ' but the line ends'}.</span></div>`;
@@ -360,22 +390,31 @@ function labRegex(){
       return `<button class="rx-fmi" role="tab" data-act="rxFmt" data-v="${fi}" aria-pressed="${S.fmt === fi}" aria-selected="${S.fmt === fi}" title="${esc((F.label ? F.label + ' · ' : '') + tip + '\n' + ex.slice(0, 160))}"><span class="rx-fdot ${c}"></span><b class="mono">${esc(F.name)}</b><span class="rx-fmc">${F.lines.length.toLocaleString()}</span><span class="rx-fms ${c}">${esc(t)}</span></button>`; }).join('')}</div>` : '';
   const P = S.fmts.length > 1 ? rxAllPatterns() : [], src0 = C.ok ? (C.built || C.src) : '', O = S.opt && C.ok && S.opt.from === src0 ? S.opt : null;
   const tab = RX_TABS.some(t => t[0] === S.tab) ? S.tab : 'match', cm = ok && R.M[S.cur];
+  const TT = (S.tests || []).filter(t => t.fmt === S.fmt), TR = C.ok && !held ? rxTestRun(C.src, TT) : TT.map(() => ({ok:false, why:'no pattern'})), tFail = TR.filter(x => !x.ok).length;
   const speed = ok && n && !held ? (O ? O.end && C.optimised ? O.end : O.start : null) : null;
   /* the sidebar */
   const body = {
     match:() => { const i = S.cur, l = S.lines[i]; if(l == null) return `<p class="rx-empty t3">Click a ${unit[0]} to see what it gives.</p>`;
       const head = `<div class="rx-mh"><b>${unit[0][0].toUpperCase() + unit[0].slice(1)} ${i + 1}</b>${!inView.has(i) ? '<span class="t3">· another format</span>' : cm ? `<span class="rx-good">${ico('check','sm')}matches</span>` : ok ? `<span class="rx-warn">${ico('triangle-alert','sm')}missed</span>` : ''}<span style="flex:1"></span>${cm ? `<button class="btn xs ghost" data-act="rxCopyRow">${ico('copy','sm')}Copy as JSON</button>` : ''}</div>`;
-      if(cm) return head + `<dl class="rx-kv">${groups.map(g => { const v = cm.g[g.name]; return `<dt class="c${col(g.name)}" data-f="${esc(g.name)}"><span class="rx-dot"></span>${esc(g.name)}</dt><dd class="mono${v == null ? ' rx-none' : ''}">${v == null ? 'not on this line' : esc(v)}</dd>`; }).join('')}</dl>`;
-      if(ok && inView.has(i)){ const w = rxWhy(C.src, l); return head + `<p class="small" style="margin:0 0 8px">The pattern matches the start of this ${unit[0]} up to column <b>${w.at + 1}</b>, then needs <code class="rx-src-in mono">${rxHl(w.next, col)}</code>${w.at < l.length ? `, but the ${unit[0]} has <code class="mono">${esc(l.slice(w.at, w.at + 24))}</code>` : `, but the ${unit[0]} ends there`}.</p><p class="t3 small" style="margin:0">To teach it this variation, select the same fields on this ${unit[0]}. A field it does not have becomes optional.</p>`; }
-      return head + `<p class="t3 small" style="margin:0">${C.ok ? 'This line belongs to another format.' : 'Select a part of a line to start.'}</p>`; },
+      const pinned = TT.find(t => t.text === l), pin = !C.ok ? '' : `<div class="rx-pin">${pinned ? `<span class="t3 small">${ico('pin','sm')}Pinned as a test: must ${pinned.want === 'none' ? 'not ' : ''}match</span>` : cm ? `<button class="btn xs" data-act="rxPin" data-v="match">${ico('pin','sm')}Pin as test: must match, with these values</button>` : `<button class="btn xs" data-act="rxPin" data-v="none">${ico('pin','sm')}Pin as test: must not match</button>`}</div>`;
+      if(cm) return head + pin + `<dl class="rx-kv">${groups.map(g => { const v = cm.g[g.name]; return `<dt class="c${col(g.name)}" data-f="${esc(g.name)}"><span class="rx-dot"></span>${esc(g.name)}</dt><dd class="mono${v == null ? ' rx-none' : ''}">${v == null ? 'not on this line' : esc(v)}</dd>`; }).join('')}</dl>`;
+      if(ok && inView.has(i)){ const w = rxWhy(C.src, l); return head + pin + `<p class="small" style="margin:0 0 8px">The pattern matches the start of this ${unit[0]} up to column <b>${w.at + 1}</b>, then needs <code class="rx-src-in mono">${rxHl(w.next, col)}</code>${w.at < l.length ? `, but the ${unit[0]} has <code class="mono">${esc(l.slice(w.at, w.at + 24))}</code>` : `, but the ${unit[0]} ends there`}.</p><p class="t3 small" style="margin:0">To teach it this variation, select the same fields on this ${unit[0]}. A field it does not have becomes optional.</p>`; }
+      return head + pin + `<p class="t3 small" style="margin:0">${C.ok ? 'This line belongs to another format.' : 'Select a part of a line to start.'}</p>`; },
     explain:() => !C.ok ? `<p class="rx-empty t3">The pattern is explained here, piece by piece.</p>` : `<ol class="rx-xp">${rxExplainRows(C.src, groups).map(r => `<li class="rx-x-${r.k}${r.f ? ' c' + col(r.f) : ''}"${r.f ? ` data-f="${esc(r.f)}"` : ''}><span class="rx-xh">${r.html}</span>${r.src ? `<code class="mono rx-xs">${rxHl(r.src, col)}</code>` : ''}</li>`).join('')}</ol>`,
     fields:() => !names.length ? `<p class="rx-empty t3">Select a part of a ${unit[0]} — an IP address, a user name, a time — and name it, or use <b>Auto-parse</b>.</p>`
-      : `<div class="rx-fs" role="list">${names.map(nm => { const g = groups.find(x => x.name === nm), t = (S.types || {})[nm] || 'auto', st = FS[nm], auto = g && (g.type === 'delim' ? 'up to the next delimiter' : (rxType(g.type) || [, g.type])[1]);
-          return `<div class="rx-fld c${col(nm)}" role="listitem" data-f="${esc(nm)}"><div class="rx-fr1"><span class="rx-dot"></span><b class="mono rx-fnm" title="${esc(nm)}">${esc(nm)}</b>${opt.has(nm) ? '<span class="rx-tagopt">optional</span>' : ''}<span style="flex:1"></span>
-            <span class="rx-cov${st && st.cov < 1 ? ' part' : ''}" title="Share of matching ${unit[1]} that have ${esc(nm)}">${st ? `${opt.has(nm) ? 'optional · ' : ''}${st.cov === 1 ? 'every match' : Math.round(st.cov * 100) + '% of matches'}` : opt.has(nm) ? 'optional' : ''}</span>
-            ${C.manual ? '' : `<button class="iconbtn xs" data-act="rxDel" data-v="${esc(nm)}" aria-label="Remove ${esc(nm)}">${ico('x','sm')}</button>`}</div>
-            ${C.manual ? '' : `<label class="sr" for="rxT-${esc(nm)}">What ${esc(nm)} is</label><select class="rx-sel" id="rxT-${esc(nm)}" data-rx="type" data-name="${esc(nm)}"><option value="auto"${t === 'auto' ? ' selected' : ''}>${auto ? 'Auto · ' + esc(auto) : 'Auto'}</option><option value="delim"${t === 'delim' ? ' selected' : ''}>Up to the next delimiter</option>${RX_TYPES.map(x => `<option value="${x[0]}"${t === x[0] ? ' selected' : ''}>${esc(x[1])}</option>`).join('')}</select>`}
-            ${st ? `<div class="rx-fr3"><span class="rx-bar1" aria-hidden="true"><i style="width:${Math.round(st.cov * 100)}%"></i></span><span class="t3">${st.distinct.toLocaleString()} distinct</span><span class="rx-top mono">${st.top.map(([v, c]) => `<span title="${esc(v)}">${esc(v.length > 22 ? v.slice(0, 20) + '…' : v)}${c > 1 ? ` <i>×${c}</i>` : ''}</span>`).join('')}</span></div>` : ''}</div>`; }).join('')}</div>`,
+      : `<div class="rx-fs" role="list">${names.map(nm => { const g = groups.find(x => x.name === nm), t = (S.types || {})[nm] || 'auto', st = FS[nm], auto = g && (g.type === 'delim' ? 'text' : (rxType(g.type) || [, g.type])[1].replace(/ \(.*\)$/, ''));
+          return `<div class="rx-fld c${col(nm)}" role="listitem" data-f="${esc(nm)}">
+            <div class="rx-fr1"><span class="rx-dot"></span><b class="mono rx-fnm" title="${esc(nm)}">${esc(nm)}</b>${opt.has(nm) ? '<span class="rx-tagopt">optional</span>' : ''}
+              ${C.manual ? '<span style="flex:1"></span>' : `<label class="sr" for="rxT-${esc(nm)}">What ${esc(nm)} is</label><select class="rx-sel" id="rxT-${esc(nm)}" data-rx="type" data-name="${esc(nm)}" title="What ${esc(nm)} is"><option value="auto"${t === 'auto' ? ' selected' : ''}>${auto ? 'Auto · ' + esc(auto) : 'Auto'}</option><option value="delim"${t === 'delim' ? ' selected' : ''}>Up to the next delimiter</option>${RX_TYPES.map(x => `<option value="${x[0]}"${t === x[0] ? ' selected' : ''}>${esc(x[1])}</option>`).join('')}</select>`}
+              <span class="rx-cov${st && st.cov < 1 ? ' part' : ''}" title="Share of matching ${unit[1]} that have ${esc(nm)}">${st ? `${opt.has(nm) ? 'optional · ' : ''}${st.cov === 1 ? 'every match' : Math.round(st.cov * 100) + '% of matches'}` : opt.has(nm) ? 'optional' : ''}</span>
+              ${st ? `<button class="iconbtn xs" data-act="rxToCase" data-v="${esc(nm)}" aria-label="Add the values of ${esc(nm)} to the case" title="Add its ${st.distinct.toLocaleString()} value${st.distinct === 1 ? '' : 's'} to the case">${ico('folder-plus','sm')}</button>` : ''}
+              ${C.manual ? '' : `<button class="iconbtn xs" data-act="rxDel" data-v="${esc(nm)}" aria-label="Remove ${esc(nm)}" title="Remove the field">${ico('x','sm')}</button>`}</div>
+            ${st ? `<div class="rx-fr3"><span class="rx-bar1" aria-hidden="true"><i style="width:${Math.round(st.cov * 100)}%"></i></span><span class="t3">${st.distinct.toLocaleString()} distinct</span><span class="rx-top mono">${st.top.map(([v, c]) => `<button class="rx-val${FL && FL.f === nm && FL.v === v ? ' on' : ''}" data-act="rxFilt" data-v="${esc(JSON.stringify([nm, v]))}" title="Show only ${unit[1]} where ${esc(nm)} is “${esc(v)}”">${esc(v.length > 22 ? v.slice(0, 20) + '…' : v)}${c > 1 ? ` <i>×${c}</i>` : ''}</button>`).join('')}</span></div>` : ''}</div>`; }).join('')}</div>`,
+    tests:() => { const add = `<form class="rx-tadd" data-form="rxTestAdd"><label class="sr" for="rxTestText">A line to test</label><textarea id="rxTestText" class="mono" rows="2" spellcheck="false" placeholder="Paste a line that must or must not match"></textarea>
+          <div class="wrap"><button class="btn xs" type="submit" data-want="match">Must match</button><button class="btn xs" type="button" data-act="rxTestNone">Must not match</button></div></form>`;
+        if(!TT.length) return `<p class="t3 small" style="margin:0">Tests keep a pattern honest: pin lines that must match (with their values) and lines that must not, and every change is checked against them — a fix cannot quietly break an older line. Pin a line from the Match tab, or paste one here.</p>${add}`;
+        return `<p class="rx-tsum ${tFail ? 'rx-warn' : 'rx-good'}">${ico(tFail ? 'triangle-alert' : 'circle-check','sm')}${tFail ? `${tFail} of ${TT.length} tests fail` : `All ${TT.length} tests pass`}</p>
+          <ul class="rx-tl">${TT.map((t, k) => `<li class="${TR[k].ok ? 'pass' : 'fail'}"><span class="rx-ti">${ico(TR[k].ok ? 'check' : 'x','sm')}</span><div><span class="rx-tw2">must ${t.want === 'none' ? 'not ' : ''}match${t.expect ? ' · ' + Object.keys(t.expect).length + ' values' : ''}</span><code class="mono">${esc(t.text.length > 140 ? t.text.slice(0, 138) + '…' : t.text)}</code>${TR[k].ok ? '' : `<span class="rx-tf">${esc(TR[k].why)}</span>`}</div><button class="iconbtn xs" data-act="rxTestDel" data-v="${S.tests.indexOf(t)}" aria-label="Remove this test">${ico('x','sm')}</button></li>`).join('')}</ul>${add}`; },
     speed:() => !(ok && n) ? `<p class="rx-empty t3">Build a pattern that matches first.</p>` : C.manual ? `<p class="rx-empty t3">The optimiser works on the built pattern.</p>`
       : `<div class="rx-sh"><button class="btn sm${O ? '' : ' primary'}" data-act="rxOpt">${ico('gauge','sm')}${O ? 'Run again' : 'Optimise'}</button>${O && O.src !== O.from && !C.optimised ? `<button class="btn sm primary" data-act="rxOptUse">${ico('check','sm')}Use the optimised pattern</button>` : ''}</div>
         ${O ? `<p class="rx-speed"><b>${rxRate(O.start)}</b> → <b>${rxRate(O.end)}</b> ${unit[1]} a second${O.end > O.start * 1.02 ? ` <span class="rx-good">${Math.round((O.end / O.start - 1) * 100)}% faster</span>` : ' <span class="t3">· already about as fast as it gets</span>'}</p>
@@ -387,24 +426,29 @@ function labRegex(){
     export:() => !(ok && n) ? `<p class="rx-empty t3">Build a pattern that matches first.</p>`
       : `<div class="rx-sh"><div class="seg" role="group" aria-label="Tool">${RX_EXPORTS.map(([k, l]) => `<button data-act="rxExp" data-v="${k}" aria-pressed="${S.exp === k}">${l}</button>`).join('')}</div>
           ${P.length > 1 ? `<div class="seg" role="group" aria-label="Which patterns"><button data-act="rxExpAll" data-v="0" aria-pressed="${!S.expAll}">This format</button><button data-act="rxExpAll" data-v="1" aria-pressed="${!!S.expAll}">All formats (${P.length})</button></div>` : ''}</div>
-        <pre class="rx-out mono" id="rxOut">${esc(P.length > 1 && S.expAll ? rxExportAll(P, S.exp) : rxExport(C.src, groups, S.exp))}</pre>
+        ${(() => { const all = P.length > 1 && S.expAll, K = all ? null : rxCompat(C.src, S.exp, V.idx.slice(0, 2000).map(i => S.lines[i]));
+          const out = all ? rxExportAll(P.map(p => { const k = rxCompat(p.src, S.exp, S.lines.slice(0, 2000)); return k.src ? {...p, src:k.src} : p; }), S.exp) : rxExport(K.src || C.src, groups, S.exp);
+          const chips = RX_EXPORTS.map(([k, l]) => { const c = rxCompat(C.src, k, []); return `<span class="rx-cc ${c.level === 'ok' ? 'ok' : c.level === 'bad' ? 'bad' : 'fix'}" title="${esc(c.note)}">${ico(c.level === 'ok' ? 'check' : c.level === 'bad' ? 'x' : 'wand-sparkles','sm')}${l}</span>`; }).join('');
+          return `<div class="rx-compat"><span class="t3 small">Runs in</span>${chips}</div>${K && K.level !== 'ok' ? `<p class="rx-cn ${K.level}">${ico(K.level === 'bad' ? 'triangle-alert' : K.level === 'warn' ? 'triangle-alert' : 'info','sm')}${esc(K.note)}</p>` : ''}<pre class="rx-out mono" id="rxOut">${esc(out)}</pre>`; })()}
         <div class="wrap"><button class="btn sm primary" data-act="rxCopy">${ico('copy','sm')}Copy</button><button class="btn sm" data-act="rxSave">${ico('save','sm')}Save as a parser for log imports</button></div>
         ${rec ? `<details class="rx-box"><summary>Records over several lines: the same setting for Logstash, Filebeat, Splunk and Fluent Bit</summary><pre class="rx-out mono" id="rxMlOut">${esc(rxMlExport(S.ml.re))}</pre><button class="btn xs" data-act="rxMlCopy">${ico('copy','sm')}Copy</button></details>` : ''}`};
-  const cnt = {match:'', explain:'', fields:names.length || '', speed:'', export:''};
-  const tbl = () => ok && n ? (() => { const G = groups.map(g => g.name), rows = V.idx.filter(i => R.M[i]).slice(0, 500);
-      return `<div class="rx-tw"><table class="rx-tb"><thead><tr><th scope="col">#</th>${G.map(g => `<th scope="col" class="c${col(g)}" data-f="${esc(g)}"><span class="rx-dot"></span>${esc(g)}</th>`).join('')}</tr></thead><tbody>${rows.map(i => `<tr data-i="${i}"${i === S.cur ? ' class="cur"' : ''}><td class="t3">${i + 1}</td>${G.map(g => { const v = R.M[i].g[g]; return `<td class="mono${v == null ? ' rx-none' : ''}">${v == null ? '—' : esc(v)}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div>${n > 500 ? `<p class="t3 small" style="margin:8px 12px">First 500 of ${n.toLocaleString()} matches.</p>` : ''}`; })() : `<p class="rx-empty t3">Nothing matched yet.</p>`;
+  const cnt = {match:'', explain:'', fields:names.length || '', tests:TT.length ? (tFail ? '✗' + tFail : TT.length) : '', speed:'', export:''};
+  const tbl = () => ok && n ? (() => { const G = groups.map(g => g.name), rows = V.idx.filter(i => R.M[i] && (!FL || R.M[i].g[FL.f] === FL.v)).slice(0, 500);
+      return `<div class="rx-tw"><table class="rx-tb"><thead><tr><th scope="col">#</th>${G.map(g => `<th scope="col" class="c${col(g)}" data-f="${esc(g)}"><span class="rx-dot"></span>${esc(g)}</th>`).join('')}</tr></thead><tbody>${rows.map(i => `<tr data-i="${i}"${i === S.cur ? ' class="cur"' : ''}><td class="t3">${i + 1}</td>${G.map(g => { const v = R.M[i].g[g], nl = v ? (v.match(/\n/g) || []).length : 0; return `<td class="mono${v == null ? ' rx-none' : ''}${nl ? ' rx-ml' : ''}"${v != null && (v.length > 40 || nl) ? ` title="${esc(v.length > 600 ? v.slice(0, 600) + '…' : v)}"` : ''}${nl ? ` data-more="+${nl} line${nl === 1 ? '' : 's'}"` : ''}>${v == null ? '—' : esc(v)}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div>${n > 500 ? `<p class="t3 small" style="margin:8px 12px">First 500 of ${n.toLocaleString()} matches.</p>` : ''}`; })() : `<p class="rx-empty t3">Nothing matched yet.</p>`;
   return `<div class="rxb">
     <div class="rx-bar">
       <span class="rx-cnt"><b>${S.lines.length.toLocaleString()}</b> ${U(S.lines.length)}${rec ? ` <span class="t3">from ${S.raw.length.toLocaleString()} lines</span>` : ''}${S.fmts.length > 1 ? ` · ${S.fmts.length} formats` : ''}</span>
       ${S.ml ? `<span class="rx-mlc${rec ? ' on' : ''}" title="${rec ? `Each record starts with ${esc(S.ml.label)}` : `These lines look like records over several lines, each starting with ${esc(S.ml.label)}`}">${ico('rows-3','sm')}${rec ? `${S.raw.length.toLocaleString()} lines read as ${S.lines.length.toLocaleString()} records · each starts with ${esc(S.ml.label)}` : 'Records over several lines found'}<button class="lnk" data-act="rxMl">${rec ? 'Read lines separately' : 'Join into records'}</button></span>` : ''}
       <span style="flex:1"></span>
+      <span class="rx-ur"><button class="iconbtn sm" data-act="rxUndo" aria-label="Undo" title="Undo (Ctrl+Z)"${(S.hist || []).length ? '' : ' disabled'}>${ico('undo-2','sm')}</button><button class="iconbtn sm" data-act="rxRedo" aria-label="Redo" title="Redo (Ctrl+Shift+Z)"${(S.fut || []).length ? '' : ' disabled'}>${ico('redo-2','sm')}</button></span>
       <label class="rx-opt" title="Tie the pattern to the start of the line"><input type="checkbox" data-rx="fromStart"${S.fromStart ? ' checked' : ''}> From line start</label>
-      <button class="btn sm ghost" data-act="rxReset">${ico('refresh-cw','sm')}New lines</button>
+      <button class="btn sm ghost" data-act="rxReset" title="Clear everything and paste other log lines">${ico('eraser','sm')}Start over</button>
       <button class="btn sm primary" data-act="rxAutoParse">${ico('wand-sparkles','sm')}Auto-parse</button></div>
     <section class="rx-pc" aria-label="Pattern">
       <div class="rx-pch">${fmts || '<span class="rx-plbl">Pattern</span>'}<span style="flex:1"></span>
         ${ok ? `<span class="rx-stat"><b>${n.toLocaleString()}</b> of ${total.toLocaleString()} ${U(total)}${V.F ? ' in this format' : ''} match</span>` : ''}
         ${Sf && !held ? `<span class="rx-safe ${Sf.level}" title="${esc(Sf.notes.join(' ') || 'Tried on very long and almost-matching lines; it never took more than a few milliseconds')}">${ico(Sf.level === 'safe' ? 'shield-check' : 'triangle-alert','sm')}${{safe:'Safe on hostile input', watch:'Watch', risky:'Risky', bad:'Invalid'}[Sf.level]}</span>` : ''}
+        ${TT.length ? `<button class="rx-chip rx-tchip ${tFail ? 'bad' : 'good'}" data-act="rxTab" data-v="tests" title="Pinned tests">${ico(tFail ? 'triangle-alert' : 'flask-conical','sm')}${tFail ? `${tFail} of ${TT.length} tests fail` : `${TT.length} test${TT.length === 1 ? '' : 's'} pass`}</button>` : ''}
         ${speed ? `<span class="rx-chip" title="Measured by the optimiser">${ico('gauge','sm')}${rxRate(speed)} ${unit[1]}/s</span>` : ''}</div>
       <div class="rx-pbox${C.manual ? ' editing' : ''}"><span class="rx-delim">/</span>
         ${C.manual ? `<label class="sr" for="rxSrc">Pattern</label><textarea id="rxSrc" class="mono rx-src" rows="3" spellcheck="false">${esc(S.manual)}</textarea>` : C.ok ? `<pre class="rx-src mono" id="rxSrcView" data-act="rxEditP" title="Click to edit by hand">${rxHl(C.src, col)}</pre>` : `<div class="rx-src rx-ph">${V.fields.length ? esc(C.why) + (V.all && S.fmts.length > 1 ? ' With several formats, pick one above: each gets its own pattern.' : '') : `Select any part of a ${unit[0]} below to make it a field — or press Auto-parse.`}</div>`}
@@ -412,20 +456,21 @@ function labRegex(){
         <div class="rx-pact">${C.manual ? '<span class="chip sq amber">edited by hand</span><button class="btn xs ghost" data-act="rxAuto">Back to built</button>' : C.optimised ? '<span class="chip sq">optimised</span><button class="btn xs ghost" data-act="rxOptOff">Back to built</button>' : ''}${C.ok && !C.manual ? `<button class="btn xs ghost" data-act="rxFull" aria-pressed="${!!S.fullPat}" title="${S.fullPat ? 'Show standard patterns by name' : 'Show standard patterns in full'}">${ico(S.fullPat ? 'minimize-2' : 'maximize-2','sm')}</button><button class="btn xs ghost" data-act="rxEdit" title="Edit by hand">${ico('pencil','sm')}</button><button class="btn xs ghost" data-act="rxCopySrc" title="Copy the pattern">${ico('copy','sm')}</button>` : ''}</div></div>
       ${held ? `<div class="rx-stat"><span class="rx-safe risky">${ico('triangle-alert','sm')}Risky — not run</span></div><ul class="rx-notes">${Sf.notes.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : R && R.err ? `<p class="rx-err">${esc(R.err)}</p>` : ''}
     </section>
-    <div class="rxw">
+    <div class="rxw${S.side === 'closed' ? ' side-closed' : ''}">
       <section class="rxw-l" aria-label="Log ${unit[1]}">
         <div class="rxw-h"><div class="seg sm" role="group" aria-label="View"><button data-act="rxLeft" data-v="lines" aria-pressed="${S.left !== 'table'}">${ico('scan-text','sm')}${unit[1][0].toUpperCase() + unit[1].slice(1)}</button><button data-act="rxLeft" data-v="table" aria-pressed="${S.left === 'table'}">${ico('table','sm')}Table</button></div>
-          ${S.left !== 'table' ? `<span class="t3 small rx-hint">Select text to add a field · click a ${unit[0]} to inspect</span>` : ''}<span style="flex:1"></span>
+          ${FL ? `<span class="rx-flt c${col(FL.f)}">${ico('filter','sm')}<b class="mono">${esc(FL.f)}</b> = <span class="mono">${esc(FL.v.length > 30 ? FL.v.slice(0, 28) + '…' : FL.v)}</span><button class="iconbtn xs" data-act="rxFilt" data-v="" aria-label="Clear the filter">${ico('x','sm')}</button></span>` : S.left !== 'table' ? `<span class="t3 small rx-hint" title="Keys: ↑ ↓ move · M next missed · / edit the pattern · Ctrl+Z undo">Select text to add a field <kbd>↑</kbd><kbd>↓</kbd><kbd>M</kbd></span>` : ''}<span style="flex:1"></span>
           ${ok && S.left !== 'table' ? `<div class="seg sm" role="group" aria-label="Show ${unit[1]}">${[['all', V.F ? 'This format' : 'All', total], ['hit', 'Matched', n], ['miss', 'Missed', misses]].concat(V.F ? [['every', 'Every ' + unit[0], S.lines.length]] : []).map(([k, l, c]) => `<button data-act="rxShow" data-v="${k}" aria-pressed="${S.show === k}">${l} <span class="${k === 'miss' && c ? 'rx-nm' : 'rx-nc'}">${c.toLocaleString()}</span></button>`).join('')}</div>` : ''}</div>
         ${S.left === 'table' ? tbl() : `<div class="rx-lines" id="rxLines" role="list">${shown.map(lineHtml).join('') || `<p class="rx-empty t3">No ${unit[1]} here.</p>`}</div>`}
         ${S.pend ? `<form class="rx-pend" data-form="rxName" style="left:${S.pend.x || 12}px;top:${S.pend.y || 12}px"><span class="rx-pv mono" title="${esc(S.pend.v)}">${esc(S.pend.v.length > 40 ? S.pend.v.slice(0, 38) + '…' : S.pend.v)}</span><div class="rx-prow"><label class="sr" for="rxName">Field name</label><input id="rxName" class="inp sm mono" value="${esc(S.pend.name)}" maxlength="32" autocomplete="off" pattern="[A-Za-z_][A-Za-z0-9_]{0,31}">
           <button class="btn sm primary" type="submit">Add field</button><button class="iconbtn xs" type="button" data-act="rxCancel" aria-label="Cancel">${ico('x','sm')}</button></div>
           ${allNames.length ? `<div class="rx-pk"><span class="t3 small">Same as</span>${allNames.slice(0, 14).map(nm => `<button type="button" class="chip c${col(nm)}" data-act="rxPick" data-v="${esc(nm)}">${esc(nm)}</button>`).join('')}</div>` : ''}<span class="hint" id="rxNameHint"></span></form>` : ''}
       </section>
-      <aside class="rxw-r" aria-label="Details">
-        <div class="rx-tabs" role="tablist" aria-label="Details">${RX_TABS.map(([k, l]) => `<button role="tab" data-act="rxTab" data-v="${k}" aria-selected="${tab === k}" id="rxtab-${k}">${l}${cnt[k] ? `<span class="rx-tc">${cnt[k]}</span>` : ''}</button>`).join('')}</div>
+      ${S.side === 'closed' ? `<aside class="rxw-r rx-rail" aria-label="Details (hidden)"><button class="iconbtn sm" data-act="rxSide" aria-label="Show the details panel" title="Show the details panel">${ico('panel-right','sm')}</button>${RX_TABS.map(([k, l]) => `<button class="rx-rt" data-act="rxTab" data-v="${k}" title="${l}">${l}${cnt[k] ? `<span class="rx-tc${k === 'tests' && tFail ? ' bad' : ''}">${cnt[k]}</span>` : ''}</button>`).join('')}</aside>`
+      : `<aside class="rxw-r" aria-label="Details">
+        <div class="rx-tabs" role="tablist" aria-label="Details">${RX_TABS.map(([k, l]) => `<button role="tab" data-act="rxTab" data-v="${k}" aria-selected="${tab === k}" id="rxtab-${k}">${l}${cnt[k] ? `<span class="rx-tc${k === 'tests' && tFail ? ' bad' : ''}">${cnt[k]}</span>` : ''}</button>`).join('')}<span style="flex:1"></span><button class="iconbtn xs rx-hide" data-act="rxSide" aria-label="Hide the details panel" title="Hide the panel — more room for the ${S.left === 'table' ? 'table' : unit[1]}">${ico('panel-right','sm')}</button></div>
         <div class="rx-tb-b" role="tabpanel" aria-labelledby="rxtab-${tab}">${body[tab]()}</div>
-      </aside>
+      </aside>`}
     </div>
     <details class="rx-lib"><summary>Ready-made patterns for incident response</summary>${rxLibHtml()}</details></div>`;
 }
@@ -433,7 +478,7 @@ function labRegex(){
 function rxRender(){ const a = $('rxLines'), y = a ? a.scrollTop : 0; renderMain(); const b = $('rxLines'); if(b) b.scrollTop = y; }
 /* its own page in the sidebar (Kit → Regex builder) */
 function viewRegex(){ return `<div class="scroll"><div class="page wide">
-    ${libHead('Regex builder', 'Paste log lines, select what you want, and get a tested, fast regular expression for JavaScript, PCRE, Python, Grok, Splunk and KQL. Your lines never leave this browser.', '', '')}
+    <header class="lhd rx-lhd"><div><h1>Regex builder</h1><p>Tested, explained, fast patterns for Splunk, KQL, Grok, Python, JavaScript and PCRE — your lines never leave this browser.</p></div></header>
     ${labRegex()}</div></div>`; }
 function rxLibHtml(){ return `<div class="rx-libl">${RX_LIB.map(([n, p], i) => `<div class="rx-libi"><span>${esc(n)}</span><code class="mono">${esc(p)}</code><button class="iconbtn xs" data-act="rxLib" data-v="${i}" aria-label="Copy the pattern for ${esc(n)}">${ico('copy','sm')}</button></div>`).join('')}</div>`; }
 /* selecting text in a line → a field to name */
@@ -453,20 +498,35 @@ function rxFromSel(quiet){
     const x = Math.max(8, Math.min(rb.left - bb.left, bb.width - 320)), y = rb.bottom - bb.top + 6;
     S.pend = {line:i, s, e, v, name, x:Math.round(x), y:Math.round(y)}; sel.removeAllRanges(); rxRender(); const inp = $('rxName'); if(inp){ inp.focus(); inp.select(); } }
 }
+/* keys on the Regex builder: ↑ ↓ move between lines, M the next missed line, / edit the pattern, Ctrl+Z / Ctrl+Shift+Z undo and redo, Esc cancels */
+document.addEventListener('keydown', ev => { if(!UI.route || UI.route.area !== 'regex' || !UI.rx || !UI.rx.lines.length) return; const t = ev.target, typing = t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable); const S = RX();
+  if(ev.key === 'Escape'){ if(S.pend){ S.pend = null; rxRender(); ev.preventDefault(); } else if(S.manual != null && typing && t.id === 'rxSrc'){ t.blur(); } return; }
+  if(typing || ev.altKey || document.querySelector('#dlg[open], .dlg.open')) return;
+  if((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z'){ ev.preventDefault(); return rxUndo(ev.shiftKey); }
+  if((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'y'){ ev.preventDefault(); return rxUndo(true); }
+  if(ev.ctrlKey || ev.metaKey) return;
+  const L = UI.rxShown || [], k = L.indexOf(S.cur);
+  if(ev.key === 'ArrowDown' || ev.key === 'ArrowUp' || ev.key === 'j' || ev.key === 'k'){ if(!L.length) return; ev.preventDefault(); const d = ev.key === 'ArrowDown' || ev.key === 'j' ? 1 : -1; S.cur = L[Math.max(0, Math.min(L.length - 1, (k < 0 ? 0 : k + d)))]; if(S.tab !== 'match' && S.tab !== 'tests') S.tab = 'match'; rxRender(); const el = document.querySelector(`#rxLines .rx-ln[data-i="${S.cur}"]`); if(el) el.scrollIntoView({block:'nearest'}); return; }
+  if(ev.key === 'm' || ev.key === 'M'){ const miss = [...document.querySelectorAll('#rxLines .rx-ln.miss')].map(x => +x.dataset.i); if(!miss.length) return toast('No missed lines'); ev.preventDefault(); const nx = miss.find(i => L.indexOf(i) > k) ?? miss[0]; S.cur = nx; S.tab = 'match'; rxRender(); const el = document.querySelector(`#rxLines .rx-ln[data-i="${nx}"]`); if(el) el.scrollIntoView({block:'center'}); return; }
+  if(ev.key === '/'){ ev.preventDefault(); RX_ACTS.rxEdit(); } });
 /* click a line (or a table row) to inspect it; hover a field to see it everywhere */
 document.addEventListener('click', ev => { const t = ev.target; if(!t.closest || t.closest('button, a, input, select, textarea, form')) return; const ln = t.closest('#rxLines .rx-ln, .rx-tb tbody tr[data-i]'); if(!ln) return;
-  const sel = getSelection(); if(sel && !sel.isCollapsed) return; const S = RX(); if(S.pend) return; const i = +ln.dataset.i; if(S.cur === i && S.tab === 'match') return; S.cur = i; S.tab = 'match'; rxRender(); });
+  const sel = getSelection(); if(sel && !sel.isCollapsed) return; const S = RX(); if(S.pend) return; const i = +ln.dataset.i; if(S.cur === i && S.tab === 'match' && S.side !== 'closed') return; S.cur = i; S.tab = 'match'; S.side = 'open'; rxRender(); });
 document.addEventListener('mouseover', ev => { const t = ev.target; if(!t.closest) return; const box = t.closest('.rxb'); if(!box) return; const f = t.closest('[data-f]'), nm = f ? f.dataset.f : null; if(nm === UI.rxHot) return; UI.rxHot = nm;
   box.querySelectorAll('.hot[data-f]').forEach(x => x.classList.remove('hot')); if(nm) box.querySelectorAll(`[data-f="${CSS.escape(nm)}"]`).forEach(x => x.classList.add('hot')); });
 document.addEventListener('mouseup', ev => { if(ev.target && ev.target.closest && ev.target.closest('#rxLines')) setTimeout(() => rxFromSel(false), 0); });
 /* phones and tablets: a selection made by touch ends without a mouse-up; take it once it has stopped changing */
 document.addEventListener('selectionchange', () => { clearTimeout(UI.rxSelT); UI.rxSelT = setTimeout(() => { const sel = getSelection(), n = sel && sel.anchorNode; if(n && n.parentElement && n.parentElement.closest('#rxLines') && matchMedia('(pointer: coarse)').matches) rxFromSel(true); }, 700); });
+function rxTestAdd(want){ const S = RX(), el = $('rxTestText'), t = el && el.value.replace(/\r\n?/g, '\n').replace(/\n+$/, ''); if(!t || !t.trim()) return fieldErr('rxTestText', 'Paste a line first.');
+  if(t.length > 20000) return fieldErr('rxTestText', 'Up to 20,000 characters.'); let expect = null;
+  if(want === 'match'){ const C = rxCurrent(); try{ const m = C.ok && new RegExp(C.src).exec(t); if(m) expect = Object.fromEntries(Object.entries(m.groups || {}).filter(([, x]) => x != null)); }catch(e){} }
+  (S.tests = S.tests || []).push({text:t, want, expect, fmt:S.fmt}); rxRender(); }
 function rxNameSubmit(){ const S = RX(), nm = String($('rxName').value || '').trim(); if(!/^[A-Za-z_][A-Za-z0-9_]{0,31}$/.test(nm)) return fieldErr('rxName', 'Letters, digits and _ only, starting with a letter or _.'); rxAdd(nm); }
-function rxAdd(nm){ const S = RX(), p = S.pend; if(!p) return; if(S.fields.some(f => f.line === p.line && f.name === nm)) return toast(`This line already has ${nm}`);
+function rxAdd(nm){ const S = RX(), p = S.pend; if(!p) return; if(S.fields.some(f => f.line === p.line && f.name === nm)) return toast(`This line already has ${nm}`); rxSnap();
   S.fields.push({line:p.line, s:p.s, e:p.e, name:nm}); S.pend = null; S.manual = null; S.opt = null; rxRender(); }
 document.addEventListener('change', ev => { const el = ev.target; if(!el || !el.dataset || !el.dataset.rx) return; const S = RX();
   if(el.dataset.rx === 'fromStart'){ S.fromStart = el.checked; rxRender(); }
-  if(el.dataset.rx === 'type'){ S.types[el.dataset.name] = el.value; S.manual = null; S.opt = null; rxRender(); } });
+  if(el.dataset.rx === 'type'){ rxSnap(); S.types[el.dataset.name] = el.value; S.manual = null; S.opt = null; rxRender(); } });
 document.addEventListener('input', ev => { if(ev.target && ev.target.id === 'rxSrc'){ RX().manual = ev.target.value; clearTimeout(UI.rxT); UI.rxT = setTimeout(() => { const el = $('rxSrc'), pos = el && el.selectionStart; rxRender(); const n = $('rxSrc'); if(n){ n.focus(); try{ n.setSelectionRange(pos, pos); }catch(e){} } }, 500); } });
 const RX_DEMO = `Nov  2 08:15:30 web01 sshd[1234]: Failed password for root from 203.0.113.7 port 51544 ssh2
 Nov  2 08:15:33 web01 sshd[1234]: Failed password for invalid user admin from 203.0.113.7 port 51560 ssh2
@@ -501,7 +561,7 @@ java.lang.SecurityException: too many attempts
 const RX_ACTS = {
   rxGo:() => { const t = $('rxText') && $('rxText').value; if(!t || !t.trim()) return fieldErr('rxText', 'Paste some log lines first.'); rxSetText(t); rxRender(); },
   rxDemo:(id, v) => { rxSetText(v === 'mixed' ? RX_DEMO_MIXED : v === 'java' ? RX_DEMO_JAVA : RX_DEMO); rxRender(); },
-  rxAutoParse:() => { const S = RX(), done = [];
+  rxAutoParse:() => { const S = RX(), done = []; rxSnap();
     S.fmts.forEach((F, fi) => { if(F.kind === 'header') return; const set = new Set(F.lines); if(S.fields.some(f => set.has(f.line))) return;   /* a format you already started is left as it is */
       const A = rxAutoFields(S, F.lines); if(A && A.fields.length){ S.fields.push(...A.fields); F.label = F.label || A.label; done.push(A.label); } });
     S.manual = null; S.opt = null;
@@ -518,10 +578,23 @@ const RX_ACTS = {
   rxOptUse:() => { const S = RX(); if(S.opt) S.opt.on = true; rxRender(); },
   rxOptOff:() => { const S = RX(); if(S.opt) S.opt.on = false; rxRender(); },
   rxExpAll:(id, v) => { RX().expAll = v === '1'; rxRender(); },
-  rxTab:(id, v) => { RX().tab = v; rxRender(); },
+  rxTab:(id, v) => { const S = RX(); S.tab = v; S.side = 'open'; rxRender(); },
   rxEditP:() => { if(getSelection && !getSelection().isCollapsed) return; RX_ACTS.rxEdit(); },
+  rxUndo:() => rxUndo(false), rxRedo:() => rxUndo(true),
+  rxFilt:(id, v) => { const S = RX(); if(!v){ S.filter = null; } else { const [f, val] = JSON.parse(v); S.filter = S.filter && S.filter.f === f && S.filter.v === val ? null : {f, v:val}; S.left = S.left || 'lines'; } rxRender(); },
+  rxPin:(id, v) => { const S = RX(), C = rxCurrent(), l = S.lines[S.cur]; if(l == null) return; let expect = null;
+    if(v === 'match'){ try{ const m = new RegExp(C.src).exec(l); if(m) expect = Object.fromEntries(Object.entries(m.groups || {}).filter(([, x]) => x != null)); }catch(e){} }
+    (S.tests = S.tests || []).push({text:l, want:v === 'none' ? 'none' : 'match', expect, fmt:S.fmt}); toast('Pinned — every change is now checked against this line'); rxRender(); },
+  rxTestDel:(id, v) => { const S = RX(); (S.tests || []).splice(+v, 1); rxRender(); },
+  rxTestNone:() => rxTestAdd('none'),
+  rxToCase:(id, v) => { const S = RX(), C = rxCurrent(), V = rxView(); if(!C.ok) return; if(!DB.active || !theCase()) return toast('Open a case first');
+    let re; try{ re = new RegExp(C.src); }catch(e){ return; } const vals = new Map(); for(const i of V.idx){ const m = re.exec(S.lines[i]); const x = m && m.groups && m.groups[v]; if(x != null) vals.set(x, (vals.get(x) || 0) + 1); }
+    if(!vals.size) return; const list = [...vals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2000), body = `Regex builder: values of ${v} in ${V.idx.length.toLocaleString()} log ${V.idx.length === 1 ? 'line' : 'lines'}${V.F ? ' (format ' + V.F.name + ')' : ''}\nPattern: ${C.src}\n\n` + list.map(([x, c]) => `${x}\t${c}`).join('\n');
+    DB.records.push({id:uid('r'), caseId:DB.active, type:'evidence', title:`Log values: ${v} (${vals.size.toLocaleString()})`, body, tsRaw:'', tsZone:'explicit', ts:Date.now(), source:'regex-builder', host:'', tags:['log', 'regex'], ents:E.extract(body), answer:'', addedBy:'You', addedAt:Date.now(), hash:''});
+    mutate('saved log values'); hashRecords(); { const r0 = DB.records[DB.records.length - 1]; afterCapture(DB.active, [r0.id]); watchNotify([r0]); } renderNav(); toast(`${vals.size.toLocaleString()} values of ${v} saved to ${theCase().code}`, 'Open', () => go(caseHash(DB.active, 'timeline'))); },
   rxFull:() => { const S = RX(); S.fullPat = !S.fullPat; rxRender(); },
-  rxLeft:(id, v) => { RX().left = v; rxRender(); },
+  rxLeft:(id, v) => { const S = RX(); if(S.left !== v) S.side = v === 'table' ? 'closed' : 'open'; S.left = v; rxRender(); },
+  rxSide:() => { const S = RX(); S.side = S.side === 'closed' ? 'open' : 'closed'; rxRender(); },
   rxCopySrc:() => { const C = rxCurrent(); if(C.ok) copyText(C.src); },
   rxCopyRow:() => { const S = RX(), C = rxCurrent(); let re; try{ re = new RegExp(C.src); }catch(e){ return; } const m = re.exec(S.lines[S.cur] || ''); if(m) copyText(JSON.stringify(m.groups || {}, null, 2)); },
   rxFile:() => { const i = document.createElement('input'); i.type = 'file'; i.accept = '.log,.txt,.csv,.json,.jsonl,text/*'; i.onchange = async () => { const f = i.files && i.files[0]; if(!f) return; if(f.size > 50 * 1048576) return toast('That file is over 50 MB — paste a sample of it instead');
@@ -529,8 +602,8 @@ const RX_ACTS = {
   rxReset:() => { UI.rx = null; rxRender(); },
   rxCancel:() => { RX().pend = null; rxRender(); },
   rxPick:(id, v) => rxAdd(v),
-  rxDel:(id, v) => { const S = RX(), V = rxView(), set = new Set(V.idx); S.fields = S.fields.filter(f => f.name !== v || !set.has(f.line)); if(!S.fields.some(f => f.name === v)) delete S.types[v]; S.manual = null; S.opt = null; rxRender(); },
-  rxUnex:(id, v) => { const S = RX(); S.fields = S.fields.filter(f => f.line !== +v); S.manual = null; S.opt = null; rxRender(); },
+  rxDel:(id, v) => { rxSnap(); const S = RX(), V = rxView(), set = new Set(V.idx); S.fields = S.fields.filter(f => f.name !== v || !set.has(f.line)); if(!S.fields.some(f => f.name === v)) delete S.types[v]; S.manual = null; S.opt = null; rxRender(); },
+  rxUnex:(id, v) => { rxSnap(); const S = RX(); S.fields = S.fields.filter(f => f.line !== +v); S.manual = null; S.opt = null; rxRender(); },
   rxShow:(id, v) => { RX().show = v; rxRender(); },
   rxExp:(id, v) => { RX().exp = v; rxRender(); },
   rxEdit:() => { const S = RX(), C = rxCurrent(); S.manual = C.ok ? C.src : ''; rxRender(); const el = $('rxSrc'); if(el) el.focus(); },

@@ -2,6 +2,21 @@
 
 All notable changes to OSINTrix, newest first. The format is based on [Keep a Changelog](https://keepachangelog.com); this file is generated from `js/data/changelog.js` by `tools/changelog.py`.
 
+## [1.52] — Regex builder for daily work (2026-11-21)
+
+_Tests pinned to a pattern, a check of which tools can run it, values that filter the lines and go straight to the case, undo, keyboard keys, and a calmer, full-height layout._
+
+### Added
+- Tests: pin a line as “must match” (with its values) or “must not match”, or paste one. Every change is checked against them; the pattern bar says how many pass, and a failing test says what broke (“does not match any more”, “user is … , was …”).
+- Runs in: each export shows which tools can run the pattern as it is. KQL uses RE2, which has no lookahead — the export is written without it, and says whether every line still gives the same values.
+- Pivot on values: the commonest values of each field filter the lines and the table with one click; another click adds all of a field’s values to the case as evidence, so addresses, users and hashes become indicators.
+- Undo and redo for field changes (Ctrl+Z, Ctrl+Shift+Z), ↑ ↓ to move between lines, M for the next missed line, / to edit the pattern.
+
+### Changed
+- A calmer layout: a one-line header, panes that fill the screen, spaces in the pattern shown as a faint ␣, regex symbols muted so field names stand out, field rows on two lines, and a label on every highlighted value when you point at it.
+- Regex builder: “New lines” is now “Start over”. In table view the details panel folds to a slim rail (and opens again when you click a row or a tab); long and multi-line values stay on one line with a “+4 lines” count and the full value on hover; scrollbars are thin.
+- CTF cheatsheets: each category’s one-line description sits behind a ? next to the views, readable in full at any width instead of cut off.
+
 ## [1.51] — Regex builder, rebuilt (2026-11-21)
 
 _The Regex builder becomes a workbench: the coloured pattern on top, your lines below, and a sidebar that explains the pattern, shows what each line gives and why a line is missed. It sorts mixed logs into formats, joins records over several lines, names the fields of common layouts in one click, and makes patterns faster where it can prove nothing changes._

@@ -273,7 +273,7 @@ function ctfCheatsView(){
             <div class="cs4-pf"><span id="csValsN">${nSet} of ${CS_VARS.length} set</span><button class="btn sm" data-act="csValsClear">Clear all</button></div></div>
         </div>
       </div>
-      <div class="cs4-sub"><div class="seg cs4-seg" role="group" aria-label="Show" id="csSeg">${csViewSeg(cat)}</div><p class="cs4-blurb" id="csBlurb"${searching ? ' hidden' : ''} title="${esc(C.blurb || '')}">${esc(C.blurb || '')}</p></div>
+      <div class="cs4-sub"><div class="seg cs4-seg" role="group" aria-label="Show" id="csSeg">${csViewSeg(cat)}</div>${C.blurb ? `<span class="cs4-help" id="csBlurb"${searching ? ' hidden' : ''}><button class="iconbtn sm cs4-hb" type="button" aria-label="What ${esc(C.name || 'this category')} is about" aria-describedby="csBlurbTx">${ico('circle-help','sm')}</button><span class="cs4-hp" role="tooltip" id="csBlurbTx">${esc(C.blurb)}</span></span>` : ''}</div>
       <div id="csBody">${csBody()}</div>
     </div>
   </div>`;

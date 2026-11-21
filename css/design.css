@@ -3179,3 +3179,67 @@ button.rsum-i:hover{background:var(--hover);color:var(--text)}
 .ds .rx-fr3 .t3{white-space:nowrap}
 .ds .rx-xp li{flex-direction:row;flex-wrap:wrap;align-items:baseline;gap:2px 10px;padding:5px 0 5px 10px}
 .ds .rx-xs{flex-basis:100%}
+/* regex builder v1.51 polish: compact header, full-height panes, quiet syntax, tooltips, tests, compatibility, pivots */
+.ds .rx-lhd{margin-bottom:6px}.ds .rx-lhd h1{font-size:calc(20px * var(--ts,1))}.ds .rx-lhd p{font-size:calc(12.5px * var(--ts,1));margin-top:2px}
+.ds .rxw{height:max(460px,calc(100vh - 290px));align-items:stretch}
+.ds .rxw-l{min-height:0}.ds .rxw-l .rx-lines,.ds .rxw-l .rx-tw{flex:1;max-height:none;min-height:0}
+.ds .rxw-r{position:static;max-height:none;min-height:0}.ds .rx-tb-b{flex:1;min-height:0}
+@media (max-width:1180px){.ds .rxw{height:auto}.ds .rxw-l .rx-lines,.ds .rxw-l .rx-tw{max-height:55vh;min-height:260px}.ds .rxw-r{max-height:70vh}}
+.ds .rx-sc{color:color-mix(in srgb,#0e7490 70%,var(--text-3))}.ds .rx-sq{color:color-mix(in srgb,#a16207 60%,var(--text-3))}
+.ds .rx-ws{font-size:0}.ds .rx-ws::before{content:'␣';font-size:calc(12px * var(--ts,1));color:var(--text-3);opacity:.7;margin:0 1px}
+.ds .rx-m{position:relative}
+.ds .rx-m[data-tip]:hover::after{content:attr(data-tip);position:absolute;left:0;bottom:calc(100% + 4px);z-index:6;white-space:nowrap;font:560 11px/1.2 Inter,var(--font,system-ui),sans-serif;padding:4px 7px;border-radius:6px;background:var(--text);color:var(--surface);pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,.15)}
+.ds .rx-ur{display:inline-flex;gap:2px}.ds .rx-ur .iconbtn:disabled{opacity:.35;cursor:default}
+.ds .rx-hint kbd{font:500 10.5px/1 var(--mono,monospace);border:1px solid var(--border);border-bottom-width:2px;border-radius:4px;padding:1px 4px;margin:0 1px;color:var(--text-2);background:var(--surface)}
+.ds .rx-flt{display:inline-flex;align-items:center;gap:5px;font-size:calc(12.5px * var(--ts,1));padding:2px 4px 2px 8px;border-radius:999px;background:color-mix(in srgb,var(--rx) 12%,transparent);color:var(--text)}.ds .rx-flt b{color:var(--rx)}
+/* fields: two compact rows */
+.ds .rx-fld{gap:2px;padding:7px 0}
+.ds .rx-fr1{gap:6px}
+.ds .rx-fr1 .rx-sel{flex:1;min-width:0;margin-left:0;align-self:center;padding:1px 4px}
+.ds .rx-fr3{margin-left:13px}
+.ds .rx-val{border:0;font:inherit;cursor:pointer;white-space:nowrap;background:var(--surface-2);border-radius:4px;padding:0 5px;color:var(--text-2)}
+.ds .rx-val:hover{background:color-mix(in srgb,var(--rx) 14%,transparent);color:var(--text)}.ds .rx-val.on{background:color-mix(in srgb,var(--rx) 22%,transparent);color:var(--text);box-shadow:inset 0 0 0 1px var(--rx)}
+.ds .rx-val i{font-style:normal;color:var(--text-3)}
+/* tests */
+.ds .rx-pin{margin:-2px 0 2px}.ds .rx-pin .i{vertical-align:-2px;margin-right:3px}
+.ds .rx-tsum{margin:0;display:flex;align-items:center;gap:6px;font-weight:560;font-size:calc(13px * var(--ts,1))}
+.ds .rx-tl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;border:1px solid var(--border-soft);border-radius:8px}
+.ds .rx-tl li{display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:8px;align-items:start;padding:7px 8px;border-bottom:1px solid var(--border-soft)}.ds .rx-tl li:last-child{border-bottom:0}
+.ds .rx-tl li.pass .rx-ti{color:var(--green,#16a34a)}.ds .rx-tl li.fail .rx-ti{color:var(--red)}.ds .rx-tl li.fail{background:color-mix(in srgb,var(--red) 5%,transparent)}
+.ds .rx-tl li>div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.ds .rx-tw2{font-size:11.5px;color:var(--text-3)}.ds .rx-tl code{font-size:11.5px;overflow-wrap:anywhere;white-space:pre-wrap;color:var(--text-2)}
+.ds .rx-tf{font-size:12px;color:var(--red)}
+.ds .rx-tadd{display:flex;flex-direction:column;gap:6px}.ds .rx-tadd textarea{width:100%;border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:12px;background:var(--surface);color:var(--text);resize:vertical}
+.ds .rx-tchip{border:0;background:none;cursor:pointer;font:inherit}.ds .rx-tchip.good{color:var(--green,#16a34a)}.ds .rx-tchip.bad{color:var(--red);font-weight:560}
+.ds .rx-tc.bad{color:var(--red);font-weight:600}
+/* compatibility */
+.ds .rx-compat{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.ds .rx-cc{display:inline-flex;align-items:center;gap:3px;font-size:11.5px;padding:1px 7px 1px 5px;border-radius:999px;border:1px solid var(--border-soft);color:var(--text-2)}
+.ds .rx-cc.ok .i{color:var(--green,#16a34a)}.ds .rx-cc.fix .i{color:var(--amber)}.ds .rx-cc.bad{color:var(--red)}
+.ds .rx-cn{margin:0;display:flex;gap:6px;align-items:flex-start;font-size:12.5px;color:var(--text-2)}.ds .rx-cn .i{flex:none;margin-top:2px}.ds .rx-cn.warn .i,.ds .rx-cn.bad .i{color:var(--amber)}.ds .rx-cn.fixed .i{color:var(--accent)}
+
+/* CTF cheatsheets: the category's one-line description sits behind a ? next to the views, readable at any width */
+.ds .cs4-help{position:relative;display:inline-flex;flex:none}
+.ds .cs4-hb{color:var(--text-3)}.ds .cs4-hb:hover,.ds .cs4-help:focus-within .cs4-hb{color:var(--text)}
+.ds .cs4-hp{display:none;position:absolute;left:0;top:calc(100% + 6px);z-index:20;width:max-content;max-width:min(360px,80vw);padding:9px 12px;border-radius:9px;background:var(--text);color:var(--surface);font-size:calc(13px * var(--ts,1));line-height:1.45;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.ds .cs4-help:hover .cs4-hp,.ds .cs4-help:focus-within .cs4-hp{display:block}
+@media (max-width:700px){.ds .cs4-hp{left:auto;right:0}}
+/* regex builder: the details panel folds away (it does when the table is shown), a tidier table and thin scrollbars */
+.ds .rxw.side-closed{grid-template-columns:minmax(0,1fr) 44px}
+.ds .rx-rail{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 0;overflow:hidden}
+.ds .rx-rt{writing-mode:vertical-rl;transform:rotate(180deg);border:0;background:none;font:inherit;font-size:calc(12px * var(--ts,1));color:var(--text-3);padding:8px 4px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
+.ds .rx-rt:hover{color:var(--text);background:var(--hover)}
+.ds .rx-tabs{align-items:center}.ds .rx-hide{margin-right:-2px;color:var(--text-3)}
+.ds .rx-tb td{white-space:nowrap;max-width:320px}
+.ds .rx-tb td.rx-ml::after{content:attr(data-more);margin-left:6px;font:500 10.5px/1 Inter,var(--font,system-ui),sans-serif;color:var(--text-3);background:var(--surface-2);border-radius:4px;padding:1px 5px}
+.ds .rx-tb td.rx-ml{max-width:360px}
+.ds .rx-tb th:first-child,.ds .rx-tb td:first-child{position:sticky;left:0;background:var(--surface);z-index:1;width:1%}
+.ds .rx-tb th:first-child{z-index:2}.ds .rx-tb tr.cur td:first-child{background:color-mix(in srgb,var(--accent) 8%,var(--surface))}
+.ds .rxb ::-webkit-scrollbar{width:10px;height:10px}
+.ds .rxb ::-webkit-scrollbar-track{background:transparent}
+.ds .rxb ::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--text-3) 35%,transparent);border-radius:10px;border:3px solid var(--surface)}
+.ds .rxb ::-webkit-scrollbar-thumb:hover{background:color-mix(in srgb,var(--text-3) 60%,transparent)}
+.ds .rxb ::-webkit-scrollbar-corner{background:transparent}
+.ds .rxb *{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--text-3) 40%,transparent) transparent}
+@media (max-width:1180px){.ds .rxw.side-closed{grid-template-columns:1fr}.ds .rx-rail{flex-direction:row;flex-wrap:wrap;justify-content:flex-start;padding:6px 8px}.ds .rx-rt{writing-mode:horizontal-tb;transform:none}}
+.ds .rx-tabs{padding:0 4px 0 6px;gap:0}.ds .rx-tabs button[role=tab]{padding:10px 7px}.ds .rx-hide{flex:none;width:26px;height:26px}

@@ -462,3 +462,67 @@ test('regex builder optimiser: rewrites are tried one at a time, kept only when 
   }
   noErrors(errors);
 });
+
+test('regex builder for daily work: pinned tests catch a regression, each tool says whether it can run the pattern (KQL gets a version without lookahead), a value filters the lines and goes to the case, undo and keys work', async ({ page }) => {
+  const errors = await open(page, '#/regex');
+  await page.click('[data-act=rxDemo][data-v=mixed]'); await page.click('[data-act=rxAutoParse]');
+  // pin line 1 with its values, and a cron line that must not match
+  await page.click('.rx-ln[data-i="0"] .rx-no'); await page.click('[data-act=rxPin][data-v=match]');
+  await page.click('[data-act=rxShow][data-v=every]'); await page.click('.rx-ln[data-i="3"] .rx-no'); await page.click('[data-act=rxPin][data-v=none]');
+  await expect(page.locator('.rx-tchip')).toHaveText('2 tests pass');
+  // a pasted line that must match too
+  await page.click('[data-act=rxTab][data-v=tests]'); await page.fill('#rxTestText', 'Nov 30 23:59:59 bastion-3 sshd[9]: Accepted password for svc_backup from 10.0.0.5 port 1 ssh2'); await page.click('form[data-form=rxTestAdd] [type=submit]');
+  await expect(page.locator('.rx-tsum')).toHaveText('All 3 tests pass');
+  // break it by hand: the tests say what broke
+  await page.click('[data-act=rxEdit]'); const src = await page.inputValue('#rxSrc');
+  await page.fill('#rxSrc', src.replace('(?<user>\\S+)', '(?<user>[a-z]+)')); await page.waitForTimeout(700);
+  await expect(page.locator('.rx-tchip')).toHaveText('1 of 3 tests fail');
+  await expect(page.locator('.rx-tl li.fail .rx-tf')).toHaveText('it does not match any more');
+  await page.click('[data-act=rxAuto]'); await expect(page.locator('.rx-tchip')).toHaveText('3 tests pass');
+  // compatibility: the optimiser's fixed-word check is lookahead — KQL (RE2) gets it taken out, with the same values
+  await page.click('[data-act=rxTab][data-v=speed]'); await page.click('[data-act=rxOpt]');
+  await page.evaluate(() => { const S = UI.rx; S.opt.src = '^(?=[^\\n]*?password)' + S.opt.from.replace(/^\^|^\\b/, ''); S.opt.on = true; rxRender(); });
+  await page.click('[data-act=rxTab][data-v=export]'); await page.click('[data-act=rxExp][data-v=kql]');
+  await expect(page.locator('.rx-cn')).toContainText('has no lookahead: written without it — the same values on all your lines');
+  expect(await page.locator('#rxOut').textContent()).not.toContain('(?=');
+  await expect(page.locator('.rx-cc', { hasText: 'KQL' })).toHaveClass(/fix/); await expect(page.locator('.rx-cc', { hasText: 'Splunk' })).toHaveClass(/ok/);
+  await page.click('[data-act=rxExp][data-v=pcre]'); expect(await page.locator('#rxOut').textContent()).toContain('(?=[^\\n]*?password)');
+  await page.click('[data-act=rxOptOff]');
+  // pivot: a value filters the lines and the table
+  await page.click('[data-act=rxTab][data-v=fields]'); await page.click('[data-act=rxShow][data-v=all]');
+  await page.locator('.rx-fld[data-f=src_ip] .rx-val', { hasText: '203.0.113.7' }).click();
+  await expect(page.locator('.rx-flt')).toContainText('src_ip = 203.0.113.7'); await expect(page.locator('.rx-ln')).toHaveCount(2);
+  await page.click('.rx-flt [data-act=rxFilt]'); await expect(page.locator('.rx-ln')).toHaveCount(4);
+  // the values go to the case as evidence, and their addresses become indicators
+  await page.click('.rx-fld[data-f=src_ip] [data-act=rxToCase]');
+  const rec = await page.evaluate(() => { const r = DB.records.find(x => x.source === 'regex-builder' && x.caseId === DB.active); return r && { title: r.title, ips: r.ents.filter(e => e.k === 'ipv4' || e.k === 'ipv6' || e.k === 'ip').map(e => e.v).sort() }; });
+  expect(rec.title).toBe('Log values: src_ip (3)'); expect(rec.ips).toEqual(expect.arrayContaining(['198.51.100.23', '203.0.113.7']));
+  // undo and redo of field changes, from the keyboard too
+  await page.click('.rx-fld[data-f=port] [data-act=rxDel]'); await expect(page.locator('.rx-fld[data-f=port]')).toHaveCount(0);
+  await page.keyboard.press('Control+z'); await expect(page.locator('.rx-fld[data-f=port]')).toHaveCount(1);
+  await page.keyboard.press('Control+Shift+z'); await expect(page.locator('.rx-fld[data-f=port]')).toHaveCount(0);
+  await page.click('[data-act=rxUndo]'); await expect(page.locator('.rx-fld[data-f=port]')).toHaveCount(1);
+  // keys: ↓ moves to the next line, / opens the pattern for editing (not the app search)
+  await page.click('.rx-ln[data-i="0"] .rx-no'); await page.keyboard.press('ArrowDown'); await expect(page.locator('.rx-ln.cur')).toHaveAttribute('data-i', '1');
+  await page.keyboard.press('/'); await expect(page.locator('#rxSrc')).toBeVisible(); await expect(page.locator('#srQ')).toBeHidden();
+  noErrors(errors);
+});
+
+test('regex builder table and CTF help: the details panel folds away for the table and comes back on a row; long multi-line values stay one line with a count; a category description sits behind a ?', async ({ page }) => {
+  const errors = await open(page, '#/regex');
+  await expect(page.locator('[data-act=rxReset]')).toHaveCount(0);
+  await page.click('[data-act=rxDemo][data-v=java]'); await page.click('[data-act=rxAutoParse]');
+  await expect(page.locator('[data-act=rxReset]')).toHaveText('Start over');
+  await page.click('[data-act=rxLeft][data-v=table]');
+  await expect(page.locator('.rx-rail')).toBeVisible(); await expect(page.locator('.rx-tb-b')).toHaveCount(0);
+  await expect(page.locator('.rx-tb tbody tr[data-i="1"] td.rx-ml')).toHaveAttribute('data-more', '+4 lines');
+  const h = await page.locator('.rx-tb tbody tr[data-i="1"]').evaluate(r => r.getBoundingClientRect().height); expect(h).toBeLessThan(40);   // one line per record
+  await page.click('.rx-tb tbody tr[data-i="3"] td:nth-child(3)'); await expect(page.locator('.rx-mh')).toContainText('Record 4');
+  await page.click('[data-act=rxSide]'); await expect(page.locator('.rx-rail')).toBeVisible();
+  await page.click('.rx-rail [data-act=rxSide]'); await expect(page.locator('.rx-tabs')).toBeVisible();
+  // CTF: the description is behind a ? and readable in full
+  await page.evaluate(() => { go('#/ctf'); UI.ctfTab = 'cheats'; renderMain(); });
+  await expect(page.locator('.cs4-hp')).toBeHidden();
+  await page.hover('.cs4-hb'); await expect(page.locator('.cs4-hp')).toBeVisible(); await expect(page.locator('.cs4-hp')).toContainText('public breadcrumbs');
+  noErrors(errors);
+});

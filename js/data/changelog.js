@@ -4,6 +4,42 @@
    Each change has a type: "added" | "changed" | "fixed" | "removed". */
 const CHANGELOG_DATA = [
   {
+    "version": "1.52",
+    "name": "Regex builder for daily work",
+    "date": "2026-11-21",
+    "summary": "Tests pinned to a pattern, a check of which tools can run it, values that filter the lines and go straight to the case, undo, keyboard keys, and a calmer, full-height layout.",
+    "changes": [
+      {
+        "type": "added",
+        "text": "Tests: pin a line as “must match” (with its values) or “must not match”, or paste one. Every change is checked against them; the pattern bar says how many pass, and a failing test says what broke (“does not match any more”, “user is … , was …”)."
+      },
+      {
+        "type": "added",
+        "text": "Runs in: each export shows which tools can run the pattern as it is. KQL uses RE2, which has no lookahead — the export is written without it, and says whether every line still gives the same values."
+      },
+      {
+        "type": "added",
+        "text": "Pivot on values: the commonest values of each field filter the lines and the table with one click; another click adds all of a field’s values to the case as evidence, so addresses, users and hashes become indicators."
+      },
+      {
+        "type": "added",
+        "text": "Undo and redo for field changes (Ctrl+Z, Ctrl+Shift+Z), ↑ ↓ to move between lines, M for the next missed line, / to edit the pattern."
+      },
+      {
+        "type": "changed",
+        "text": "A calmer layout: a one-line header, panes that fill the screen, spaces in the pattern shown as a faint ␣, regex symbols muted so field names stand out, field rows on two lines, and a label on every highlighted value when you point at it."
+      },
+      {
+        "type": "changed",
+        "text": "Regex builder: “New lines” is now “Start over”. In table view the details panel folds to a slim rail (and opens again when you click a row or a tab); long and multi-line values stay on one line with a “+4 lines” count and the full value on hover; scrollbars are thin."
+      },
+      {
+        "type": "changed",
+        "text": "CTF cheatsheets: each category’s one-line description sits behind a ? next to the views, readable in full at any width instead of cut off."
+      }
+    ]
+  },
+  {
     "version": "1.51",
     "name": "Regex builder, rebuilt",
     "date": "2026-11-21",
