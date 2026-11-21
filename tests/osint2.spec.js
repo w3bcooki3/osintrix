@@ -239,3 +239,63 @@ test('sample case: “Harbourline refund scam” is added to a workspace with sa
   await page.evaluate(() => removeSample ? 0 : 0);
   noErrors(errors);
 });
+
+test('regex builder: select fields in SSH log lines, the pattern is built and tried on every line, a missed line teaches it a variation, it is exported for six tools, saved as a parser that reads a log import, and a risky hand-written pattern is flagged', async ({ page, context }) => {
+  const errors = await open(page, '#/home');
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.evaluate(() => { UI.labTab = 'regex'; go('#/lab'); });
+  await page.click('[data-act=rxDemo]');
+  await expect(page.locator('.rx-ln')).toHaveCount(6);
+  // select text in a line, as with the mouse, and name it
+  const pick = async (line, text, name) => {
+    await page.evaluate(([line, text]) => { const t = document.querySelector(`.rx-ln[data-i="${line}"] .rx-t`), full = t.textContent, s = full.indexOf(text); const r = document.createRange();
+      const walk = (off) => { const w = document.createTreeWalker(t, NodeFilter.SHOW_TEXT); let n, at = 0; while((n = w.nextNode())){ if(at + n.length >= off) return [n, off - at]; at += n.length; } };
+      const [a, ao] = walk(s), [b, bo] = walk(s + text.length); r.setStart(a, ao); r.setEnd(b, bo); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      t.dispatchEvent(new MouseEvent('mouseup', { bubbles: true })); }, [line, text]);
+    await expect(page.locator('#rxName')).toBeVisible();
+    if(name) await page.fill('#rxName', name); await page.click('form[data-form=rxName] [type=submit]'); await expect(page.locator('#rxName')).toHaveCount(0); };
+  await pick(0, 'Nov  2 08:15:30', 'time'); await pick(0, 'root', 'user'); await pick(0, '203.0.113.7', 'src_ip'); await pick(0, '51544', 'port');
+  // suggested names come from what was selected: an IP is "ip", a time "time"
+  const stat = () => page.locator('.rx-stat b').textContent();
+  expect(await stat()).toBe('1');
+  await expect(page.locator('#rxSrcView')).toContainText('(?<src_ip>(?:25[0-5]');
+  // teach it: the same fields on lines it missed — a second line suggests the names in order
+  await pick(1, 'Nov  2 08:15:33'); await pick(1, 'admin'); await pick(1, '203.0.113.7'); await pick(1, '51560');
+  await pick(2, 'Nov  2 08:16:02'); await pick(2, 'deploy'); await pick(2, '198.51.100.23'); await pick(2, '40022');
+  await pick(3, 'Nov 12 22:01:47'); await pick(3, 'root'); await pick(3, '2001:db8::7'); await pick(3, '6022');
+  expect(await stat()).toBe('4');   // "Accepted publickey" is a wording it has not seen yet
+  await page.click('[data-act=rxShow][data-v=miss]'); await expect(page.locator('.rx-ln')).toHaveCount(2); await page.click('[data-act=rxShow][data-v=all]');
+  await pick(4, 'Nov 12 22:01:50'); await pick(4, 'j.doe'); await pick(4, '192.0.2.44'); await pick(4, '52111');
+  expect(await stat()).toBe('5');   // all but "Connection closed", which has no user
+  const src = await page.locator('#rxSrcView').textContent();
+  expect(src).toContain('(?:Failed +password +for +invalid +user|Accepted +publickey +for|Accepted +password +for|Failed +password +for)'); expect(src).toContain('[\\w.-]+ +sshd\\[\\d+\\]');
+  expect(src).not.toMatch(/\.\*(?!\?)/);                                                     // no greedy wildcards
+  await expect(page.locator('.rx-safe')).toHaveText(/Safe on hostile input/);
+  const rows = await page.locator('.rx-tb tbody tr').evaluateAll(T => T.map(r => [...r.cells].map(c => c.textContent)));
+  expect(rows).toEqual([['1', 'Nov  2 08:15:30', 'root', '203.0.113.7', '51544'], ['2', 'Nov  2 08:15:33', 'admin', '203.0.113.7', '51560'], ['3', 'Nov  2 08:16:02', 'deploy', '198.51.100.23', '40022'], ['4', 'Nov 12 22:01:47', 'root', '2001:db8::7', '6022'], ['5', 'Nov 12 22:01:50', 'j.doe', '192.0.2.44', '52111']]);
+  await page.click('[data-act=rxShow][data-v=miss]'); await expect(page.locator('.rx-ln')).toHaveCount(1); await expect(page.locator('.rx-ln')).toContainText('Connection closed'); await page.click('[data-act=rxShow][data-v=all]');
+  // exports: each one is the same pattern in that tool's own syntax
+  const exp = async k => { await page.click(`[data-act=rxExp][data-v=${k}]`); return page.locator('#rxOut').textContent(); };
+  const js = await exp('js'); expect(js.startsWith('/') && js.endsWith('/')).toBe(true); const re = new RegExp(js.slice(1, -1));
+  expect('Nov 30 23:59:59 bastion-3 sshd[9]: Accepted password for svc_backup from 10.0.0.5 port 1 ssh2'.match(re).groups).toEqual({ time: 'Nov 30 23:59:59', user: 'svc_backup', src_ip: '10.0.0.5', port: '1' });
+  expect(await exp('python')).toContain("re.compile(r'\\b(?P<time>");
+  const grok = await exp('grok'); expect(grok).toContain('%{SYSLOGTIMESTAMP:time}'); expect(grok).toContain('%{IP:src_ip}'); expect(grok).toContain('%{INT:port}'); expect(grok).toContain('(?<user>\\S+)');
+  expect(await exp('splunk')).toMatch(/^\| rex field=_raw "\\\\b\(\?<time>/);
+  const kql = await exp('kql'); expect(kql).toContain('user = extract(@"'); expect(kql).toContain('", 2, RawData)'); expect(kql).not.toContain('(?<');
+  await page.click('[data-act=rxCopy]'); expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(kql);
+  // saved as a parser, it reads a log import
+  await page.click('[data-act=rxSave]'); await expect(page.locator('#lpRe')).toHaveValue(js.slice(1, -1).replace(/\\\//g, '\\/'));
+  await page.fill('#lpName', 'SSH auth (built)'); await page.click('#dlg [type=submit]');
+  const P = await page.evaluate(() => { const p = DB.parsers.find(x => x.name === 'SSH auth (built)'); return runUserParser(p, 'Dec  1 01:02:03 web09 sshd[77]: Failed password for invalid user oracle from 203.0.113.250 port 22 ssh2'); });
+  expect(P).toMatchObject({ user: 'oracle', src_ip: '203.0.113.250', port: '22' });
+  // by hand: a pattern that backtracks badly is caught before it reaches a log tool
+  await page.click('[data-act=rxEdit]'); await page.fill('#rxSrc', '(?<a>(\\w+\\s?)+)$'); await page.waitForTimeout(800);
+  await expect(page.locator('.rx-safe')).toHaveText(/Risky — not run/); await expect(page.locator('.rx-notes')).toContainText('catastrophic backtracking'); await expect(page.locator('.rx-tb')).toHaveCount(0);   // not run, so the page stays responsive
+  await page.fill('#rxSrc', '(?<a>[unclosed'); await page.waitForTimeout(800); await expect(page.locator('.rx-err')).toContainText('Invalid regular expression');
+  await page.click('[data-act=rxAuto]'); await expect(page.locator('#rxSrcView')).toBeVisible();
+  // hostile log text stays text; nothing of the sample is saved
+  await page.click('[data-act=rxReset]'); await page.fill('#rxText', '<img src=x onerror=window.__x=1> user="><b id=pwn>x</b> from 10.1.1.1'); await page.click('[data-act=rxGo]');
+  await pick(0, '10.1.1.1', 'ip'); expect(await page.evaluate(() => [window.__x, document.querySelectorAll('#pwn, img[src="x"]').length])).toEqual([undefined, 0]);
+  expect(await page.evaluate(() => JSON.stringify(DB).includes('onerror=window.__x'))).toBe(false);
+  noErrors(errors);
+});

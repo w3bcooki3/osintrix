@@ -4,6 +4,34 @@
    Each change has a type: "added" | "changed" | "fixed" | "removed". */
 const CHANGELOG_DATA = [
   {
+    "version": "1.50",
+    "name": "Regex builder",
+    "date": "2026-11-20",
+    "summary": "Select the parts of a log line you want and get the regular expression for them — tested on every line, checked for patterns that freeze log tools, and written for six tools. Nothing leaves the browser.",
+    "changes": [
+      {
+        "type": "added",
+        "text": "Forensics kit → Regex builder: paste log lines or open a log file, select the parts you want and name them. The pattern uses a precise form for what it recognises (IPv4 and IPv6, ISO, syslog and web-server times, email, URL, GUID, hashes, SIDs, numbers) and “up to the next delimiter” for the rest; host names and process numbers become patterns, an empty field written as “-” matches whatever is there, and fixed words stay as anchors."
+      },
+      {
+        "type": "added",
+        "text": "It is tried on every line, with the fields it pulls out in a table and the lines it misses listed. Selecting the same fields on a missed line teaches it the variation: different words become alternatives, an extra phrase becomes optional."
+      },
+      {
+        "type": "added",
+        "text": "A safety check before anything runs: patterns that can backtrack badly — and freeze a log tool on a line that almost matches — are flagged and, when written by hand, not run at all; others are timed on hostile input."
+      },
+      {
+        "type": "added",
+        "text": "The same pattern for JavaScript, PCRE, Python, Grok (using Grok’s own patterns where they fit), Splunk rex and KQL extract, ready to copy — or saved as a parser so log imports read that format. Plus a library of ready-made patterns for incident response."
+      },
+      {
+        "type": "fixed",
+        "text": "Custom parsers: a pattern that can freeze on near-matching lines is no longer run in the test box, and cannot be saved."
+      }
+    ]
+  },
+  {
     "version": "1.49",
     "name": "A sample case for the OSINT tools",
     "date": "2026-11-19",

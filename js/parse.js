@@ -263,6 +263,9 @@ function parserDlg(id, pre){
     <div id="lpTestOut" class="lp-test"></div></div>
     <footer>${id ? `<button class="btn danger" type="button" data-act="lpDel" data-id="${id}" style="margin-right:auto">${ico('trash-2','sm')}Delete</button>` : ''}<button class="btn" type="button" data-act="dclose">Cancel</button><button class="btn primary" type="submit">Save parser</button></footer></form>`, true, () => {
       const run = () => { const re = $('lpRe').value, t = $('lpTest').value, o = $('lpTestOut'); let r = null, err = '';
+        /* a pattern that backtracks badly is not run: it would freeze the page (and, saved, every log import) */
+        const risky = typeof rxSafety === 'function' && re && (() => { try{ new RegExp(re); }catch(e){ return null; } const x = rxSafety(re, [], true); return x.level === 'risky' ? x.notes[0] : null; })();
+        if(risky){ o.innerHTML = `<span style="color:var(--red)">${ico('triangle-alert','sm')} Not run: ${esc(risky)}</span>`; return; }
         try{ new RegExp(re, $('lpFlags').value); r = runUserParser({re, flags:$('lpFlags').value}, t); }catch(e){ err = e.message; }
         o.innerHTML = err ? `<span style="color:var(--red)">${esc(err)}</span>` : r ? `<span style="color:var(--green)">${ico('check','sm')} Matches · ${Object.keys(r).length} fields</span><table class="ftab">${Object.entries(r).map(([k, v]) => `<tr><th>${esc(k)}${ALIAS.get(k.toLowerCase()) || CANON[k] ? '' : ''}</th><td class="mono">${esc(v)}</td></tr>`).join('')}</table>` : '<span class="t3">No match on the test line.</span>'; };
       ['lpRe', 'lpTest', 'lpFlags'].forEach(i => $(i).oninput = run); run(); });
@@ -273,6 +276,7 @@ function parserSubmit(f){
   if(!nm) return fieldErr('lpName', 'Give the parser a name.'); if(!checkLen('lpName', nm, 80, 'Name')) return;
   if(clash(DB.parsers, nm, 'name', f.dataset.id || null)) return fieldErr('lpName', `A parser called “${nm}” already exists.`);
   if(!re) return fieldErr('lpRe', 'Write the regular expression.'); if(!checkRegex('lpRe', re, flags)) return;
+  if(typeof rxSafety === 'function'){ const x = rxSafety(re, [], true); if(x.level === 'risky') return fieldErr('lpRe', 'This pattern can freeze on lines that almost match: ' + x.notes[0]); }
   if(!/\(\?<\w+>/.test(re)) return fieldErr('lpRe', 'Add at least one named group, e.g. (?<src__ip>[\\d.]+).');
   if(/\(\?<\w+>/.test(re) && new RegExp(re, flags.replace('g', '')).test('')) return fieldErr('lpRe', 'This expression matches an empty line, so it would match everything. Make it more specific.');
   const vals = {name:nm, re, flags:flags.replace('g', '')};

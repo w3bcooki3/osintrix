@@ -166,15 +166,15 @@ function ctfWriteups(){
 }
 
 /* ---------- forensics kit ---------- */
-const LAB_TABS = [['file','File inspector','file-search'], ['logs','Log parser','scan-text'], ['pcap','PCAP','network'], ['sqlite','SQLite','database'], ['image','Image','image'], ['email','Email headers','mail'], ['time','Time & IDs','clock-3'], ['hash','Hashes','fingerprint'], ['geo','Coordinates','compass'], ['net','Network','network'], ['gen','Generators','users'], ['twist','Look-alikes','copy'], ['ident','Identity','user']];
+const LAB_TABS = [['file','File inspector','file-search'], ['logs','Log parser','scan-text'], ['regex','Regex builder','code'], ['pcap','PCAP','network'], ['sqlite','SQLite','database'], ['image','Image','image'], ['email','Email headers','mail'], ['time','Time & IDs','clock-3'], ['hash','Hashes','fingerprint'], ['geo','Coordinates','compass'], ['net','Network','network'], ['gen','Generators','users'], ['twist','Look-alikes','copy'], ['ident','Identity','user']];
 /* the tools in three groups, all visible at any width (the bar wraps instead of hiding tools off to the side) */
-const LAB_GROUPS = [['Analyse files', ['file', 'logs', 'pcap', 'sqlite', 'image']], ['Decode', ['email', 'time', 'hash']], ['Investigate', ['geo', 'net', 'gen', 'twist', 'ident']]];
+const LAB_GROUPS = [['Analyse files', ['file', 'logs', 'regex', 'pcap', 'sqlite', 'image']], ['Decode', ['email', 'time', 'hash']], ['Investigate', ['geo', 'net', 'gen', 'twist', 'ident']]];
 /* one line: a button per group showing the tool in use; its tools drop down under it */
 document.addEventListener('click', ev => { if(UI.ltOpen == null || ev.target.closest('.lt-c')) return; UI.ltOpen = null; document.querySelectorAll('.lt-pop').forEach(x => x.hidden = true); document.querySelectorAll('.lt-cat').forEach(b => b.setAttribute('aria-expanded', 'false')); });
 document.addEventListener('keydown', ev => { if(ev.key === 'Escape' && UI.ltOpen != null){ const b = document.querySelector(`.lt-cat[data-v="${UI.ltOpen}"]`); UI.ltOpen = null; document.querySelectorAll('.lt-pop').forEach(x => x.hidden = true); if(b){ b.setAttribute('aria-expanded', 'false'); b.focus(); } } });
 function viewLab(){
   const t = LAB_TABS.some(x => x[0] === UI.labTab) ? UI.labTab : 'file';
-  const body = {file:labFile, logs:labParse, pcap:labPcap, sqlite:labSql, image:labImage, email:labEmail, time:labTime, hash:labHash, geo:labGeo, net:labNet, gen:labGen, twist:labTwist, ident:labIdent}[t]();
+  const body = {file:labFile, logs:labParse, pcap:labPcap, sqlite:labSql, image:labImage, regex:() => typeof labRegex === 'function' ? labRegex() : '', email:labEmail, time:labTime, hash:labHash, geo:labGeo, net:labNet, gen:labGen, twist:labTwist, ident:labIdent}[t]();
   return `<div class="scroll"><div class="page wide">
     ${libHead('Forensics kit', 'Inspect files and images, read email headers, decode timestamps and IDs, identify hashes, find look-alike domains and pivot on identities. Files never leave your browser; online checks use only the sources you switched on.', '', '')}
     <div class="mpick"><label for="labSel" class="ix">Tool</label><select id="labSel" class="gsel bord">${LAB_TABS.map(([k, l]) => `<option value="${k}"${t === k ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
