@@ -1,0 +1,4 @@
+203.0.113.7 - - [02/Nov/2026:08:15:30 +0100] "GET /wp-login.php HTTP/1.1" 404 196 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+198.51.100.23 - bob [02/Nov/2026:08:15:31 +0100] "POST /api/login HTTP/1.1" 200 512 "https://example.com/login" "curl/8.4.0"
+192.0.2.44 - - [02/Nov/2026:08:15:35 +0100] "GET /index.php?s=/Index/\think\app/invokefunction&function=call_user_func_array HTTP/1.1" 400 0 "-" "python-requests/2.31.0"
+203.0.113.9 - - [02/Nov/2026:08:16:02 +0100] "GET /.env HTTP/1.1" 403 153 "-" "zgrab/0.x"

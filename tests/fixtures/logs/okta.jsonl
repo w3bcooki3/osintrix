@@ -1,0 +1,3 @@
+{"published":"2026-11-02T08:15:30.112Z","eventType":"user.session.start","severity":"WARN","actor":{"alternateId":"alice@corp.example"},"client_ip":"203.0.113.7","outcome":"FAILURE","reason":"INVALID_CREDENTIALS"}
+{"published":"2026-11-02T08:15:34.005Z","eventType":"user.session.start","severity":"INFO","actor":{"alternateId":"alice@corp.example"},"client_ip":"203.0.113.7","outcome":"SUCCESS"}
+{"published":"2026-11-02T08:16:10.871Z","eventType":"user.mfa.factor.deactivate","severity":"WARN","actor":{"alternateId":"alice@corp.example"},"client_ip":"203.0.113.7","outcome":"SUCCESS","reason":"User deactivated factor"}

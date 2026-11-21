@@ -16,7 +16,7 @@ const S = {open:false, q:'', scope:'all', at:0, flat:[], index:null};
 function srchIndex(){
   const I = [], add = (kind, o) => I.push({kind, ...o});
   const nav = [['#/home','Dashboard','layout-dashboard'],['#/cases','Cases','folder-open'],['#/notes','Notes','sticky-note'],['#/toolbox','Toolbox','wrench'],['#/queries','Query library','scan-search'],
-    ['#/ctf','CTF','flag'],['#/notebook','Notebook','graduation-cap'],['#/certs','Certificates','shield-check'],['#/lab','Forensics kit','file-search'],['#/decoder','Decoder','binary'],['#/feeds','Threat Intel','rss'],['#/detections','Detections','file-code'],['#/entities','Entities','fingerprint'],
+    ['#/ctf','CTF','flag'],['#/notebook','Notebook','graduation-cap'],['#/certs','Certificates','shield-check'],['#/lab','Forensics kit','file-search'],['#/regex','Regex builder','regex'],['#/decoder','Decoder','binary'],['#/feeds','Threat Intel','rss'],['#/detections','Detections','file-code'],['#/entities','Entities','fingerprint'],
     ['#/reference','Reference','book-open'],['#/playbooks','Playbooks','list-checks'],['#/help','Help','circle-help'],['#/settings','Settings','settings']];
   for(const [h, l, i] of nav) add('action', {id:'go' + h, title:'Go to ' + l, sub:'Page', icon:i, text:l + ' page open go', run:() => go(h), w:2});
   const c0 = theCase();
@@ -24,7 +24,7 @@ function srchIndex(){
   const acts = [['Capture evidence','plus','capture paste log new record', () => openCapture()], ['Add a vault entry','layers','new entry add person domain ip', () => entryDlg()], ['New case','folder-plus','create case', () => caseDlg()],
     ['New note','sticky-note','note todo', () => go('#/notes')], ['New CTF challenge','flag','ctf challenge add', () => { go('#/ctf'); setTimeout(() => clickAct('ctfNew'), 50); }],
     ['Inspect a file','file-search','file forensics exif hash strings', () => { UI.labTab = 'file'; go('#/lab'); }], ['Convert a timestamp','clock-3','epoch unix filetime webkit time', () => { UI.labTab = 'time'; go('#/lab'); }],
-    ['Identify a hash','fingerprint','hash md5 ntlm bcrypt hashcat', () => { UI.labTab = 'hash'; go('#/lab'); }], ['Convert coordinates','compass','gps dms map geolocation', () => { UI.labTab = 'geo'; go('#/lab'); }],
+    ['Build a regex from log lines','regex','regex regular expression pattern grok rex kql parse log fields extract', () => go('#/regex')], ['Identify a hash','fingerprint','hash md5 ntlm bcrypt hashcat', () => { UI.labTab = 'hash'; go('#/lab'); }], ['Convert coordinates','compass','gps dms map geolocation', () => { UI.labTab = 'geo'; go('#/lab'); }],
     ['Export IOCs of this case','download','ioc csv stix export indicators', () => { go(caseHash(DB.active, 'report')); }], ['Print the report','file-text','pdf print report', () => { go(caseHash(DB.active, 'report')); setTimeout(printReport, 200); }],
     ['Run a playbook on this case','list-checks','playbook checklist', () => go('#/playbooks')], ['Export a backup of everything','download','backup export json', () => clickAct('exportAll')],
     ['Import a backup','upload','restore import backup', () => clickAct('importAll')], ['Import a case','upload','import case json', () => clickAct('importCase')],

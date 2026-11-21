@@ -8,7 +8,7 @@ function renderMain(){
   if(typeof workHydrate === 'function') workHydrate();
   const r = UI.route, el = $('main');
   const V = {today:viewToday, security:viewSecurity, watch:viewWatch, trash:viewTrash, ctf:viewCTF, lab:viewLab, help:viewHelp, home:viewHome, cases:viewCases, toolbox:viewToolbox, entities:viewEntities, feeds:viewIntel, decoder:viewDecoder, reference:viewReference, settings:viewSettings,
-    detections:viewDetections, queries:viewQueries, notes:viewNotes, playbooks:viewPlaybooks, cloud:viewCloud, whatsnew:viewWhatsNew, pad:viewPad, notebook:viewNotebook, certs:viewCerts};
+    detections:viewDetections, queries:viewQueries, notes:viewNotes, playbooks:viewPlaybooks, cloud:viewCloud, whatsnew:viewWhatsNew, pad:viewPad, notebook:viewNotebook, certs:viewCerts, regex:viewRegex};
   if(cy && !(r.area === 'case' && r.tab === 'graph')){ cy.destroy(); cy = null; }
   const key = r.area + '/' + (r.tab || ''), sc = el.querySelector('.scroll'), keepY = renderMain.key === key && sc ? sc.scrollTop : 0; renderMain.key = key;
   try{ el.innerHTML = r.area === 'case' ? viewCase(r.tab) : (V[r.area] || viewHome)(); }
@@ -44,7 +44,7 @@ function placeInsp(){ const t = document.querySelector('.gtools') || document.qu
   if(t){ const r = t.getBoundingClientRect(); if(r.height) y = Math.round(r.bottom + 10); }
   document.documentElement.style.setProperty('--insp-top', y ? y + 'px' : ''); }
 window.addEventListener('resize', () => { clearTimeout(placeInsp.t); placeInsp.t = setTimeout(placeInsp, 120); });
-const TITLES = {today:'Today', security:'Security', watch:'Watchlist', trash:'Trash', ctf:'CTF', lab:'Forensics kit', help:'Help', home:'Dashboard', cases:'Cases', toolbox:'Toolbox', entities:'Entities', feeds:'Threat Intel', decoder:'Decoder', reference:'Reference', settings:'Settings', detections:'Detections', queries:'Query library', notes:'Notes', playbooks:'Playbooks', library:'Library', cloud:'Cloud', whatsnew:"What's new", pad:"Scratchpad", notebook:'Notebook', certs:'Certificates'};
+const TITLES = {today:'Today', security:'Security', watch:'Watchlist', trash:'Trash', ctf:'CTF', lab:'Forensics kit', help:'Help', home:'Dashboard', cases:'Cases', toolbox:'Toolbox', entities:'Entities', feeds:'Threat Intel', decoder:'Decoder', reference:'Reference', settings:'Settings', detections:'Detections', queries:'Query library', notes:'Notes', playbooks:'Playbooks', library:'Library', cloud:'Cloud', whatsnew:"What's new", pad:"Scratchpad", notebook:'Notebook', certs:'Certificates', regex:'Regex builder'};
 function onRoute(){
   UI.route = parseHash(); $('side').classList.remove('open');
   document.title = (UI.route.area === 'case' ? theCase().name.split(' — ')[0] + ' · ' + CASE_TABS.find(t => t[0] === UI.route.tab)[1] : TITLES[UI.route.area] || 'OSINTrix') + ' — OSINTrix';

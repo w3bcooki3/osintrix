@@ -1,0 +1,33 @@
+Log Name:      Security
+Source:        Microsoft-Windows-Security-Auditing
+Date:          11/2/2026 8:15:30 AM
+Event ID:      4625
+Task Category: Logon
+Level:         Information
+Keywords:      Audit Failure
+User:          N/A
+Computer:      DC01.corp.local
+Description:
+An account failed to log on.
+Log Name:      Security
+Source:        Microsoft-Windows-Security-Auditing
+Date:          11/2/2026 8:15:41 AM
+Event ID:      4624
+Task Category: Logon
+Level:         Information
+Keywords:      Audit Success
+User:          N/A
+Computer:      WS042.corp.local
+Description:
+An account was successfully logged on.
+Log Name:      Security
+Source:        Microsoft-Windows-Security-Auditing
+Date:          11/2/2026 8:16:02 AM
+Event ID:      4672
+Task Category: Special Logon
+Level:         Information
+Keywords:      Audit Success
+User:          N/A
+Computer:      WS042.corp.local
+Description:
+Special privileges assigned to new logon.

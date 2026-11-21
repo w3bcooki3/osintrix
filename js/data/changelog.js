@@ -4,6 +4,46 @@
    Each change has a type: "added" | "changed" | "fixed" | "removed". */
 const CHANGELOG_DATA = [
   {
+    "version": "1.51",
+    "name": "Regex builder, rebuilt",
+    "date": "2026-11-21",
+    "summary": "The Regex builder becomes a workbench: the coloured pattern on top, your lines below, and a sidebar that explains the pattern, shows what each line gives and why a line is missed. It sorts mixed logs into formats, joins records over several lines, names the fields of common layouts in one click, and makes patterns faster where it can prove nothing changes.",
+    "changes": [
+      {
+        "type": "changed",
+        "text": "Regex builder layout: the pattern sits on top with its formats, match count and safety; the lines are below (or a table of what they give); a sidebar has Match, Explain, Fields, Speed and Export. The pattern is coloured, each field labelled, and long standard parts (IP addresses, timestamps) shown by name — expand to see them in full. Click it to edit by hand."
+      },
+      {
+        "type": "added",
+        "text": "Why a line is missed: the pattern shows how far it got on the line, what it expected next and what it found instead."
+      },
+      {
+        "type": "added",
+        "text": "Explain: the pattern in plain words, piece by piece — “field user — text up to a space”, “one of Failed password for [invalid user]”. Hover a field anywhere and it lights up in the lines, the pattern, the explanation and the table."
+      },
+      {
+        "type": "added",
+        "text": "Formats: mixed logs (sshd, sudo, cron, a firewall…) are sorted into groups of lines written the same way, each with its own pattern and match count. Every format can be exported at once: several Grok patterns, Splunk rex lines, a KQL case(), a JavaScript or Python lookup, most specific first."
+      },
+      {
+        "type": "added",
+        "text": "Records over several lines — Java stack traces, Windows Event Viewer text exports, pretty-printed JSON — are found and joined, with the same record-start setting for Logstash, Filebeat, Splunk and Fluent Bit."
+      },
+      {
+        "type": "added",
+        "text": "Auto-parse names the fields of key=value, JSON (nested fields too), CSV and TSV, CEF, LEEF, syslog (RFC 3164 and 5424, with firewall key=value messages and the users, addresses and ports in a message), Apache and nginx, IIS W3C and “Key: value” exports — learning variations from lines its first pattern misses."
+      },
+      {
+        "type": "added",
+        "text": "Optional fields: a field some lines lack is written as optional, in its place, with the words before it. Each field shows how often it is present, how many values it has and the commonest ones."
+      },
+      {
+        "type": "added",
+        "text": "Optimiser: up to six rewrites — tying to the line start, taking out shared words, character classes for single-character choices, one-pass quoted text, exact classes instead of wildcards, a fixed word checked first — each kept only if every line gives exactly the same values, shown with what changed and the speed before and after."
+      }
+    ]
+  },
+  {
     "version": "1.50",
     "name": "Regex builder",
     "date": "2026-11-20",
@@ -11,7 +51,7 @@ const CHANGELOG_DATA = [
     "changes": [
       {
         "type": "added",
-        "text": "Forensics kit → Regex builder: paste log lines or open a log file, select the parts you want and name them. The pattern uses a precise form for what it recognises (IPv4 and IPv6, ISO, syslog and web-server times, email, URL, GUID, hashes, SIDs, numbers) and “up to the next delimiter” for the rest; host names and process numbers become patterns, an empty field written as “-” matches whatever is there, and fixed words stay as anchors."
+        "text": "Regex builder, its own page in the sidebar under Kit (or type “regex” in search): paste log lines or open a log file, select the parts you want and name them. The pattern uses a precise form for what it recognises (IPv4 and IPv6, ISO, syslog and web-server times, email, URL, GUID, hashes, SIDs, numbers) and “up to the next delimiter” for the rest; host names and process numbers become patterns, an empty field written as “-” matches whatever is there, and fixed words stay as anchors."
       },
       {
         "type": "added",

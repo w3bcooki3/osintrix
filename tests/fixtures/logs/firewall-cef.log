@@ -1,0 +1,4 @@
+Nov 02 08:15:30 fw01 CEF:0|Palo Alto Networks|PAN-OS|10.2.4|THREAT|vulnerability|7|rt=Nov 02 2026 08:15:30 src=203.0.113.7 dst=10.0.0.5 spt=51544 dpt=443 proto=TCP act=reset-both msg=SQL injection attempt detected cs1Label=Rule cs1=block-web
+Nov 02 08:15:31 fw01 CEF:0|Palo Alto Networks|PAN-OS|10.2.4|TRAFFIC|end|3|rt=Nov 02 2026 08:15:31 src=10.0.0.8 dst=8.8.8.8 spt=55000 dpt=53 proto=UDP act=allow
+Nov 02 08:15:33 fw01 CEF:0|Palo Alto Networks|PAN-OS|10.2.4|THREAT|spyware|8|rt=Nov 02 2026 08:15:33 src=10.0.0.9 dst=185.220.101.4 spt=50111 dpt=443 proto=TCP act=drop msg=C2 beacon to known Tor exit cs1Label=Rule cs1=block-c2
+Nov 02 08:15:36 fw01 CEF:0|Palo Alto Networks|PAN-OS|10.2.4|TRAFFIC|end|3|rt=Nov 02 2026 08:15:36 src=10.0.0.8 dst=1.1.1.1 spt=55002 dpt=443 proto=TCP act=allow

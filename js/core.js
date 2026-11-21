@@ -198,7 +198,7 @@ function passes(r){
 }
 
 /* ---------- routing ---------- */
-const AREAS = ['today','security','watch','trash','help','ctf','lab','home','cases','case','toolbox','entities','feeds','decoder','reference','settings','detections','playbooks','queries','notes','cloud','whatsnew','pad','notebook','certs'];
+const AREAS = ['today','security','watch','trash','help','ctf','lab','home','cases','case','toolbox','entities','feeds','decoder','reference','settings','detections','playbooks','queries','notes','cloud','whatsnew','pad','notebook','certs','regex'];
 const CASE_TABS = [['overview','Overview','layout-dashboard'],['vault','Vault','layers'],['entities','Entities','fingerprint'],['timeline','Timeline','clock'],['graph','Graph','waypoints'],['map','Places','map-pin'],['media','Media','images'],['infra','Infrastructure','network'],['questions','Analysis','scale'],['report','Report','file-chart-column']];
 function parseHash(){
   const p = (location.hash || '#/home').replace(/^#\/?/, '').split('/').map(decodeURIComponent);

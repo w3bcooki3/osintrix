@@ -243,8 +243,11 @@ test('sample case: “Harbourline refund scam” is added to a workspace with sa
 test('regex builder: select fields in SSH log lines, the pattern is built and tried on every line, a missed line teaches it a variation, it is exported for six tools, saved as a parser that reads a log import, and a risky hand-written pattern is flagged', async ({ page, context }) => {
   const errors = await open(page, '#/home');
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-  await page.evaluate(() => { UI.labTab = 'regex'; go('#/lab'); });
-  await page.click('[data-act=rxDemo]');
+  // its own entry in the sidebar, and "regex" in search goes straight to it
+  await page.click('#side a[href="#/regex"]'); await expect(page.locator('.lhd h1')).toHaveText('Regex builder');
+  await page.evaluate(() => go('#/home')); await page.evaluate(() => srchOpen()); await page.fill('#srQ', 'regex'); await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/#\/regex$/); await expect(page.locator('[data-act=rxDemo]:not([data-v])')).toBeVisible();
+  await page.click('[data-act=rxDemo]:not([data-v])');
   await expect(page.locator('.rx-ln')).toHaveCount(6);
   // select text in a line, as with the mouse, and name it
   const pick = async (line, text, name) => {
@@ -259,6 +262,10 @@ test('regex builder: select fields in SSH log lines, the pattern is built and tr
   const stat = () => page.locator('.rx-stat b').textContent();
   expect(await stat()).toBe('1');
   await expect(page.locator('#rxSrcView')).toContainText('(?<src_ip>(?:25[0-5]');
+  // a missed line says where the pattern stops and what it expected there
+  await page.click('.rx-ln[data-i="1"] .rx-no');
+  await expect(page.locator('.rx-ln[data-i="1"] .rx-why')).toContainText('then expects');
+  await expect(page.locator('.rx-tb-b')).toContainText('The pattern matches the start of this line up to column');
   // teach it: the same fields on lines it missed — a second line suggests the names in order
   await pick(1, 'Nov  2 08:15:33'); await pick(1, 'admin'); await pick(1, '203.0.113.7'); await pick(1, '51560');
   await pick(2, 'Nov  2 08:16:02'); await pick(2, 'deploy'); await pick(2, '198.51.100.23'); await pick(2, '40022');
@@ -268,13 +275,19 @@ test('regex builder: select fields in SSH log lines, the pattern is built and tr
   await pick(4, 'Nov 12 22:01:50'); await pick(4, 'j.doe'); await pick(4, '192.0.2.44'); await pick(4, '52111');
   expect(await stat()).toBe('5');   // all but "Connection closed", which has no user
   const src = await page.locator('#rxSrcView').textContent();
-  expect(src).toContain('(?:Failed +password +for +invalid +user|Accepted +publickey +for|Accepted +password +for|Failed +password +for)'); expect(src).toContain('[\\w.-]+ +sshd\\[\\d+\\]');
+  expect(src).toContain('(?:Failed +password +for(?: +invalid +user)?|Accepted(?: +publickey +for| +password +for))'); expect(src).toContain('[\\w.-]+ +sshd\\[\\d+\\]');
   expect(src).not.toMatch(/\.\*(?!\?)/);                                                     // no greedy wildcards
   await expect(page.locator('.rx-safe')).toHaveText(/Safe on hostile input/);
+  await page.click('[data-act=rxLeft][data-v=table]');
   const rows = await page.locator('.rx-tb tbody tr').evaluateAll(T => T.map(r => [...r.cells].map(c => c.textContent)));
   expect(rows).toEqual([['1', 'Nov  2 08:15:30', 'root', '203.0.113.7', '51544'], ['2', 'Nov  2 08:15:33', 'admin', '203.0.113.7', '51560'], ['3', 'Nov  2 08:16:02', 'deploy', '198.51.100.23', '40022'], ['4', 'Nov 12 22:01:47', 'root', '2001:db8::7', '6022'], ['5', 'Nov 12 22:01:50', 'j.doe', '192.0.2.44', '52111']]);
+  await page.click('[data-act=rxLeft][data-v=lines]');
   await page.click('[data-act=rxShow][data-v=miss]'); await expect(page.locator('.rx-ln')).toHaveCount(1); await expect(page.locator('.rx-ln')).toContainText('Connection closed'); await page.click('[data-act=rxShow][data-v=all]');
+  // the pattern explained piece by piece
+  await page.click('[data-act=rxTab][data-v=explain]');
+  await expect(page.locator('.rx-xp')).toContainText('field time — Syslog time'); await expect(page.locator('.rx-xp')).toContainText('one of Failed password for [invalid user]');
   // exports: each one is the same pattern in that tool's own syntax
+  await page.click('[data-act=rxTab][data-v=export]');
   const exp = async k => { await page.click(`[data-act=rxExp][data-v=${k}]`); return page.locator('#rxOut').textContent(); };
   const js = await exp('js'); expect(js.startsWith('/') && js.endsWith('/')).toBe(true); const re = new RegExp(js.slice(1, -1));
   expect('Nov 30 23:59:59 bastion-3 sshd[9]: Accepted password for svc_backup from 10.0.0.5 port 1 ssh2'.match(re).groups).toEqual({ time: 'Nov 30 23:59:59', user: 'svc_backup', src_ip: '10.0.0.5', port: '1' });
@@ -297,5 +310,155 @@ test('regex builder: select fields in SSH log lines, the pattern is built and tr
   await page.click('[data-act=rxReset]'); await page.fill('#rxText', '<img src=x onerror=window.__x=1> user="><b id=pwn>x</b> from 10.1.1.1'); await page.click('[data-act=rxGo]');
   await pick(0, '10.1.1.1', 'ip'); expect(await page.evaluate(() => [window.__x, document.querySelectorAll('#pwn, img[src="x"]').length])).toEqual([undefined, 0]);
   expect(await page.evaluate(() => JSON.stringify(DB).includes('onerror=window.__x'))).toBe(false);
+  noErrors(errors);
+});
+
+/* ---------- Regex builder, v1.51: formats, records over several lines, auto-parse, optional fields, the optimiser ---------- */
+const rxTable = page => page.locator('.rx-tb').evaluate(t => { const H = [...t.tHead.rows[0].cells].slice(1).map(c => c.textContent.trim()); return [...t.tBodies[0].rows].map(r => Object.fromEntries([...r.cells].slice(1).map((c, i) => [H[i], c.textContent]))); });
+const rxLoad = async (page, text) => { await page.evaluate(() => { UI.rx = null; go('#/regex'); renderMain(); }); await page.fill('#rxText', text); await page.click('[data-act=rxGo]'); };
+const rxFormat = async (page, name) => { await page.locator('.rx-fmi', { has: page.locator(`b.mono:text-is("${name}")`) }).click(); };
+
+test('regex builder formats: a mixed server log is sorted into formats, auto-parse names each one\'s fields, a field some lines lack is optional with its coverage, and every format is exported at once for six tools', async ({ page, context }) => {
+  const errors = await open(page, '#/regex');
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.click('[data-act=rxDemo][data-v=mixed]');
+  await expect(page.locator('.rx-bar')).toContainText('13 lines · 6 formats');
+  const F = await page.evaluate(() => Object.fromEntries(UI.rx.fmts.map(f => [f.name, f.lines.map(i => i + 1)])));
+  // failed and accepted passwords (with and without "invalid user", IPv4 and IPv6) are one format; closed connections, cron, sudo and the firewall are each their own
+  expect(F).toMatchObject({ sshd: [1, 2, 3, 10], cron: [4, 6], sudo: [5, 7], kernel: [8, 9], sshd_2: [12, 13] });
+  await page.click('[data-act=rxAutoParse]');
+  await expect(page.locator('.toast').last()).toContainText('Recognised: Syslog ×6');
+  // every format has a pattern that matches all its lines
+  for (const s of await page.locator('.rx-fmi:not(.rx-fmall) .rx-fms').allTextContents()) { const m = s.match(/(\d+) of (\d+)/); expect(m && m[1]).toBe(m && m[2]); }
+  await expect(page.locator('.rx-fmi[aria-pressed=true] b.mono')).toHaveText('sshd');
+  await page.click('[data-act=rxLeft][data-v=table]');
+  let T = await rxTable(page);
+  expect(T.map(r => [r.user, r.src_ip, r.port])).toEqual([['root', '203.0.113.7', '51544'], ['admin', '203.0.113.7', '51560'], ['deploy', '198.51.100.23', '40022'], ['root', '2001:db8::7', '6022']]);
+  // the firewall lines: key=value pairs become fields; WINDOW is on one line of two, so it is optional
+  await rxFormat(page, 'kernel');
+  T = await rxTable(page);
+  expect(T.map(r => [r.text, r.SRC, r.DPT, r.PROTO, r.WINDOW])).toEqual([['[UFW BLOCK]', '185.220.101.4', '22', 'TCP', '64240'], ['[UFW BLOCK]', '45.155.205.3', '161', 'UDP', '—']]);
+  await page.click('[data-act=rxTab][data-v=fields]');
+  await expect(page.locator('.rx-cov[title$=" have WINDOW"]')).toHaveText('optional · 50% of matches');
+  await expect(page.locator('.rx-fld[data-f=PROTO] .rx-fr3')).toContainText('2 distinct');
+  await expect(page.locator('.rx-fld[data-f=DST] .rx-fr3')).toContainText('1 distinct10.0.0.5 ×2');
+  await expect(page.locator('.rx-cov[title$=" have SRC"]')).toHaveText('every match');
+  await page.click('[data-act=rxTab][data-v=explain]'); await expect(page.locator('.rx-xp')).toContainText('optional: WINDOW= then field WINDOW');
+  expect(await page.locator('#rxSrcView').textContent()).toContain('(?: +WINDOW=(?<WINDOW>');
+  await rxFormat(page, 'sudo');
+  T = await rxTable(page); expect(T.map(r => [r.text, r.USER, r.COMMAND])).toEqual([['deploy', 'root', '/usr/bin/systemctl restart nginx'], ['alice', 'root', '/bin/cat /etc/shadow']]);
+  // every format at once
+  await page.click('[data-act=rxTab][data-v=export]');
+  await page.click('[data-act=rxExpAll][data-v="1"]');
+  const exp = async k => { await page.click(`[data-act=rxExp][data-v=${k}]`); return page.locator('#rxOut').textContent(); };
+  const js = await exp('js');
+  const parse = new Function('line', 'let fields = null;\n' + js + '\nreturn fields;');
+  const lines = (await page.evaluate(() => RX_DEMO_MIXED)).split('\n');
+  const out = lines.map(parse);
+  expect(out.every(Boolean)).toBe(true);
+  expect(out.map(o => o.format)).toEqual(['sshd', 'sshd', 'sshd', 'cron', 'sudo', 'cron', 'sudo', 'kernel', 'kernel', 'sshd', 'sshd_3', 'sshd_2', 'sshd_2']);
+  expect(out[7]).toMatchObject({ SRC: '185.220.101.4', DPT: '22' }); expect(out[11]).toMatchObject({ src_ip: '192.0.2.44', port: '52111' });
+  expect(await exp('python')).toMatch(/PATTERNS = \{[\s\S]*"kernel": re\.compile\(r'.*\(\?P<SRC>/);
+  const grok = await exp('grok'); expect(grok).toContain('match => { "message" => ['); expect((grok.match(/^      '/gm) || []).length).toBe(6); expect(grok).toContain('%{SYSLOGTIMESTAMP:time}');
+  expect(((await exp('splunk')).match(/^\| rex field=_raw/gm) || []).length).toBe(6);
+  const kql = await exp('kql'); expect(kql).toContain('| extend format = case('); expect(kql).toMatch(/SRC = case\(format == "kernel", extract\(@".*", 7, RawData\), ""\)/);
+  await page.click('[data-act=rxCopy]'); expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(kql);
+  // back to one pattern for every line: the fields of different formats do not line up, and it says so
+  await page.click('.rx-fmall'); await page.click('[data-act=rxLeft][data-v=lines]');
+  await expect(page.locator('.rx-bar')).toContainText('13 lines'); await expect(page.locator('.rx-ln')).toHaveCount(13);
+  noErrors(errors);
+});
+
+test('regex builder records: a Java log with stack traces and a Windows Event Viewer text export are read as records, auto-parse names their fields, and the same record setting is given for Logstash, Filebeat, Splunk and Fluent Bit', async ({ page }) => {
+  const errors = await open(page, '#/regex');
+  await page.click('[data-act=rxDemo][data-v=java]');
+  await expect(page.locator('.rx-mlc')).toContainText('11 lines read as 4 records · each starts with an ISO 8601 time');
+  await expect(page.locator('.rx-ln')).toHaveCount(4);
+  await page.click('[data-act=rxAutoParse]');
+  await expect(page.locator('.toast').last()).toContainText('Application log');
+  await expect(page.locator('.rx-stat b')).toHaveText('4');
+  await page.click('[data-act=rxLeft][data-v=table]');
+  const T = await rxTable(page);
+  expect(T.map(r => [r.level, r.thread, r.logger, r.message])).toEqual([['INFO', 'main', 'c.e.App', 'Started in 2.3s'], ['ERROR', 'http-nio-8080-exec-1', 'c.e.Api', 'Request failed for user alice'], ['WARN', 'main', 'c.e.Db', 'Slow query 1200 ms'], ['ERROR', 'http-nio-8080-exec-4', 'c.e.Auth', 'Login refused for 203.0.113.7']]);
+  expect(T[1].detail).toBe('java.lang.NullPointerException: user is null\n\tat com.example.Api.handle(Api.java:42)\n\tat org.apache.catalina.core.StandardWrapperValve.invoke(StandardWrapperValve.java:197)\nCaused by: java.io.IOException: closed\n\t... 12 more');
+  expect(T[2].detail).toBe('—');
+  await page.click('[data-act=rxTab][data-v=fields]');
+  await expect(page.locator('.rx-cov[title$=" have detail"]')).toHaveText('optional · 50% of matches');
+  // the shipper settings: applied to the raw lines, the start pattern cuts them into the same 4 records
+  await page.click('[data-act=rxTab][data-v=export]'); await page.click('.rx-box summary');
+  const ml = await page.locator('#rxMlOut').textContent();
+  expect(ml).toContain('negate => true'); expect(ml).toContain('match: after'); expect(ml).toContain('SHOULD_LINEMERGE = false'); expect(ml).toContain('[MULTILINE_PARSER]');
+  const fb = ml.match(/pattern: '(.*)'/)[1], raw = (await page.evaluate(() => RX_DEMO_JAVA)).split('\n');
+  expect(raw.filter(l => new RegExp(fb).test(l)).length).toBe(4);
+  const lb = ml.match(/LINE_BREAKER = (.*)/)[1]; expect(raw.join('\n').split(new RegExp(lb)).filter(x => x && !/^[\r\n]+$/.test(x)).length).toBe(4);
+  // read line by line again
+  await page.click('[data-act=rxMl]'); await expect(page.locator('.rx-bar')).toContainText('11 lines'); await page.click('[data-act=rxLeft][data-v=lines]'); await expect(page.locator('.rx-ln')).toHaveCount(11);
+  // a Windows Event Viewer export (text): one record per event, each "Key: value" a field
+  await rxLoad(page, fs.readFileSync(FX('logs', 'winevents.txt'), 'utf8'));
+  await expect(page.locator('.rx-mlc')).toContainText('33 lines read as 3 records · each starts with “Log Name:”');
+  await page.click('[data-act=rxAutoParse]'); await page.click('[data-act=rxLeft][data-v=table]');
+  const W = await rxTable(page);
+  expect(W.map(r => [r.Event_ID, r.Task_Category, r.Keywords, r.Computer, r.Date])).toEqual([['4625', 'Logon', 'Audit Failure', 'DC01.corp.local', '11/2/2026 8:15:30 AM'], ['4624', 'Logon', 'Audit Success', 'WS042.corp.local', '11/2/2026 8:15:41 AM'], ['4672', 'Special Logon', 'Audit Success', 'WS042.corp.local', '11/2/2026 8:16:02 AM']]);
+  noErrors(errors);
+});
+
+test('regex builder auto-parse: Apache, a Palo Alto CEF feed, IIS W3C with its header, Okta JSON with nested fields and a VPN CSV with a quoted comma each get named fields and a pattern that matches every line', async ({ page }) => {
+  const errors = await open(page, '#/regex');
+  const cases = [
+    ['access.log', 'Apache / nginx', 4, T => { expect(T.map(r => [r.client_ip, r.user, r.method, r.path, r.status, r.user_agent])[3]).toEqual(['203.0.113.9', '-', 'GET', '/.env', '403', 'zgrab/0.x']); expect(T[2].path).toBe('/index.php?s=/Index/\\think\\app/invokefunction&function=call_user_func_array'); expect(T[1].referrer).toBe('https://example.com/login'); }],
+    ['firewall-cef.log', 'CEF', 4, T => { expect(T.map(r => [r.signature_id, r.src, r.dst, r.dpt, r.act])).toEqual([['THREAT', '203.0.113.7', '10.0.0.5', '443', 'reset-both'], ['TRAFFIC', '10.0.0.8', '8.8.8.8', '53', 'allow'], ['THREAT', '10.0.0.9', '185.220.101.4', '443', 'drop'], ['TRAFFIC', '10.0.0.8', '1.1.1.1', '443', 'allow']]); expect(T[2].msg).toBe('C2 beacon to known Tor exit'); expect(T[1].msg).toBe('—'); expect(T[0].rt).toBe('Nov 02 2026 08:15:30'); }],
+    ['iis.log', 'IIS / W3C', 4, T => { expect(T.map(r => [r.cs_method, r.cs_uri_stem, r.cs_username, r.c_ip, r.sc_status])).toEqual([['GET', '/owa/auth/logon.aspx', '-', '203.0.113.7', '200'], ['POST', '/autodiscover/autodiscover.json', '-', '198.51.100.23', '200'], ['POST', '/ecp/DDI/DDIService.svc/GetList', 'CORP\\svc-backup', '198.51.100.23', '401'], ['GET', '/aspnet_client/system_web/shell.aspx', '-', '198.51.100.23', '200']]); expect(T[3].cs_uri_query).toBe('cmd=whoami'); }],
+    ['okta.jsonl', 'JSON', 3, T => { expect(T.map(r => [r.eventType, r.actor_alternateId, r.client_ip, r.outcome, r.reason])).toEqual([['user.session.start', 'alice@corp.example', '203.0.113.7', 'FAILURE', 'INVALID_CREDENTIALS'], ['user.session.start', 'alice@corp.example', '203.0.113.7', 'SUCCESS', '—'], ['user.mfa.factor.deactivate', 'alice@corp.example', '203.0.113.7', 'SUCCESS', 'User deactivated factor']]); }],
+    ['vpn.csv', 'CSV (comma)', 4, T => { expect(T.map(r => [r.user, r.src_ip, r.country, r.result])).toEqual([['alice', '203.0.113.7', 'NL', 'fail'], ['alice', '203.0.113.7', 'NL', 'ok'], ['smith, j', '192.0.2.4', 'US', 'ok'], ['bob', '198.51.100.23', 'DE', 'ok']]); }]];
+  for (const [file, label, n, check] of cases) {
+    await rxLoad(page, fs.readFileSync(FX('logs', file), 'utf8'));
+    await page.click('[data-act=rxAutoParse]');
+    await expect(page.locator('.toast').last()).toContainText(label);
+    await expect(page.locator('.rx-stat')).toContainText(`${n} of ${n}`);
+    await page.click('[data-act=rxLeft][data-v=table]');
+    check(await rxTable(page));
+  }
+  // the header lines of the IIS log and the CSV are their own format and left alone
+  await expect(page.locator('.rx-fmi', { hasText: 'header' }).locator('.rx-fms')).toHaveText('not parsed');
+  // a field selected by hand is never overwritten: auto-parse fills only formats without fields
+  await rxLoad(page, fs.readFileSync(FX('logs', 'access.log'), 'utf8'));
+  await page.evaluate(() => { UI.rx.fields.push({ line: 0, s: 0, e: 11, name: 'mine' }); renderMain(); });
+  await page.click('[data-act=rxAutoParse]'); await expect(page.locator('.toast').last()).toContainText('Every format already has fields');
+  expect(await page.evaluate(() => UI.rx.fields.map(f => f.name))).toEqual(['mine']);
+  noErrors(errors);
+});
+
+test('regex builder optimiser: rewrites are tried one at a time, kept only when every line gives the same values, shown with what changed and the speed before and after, and the optimised pattern is what gets exported', async ({ page }) => {
+  const errors = await open(page, '#/regex');
+  // the engine on its own: shared starts are taken out, a lazy wildcard becomes an exact class, a rewrite that changes a value is refused
+  const r = await page.evaluate(() => { const L = RX_DEMO_MIXED.split('\n');
+    const a = rxOptimise('sshd\\[\\d+\\]: +(?:Failed +password +for +invalid +user|Accepted +password +for|Failed +password +for) +(?<user>\\S+) +from', L, []);
+    const b = rxOptimise('(?<pid>\\d+)\\]: .*?for (?<user>\\S+) from (?<ip>\\S+)', L, []);
+    const c = rxOptimise('for (?<who>.+?) from', L, [{ k: 'anchor', src: '^for (?<who>.+?) from' }]);
+    const d = rxOptimise('"(?<q>(?:[^"\\\\]|\\\\.)*)"', ['say "a \\"b\\" c" now', 'x "" y', 'none'], []);
+    return { a: a.src, a0: a.from, aA: a.steps.find(s => s.k === 'factor').after, aS: a.steps.find(s => s.k === 'factor').state, b: b.src, bS: b.steps.find(s => s.k === 'lazy'), c: c.src, cS: c.steps.map(s => s.k + ':' + s.state), d: d.src, dA: d.steps.find(s => s.k === 'unroll').after, same: [a, b, c].every(x => rxSame(x.from, x.src, L)) && rxSame(d.from, d.src, ['say "a \\"b\\" c" now', 'x "" y']) }; });
+  // a pure rewrite: kept unless this browser measures it slower
+  expect(r.aA).toBe('sshd\\[\\d+\\]: +(?:Failed +password +for(?: +invalid +user)?|Accepted +password +for) +(?<user>\\S+) +from'); expect(['kept', 'slower']).toContain(r.aS); expect(r.a).toBe(r.aS === 'kept' ? r.aA : r.a0);
+  expect(r.bS.after).toBe('(?<pid>\\d+)\\]: [^f\\r\\n]*for (?<user>\\S+) from (?<ip>\\S+)'); expect(['kept', 'slower']).toContain(r.bS.state); expect(r.bS.detail).toBe('1 wildcard');
+  // "for invalid user admin from": the name has spaces, so [^ ]+ would cut it short — left as it is; tied to the line start it would match nothing — refused
+  expect(r.c).toBe('for (?<who>.+?) from'); expect(r.cS).toContain('anchor:differs'); expect(r.cS).toContain('lazy:none');
+  expect(r.dA).toBe('"(?<q>[^"\\\\]*(?:\\\\.[^"\\\\]*)*)"'); expect(r.same).toBe(true);
+  // in the page
+  await page.click('[data-act=rxDemo][data-v=mixed]'); await page.click('[data-act=rxAutoParse]');
+  await page.click('[data-act=rxTab][data-v=speed]'); await page.click('[data-act=rxOpt]');
+  await expect(page.locator('.rx-steps li')).toHaveCount(6);
+  await expect(page.locator('.rx-speed')).toContainText(/lines a second/);
+  const states = await page.locator('.rx-steps .rx-sts').allTextContents();
+  expect(states.every(s => /^(Kept|Nothing to change|Not faster — left out|Would change the results — left out)/.test(s))).toBe(true);
+  for (const li of await page.locator('.rx-steps li.kept').all()) { await expect(li.locator('.rx-diff del, .rx-diff ins').first()).toBeAttached(); await expect(li).toContainText(/a second/); }
+  const before = await page.locator('.rx-stat b').textContent(), built = await page.locator('#rxSrcView').textContent();
+  if (await page.locator('[data-act=rxOptUse]').count()) {
+    await page.click('[data-act=rxOptUse]');
+    await expect(page.locator('.rx-pact .chip')).toHaveText('optimised');
+    const opt = await page.locator('#rxSrcView').textContent(); expect(opt).not.toBe(built);
+    await expect(page.locator('.rx-stat b')).toHaveText(before);
+    await page.click('[data-act=rxTab][data-v=export]'); await page.click('[data-act=rxExp][data-v=pcre]'); await expect(page.locator('#rxOut')).toHaveText(opt);
+    await page.click('[data-act=rxOptOff]'); await expect(page.locator('#rxSrcView')).toHaveText(built);
+  }
   noErrors(errors);
 });
