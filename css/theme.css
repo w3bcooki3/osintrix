@@ -62,7 +62,7 @@ h1,h2,h3{letter-spacing:-.02em;font-weight:620}
 .btn:hover{background:var(--hover);border-color:var(--border)}
 .btn.primary{background:var(--accent-bg);border-color:var(--accent-bg);color:#fff}
 .btn.primary:hover{filter:none;background:color-mix(in srgb,var(--accent-bg) 88%,#000)}
-html[data-theme=dark] .btn.primary:hover{background:color-mix(in srgb,var(--accent-bg) 85%,#fff)}
+html[data-theme=dark] .btn.primary:hover{background:color-mix(in srgb,var(--accent-bg) 86%,#000)}
 .btn.sm{height:30px;border-radius:6px} .btn.xs{height:26px;border-radius:6px} .btn.big{height:40px;border-radius:8px}
 .btn kbd,kbd{border-radius:4px}
 .iconbtn,.tb-ic,.gbtn{border-radius:6px}

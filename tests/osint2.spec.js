@@ -330,7 +330,7 @@ test('regex builder formats: a mixed server log is sorted into formats, auto-par
   await expect(page.locator('.toast').last()).toContainText('Recognised: Syslog ×6');
   // every format has a pattern that matches all its lines
   for (const s of await page.locator('.rx-fmi:not(.rx-fmall) .rx-fms').allTextContents()) { const m = s.match(/(\d+) of (\d+)/); expect(m && m[1]).toBe(m && m[2]); }
-  await expect(page.locator('.rx-fmi[aria-pressed=true] b.mono')).toHaveText('sshd');
+  await expect(page.locator('.rx-fmi[aria-selected=true] b.mono')).toHaveText('sshd');
   await page.click('[data-act=rxLeft][data-v=table]');
   let T = await rxTable(page);
   expect(T.map(r => [r.user, r.src_ip, r.port])).toEqual([['root', '203.0.113.7', '51544'], ['admin', '203.0.113.7', '51560'], ['deploy', '198.51.100.23', '40022'], ['root', '2001:db8::7', '6022']]);
@@ -524,5 +524,285 @@ test('regex builder table and CTF help: the details panel folds away for the tab
   await page.evaluate(() => { go('#/ctf'); UI.ctfTab = 'cheats'; renderMain(); });
   await expect(page.locator('.cs4-hp')).toBeHidden();
   await page.hover('.cs4-hb'); await expect(page.locator('.cs4-hp')).toBeVisible(); await expect(page.locator('.cs4-hp')).toContainText('public breadcrumbs');
+  noErrors(errors);
+});
+
+test('polish: no screen is wider than a phone, tab strips that do not fit scroll with a soft edge, and text cut off with … shows in full when pointed at', async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await ctx.addInitScript(() => { try { localStorage.setItem('osintrix:welcomed', '1'); } catch (e) {} });
+  const page = await ctx.newPage(); const errors = []; page.on('pageerror', e => errors.push(e.message));
+  await page.goto(require('url').pathToFileURL(require('path').join(__dirname, '..', 'index.html')).href + '#/home');
+  await expect(page.locator('#main .page, #main .scroll').first()).toBeVisible();
+  const areas = ['home', 'today', 'cases', 'entities', 'feeds', 'watch', 'security', 'detections', 'playbooks', 'queries', 'notes', 'pad', 'notebook', 'toolbox', 'lab', 'regex', 'decoder', 'certs', 'cloud', 'ctf', 'reference', 'help', 'whatsnew', 'settings', 'trash', 'case/c-harbour/overview', 'case/c-harbour/vault', 'case/c-harbour/entities', 'case/c-harbour/timeline', 'case/c-harbour/infra', 'case/c-harbour/questions'];
+  const wide = [];
+  for (const a of areas) { await page.evaluate(r => { location.hash = '#/' + r; }, a); await page.waitForTimeout(250);
+    const w = await page.evaluate(() => { const s = document.querySelector('#main .scroll') || document.querySelector('#main'); return [document.scrollingElement.scrollWidth - innerWidth, s.scrollWidth - s.clientWidth]; });
+    if (w[0] > 1 || w[1] > 1) wide.push(a + ' ' + w.join('/')); }
+  expect(wide).toEqual([]);
+  // the cloud guide's tabs do not fit a phone: they scroll, with an edge
+  await page.evaluate(() => { location.hash = '#/cloud'; }); await expect(page.locator('.cld-tabs.x-more')).toHaveCount(1);
+  await page.locator('.cld-tabs').evaluate(e => { e.scrollLeft = e.scrollWidth; e.dispatchEvent(new Event('scroll')); }); await expect(page.locator('.cld-tabs')).toHaveClass(/x-end/);
+  await ctx.close();
+  expect(errors).toEqual([]);
+});
+
+test('polish on a desktop: a case summary cut off with … shows in full when pointed at; the decoder groups its operations', async ({ page }) => {
+  const errors = await open(page, '#/home', { osintSample: true });
+  const cut = page.locator('#main small').filter({ hasText: 'Fake refund support' }).first();
+  await cut.hover(); await expect(cut).toHaveAttribute('title', /went quiet: who runs it, where the money goes, and when they work/);
+  await page.evaluate(() => go('#/decoder')); await expect(page.locator('.txg-l')).toHaveText(['Decode', 'Encode & transform', 'Analyse']);
+  await page.click('[data-act=txOp][data-v=b64d]'); await expect(page.locator('[data-act=txOp][data-v=b64d]')).toHaveAttribute('aria-pressed', 'true');
+  noErrors(errors);
+});
+
+test('right-click an indicator anywhere: copy, copy defanged, details, every case it is in, watch and the lookups for its kind; plain text keeps the browser menu', async ({ page, context }) => {
+  const errors = await open(page, '#/case/c-harbour/timeline', { osintSample: true });
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  const v = page.locator('#main .v', { hasText: /^j\.harbour@proton\.me$/ }).first();
+  await v.click({ button: 'right' });
+  await expect(page.locator('#ctx .ctx-title')).toContainText('j.harbour@proton.me');
+  await expect(page.locator('#ctx')).toContainText('Open in Have I Been Pwned');
+  await page.locator('#ctx .ctx-it', { hasText: 'Copy defanged' }).click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('j[.]harbour[@]proton[.]me');
+  // an address from the sample case: watch it, then find it in every case
+  const ip = page.locator('#main .v', { hasText: /^198\.51\.100\.23$/ }).first();
+  await ip.click({ button: 'right' }); await page.getByRole('menuitem', { name: 'Watch', exact: true }).click();
+  expect(await page.evaluate(() => !!(DB.watch || {})['ipv4:198.51.100.23'])).toBe(true);
+  await ip.click({ button: 'right' }); await expect(page.locator('#ctx .ctx-it', { hasText: 'Stop watching' })).toBeVisible();
+  await page.locator('#ctx .ctx-it', { hasText: 'Find in every case' }).click();
+  await expect(page).toHaveURL(/#\/entities$/); await expect(page.locator('#entq')).toHaveValue('198.51.100.23');
+  // a heading is not an indicator: no menu of ours
+  await page.locator('#main h1').first().click({ button: 'right' }); await expect(page.locator('#ctx')).toHaveCount(0);
+  noErrors(errors);
+});
+
+test('regex builder My patterns: save with sample lines, fields and tests, keep earlier versions, open again after a reload, export and import, delete to the trash and restore', async ({ page }) => {
+  const errors = await open(page, '#/regex');
+  await page.click('[data-act=rxDemo][data-v=mixed]'); await page.click('[data-act=rxAutoParse]');
+  await page.click('.rx-ln[data-i="0"] .rx-no'); await page.click('[data-act=rxPin][data-v=match]');
+  const built = await page.locator('#rxSrcView').textContent();
+  await page.click('[data-act=rxlSave]'); await page.fill('#rxlName', 'SSH logins'); await page.fill('#rxlTags', 'SSH, linux, auth, ssh');
+  await page.click('form[data-form=rxlSave] [type=submit]');
+  await expect(page.locator('.rx-libn')).toHaveText('SSH logins');
+  expect(await page.evaluate(() => DB.rxlib.map(x => [x.name, x.tags, x.tests.length, x.fields.length > 3]))).toEqual([['SSH logins', ['ssh', 'linux', 'auth'], 1, true]]);
+  // a second version: edit by hand and save over it
+  await page.click('[data-act=rxEdit]'); await page.fill('#rxSrc', built.replace('(?<port>', '(?<port>\\b')); await page.waitForTimeout(600);
+  await page.click('[data-act=rxlSave]'); await page.click('form[data-form=rxlSave] [type=submit]');
+  await expect(page.locator('.toast').last()).toContainText('version 2');
+  // after a reload it is still there and opens as it was, tests and all
+  await page.waitForTimeout(400); await page.reload(); await page.evaluate(() => go('#/regex'));
+  await expect(page.locator('.rxl-o')).toHaveCount(1); await expect(page.locator('.rxl-o')).toContainText('version 2');
+  await page.click('.rxl-o');
+  await expect(page.locator('.rx-libn')).toHaveText('SSH logins'); await expect(page.locator('.rx-tchip')).toHaveText('1 test pass');
+  expect(await page.inputValue('#rxSrc')).toContain('(?<port>\\b');
+  // the earlier version
+  await page.click('[data-act=rxlLib]'); await page.click('.dlg [data-act=rxlMore]'); await page.getByRole('menuitem', { name: /Versions/ }).click();
+  await expect(page.locator('.rxl-v li')).toHaveCount(2); await expect(page.locator('.rxl-v .rx-diff ins').first()).toHaveText('\\b');
+  await page.click('[data-act=rxlVerOpen]'); expect(await page.inputValue('#rxSrc')).toBe(built);
+  // export, delete (to the trash), import back
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.evaluate(() => RXL_ACTS.rxlExport())]);
+  const file = await (await dl.createReadStream()).toArray().then(b => Buffer.concat(b).toString());
+  expect(JSON.parse(file).patterns[0].name).toBe('SSH logins');
+  await page.evaluate(() => go('#/regex')); await page.click('[data-act=rxReset]');
+  await page.click('[data-act=rxlMore]'); await page.getByRole('menuitem', { name: 'Delete' }).click();
+  await expect(page.locator('.rxl-o')).toHaveCount(0);
+  await page.evaluate(() => { const x = DB.trash.find(t => t.kind === 'pattern'); trashRestore(x.id); go('#/regex'); });
+  await expect(page.locator('.rxl-o')).toHaveCount(1);
+  await page.evaluate(t => rxlImportText(t), file); await expect(page.locator('.rxl-o')).toHaveCount(2);
+  // a broken or hostile file is refused
+  await page.evaluate(() => rxlImportText('{"patterns":[{"name":"bad","src":"(unclosed"},{"name":"<img src=x onerror=alert(1)>","src":"a+"}]}'));
+  await expect(page.locator('.rxl-o')).toHaveCount(3); await expect(page.locator('.rxl-o img')).toHaveCount(0);
+  noErrors(errors);
+});
+
+test('masking: addresses, users, hosts, emails, hashes and MACs get placeholders of the same shape, the same value always the same one; in the Decoder and as a masked copy in the Regex builder', async ({ page, context }) => {
+  const errors = await open(page, '#/regex');
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  const r = await page.evaluate(() => maskText(`Nov  2 08:15:30 web01 sshd[1234]: Failed password for invalid user alice from 203.0.113.7 port 51544 ssh2
+Nov  2 08:15:33 web01 sshd[1234]: Accepted password for root from 10.0.4.17 port 51560 ssh2
+2026-11-02 08:15:30 10.0.0.5 POST /owa/ - 443 CORP\\svc-backup 203.0.113.7 curl 401
+mail from j.harbour@proton.me via mx.harbourline-deals.shop C:\\Users\\jdoe\\AppData\\x.exe user=alice mac 00:16:3e:aa:bb:cc google.com
+9f2c1d0b7e4a6c8f3b5d2e1a0c9b8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a`));
+  const t = r.text;
+  for (const secret of ['203.0.113.7', '10.0.4.17', 'web01', 'alice', 'svc-backup', 'CORP', 'j.harbour', 'proton.me', 'harbourline', 'jdoe', '00:16:3e', '9f2c1d0b']) expect(t).not.toContain(secret);
+  // the same value, the same placeholder; shapes kept; system accounts and big providers kept
+  expect(t.match(/192\.0\.2\.1\b/g).length).toBe(2); expect(t).toMatch(/for invalid user user-\d+ from/); expect((t.match(/user=(user-\d+)/) || [])[1]).toBe((t.match(/invalid user (user-\d+)/) || [])[1]);
+  expect(t).toContain('for root from 10.255.'); expect(t).toContain('google.com'); expect(t).toMatch(/\b0{63}1\b/); expect(t).toContain('00:00:5e:00:53:');
+  expect(t).toMatch(/user-\d+@domain-\d+\.example/);
+  // in the builder: a masked copy, and work on it
+  await page.click('[data-act=rxDemo]:not([data-v])'); await page.click('[data-act=rxMask]');
+  await expect(page.locator('.dlg')).toContainText('Replaced'); const out = await page.locator('#rxMaskOut').textContent();
+  expect(out).not.toContain('203.0.113.7'); expect(out).not.toContain('web01');
+  await page.click('[data-act=rxMaskCopy]'); expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(out);
+  await page.click('[data-act=rxMaskUse]'); await expect(page.locator('.rx-ln').first()).not.toContainText('web01');
+  // in the Decoder
+  await page.evaluate(() => go('#/decoder')); await page.click('[data-act=txOp][data-v=mask]');
+  await page.fill('#decIn', 'login by alice from 198.51.100.23 to fileserver.acme-corp.com'); await page.waitForTimeout(500);
+  const dec = await page.locator('#txOut').textContent(); expect(dec).not.toContain('198.51.100.23'); expect(dec).not.toContain('acme-corp'); expect(dec).toContain('domain-1.example');
+  noErrors(errors);
+});
+
+test('regex builder on a whole file: a 40 MB log is read in pieces with progress, every line counted, field coverage and commonest values, matches as CSV, and missed lines go back into the sample', async ({ page }, info) => {
+  test.setTimeout(120000);
+  const errors = await open(page, '#/regex');
+  // 400,000 lines: SSH logins from a few addresses, and lines of other kinds in between
+  const os = require('os'), p = require('path').join(os.tmpdir(), 'osx-big-' + process.pid + '.log'), ips = ['203.0.113.7', '198.51.100.23', '192.0.2.44', '2001:db8::7'], users = ['root', 'admin', 'deploy', 'alice'];
+  const out = fs.createWriteStream(p); let want = 0, wantRoot = 0;
+  for (let i = 0; i < 400000; i++) {
+    if (i % 4 === 3) out.write(`Nov  2 08:${String(i % 60).padStart(2, '0')}:00 web01 CRON[${i}]: (root) CMD (run-parts /etc/cron.hourly)\n`);
+    else { const u = users[i % 4]; want++; if (u === 'root') wantRoot++; out.write(`Nov  2 08:${String(i % 60).padStart(2, '0')}:${String(i % 60).padStart(2, '0')} web0${i % 3} sshd[${1000 + i % 9000}]: ${i % 2 ? 'Accepted' : 'Failed'} password for ${u} from ${ips[i % 4]} port ${40000 + i % 20000} ssh2\n`); }
+  }
+  await new Promise(r => out.end(r));
+  await page.click('[data-act=rxDemo][data-v=mixed]'); await page.click('[data-act=rxAutoParse]');
+  await page.click('[data-act=rxTab][data-v=export]');
+  const [fc] = await Promise.all([page.waitForEvent('filechooser'), page.click('[data-act=rxBig]')]); await fc.setFiles(p);
+  await expect(page.locator('.rxb-bar')).toBeVisible();
+  await expect(page.locator('[data-act=rxBigCsv]')).toBeVisible({ timeout: 90000 });
+  const n = await page.locator('.rxb-n b').allTextContents();
+  expect(n[0]).toBe('400,000'); expect(n[1]).toBe(want.toLocaleString('en-US')); expect(n[2]).toBe((400000 - want).toLocaleString('en-US'));
+  const userRow = page.locator('.rxb-t tr', { has: page.locator('td b', { hasText: /^user$/ }) });
+  await expect(userRow).toContainText('100%'); await expect(userRow.locator('td').nth(2)).toHaveText('3');   // root, admin, deploy — alice's lines are the cron ones
+  await expect(userRow).toContainText('root ' + wantRoot.toLocaleString('en-US'));
+  // matches as CSV
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('[data-act=rxBigCsv]')]);
+  const csv = Buffer.concat(await (await dl.createReadStream()).toArray()).toString(); const rows = csv.trim().split('\r\n');
+  expect(rows[0]).toContain('line,'); expect(rows.length - 1).toBe(Math.min(want, 200000));
+  // the missed lines go into the sample, shown as missed
+  await page.click('[data-act=rxBigTeach]'); await expect(page.locator('.toast').last()).toContainText('Added');
+  await expect(page.locator('[data-act=rxShow][data-v=miss]')).toHaveAttribute('aria-pressed', 'true');
+  fs.unlinkSync(p); noErrors(errors);
+});
+
+test('a fresh workspace without the sample says what to do next everywhere, and the activity chart shows the real last eight days', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  await page.evaluate(() => removeSample()); await page.click('[data-act=confirmOk]');
+  await expect(page.locator('.brief p')).toContainText('is empty');
+  await expect(page.locator('.act-none')).toContainText('Nothing captured in the last 8 days');
+  const labels = await page.locator('.axis span').allTextContents();
+  const today = new Date(); expect(labels).toHaveLength(8); expect(labels[7]).toContain(String(today.getDate()));
+  await expect(page.locator('.impl', { hasText: 'Sample data' })).toHaveCount(0);
+  await page.evaluate(() => go('#/entities')); await expect(page.locator('#main .empty h3')).toHaveText('No entities yet');
+  await page.fill('#entq', 'nothing-here'); await page.evaluate(() => { UI.entq = 'zzz'; renderMain(); });
+  await page.evaluate(() => go(caseHash(DB.active, 'timeline'))); await expect(page.locator('#main .empty h3')).toHaveText('No events yet');
+  await expect(page.locator('#main .empty [data-act=capture]')).toBeVisible();
+  // once there is evidence, the chart has a bar today
+  await page.evaluate(() => { DB.records.push({ id: 'r-now', caseId: DB.active, type: 'evidence', title: 'Seen 203.0.113.9', body: '203.0.113.9', tsRaw: '', tsZone: 'explicit', ts: Date.now(), source: 'test', host: '', tags: [], ents: E.extract('203.0.113.9'), answer: '', addedBy: 'You', addedAt: Date.now(), hash: '' }); mutate('t'); go('#/home'); renderMain(); });
+  await expect(page.locator('.bars span').last()).toHaveText('1'); await expect(page.locator('.act-none')).toHaveCount(0);
+  noErrors(errors);
+});
+
+test('a 3,000-node graph fits on screen whole, and the screens with it stay quick', async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = await open(page, '#/home');
+  const t = await page.evaluate(() => { const N = 3000; for (let i = 0; i < N; i++) DB.entries.push({ id: 'gv' + i, caseId: 'c-portal', type: i % 3 ? 'domain' : 'ip', fields: i % 3 ? { domain: 'host' + i + '.example.org' } : { ip: '203.0.113.' + (i % 250) }, priority: 'medium', starred: false, tags: [], notes: '', src: '', created: Date.now(), pos: null });
+    for (let i = 1; i < N; i++) DB.links.push({ id: 'gl' + i, caseId: 'c-portal', a: 'gv' + i, b: 'gv' + Math.floor(i / 3), label: 'resolves', conf: 2, src: '' }); mutate('g');
+    const out = {}; for (const tab of ['overview', 'vault', 'entities', 'graph']) { const s = performance.now(); location.hash = caseHash('c-portal', tab); onRoute(); out[tab] = performance.now() - s; } return out; });
+  for (const k in t) expect(t[k], k).toBeLessThan(3000);
+  await page.waitForTimeout(1500);
+  const v = await page.evaluate(() => { const bb = cy.elements().renderedBoundingBox(), W = cy.width(), H = cy.height(); return { z: cy.zoom(), fits: bb.w <= W + 2 && bb.h <= H + 2 }; });
+  expect(v.z).toBeLessThan(.7); expect(v.fits).toBe(true);
+  noErrors(errors);
+});
+
+test('the regex builder works by keyboard and has no accessibility problems, light and dark', async ({ page }) => {
+  test.setTimeout(180_000);
+  const AxeBuilder = require('@axe-core/playwright').default;
+  const errors = await open(page, '#/regex');
+  await page.click('[data-act=rxDemo][data-v=mixed]'); await page.click('[data-act=rxAutoParse]');
+  // ← → Home End move between the detail tabs and open them, keeping focus
+  await page.focus('#rxtab-match'); await page.keyboard.press('ArrowRight');
+  await expect(page.locator('#rxtab-explain')).toBeFocused(); await expect(page.locator('#rxtab-explain')).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('End'); await expect(page.locator('#rxtab-export')).toBeFocused();
+  await page.keyboard.press('ArrowRight'); await expect(page.locator('#rxtab-match')).toBeFocused();
+  const found = [];
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate(t => { DB.prefs.theme = t; applyPrefs(); }, theme);
+    for (const step of ['match', 'explain', 'fields', 'tests', 'speed', 'export', 'table', 'save', 'lib', 'mask']) {
+      await page.evaluate(s => { closeDlg(); const S = UI.rx; if (s === 'table') S.left = 'table'; else { S.left = 'lines'; if (RX_TABS.some(t => t[0] === s)) S.tab = s; }
+        rxRender(); if (s === 'save') RXL_ACTS.rxlSave(); if (s === 'lib') RXL_ACTS.rxlLib(); if (s === 'mask') document.querySelector('[data-act=rxMask]').click(); }, step);
+      await page.waitForTimeout(250);
+      const res = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
+      for (const x of res.violations) if (['serious', 'critical'].includes(x.impact)) for (const n of x.nodes.slice(0, 2)) found.push(`${theme} ${step} ${x.id}: ${n.target.join(' ')}`);
+    }
+  }
+  expect(found, found.join('\n')).toEqual([]);
+  noErrors(errors.filter(e => !/Connecting to 'file:[^']*\.css/.test(e)));
+});
+
+test('mask from anywhere: a record’s captured text, the scratchpad, and any selected text', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  const errors = await open(page, '#/home');
+  const body = 'Nov 21 10:02:11 web-prod-03 sshd[811]: Accepted password for jsmith from 185.220.101.7 port 51122\nlogin alert sent to jsmith@harbourline.co.uk via mail.harbourline.co.uk';
+  const clip = () => page.evaluate(() => navigator.clipboard.readText());
+  const id = await page.evaluate(b => { const r = { id: 'r-mask', caseId: DB.active, type: 'evidence', title: 'SSH login', body: b, tsRaw: '', tsZone: 'explicit', ts: Date.now(), source: 'test', host: '', tags: [], ents: E.extract(b), answer: '', addedBy: 'You', addedAt: Date.now(), hash: '' }; DB.records.push(r); mutate('t'); select('rec', r.id); return r.id; }, body);
+  await page.click(`[data-act=recCopyBody][data-id=${id}]`); expect(await clip()).toBe(body);
+  await page.click(`[data-act=recCopyMasked][data-id=${id}]`);
+  const m = await clip();
+  for (const v of ['185.220.101.7', 'jsmith', 'harbourline', 'web-prod-03']) expect(m).not.toContain(v);
+  expect(m).toContain('192.0.2.1'); expect(m).toContain('sshd[811]: Accepted password for user-'); expect(m.split('\n')).toHaveLength(2);
+  await expect(page.locator('.toast').last()).toContainText('Copied masked');
+  // the scratchpad
+  await page.evaluate(b => { UI.padText = b; DB.pad = b; go('#/pad'); }, body);
+  await page.click('[data-act=padMask]'); expect(await clip()).toBe(m);
+  // selected text in a page: copy masked and copy defanged (only the indicators are defanged)
+  await page.evaluate(() => select('rec', 'r-mask'));
+  const pre = page.locator('#insp .rawbox');
+  await pre.evaluate(el => { const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); });
+  await pre.click({ button: 'right', position: { x: 20, y: 10 } });
+  await expect(page.locator('#ctx .ctx-title')).toHaveText('Selected text');
+  await page.locator('#ctx button', { hasText: 'Copy defanged' }).click();
+  const d = await clip(); expect(d).toContain('185[.]220[.]101[.]7'); expect(d).toContain('Accepted password for jsmith'); expect(d).not.toContain('[.]\n');
+  await pre.evaluate(el => { const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); });
+  await pre.click({ button: 'right', position: { x: 20, y: 10 } });
+  await page.locator('#ctx button', { hasText: 'Copy masked' }).click(); expect(await clip()).toBe(m);
+  noErrors(errors);
+});
+
+test('search builder: rows become a search for each engine, what an engine cannot do is said, and a saved search is rewritten for the engine it runs on', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  const errors = await open(page, '#/queries');
+  await page.click('[data-act=qbOpen]');
+  await page.fill('#qbv0', '{{DOMAIN_NAME}}'); await page.fill('#qbv1', 'password backup');
+  await page.click('[data-act=qbAdd][data-v=filetype]'); await page.fill('#qbv2', '.sql');
+  await page.click('[data-act=qbAdd][data-v=not]'); await page.fill('#qbv3', 'github');
+  await page.click('[data-act=qbAdd][data-v=intitle]'); await page.fill('#qbv4', 'index of');
+  await expect(page.locator('#qbQ')).toHaveText('site:{{DOMAIN_NAME}} password backup filetype:sql -github intitle:"index of"');
+  // a blank means it cannot be searched yet, only saved
+  await expect(page.locator('.qb-go button.primary')).toBeDisabled();
+  // Shodan: the file type and the exclusion are said to be left out, and struck through
+  await page.click('[data-act=qbEng][data-v=shodan]');
+  await expect(page.locator('#qbQ')).toHaveText('hostname:{{DOMAIN_NAME}} password backup http.title:"index of"');
+  await expect(page.locator('.qb-w').first()).toContainText('file type, none of these');
+  await expect(page.locator('.qb-r.off')).toHaveCount(2);
+  await expect(page.locator('#qbt-shodan .qb-d')).toHaveText('2');
+  // GitHub: file type becomes a path
+  await page.click('[data-act=qbEng][data-v=github]'); await expect(page.locator('#qbQ')).toHaveText('password backup path:*.sql NOT github');
+  // a wrong value is pointed out under its row
+  await page.fill('#qbv2', 'not a type'); await expect(page.locator('#qbe2')).toHaveText('An extension, like pdf'); await expect(page.locator('#qbv2')).toHaveAttribute('aria-invalid', 'true');
+  await page.fill('#qbv2', 'sql');
+  // typing keeps the caret where it was
+  await page.click('#qbv1'); await page.keyboard.press('End'); await page.keyboard.type(' dump'); await expect(page.locator('#qbv1')).toHaveValue('password backup dump'); await expect(page.locator('#qbv1')).toBeFocused();
+  // save on Google
+  await page.click('[data-act=qbEng][data-v=google]');
+  await page.click('[data-act=qbSave]'); await expect(page.locator('#qbName')).toHaveAttribute('aria-invalid', 'true');
+  await page.fill('#qbName', 'Database dumps on a domain'); await page.click('[data-act=qbSave]');
+  await expect(page.locator('.qp h2')).toHaveText('Database dumps on a domain');
+  const saved = await page.evaluate(() => { const x = DB.queries.find(q => q.name === 'Database dumps on a domain'); return { engines: x.engines, cat: x.cat, custom: x.custom, b: x.b.length }; });
+  expect(saved).toEqual({ engines: ['google', 'bing', 'duckduckgo'], cat: 'files', custom: true, b: 5 });
+  // run it: fill the blank, and the link is right for Google, then for Bing after switching
+  await page.fill('#qv-DOMAIN_NAME', 'acme.example');
+  await expect(page.locator('#qPrev')).toHaveValue('site:acme.example password backup dump filetype:sql -github intitle:"index of"');
+  expect(decodeURIComponent(await page.locator('#qRunLink').getAttribute('href'))).toContain('google.com/search?q=site:acme.example');
+  // on an engine that cannot do all of it, the panel rewrites the search for that engine
+  await page.locator('.qp details.more summary').click(); await page.click('.eng[data-v=shodan]');
+  await expect(page.locator('#qPrev')).toHaveValue('hostname:{{DOMAIN_NAME}} password backup dump http.title:"index of"');
+  await page.fill('#qv-DOMAIN_NAME', 'acme.example'); await expect(page.locator('#qPrev')).toHaveValue('hostname:acme.example password backup dump http.title:"index of"');
+  // edit reopens the builder with its rows; saving keeps one entry
+  await page.click('.qp [data-act=qEdit]'); await expect(page.locator('#qbv4')).toHaveValue('index of');
+  await page.click('[data-act=qbDel][data-v="3"]'); await page.click('[data-act=qbSave]');
+  expect(await page.evaluate(() => DB.queries.filter(q => q.name === 'Database dumps on a domain').map(q => q.query))).toEqual(['site:{{DOMAIN_NAME}} password backup dump filetype:sql intitle:"index of"']);
+  // a hostile stored shape is cleaned on load
+  const clean = await page.evaluate(() => { const d = { queries: [{ id: 'qa', name: 'a', query: 'x', engines: ['google'], tags: [], b: 'nope' }, { id: 'qb', name: 'b', query: 'y', engines: ['google'], tags: [], b: [{ k: 'site', v: 'a.example' }, { k: 'evil', v: '<img>' }, null, { k: 'words', v: 5 }] }] }; normStored(d); return d.queries.map(q => q.b); });
+  expect(clean).toEqual([undefined, [{ k: 'site', v: 'a.example' }]]);
   noErrors(errors);
 });

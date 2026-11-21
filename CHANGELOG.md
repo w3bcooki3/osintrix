@@ -2,6 +2,32 @@
 
 All notable changes to OSINTrix, newest first. The format is based on [Keep a Changelog](https://keepachangelog.com); this file is generated from `js/data/changelog.js` by `tools/changelog.py`.
 
+## [1.53] — Polish, a menu on every indicator, masking, big files, a search builder (2026-11-21)
+
+_Every screen checked at desktop, laptop, tablet and phone widths: text that was cut off can be read, strips of tabs that do not fit scroll with a soft edge, scrollbars are thin, and nothing is wider than a phone. Right-click any indicator for copy, details, every case it is in, watch and lookups._
+
+### Added
+- Query library → Build a search: pick what you want row by row — words, an exact phrase, any of several, words to leave out, a site, a file type, words in the title, address or text, a date range, a port, an organisation, a country, a product, an IP range, a certificate name, a code language or repository — and see it written for Google, Bing, DuckDuckGo, Shodan, Censys and GitHub at once. What an engine cannot search by is struck through and named, not silently dropped; a wrong value (a port over 65535, a date that is not a date) is pointed out under its row. Blanks like {{DOMAIN_NAME}} stay blanks, so it saves to the library as a template; a saved one reopens in the builder and is rewritten for whichever engine you run it on.
+- Regex builder → My patterns: save a pattern with its sample lines, fields, types and pinned tests, with tags; saving again keeps the earlier version (up to 20, each shown as a change you can open); open any of them later, export the library as one JSON file and import it on another machine. A deleted pattern goes to the trash and can be restored.
+- Masking: a copy of a log with its IP addresses, domains, emails, user names, host names, hashes, MAC addresses, phones and wallets replaced by placeholders of the same shape (192.0.2.1, domain-1.example, user-1) — the same value always gets the same one, private addresses stay private-looking, and system accounts like root stay as they are. In the Regex builder (Mask a copy, with the list of what was replaced kept here) and in the Decoder (Mask identifiers).
+- Regex builder → Export → Run on a whole file: a log of any size (up to 4 GB) is read here in 4 MB pieces with progress and a Stop button — how many lines match, each field’s coverage, distinct values and commonest ones, the matches as CSV, and the missed lines, 50 of which can go straight into the sample to teach the pattern. A 40 MB log of 400,000 lines takes a few seconds.
+- Right-click any indicator anywhere — an IP, domain, URL, email, hash, handle, wallet or CVE in a timeline, a table, a note or a result — for Copy, Copy defanged, Details, Find in every case, Watch, and the lookups for its kind (VirusTotal, Shodan, crt.sh, Wayback, Have I Been Pwned…, opened in a new tab). Select part of a line and right-click to use just that. Anything else, or Shift + right-click, keeps the browser’s own menu.
+- Copy masked from anywhere: on a record’s captured text (next to a plain Copy), at the top of the Scratchpad, and by selecting any text and right-clicking it, which also offers Copy defanged. Defanging there brackets only the indicators, so the sentences around them stay readable.
+
+### Changed
+- Text cut off with … now shows in full when you point at it, on every screen; the cloud guide’s section names, the release list in What’s new and the area descriptions in Help wrap instead of being cut.
+- Rows of tabs or buttons too wide for the screen (case tabs, the cloud guide, CTF, the Toolbox, Certificates, Threat Intel) scroll sideways with a soft edge that shows there is more; on a phone, the cloud guide’s provider buttons no longer push the page wider.
+- Scrollbars are thin and quiet everywhere.
+- Decoder: the 25 operations sit in labelled rows — Decode, Encode & transform, Analyse — instead of one wall of buttons.
+- Playbooks: Checklists and Automations sit beside the page title, as on every other page, instead of in a bar above it; Automations has the same page header.
+- A workspace without the sample data says what to do next everywhere: Entities and an empty case’s Timeline explain where indicators and events come from instead of showing an empty table or “Nothing matches”, the dashboard says your case is empty, and the feed card no longer says “Sample data”.
+- A graph with more than 300 nodes now fits on screen whole instead of opening zoomed in on a tangle; names appear as you zoom in. Checked with 3,000 nodes (smooth) and 50,000 records (every screen in under half a second, reload with all of them in about a second).
+- Keyboard and screen readers: ← → Home End move between tabs in every tab strip and open the tab reached; the Regex builder’s formats, lines and detail tabs are announced correctly, and its details panel can be scrolled by keyboard.
+
+### Fixed
+- Dark mode: the Regex builder’s field colours stayed in their light shades, and a hovered primary button got lighter until its white text was hard to read; both now keep their contrast. Every screen was checked for low-contrast text in light and dark.
+- Dashboard → Activity showed fixed September dates; it now shows the last eight days up to today (or the sample cases’ last week while only those are here), and says what to do when nothing was captured.
+
 ## [1.52] — Regex builder for daily work (2026-11-21)
 
 _Tests pinned to a pattern, a check of which tools can run it, values that filter the lines and go straight to the case, undo, keyboard keys, and a calmer, full-height layout._

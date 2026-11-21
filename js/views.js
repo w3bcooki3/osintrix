@@ -19,7 +19,10 @@ function stat(icon, color, n, label, sub, act, spark){
   const inner = `<span class="st-ic" style="--c:${color}" aria-hidden="true">${ico(icon,'sm')}</span><span class="st-l">${label}</span><b class="st-n${tone}">${n}</b>${sub ? `<small>${sub}</small>` : ''}`;
   return act.startsWith('#') ? `<a class="stat" href="${act}">${inner}</a>` : `<button class="stat" data-act="${act}">${inner}</button>`;
 }
-function perDay(list, f, days = 8){ const since = Date.parse('2026-09-08T00:00:00Z'), b = new Array(days).fill(0); for(const x of list){ const t = f(x); if(t >= since){ const i = Math.floor((t - since) / 864e5); if(i < days) b[i]++; } } return b; }
+/* the last `days` days up to today — or, while only the sample cases are here, up to their last record, so the demo is not a flat line */
+function actEnd(){ const d = new Date(); d.setHours(0, 0, 0, 0); if(DB.sample && DB.cases.every(c => c.sample)){ const last = Math.max(0, ...DB.records.map(r => r.ts || 0)); if(last){ const l = new Date(last); l.setHours(0, 0, 0, 0); return l.getTime(); } } return d.getTime(); }
+function perDay(list, f, days = 8){ const end = actEnd(), since = end - (days - 1) * 864e5, b = new Array(days).fill(0); for(const x of list){ const t = f(x); if(t >= since){ const i = Math.floor((t - since) / 864e5); if(i < days) b[i]++; } } return b; }
+const perDayLabels = (days = 8) => { const end = actEnd(); return Array.from({length:days}, (_, i) => { const d = new Date(end - (days - 1 - i) * 864e5); return d.toLocaleDateString(undefined, {weekday:'short'}) + ' ' + d.getDate(); }); };
 function greeting(){ const h = new Date().getHours(); return h < 5 ? 'Working late' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'; }
 function viewHome(){
   const active = DB.cases.filter(c => c.status !== 'closed'), g = globalEnts();
@@ -33,7 +36,7 @@ function viewHome(){
     ${sampleBanner()}${backupBanner()}${typeof setupBanner === 'function' ? setupBanner() : ''}
     <header class="brief">
       <div><span class="ix">${esc(new Date().toLocaleDateString(undefined, {weekday:'long', day:'numeric', month:'long', year:'numeric'}))}</span><h1>Dashboard</h1>
-        <p>${top ? `Most active: <a href="${caseHash(top.id)}">${esc(top.name.split(' — ')[0])}</a> — ${openQ.filter(r => r.caseId === top.id).length} open questions, ${derive(top.id).entries.filter(e => entryVerdict(e) === 'malicious').length} malicious entries.` : 'No investigations yet. Create a case or capture your first piece of evidence.'}${cross.length ? ` <span class="mono">${esc(cross[0].v)}</span> appears in ${cross[0].cases.size} cases.` : ''}${fm.length ? ` ${fm.length} feed item${fm.length > 1 ? 's' : ''} mention your entities.` : ''}</p></div>
+        <p>${top && derive(top.id).entries.length ? `Most active: <a href="${caseHash(top.id)}">${esc(top.name.split(' — ')[0])}</a> — ${openQ.filter(r => r.caseId === top.id).length} open questions, ${derive(top.id).entries.filter(e => entryVerdict(e) === 'malicious').length} malicious entries.` : top ? `Your case <a href="${caseHash(top.id)}">${esc(top.name.split(' — ')[0])}</a> is empty — capture evidence or add a vault entry to get started.` : 'No investigations yet. Create a case or capture your first piece of evidence.'}${cross.length ? ` <span class="mono">${esc(cross[0].v)}</span> appears in ${cross[0].cases.size} cases.` : ''}${fm.length ? ` ${fm.length} feed item${fm.length > 1 ? 's' : ''} mention your entities.` : ''}</p></div>
       <div class="brief-a">${top ? `<a class="btn" href="${caseHash(top.id, 'graph')}">${ico('waypoints','sm')}Open graph</a>` : ''}<button class="btn" data-act="newCase">${ico('folder-open','sm')}New case</button><button class="btn primary" data-act="capture">${ico('plus','sm')}Capture evidence<kbd>N</kbd></button></div>
     </header>
     <div class="stats">
@@ -52,13 +55,13 @@ function viewHome(){
                 ${done ? `<span class="prog" title="${pct}% of questions answered"><i style="width:${pct}%;background:${esc(c.color)}"></i></span>` : ''}</div>
               <div class="end hide-m">${statusTag(c.status)}<span class="chip sq">${D.entries.length} entries</span>${q ? `<span class="chip amber sq">${q} open</span>` : ''}</div></a>`; }).join('')}
         </div></section>
-        <section class="card"><header><h3>Activity</h3><span class="t3">evidence captured per day</span></header><div class="body">
+        <section class="card"><header><h3>Activity</h3><span class="t3">evidence captured per day</span></header><div class="body">${buckets.some(Boolean) ? '' : `<p class="t3 small act-none">Nothing captured in the last ${buckets.length} days. Press <b>Capture</b> to add evidence — a paste, a file or a screenshot.</p>`}
           <div class="bars">${buckets.map((v, i) => `<div style="--h:${Math.round(v / mx * 100)}%" title="${v} records"><span>${v || ''}</span></div>`).join('')}</div>
-          <div class="axis">${buckets.map((v, i) => `<span>${['Tue 8','Wed 9','Thu 10','Fri 11','Sat 12','Sun 13','Mon 14','Tue 15'][i]}</span>`).join('')}</div></div></section>
+          <div class="axis">${perDayLabels(buckets.length).map(l => `<span>${esc(l)}</span>`).join('')}</div></div></section>
       </div>
       <div class="stack">
         ${watchCard()}
-        <section class="card"><header><h3>Feed items about your entities</h3>${impl('mock')}</header><div class="body flush">
+        <section class="card"><header><h3>Feed items about your entities</h3>${DB.sample && DB.cases.some(c => c.sample) ? impl('mock') : ''}</header><div class="body flush">
           ${fm.map(({f, hits}) => `<button class="li" data-act="selFeed" data-id="${f.id}" style="align-items:flex-start"><span class="tb sm" style="--c:var(--red)">${ico('rss')}</span>
             <div class="main2"><b style="white-space:normal">${esc(f.title)}</b><small>${esc(f.source)} · ${hits.length} match${hits.length > 1 ? 'es' : ''}</small></div></button>`).join('') || empty('rss', 'No matches', 'No feed item mentions an entity from your cases.')}</div></section>
         <section class="card"><header><h3>Seen in more than one case</h3></header><div class="body">
@@ -345,7 +348,7 @@ function caseTimeline(c, D){
   }
   const h = vlist('tlV', items, {focus:UI.sel && UI.sel.kind === 'rec' ? UI.sel.id : null});
   if(UI.evPick){ const have = new Set(D.recs.map(r => r.id)); for(const i of [...UI.evPick]) if(!have.has(i)) UI.evPick.delete(i); }
-  return `<div class="scroll">${bar}${UI.tlHeat ? heatHTML(D) : ''}<div class="tl${UI.tlSel || (UI.evPick && UI.evPick.size) ? ' picking' : ''}">${evBulkHTML(list)}${list.length ? h : empty('filter','Nothing matches','Clear the filters or change the search.', `<button class="btn" data-act="clearFilters">Clear filters</button>`)}</div></div>`;
+  return `<div class="scroll">${bar}${UI.tlHeat ? heatHTML(D) : ''}<div class="tl${UI.tlSel || (UI.evPick && UI.evPick.size) ? ' picking' : ''}">${evBulkHTML(list)}${list.length ? h : !D.recs.length ? empty('clock','No events yet','Every timestamped record lands here — captured evidence, imported logs and dated vault entries.', `<button class="btn primary" data-act="capture">${ico('plus','sm')}Capture evidence</button>`) : empty('filter','Nothing matches','Clear the filters or change the search.', `<button class="btn" data-act="clearFilters">Clear filters</button>`)}</div></div>`;
 }
 const EVTYPE = {evidence:['file-text','var(--t-infra)','Evidence'], finding:['target','var(--amber)','Finding'], lead:['circle-help','var(--t-identity)','Question'], note:['notebook-pen','var(--text-3)','Note']};
 function evHTML(r, D, c){

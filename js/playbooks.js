@@ -174,7 +174,9 @@ function pbThread(p, caseId){
 function viewPlaybooks(){
   ensurePlaybooks();
   const tabs = `<div class="tlbar"><div class="seg" role="group" aria-label="View"><button data-act="pbTab" data-v="list" aria-pressed="${UI.pbTab !== 'auto'}">${ico('list-checks','sm')}Checklists</button><button data-act="pbTab" data-v="auto" aria-pressed="${UI.pbTab === 'auto'}">${ico('workflow','sm')}Automations${(DB.autos || []).some(R => R.on) ? ' <span class="t3">' + DB.autos.filter(R => R.on).length + ' on</span>' : ''}</button></div></div>`;
-  if(UI.pbTab === 'auto' && !UI.pb) return `<div class="scroll">${tabs}${autoView()}</div>`;
+  /* one page header for both views: the title, and Checklists | Automations beside it */
+  const seg = tabs.replace(/^<div class="tlbar">/, '').replace(/<\/div>$/, '');
+  if(UI.pbTab === 'auto' && !UI.pb) return `<div class="scroll"><div class="page wide pb-head">${libHead('Playbooks', 'Checklists to run on a case, and automations that do the routine work while OSINTrix is open.', '', seg)}</div>${autoView()}</div>`;
   const cur = DB.playbooks.find(p => p.id === UI.pb);
   if(cur) return pbDetail(cur);
   const q = (UI.pbq || '').toLowerCase(), f = UI.pbf || 'all', view = UI.pbView || DB.prefs.pbView || 'grid';
@@ -194,9 +196,9 @@ function viewPlaybooks(){
       <span class="pbr-n ix">${num(p)}</span><div class="pbr-t"><b>${esc(p.name)}</b><small>${esc(p.desc)}</small></div>
       <span class="pbr-c"><i></i>${esc(cn)}</span><span class="pbr-p">${pbThread(p, DB.active)}<small>${a.total ? a.done + '/' + a.total : p.steps.length + ' steps'}</small></span>
       <button class="btn sm pbr-run" data-act="pbRun" data-id="${p.id}">${ico('play','sm')}Run</button></div>`; };
-  return `<div class="scroll">${tabs}<div class="page wide">
+  return `<div class="scroll"><div class="page wide">
     ${libHead('Playbooks', `${DB.playbooks.length} investigation checklists. Run one on a case and each step becomes an open question there; the dots fill in as you answer them.`,
-      `<button class="btn" data-act="pbImport">${ico('upload','sm')}Import</button><button class="btn" data-act="pbExport">${ico('download','sm')}Export</button><button class="btn primary" data-act="pbNew">${ico('plus','sm')}New playbook</button>`, '')}
+      `<button class="btn" data-act="pbImport">${ico('upload','sm')}Import</button><button class="btn" data-act="pbExport">${ico('download','sm')}Export</button><button class="btn primary" data-act="pbNew">${ico('plus','sm')}New playbook</button>`, seg)}
     <div class="toolbar ltb pb-tb"><div class="search-in">${ico('search')}<label class="sr" for="pbq">Search playbooks</label><input id="pbq" class="inp" placeholder="Search playbooks and steps…" value="${esc(UI.pbq || '')}"></div>
       <div class="seg" role="group" aria-label="Level">${[['all','Any level'],['core','Core'],['advanced','Advanced']].map(([k, l]) => `<button data-act="pbLevel" data-v="${k}" aria-pressed="${lv === k}">${l}</button>`).join('')}</div>
       <span style="flex:1"></span>${layoutSeg('pbView', view, [['grid','layout-grid','Cards'],['list','rows-3','List']])}</div>

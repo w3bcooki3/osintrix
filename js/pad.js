@@ -49,7 +49,7 @@ function viewPad(){
   UI.padText = text; if(!UI.padSel) UI.padSel = new Set();
   return `<div class="pad">
     <header class="pad-h"><div><span class="ix">Workspace</span><h1>Scratchpad</h1><p>Paste logs or notes — indicators are detected and grouped as you type. Select any to copy, defang or send to a case. Saved in this browser.</p></div>
-      <div class="pad-ha"><button class="btn" data-act="padClear">${ico('trash-2','sm')}Clear</button></div></header>
+      <div class="pad-ha"><button class="btn" data-act="padMask" title="Copy the whole scratchpad with IPs, domains, emails, user and host names replaced by placeholders">${ico('eye-off','sm')}Copy masked</button><button class="btn" data-act="padClear">${ico('trash-2','sm')}Clear</button></div></header>
     <div class="pad-grid">
       <div class="pad-edit"><label class="sr" for="padText">Scratchpad</label><textarea id="padText" class="pad-ta mono" spellcheck="false" placeholder="Paste a log line, a WHOIS record, a note…\n\ne.g.  2026-10-24T09:06:00Z  src=203.0.113.9 dport=4444 proto=TCP\n      c2 at update-lamp.test  sha256 e3b0c442...  CVE-2024-3400">${esc(text)}</textarea>
         <div class="pad-foot"><span id="padCount" class="t3"></span><span class="pad-hint">${ico('shield-check','sm')}Nothing leaves this browser</span></div></div>
@@ -97,6 +97,7 @@ const PAD_ACTS = {
   padPick:(id, v) => { const s = UI.padSel || (UI.padSel = new Set()); s.has(v) ? s.delete(v) : s.add(v); const btn = document.querySelector(`[data-act=padPick][data-v="${CSS.escape(v)}"]`); if(btn){ const on = s.has(v); btn.classList.toggle('on', on); btn.setAttribute('aria-pressed', on); } padBulkPaint(); },
   padSelClear:() => { UI.padSel = new Set(); padRefresh(); },
   padLaneCopy:(id, v) => { const {lanes} = padDetect(UI.padText || ''); const vals = (lanes[v] || []).map(e => e.v); if(vals.length) copyText(vals.join('\n')); },
+  padMask:() => { const t = UI.padText != null ? UI.padText : (DB.pad || ''); if(!t.trim()) return toast('The scratchpad is empty'); maskCopy(t); },
   padCopy:() => { const v = padSelValues(); if(v.length) copyText(v.join('\n')); },
   padDefang:() => { const v = padSelValues(); if(v.length) copyText(v.map(x => (typeof defang === 'function' ? defang(x) : x)).join('\n')); },
   padClear:() => { if(!(UI.padText || '').trim()) return; confirmDlg('Clear the scratchpad?', 'This empties the note. It is not saved to any case unless you sent it there.', 'Clear', () => { UI.padText = ''; DB.pad = ''; UI.padSel = new Set(); save(); renderMain(); }); },

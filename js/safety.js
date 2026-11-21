@@ -7,7 +7,7 @@ const ago = t => E.fmtAgo(Math.max(0, Date.now() - t));
 
 /* ---------- trash ---------- */
 const TRASH_DAYS = 30;
-const TRASH_KIND = {case:['folder-open','Case'], entry:['layers','Vault entry'], record:['file-text','Evidence record'], note:['sticky-note','Note'], link:['waypoints','Relationship'], rule:['shield-check','Detection rule'], query:['search','Saved query'], hunt:['crosshair','Hunt'], playbook:['list-checks','Playbook'], tool:['wrench','Tool'], auto:['workflow','Automation']};
+const TRASH_KIND = {pattern:['regex','Saved pattern'], case:['folder-open','Case'], entry:['layers','Vault entry'], record:['file-text','Evidence record'], note:['sticky-note','Note'], link:['waypoints','Relationship'], rule:['shield-check','Detection rule'], query:['search','Saved query'], hunt:['crosshair','Hunt'], playbook:['list-checks','Playbook'], tool:['wrench','Tool'], auto:['workflow','Automation']};
 const trashUndo = x => { DB.trash = (DB.trash || []).filter(z => z !== x); };
 function trashPut(kind, label, data, caseId){ DB.trash = DB.trash || []; const x = {id:uid('x'), kind, label:String(label || '').slice(0, 140), caseId:caseId || null, at:Date.now(), data}; DB.trash.unshift(x); return x; }
 function trashPurge(){
@@ -22,7 +22,7 @@ function trashRestore(id){
   /* what each kind must hold to come back; an item damaged in storage or in a backup is explained, not restored */
   const ob = v => v && typeof v === 'object' && !Array.isArray(v), hasId = v => ob(v) && typeof v.id === 'string' && v.id !== '';
   const SHAPE = {case:() => hasId(d.c), entry:() => hasId(d.e) && typeof d.e.type === 'string' && typeof TYPES !== 'undefined' && !!TYPES[d.e.type], record:() => hasId(d.r), note:() => hasId(d.n), rule:() => hasId(d.r), query:() => hasId(d.q),
-    hunt:() => hasId(d.h), playbook:() => hasId(d.p), tool:() => hasId(d.t) && typeof d.t.url === 'string', auto:() => hasId(d.a), link:() => ob(d.l) && typeof d.l.a === 'string' && typeof d.l.b === 'string'};
+    hunt:() => hasId(d.h), playbook:() => hasId(d.p), tool:() => hasId(d.t) && typeof d.t.url === 'string', auto:() => hasId(d.a), pattern:() => hasId(d.p) && typeof rxlClean === 'function' && !!rxlClean(d.p), link:() => ob(d.l) && typeof d.l.a === 'string' && typeof d.l.b === 'string'};
   if(!ob(d) || !SHAPE[x.kind]) return toast('That item cannot be restored'); if(!SHAPE[x.kind]()) return toast('That item is damaged and cannot be restored — you can delete it for good');
   if(x.kind === 'case') for(const k of ['entries', 'links', 'records', 'notes']) d[k] = Array.isArray(d[k]) ? d[k].filter(ob) : [];
   if(x.kind === 'entry' && typeof normEntry === 'function') normEntry(d.e); if(x.kind === 'record' && typeof normRecord === 'function') normRecord(d.r);
@@ -37,6 +37,7 @@ function trashRestore(id){
     case 'record': { const r = d.r; if(!caseOk(r.caseId)) r.caseId = DB.active; DB.records.push(r); break; }
     case 'note': DB.notes = DB.notes || []; DB.notes.push(d.n); break;
     case 'rule': if(DB.rules.some(z => z.id === d.r.id)) return toast('That rule is already back'); DB.rules.unshift(d.r); if(DB.deletedRules) DB.deletedRules = DB.deletedRules.filter(z => z !== d.r.id); break;
+    case 'pattern': DB.rxlib = Array.isArray(DB.rxlib) ? DB.rxlib : []; if(!DB.rxlib.some(z => z.id === d.p.id)) DB.rxlib.unshift(rxlClean(d.p)); break;
     case 'query': DB.queries = DB.queries || []; if(!DB.queries.some(z => z.id === d.q.id)) DB.queries.push(d.q); break;
     case 'hunt': DB.hunts = Array.isArray(DB.hunts) ? DB.hunts : []; if(!DB.hunts.some(z => z.id === d.h.id)) DB.hunts.push(d.h); break;
     case 'playbook': if(!DB.playbooks.some(z => z.id === d.p.id)) DB.playbooks.push(d.p); if(DB.deletedPb) DB.deletedPb = DB.deletedPb.filter(z => z !== d.p.id); break;

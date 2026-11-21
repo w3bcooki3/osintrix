@@ -131,7 +131,6 @@ html.ds[data-theme=dark]{
 .ds .btn.primary{background:var(--accent-bg)!important;border-color:transparent!important;color:var(--accent-ink)!important;box-shadow:0 1px 2px #0000001f,inset 0 1px 0 #ffffff26!important}
 .ds .btn.primary svg.i{color:var(--accent-ink)}
 .ds .btn.primary:hover{filter:none;background:color-mix(in srgb,var(--accent-bg) 90%,#000)!important}
-.ds[data-theme=dark] .btn.primary:hover{background:color-mix(in srgb,var(--accent-bg) 88%,#fff)!important}
 .ds .btn.ghost{background:transparent;border-color:transparent;box-shadow:none!important;color:var(--text-2)}
 .ds .btn.ghost:hover{background:var(--hover);color:var(--text)}
 .ds .btn.danger,.ds .btn.danger svg.i{color:var(--red)}
@@ -3025,7 +3024,7 @@ button.rsum-i:hover{background:var(--hover);color:var(--text)}
 /* Regex builder: lines to select from, the pattern, what it pulls out */
 .ds .rxb{display:flex;flex-direction:column;gap:12px;--rx-h:calc(100vh - 330px)}
 .ds .rxb .c0{--rx:#4453d6}.ds .rxb .c1{--rx:#0f766e}.ds .rxb .c2{--rx:#b45309}.ds .rxb .c3{--rx:#7c3aed}.ds .rxb .c4{--rx:#be185d}.ds .rxb .c5{--rx:#0369a1}.ds .rxb .c6{--rx:#15803d}.ds .rxb .c7{--rx:#c2410c}
-:root[data-theme=dark] .ds .rxb .c0{--rx:#8c97ff}:root[data-theme=dark] .ds .rxb .c1{--rx:#2dd4bf}:root[data-theme=dark] .ds .rxb .c2{--rx:#fbbf24}:root[data-theme=dark] .ds .rxb .c3{--rx:#c4b5fd}:root[data-theme=dark] .ds .rxb .c4{--rx:#f472b6}:root[data-theme=dark] .ds .rxb .c5{--rx:#7dd3fc}:root[data-theme=dark] .ds .rxb .c6{--rx:#4ade80}:root[data-theme=dark] .ds .rxb .c7{--rx:#fb923c}
+.ds:not([data-theme=light]) .rxb .c0{--rx:#8c97ff}.ds:not([data-theme=light]) .rxb .c1{--rx:#2dd4bf}.ds:not([data-theme=light]) .rxb .c2{--rx:#fbbf24}.ds:not([data-theme=light]) .rxb .c3{--rx:#c4b5fd}.ds:not([data-theme=light]) .rxb .c4{--rx:#f472b6}.ds:not([data-theme=light]) .rxb .c5{--rx:#7dd3fc}.ds:not([data-theme=light]) .rxb .c6{--rx:#4ade80}.ds:not([data-theme=light]) .rxb .c7{--rx:#fb923c}
 /* start screen */
 .ds .rx-in textarea{min-height:240px}
 .ds .rx-inb{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;margin-top:10px}
@@ -3064,7 +3063,7 @@ button.rsum-i:hover{background:var(--hover);color:var(--text)}
 .ds .rx-err{color:var(--red);margin:0;font-size:calc(12.5px * var(--ts,1))}
 /* pattern syntax */
 .ds .rx-sc{color:#0e7490}.ds .rx-sq{color:#a16207}.ds .rx-sp{color:var(--text-3)}.ds .rx-sa{color:#be185d;font-weight:600}
-:root[data-theme=dark] .ds .rx-sc{color:#67e8f9}:root[data-theme=dark] .ds .rx-sq{color:#fcd34d}:root[data-theme=dark] .ds .rx-sa{color:#f9a8d4}
+.ds:not([data-theme=light]) .rx-sc{color:#67e8f9}.ds:not([data-theme=light]) .rx-sq{color:#fcd34d}.ds:not([data-theme=light]) .rx-sa{color:#f9a8d4}
 .ds .rx-gb{border-radius:3px;transition:background .12s}
 .ds .rx-gb.hot{background:color-mix(in srgb,var(--rx) 11%,transparent)}
 .ds .rx-gl{font-size:0;letter-spacing:0}
@@ -3243,3 +3242,91 @@ button.rsum-i:hover{background:var(--hover);color:var(--text)}
 .ds .rxb *{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--text-3) 40%,transparent) transparent}
 @media (max-width:1180px){.ds .rxw.side-closed{grid-template-columns:1fr}.ds .rx-rail{flex-direction:row;flex-wrap:wrap;justify-content:flex-start;padding:6px 8px}.ds .rx-rt{writing-mode:horizontal-tb;transform:none}}
 .ds .rx-tabs{padding:0 4px 0 6px;gap:0}.ds .rx-tabs button[role=tab]{padding:10px 7px}.ds .rx-hide{flex:none;width:26px;height:26px}
+
+/* ===== polish sweep (v1.53) ===== */
+/* thin, quiet scrollbars everywhere */
+.ds ::-webkit-scrollbar{width:10px;height:10px}
+.ds ::-webkit-scrollbar-track{background:transparent}
+.ds ::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--text-3) 32%,transparent);border-radius:10px;border:3px solid transparent;background-clip:padding-box}
+.ds ::-webkit-scrollbar-thumb:hover{background-color:color-mix(in srgb,var(--text-3) 60%,transparent)}
+.ds ::-webkit-scrollbar-corner{background:transparent}
+.ds,.ds *{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--text-3) 38%,transparent) transparent}
+/* a strip of tabs or buttons wider than the screen scrolls sideways, with a soft edge that shows there is more */
+.ds .x-more{overflow-x:auto;scrollbar-width:none;-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 36px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 36px),transparent)}
+.ds .x-more::-webkit-scrollbar{display:none}
+.ds .x-more.x-left{-webkit-mask-image:linear-gradient(to right,transparent,#000 36px,#000 calc(100% - 36px),transparent);mask-image:linear-gradient(to right,transparent,#000 36px,#000 calc(100% - 36px),transparent)}
+.ds .x-more.x-end{-webkit-mask-image:linear-gradient(to right,transparent,#000 36px);mask-image:linear-gradient(to right,transparent,#000 36px)}
+/* labels that were cut off now wrap */
+.ds .cg .cg-nav-l{white-space:normal;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.ds .wn2-ni span:nth-child(2){white-space:normal;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.hx2-cols small{white-space:normal}
+/* the cloud guide's provider buttons scroll on a phone instead of pushing the page wider */
+.ds .cg-filt{min-width:0;max-width:100%}.ds .cg-filt .seg{max-width:100%;flex-wrap:nowrap;overflow-x:auto}
+/* decoder: operations in labelled rows */
+.ds .txops.txg{display:flex;flex-direction:column;gap:6px;flex-wrap:nowrap;overflow:visible;margin:0 0 14px;padding:0}
+.ds .txg-r{display:grid;grid-template-columns:150px minmax(0,1fr);gap:10px;align-items:start}
+.ds .txg-l{font-size:calc(11.5px * var(--ts,1));font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--text-3);padding-top:8px}
+.ds .txg-b{display:flex;flex-wrap:wrap;gap:6px}
+.ds .txg-b button{height:30px;padding:0 10px;border-radius:8px;font-size:calc(12.5px * var(--ts,1));font-weight:520}
+@media (max-width:760px){.ds .txg-r{grid-template-columns:1fr;gap:4px}.ds .txg-l{padding-top:0}.ds .txg-b{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px 2px}.ds .txg-b button{flex:none}}
+/* regex builder: My patterns */
+.ds .rxl,.dlg .rxl{display:flex;flex-direction:column;gap:8px;margin-top:18px}
+.dlg .rxl{margin-top:0}
+.rxl-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.rxl-h h3{margin:0;display:flex;align-items:center;gap:7px;font-size:calc(14px * var(--ts,1));font-weight:600}
+.rxl-h .search-in.sm{max-width:240px}
+.rxl-empty{margin:0;padding:12px 0}
+.rxl-l{list-style:none;margin:0;padding:0;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.rxl-l li{display:flex;align-items:flex-start;gap:6px;padding:4px 6px 4px 0;border-bottom:1px solid var(--border-soft)}.rxl-l li:last-child{border-bottom:0}
+.rxl-o{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;text-align:left;border:0;background:none;padding:8px 12px;border-radius:8px;cursor:pointer;color:var(--text);font:inherit}
+.rxl-o:hover{background:var(--hover)}
+.rxl-o b{font-weight:560;font-size:calc(13.5px * var(--ts,1))}
+.rxl-o code{font-size:calc(11.5px * var(--ts,1));color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rxl-m{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center;font-size:calc(12px * var(--ts,1))}.rxl-m .i{vertical-align:-2px;margin-right:2px}
+.rxl-l li>.iconbtn{margin-top:8px}
+.rxl-v{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+.rxl-vh{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.ds .rx-libn{display:inline-flex;align-items:center;gap:5px;font-size:calc(12.5px * var(--ts,1));font-weight:560;color:var(--text);padding:2px 9px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border-soft)}
+/* regex builder: run on a whole file */
+.rxb-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.rxb-bar{height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden;margin-bottom:14px}.rxb-bar i{display:block;height:100%;background:var(--accent);transition:width .15s}
+.rxb-n{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.rxb-n>div{border:1px solid var(--border-soft);border-radius:8px;padding:8px 12px;display:flex;flex-direction:column}.rxb-n b{font-size:calc(18px * var(--ts,1));font-variant-numeric:tabular-nums}.rxb-n span{font-size:calc(12px * var(--ts,1));color:var(--text-3)}
+.rxb-t td{vertical-align:top}.rxb-top-v{display:flex;flex-wrap:wrap;gap:4px}.rxb-top-v span{background:var(--surface-2);border-radius:4px;padding:0 5px;font-size:12px;white-space:nowrap}.rxb-top-v i{font-style:normal;color:var(--text-3)}
+@media (max-width:640px){.rxb-n{grid-template-columns:1fr 1fr}}
+.ds .pb-head{padding-bottom:0}.ds .pb-head+.page{padding-top:8px}
+.ds .lhd-a .seg{margin-right:4px}
+.ds .rx-tabl{display:flex;gap:inherit;min-width:0;overflow-x:auto;scrollbar-width:none}
+.ds .ih-acts{display:flex;align-items:center;gap:4px}.ds .ih-acts .sp{flex:1}.ds .ih-acts .btn{text-transform:none;letter-spacing:0;font-weight:500}
+.ds .pad-ha{display:flex;gap:8px;flex-wrap:wrap}
+/* Query library → Build a search */
+.ds .qb{padding:0!important}
+.ds .qb-eng{display:flex;gap:2px;border-bottom:1px solid var(--border);padding:0 16px;overflow-x:auto;scrollbar-width:none}
+.ds .qb-eng button{background:none;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;padding:11px 10px;font:inherit;font-size:calc(13.5px * var(--ts,1));color:var(--text-3);cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.ds .qb-eng button:hover{color:var(--text-2)}
+.ds .qb-eng button[aria-selected=true]{color:var(--text);border-bottom-color:var(--text);font-weight:560}
+.ds .qb-d{font-size:11px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--surface-2);color:var(--amber);display:inline-grid;place-items:center;font-variant-numeric:tabular-nums}
+.ds .qb-grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);min-height:330px}
+.ds .qb-rows{padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.ds .qb-r{display:grid;grid-template-columns:minmax(140px,175px) minmax(0,1fr) auto;gap:6px 8px;align-items:center}
+.ds .qb-r .inp{height:34px;font-size:calc(13.5px * var(--ts,1))}
+.ds .qb-r.off .qb-k,.ds .qb-r.off .qb-v{color:var(--text-3)}
+.ds .qb-r.off .qb-v{text-decoration:line-through;text-decoration-color:var(--text-3)}
+.ds .qb-n{grid-column:2/4;font-size:calc(12px * var(--ts,1));color:var(--text-3);margin-top:-2px}
+.ds .qb-n.bad{color:var(--red)}
+.ds .qb-add{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}
+.ds .qb-tip{margin:4px 0 0}
+.ds .qb-out{background:var(--surface-2);border-left:1px solid var(--border-soft);padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.ds .qb-out h4{margin:0;font-size:calc(12px * var(--ts,1));font-weight:560;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em}
+.ds .qb-q{margin:0;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;white-space:pre-wrap;word-break:break-word;font-size:calc(13.5px * var(--ts,1));line-height:1.55;min-height:64px;color:var(--text)}
+.ds .qb-w{display:flex;gap:7px;align-items:flex-start;margin:0;font-size:calc(12.5px * var(--ts,1));color:var(--text-2)}
+.ds .qb-w .ic,.ds .qb-w svg{color:var(--amber);flex:none;margin-top:2px}
+.ds .qb-go{display:flex;gap:8px;flex-wrap:wrap}
+.ds .qb-out .hint{margin:0}
+.ds .qb-all summary{cursor:pointer;font-size:calc(12.5px * var(--ts,1));color:var(--text-2)}
+.ds .qb-all dl{margin:8px 0 0;display:grid;gap:8px}
+.ds .qb-all dt{font-size:calc(12px * var(--ts,1));color:var(--text-3)}
+.ds .qb-all dd{margin:0;font-size:calc(12.5px * var(--ts,1));word-break:break-word;color:var(--text-2)}
+.ds .qb-all dd small{display:block;font-family:var(--font);color:var(--text-3);margin-top:2px}
+.ds .qb-sv{display:flex;gap:8px;margin-left:auto;align-items:center;flex:1;justify-content:flex-end;min-width:0}
+.ds .qb-sv .inp{max-width:280px;flex:1;min-width:120px;height:34px}
+@media (max-width:760px){.ds .qb-grid{grid-template-columns:1fr}.ds .qb-out{border-left:0;border-top:1px solid var(--border-soft)}.ds .qb-r{grid-template-columns:1fr auto}.ds .qb-r .qb-v{grid-column:1/2}.ds .qb-n{grid-column:1/3}.ds .qb-r .qb-k{grid-column:1/3}}

@@ -75,6 +75,8 @@ const RS_ACTS = {
     renderInsp(); if(blocked) toast(`Your browser blocked ${blocked} tab${blocked > 1 ? 's' : ''}. Allow pop-ups for this site to open them all at once — or use “Open next”.`); }
 };
 const defang = s => String(s).replace(/^http/i, 'hxxp').replace(/:\/\//, '[://]').replace(/\./g, '[.]').replace(/@/g, '[@]');
+/* defang only the words in a text that are indicators, so the sentences around them stay readable */
+const defangText = s => String(s).split(/(\s+)/).map(w => /\S/.test(w) && E.extract(w).length ? defang(w) : w).join('');
 const refang = s => String(s).replace(/hxxp/ig, 'http').replace(/\[:\/\/\]/g, '://').replace(/\[\.\]|\(\.\)|\{\.\}/g, '.').replace(/\[@\]|\(at\)|\[at\]/ig, '@');
 
 /* ---------- IOCs for a case ---------- */
@@ -150,7 +152,7 @@ const TX = {
   html:['HTML entities','code', s => { const t = document.createElement('textarea'); t.innerHTML = s; return t.value; }],
   rot13:['ROT13','refresh-cw', s => s.replace(/[a-z]/gi, c => String.fromCharCode((c <= 'Z' ? 90 : 122) >= (c = c.charCodeAt(0) + 13) ? c : c - 26))],
   rev:['Reverse','undo-2', s => [...s].reverse().join('')],
-  defang:['Defang','shield-check', s => s.split(/(\s+)/).map(w => /\S/.test(w) && E.extract(w).length ? defang(w) : w).join('')], refang:['Refang','shield-alert', s => refang(s)],
+  defang:['Defang','shield-check', s => defangText(s)], refang:['Refang','shield-alert', s => refang(s)],
   jwt:['JWT decode','key-round', s => { const p = s.trim().split('.'); if(p.length < 2) throw new Error('Not a JWT'); const dj = x => JSON.stringify(JSON.parse(b64d(x)), null, 2); return '// header\n' + dj(p[0]) + '\n\n// payload\n' + dj(p[1]) + (p[2] ? '\n\n// signature not verified' : ''); }],
   iocs:['Extract IOCs','fingerprint', s => { const e = E.extract(s); return e.length ? e.map(x => (E.LABEL[x.k] || x.k).padEnd(11) + ' ' + x.v).join('\n') : '(no indicators found)'; }],
   b32d:['Base32 decode','binary', s => { const A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; let bits = '', out = []; for(const c of s.toUpperCase().replace(/[=\s]/g, '')){ const i = A.indexOf(c); if(i < 0) throw new Error('Not Base32'); bits += i.toString(2).padStart(5, '0'); } for(let i = 0; i + 8 <= bits.length; i += 8) out.push(parseInt(bits.slice(i, i + 8), 2)); return new TextDecoder().decode(new Uint8Array(out)); }],
@@ -167,6 +169,7 @@ const TX = {
     return s.trim().replace(/[•·]/g, '.').replace(/[—–_]/g, '-').split(/\s*[\/|]\s*|\s{3,}/).map(w => w.split(/\s+/).map(c => M[c] || (c ? '?' : '')).join('')).join(' '); }],
   gunzip:['Gunzip / inflate (Base64 or hex in)','box', null],
   sha256:['SHA-256','fingerprint', null], sha1:['SHA-1','fingerprint', null],
+  mask:['Mask identifiers','eye-off', s => { const r = maskText(s); return r.map.length ? r.text : s; }],
 };
 /* ---------- auto-decode: try every decoder, keep the one that gives readable text, repeat ---------- */
 function readability(s){
@@ -211,7 +214,7 @@ async function autoDecode(input){
   for(let n = 0; n < 8; n++){ const d = await decodeOnce(cur); if(!d) break; steps.push(d); cur = d[1]; }
   return steps;
 }
-const TX_GROUPS = {"Decode": ["auto", "b64d", "hexd", "urld", "html", "b32d", "b58d", "bin", "dec", "uni", "jwt", "morse", "gunzip"], "Encode & transform": ["b64e", "hexe", "urle", "rot13", "rev", "caesar", "xor", "defang", "refang"], "Analyse": ["iocs", "sha256", "sha1"]};
+const TX_GROUPS = {"Decode": ["auto", "b64d", "hexd", "urld", "html", "b32d", "b58d", "bin", "dec", "uni", "jwt", "morse", "gunzip"], "Encode & transform": ["b64e", "hexe", "urle", "rot13", "rev", "caesar", "xor", "defang", "refang", "mask"], "Analyse": ["iocs", "sha256", "sha1"]};
 async function runTx(op, input){
   if(op === 'auto'){ const st = await autoDecode(input); return {out:st.length ? st[st.length - 1][1] : '', steps:st}; }
   if(op === 'gunzip'){ if(typeof DecompressionStream === 'undefined') throw new Error('This browser cannot decompress');
@@ -227,7 +230,7 @@ function viewDecoder(){
   return `<div class="scroll"><div class="page wide">
     ${libHead('Decoder', 'Decode, encode, defang, hash and pull indicators out of anything — entirely in this browser.', `<button class="btn" data-act="decSample">${ico('play','sm')}Try a sample</button>`, '')}
     <div class="mpick"><label for="txSel" class="ix">Operation</label><select id="txSel" class="gsel bord">${Object.entries(TX_GROUPS).map(([g, ks]) => `<optgroup label="${g}">${ks.filter(k => TX[k]).map(k => `<option value="${k}"${op === k ? ' selected' : ''}>${esc(TX[k][0])}</option>`).join('')}</optgroup>`).join('')}</select><p class="t3 small">${esc(op === 'auto' ? 'Detects the encoding for you and peels layers until the text is readable.' : '')}</p></div>
-    <div class="txops" role="toolbar" aria-label="Operation">${Object.entries(TX).map(([k, [l, i]]) => `<button data-act="txOp" data-v="${k}" aria-pressed="${op === k}">${ico(i,'sm')}${l}</button>`).join('')}</div>
+    <div class="txops txg" role="toolbar" aria-label="Operation">${Object.entries(TX_GROUPS).map(([g, ks]) => `<div class="txg-r"><span class="txg-l">${g}</span><div class="txg-b">${ks.filter(k => TX[k]).map(k => `<button data-act="txOp" data-v="${k}" aria-pressed="${op === k}">${ico(TX[k][1],'sm')}${TX[k][0]}</button>`).join('')}</div></div>`).join('')}</div>
     <div id="txFlags"></div>
     <div class="txgrid">
       <section class="card txpane"><header><h3>Input</h3><span class="t3" id="txInN">${(UI.decIn || '').length} chars</span><span style="flex:1"></span><button class="btn xs ghost" data-act="txClear">Clear</button></header>

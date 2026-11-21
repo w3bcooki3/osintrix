@@ -99,14 +99,14 @@ function mountGraph(){
     layout:hasPos ? {name:'preset'} : {name:'cose', animate:false, nodeRepulsion:() => 14000, idealEdgeLength:() => 95, nodeOverlap:20, padding:40, randomize:false, numIter:1500},
     style:[
       {selector:'node', style:{width:'data(w)', height:'data(w)', 'background-color':surface, 'background-image':'data(icon)', 'background-width':'62%', 'background-height':'62%',
-        'border-width':2.5, 'border-color':'data(ring)', label:'data(label)', color:text, 'font-family':gFont, 'font-size':14.5, 'font-weight':600, 'min-zoomed-font-size':7,
+        'border-width':2.5, 'border-color':'data(ring)', label:'data(label)', color:text, 'font-family':gFont, 'font-size':14.5, 'font-weight':600, 'min-zoomed-font-size':big ? 11 : 7,
         'text-valign':'bottom', 'text-margin-y':8, 'text-background-color':bg, 'text-background-opacity':.85, 'text-background-padding':3, 'text-background-shape':'roundrectangle',
         'overlay-opacity':0, 'transition-property':'border-width, width, height', 'transition-duration':'120ms'}},
       {selector:'node[star = 1]', style:{'border-style':'double', 'border-width':5}},
       {selector:'node:selected', style:{'border-color':accent, 'border-width':4, 'underlay-color':accent, 'underlay-opacity':.22, 'underlay-padding':8, 'underlay-shape':'ellipse'}},
       {selector:'node.src', style:{'underlay-color':accent, 'underlay-opacity':.35, 'underlay-padding':10, 'underlay-shape':'ellipse'}},
       {selector:'edge', style:{width:'data(w)', 'line-color':muted, 'target-arrow-color':muted, 'target-arrow-shape':'triangle', 'arrow-scale':.9, 'curve-style':'bezier', opacity:.75,
-        label:'data(label)', 'font-size':12.5, 'min-zoomed-font-size':8, 'font-family':gFont, color:text2, 'text-rotation':'autorotate', 'text-background-color':bg, 'text-background-opacity':1,
+        label:'data(label)', 'font-size':12.5, 'min-zoomed-font-size':big ? 14 : 8, 'font-family':gFont, color:text2, 'text-rotation':'autorotate', 'text-background-color':bg, 'text-background-opacity':1,
         'text-background-padding':2, 'overlay-opacity':0}},
       {selector:'edge[kind = "co"]', style:{'line-style':'dashed', 'line-color':text2, 'target-arrow-shape':'none', opacity:.35, width:1.2}},
       {selector:'edge:selected', style:{'line-color':cssVar('--amber'), 'target-arrow-color':cssVar('--amber'), opacity:1, width:3}},
@@ -121,7 +121,7 @@ function mountGraph(){
       {selector:'node.hit', style:{'underlay-color':cssVar('--amber'), 'underlay-opacity':.4, 'underlay-padding':10, 'underlay-shape':'ellipse'}},
     ]});
   if(!hasPos){ cy.nodes().forEach(n => { const e = entryById(n.id()); if(e) e.pos = {...n.position()}; }); save(); }
-  const fitNice = () => { cy.resize(); cy.fit(undefined, 56); if(cy.zoom() > 1.25) { cy.zoom(1.25); cy.center(); } if(cy.zoom() < .7){ cy.zoom(.7); cy.center(); } if(!UI.graph.legendMin && cy.width() > 900) cy.panBy({x:100, y:0}); };
+  const fitNice = () => { cy.resize(); cy.fit(undefined, 56); if(cy.zoom() > 1.25) { cy.zoom(1.25); cy.center(); } if(cy.zoom() < .7 && !big){ cy.zoom(.7); cy.center(); }   /* a big graph fits whole; names appear as you zoom in */ if(!UI.graph.legendMin && cy.width() > 900) cy.panBy({x:100, y:0}); };
   const view = UI.graph.views && UI.graph.views[DB.active];
   let ready = !!view; const me = cy;
   if(view){ cy.zoom(view.z); cy.pan(view.p); } else { fitNice(); setTimeout(() => { if(cy === me){ fitNice(); ready = true; } }, 90); }

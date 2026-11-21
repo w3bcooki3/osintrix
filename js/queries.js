@@ -56,7 +56,7 @@ function viewQueries(){
   if(lay === 'ide' && !cur && list[0]){ cur = list[0]; UI.qsel = cur.id; }
   const open = cur && (lay === 'ide' || UI.qopen);
   const head = libHead('Query library', `${DB.queries.length} saved search recipes · fill the blanks from a vault entry and search in the right engine`,
-    `<button class="btn" data-act="qImport">${ico('upload','sm')}Import</button><button class="btn" data-act="qExport">${ico('download','sm')}Export</button><button class="btn primary" data-act="qNew">${ico('plus','sm')}New query</button>`,
+    `<button class="btn" data-act="qImport">${ico('upload','sm')}Import</button><button class="btn" data-act="qExport">${ico('download','sm')}Export</button><button class="btn" data-act="qNew">${ico('plus','sm')}New query</button><button class="btn primary" data-act="qbOpen">${ico('sliders-horizontal','sm')}Build a search</button>`,
     layoutSeg('qLay', lay, [['table','table-2','Table'],['gallery','layout-grid','Gallery'],['ide','columns-3','IDE']]));
   const catSel = `<label class="sr" for="qcatSel">Category</label><select id="qcatSel" class="gsel bord"><option value="all">All categories</option><option value="fav"${cat === 'fav' ? ' selected' : ''}>★ Favourites</option><option value="mine"${cat === 'mine' ? ' selected' : ''}>My queries</option>
     ${cats.map(([c, n]) => `<option value="${esc(c)}"${cat === c ? ' selected' : ''}>${esc(qcat(c)[0])} (${n})</option>`).join('')}</select>`;
@@ -98,8 +98,11 @@ function viewQueries(){
     <div class="toolbar ltb">${search}${catSel}<span style="flex:1"></span><span class="t3 lcount">${list.length} ${list.length === 1 ? 'query' : 'queries'}</span></div>
     ${body}</div></div>${lay === 'table' && open ? drawer(queryPanel(cur), 'qClose', cur.name, ico('scan-search','sm') + 'Query') : ''}`;
 }
+/* a search made with the builder is rewritten for whichever engine it runs on */
+const qText = x => x.b && typeof qbBuild === 'function' ? (qbBuild(x.b, UI.runFor === x.id && UI.runEng ? UI.runEng : x.engines[0] || 'google').q || x.query) : x.query;
 function queryPanel(x){
-  const vs = varsOf(x.query), D = derive(), [cn, col] = qcat(x.cat);
+  if(!UI.runEng || !ENGINES[UI.runEng] || UI.runFor !== x.id){ UI.runEng = x.engines[0] || 'google'; UI.runFor = x.id; }
+  const vs = varsOf(qText(x)), D = derive(), [cn, col] = qcat(x.cat);
   if(!UI.runEng || !ENGINES[UI.runEng] || UI.runFor !== x.id){ UI.runEng = x.engines[0] || 'google'; UI.runFor = x.id; }
   const fillOpts = v => D.entries.filter(e => (VAR_FILL[v] || Object.keys(TYPES)).includes(e.type)).map(e => `<option value="${e.id}">${esc(TYPES[e.type].label + ' · ' + primary(e))}</option>`).join('');
   const others = Object.keys(ENGINES).filter(k => !x.engines.includes(k));
@@ -114,8 +117,8 @@ function queryPanel(x){
     ${vs.length ? `<div class="qp-s"><h4><span class="stepn">1</span>Fill the blanks</h4>
       ${vs.map(v => `<div class="qvar"><label for="qv-${v}" class="mono">{{${esc(v)}}}</label><input id="qv-${v}" class="inp" data-var="${v}" autocomplete="off" placeholder="${esc(v.replace(/_/g, ' ').toLowerCase())}">
         ${fillOpts(v) ? `<label class="sr" for="qf-${v}">Fill ${esc(v)} from the vault</label><select id="qf-${v}" class="inp" data-fill="${v}"><option value="">From vault…</option>${fillOpts(v)}</select>` : ''}</div>`).join('')}</div>` : ''}
-    <div class="qp-s"><h4><span class="stepn">${vs.length ? 2 : 1}</span>Query</h4><label class="sr" for="qPrev">Query</label><textarea id="qPrev" class="inp code" rows="3" spellcheck="false">${esc(x.query)}</textarea>
-      <span class="hint">Edit freely before you search — the saved template stays as it is.</span></div>
+    <div class="qp-s"><h4><span class="stepn">${vs.length ? 2 : 1}</span>Query</h4><label class="sr" for="qPrev">Query</label><textarea id="qPrev" class="inp code" rows="3" spellcheck="false">${esc(qText(x))}</textarea>
+      <span class="hint">${x.b ? 'Built with the search builder — written for the engine you pick below. <button class="lnk" data-act="qbOpen" data-id="' + x.id + '">Change it in the builder</button>' : 'Edit freely before you search — the saved template stays as it is.'}</span></div>
     <div class="qp-s"><h4><span class="stepn">${vs.length ? 3 : 2}</span>Search with</h4><div class="engs">${x.engines.map(eng).join('')}</div>
       ${others.length ? `<details class="more"><summary>Other engines</summary><div class="engs">${others.map(eng).join('')}</div></details>` : ''}</div>
     <div class="qp-go"><a class="btn primary big" id="qRunLink" target="_blank" rel="noopener noreferrer" data-act="qGo" data-id="${x.id}">${ico('external-link','sm')}<span id="qRunLabel">Search</span></a>
@@ -133,7 +136,7 @@ function syncRun(){
 }
 function bindQueryPanel(){
   const x = DB.queries.find(z => z.id === UI.qsel); if(!x || !$('qPrev')) return;
-  const upd = () => { let q = x.query; document.querySelectorAll('[data-var]').forEach(i => { if(i.value.trim()) q = q.replace(new RegExp('\\{\\{\\s*' + i.dataset.var + '\\s*\\}\\}', 'gi'), i.value.trim()); }); $('qPrev').value = q; syncRun(); };
+  const upd = () => { let q = qText(x); document.querySelectorAll('[data-var]').forEach(i => { if(i.value.trim()) q = q.replace(new RegExp('\\{\\{\\s*' + i.dataset.var + '\\s*\\}\\}', 'gi'), i.value.trim()); }); $('qPrev').value = q; syncRun(); };
   document.querySelectorAll('[data-var]').forEach(i => i.oninput = upd);
   document.querySelectorAll('[data-fill]').forEach(s => s.onchange = () => { const e = entryById(s.value), i = $('qv-' + s.dataset.fill); if(i && e){ i.value = fillFrom(s.dataset.fill, e); upd(); } });
   $('qPrev').oninput = syncRun; syncRun();

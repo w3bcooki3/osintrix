@@ -242,6 +242,8 @@ function normStored(d){
     if(r.geo != null && !isObj(r.geo)) delete r.geo;
     if(r.hours != null && !(isObj(r.hours) && Array.isArray(r.hours.t) && Array.isArray(r.hours.who))) delete r.hours; if(r.cred != null && !/^[1-6]$/.test(String(r.cred))) delete r.cred; }
   for(const k of ['cases', 'records', 'entries', 'notes', 'tools', 'queries', 'rules', 'playbooks']) if(d[k]) d[k] = d[k].filter(x => typeof x.id === 'string' && x.id);
+  /* a built search keeps its rows: a short list of {k, v} strings, or nothing */
+  if(d.queries) for(const q of d.queries) if(q.b !== undefined){ if(!Array.isArray(q.b)) delete q.b; else { q.b = q.b.filter(r => r && typeof r === 'object' && typeof r.k === 'string' && typeof r.v === 'string' && (typeof QB_KINDS === 'undefined' || QB_KINDS[r.k])).slice(0, 30).map(r => ({k:r.k, v:r.v.slice(0, 500)})); if(!q.b.length) delete q.b; } }
   if(d.links) d.links = d.links.filter(l => typeof l.a === 'string' && typeof l.b === 'string');
   /* an entry of a kind this version does not know is kept as a document, its kind written on it as a tag */
   for(const e of d.entries || []) if(typeof TYPES !== 'undefined' && !TYPES[e.type]){ const was = typeof e.type === 'string' ? e.type.slice(0, 30) : ''; e.type = 'document'; e.tags = (Array.isArray(e.tags) ? e.tags : []).concat(was ? ['was ' + was] : []); }
@@ -254,6 +256,7 @@ function normStored(d){
   if(d.phoneCC != null && !(typeof d.phoneCC === 'string' && /^[A-Z]{2}$|^$/.test(d.phoneCC))) d.phoneCC = '';
   if(d.research != null){ if(!isObj(d.research)) d.research = {}; else for(const [k, v] of Object.entries(d.research)){ if(!isObj(v)) delete d.research[k]; else for(const [n, x] of Object.entries(v)) if(!isObj(x)) delete v[n]; else { if(x.r != null && !['found', 'none', 'private'].includes(x.r)) delete x.r; if(x.note != null) x.note = String(x.note).slice(0, 500); } } }
   if(d.autoDone != null && !isObj(d.autoDone)) d.autoDone = {}; if(d.autoLog != null && !Array.isArray(d.autoLog)) d.autoLog = [];
+  if(d.rxlib != null) d.rxlib = Array.isArray(d.rxlib) && typeof rxlClean === 'function' ? d.rxlib.map(rxlClean).filter(Boolean).slice(0, 300) : [];
   if(d.verdicts != null && !isObj(d.verdicts)) d.verdicts = {}; if(d.prefs != null && !isObj(d.prefs)) d.prefs = {};
   return d;
 }
