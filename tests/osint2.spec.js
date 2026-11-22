@@ -806,3 +806,137 @@ test('search builder: rows become a search for each engine, what an engine canno
   expect(clean).toEqual([undefined, [{ k: 'site', v: 'a.example' }]]);
   noErrors(errors);
 });
+
+test('a vault of 3,000 entries: filters, sorting, pages, a Shift+click range, bulk priority, verdict, tags, star, watch and delete, each undoable', async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = await open(page, '#/home');
+  await page.evaluate(() => { const types = ['domain', 'ip', 'email', 'username', 'person'];
+    for (let i = 0; i < 3000; i++) { const ty = types[i % 5]; const f = ty === 'domain' ? { domain: 'host' + i + '.example.org' } : ty === 'ip' ? { ip: '203.0.' + (i >> 8 & 255) + '.' + (i & 255) } : ty === 'email' ? { email: 'u' + i + '@mail.example' } : ty === 'username' ? { username: 'user' + i } : { name: 'Person ' + i };
+      DB.entries.push({ id: 'gv' + i, caseId: 'c-portal', type: ty, fields: f, priority: ['low', 'medium', 'high', 'critical'][i % 4], starred: false, tags: i % 7 === 0 ? ['wave-2'] : [], notes: '', src: '', created: 1e12 + i, pos: null }); }
+    for (let i = 1; i < 3000; i += 3) DB.links.push({ id: 'gl' + i, caseId: 'c-portal', a: 'gv' + i, b: 'gv' + (i - 1), label: 'uses', conf: 2, src: '' });
+    DB.verdicts['domain:host5.example.org'] = 'malicious'; mutate('big'); });
+  const t0 = Date.now(); await page.evaluate(() => go(caseHash('c-portal', 'vault'))); await expect(page.locator('.ecard').first()).toBeVisible();
+  expect(Date.now() - t0).toBeLessThan(3000);
+  const total = await page.evaluate(() => derive('c-portal').entries.length);
+  // only the first page is drawn, the rest on request
+  await expect(page.locator('.vmain .ecard:not(.auto)')).toHaveCount(150);
+  await expect(page.locator('.vb-more')).toContainText(`Showing 150 of ${total.toLocaleString('en-US')}`);
+  await page.click('[data-act=vbMore]:not([data-v])'); await expect(page.locator('.vmain .ecard:not(.auto)')).toHaveCount(300);
+  // filters: type, tag, verdict, "not linked", with the count and a way out
+  await page.selectOption('#vb-Type', 'domain'); await page.selectOption('#vb-Tag', 'wave-2');
+  const want = await page.evaluate(() => DB.entries.filter(e => e.caseId === 'c-portal' && e.type === 'domain' && e.tags.includes('wave-2')).length);
+  await expect(page.locator('.vmain .toolbar .t3').first()).toHaveText(`${want} of ${total.toLocaleString('en-US')} entries`);
+  await page.selectOption('#vb-Vd', 'malicious'); await expect(page.locator('#main .empty h3')).toHaveText('Nothing matches');
+  await page.click('#main .empty [data-act=vbClear]'); await expect(page.locator('.vb-s.on')).toHaveCount(0);
+  await page.selectOption('#vb-Vd', 'malicious'); const mal = await page.evaluate(() => derive('c-portal').entries.filter(e => entryVerdict(e) === 'malicious').length); expect(mal).toBeGreaterThan(0);
+  await expect(page.locator('.vmain .ecard:not(.auto)')).toHaveCount(mal); await expect(page.locator('.vmain .ecard:not(.auto)', { hasText: 'host5.example.org' })).toHaveCount(1);
+  await page.selectOption('#vb-Vd', ''); await page.selectOption('#vb-Only', 'nolinks');
+  const nolinks = await page.evaluate(() => { const s = new Set(DB.links.flatMap(l => [l.a, l.b])); return derive('c-portal').entries.filter(e => !s.has(e.id)).length; });
+  await expect(page.locator('.vmain .toolbar .t3').first()).toHaveText(`${nolinks.toLocaleString('en-US')} of ${total.toLocaleString('en-US')} entries`);
+  await page.selectOption('#vb-Only', '');
+  // list view, sorted by value, then a Shift+click range of five in screen order
+  await page.evaluate(() => { DB.prefs.vLay = 'list'; renderMain(); }); await page.selectOption('#vb-Type', 'username'); await page.selectOption('#vb-Sort', 'value');
+  const first5 = await page.locator('.vl-t tbody tr .vl-v > span[title]').evaluateAll(n => n.slice(0, 5).map(x => x.textContent));
+  const U = await page.evaluate(() => derive('c-portal').entries.filter(e => e.type === 'username').map(e => primary(e)).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })).slice(0, 5));
+  expect(first5).toEqual(U);
+  await page.locator('.vl-t tbody tr').nth(0).locator('.vb-pk').click(); await page.locator('.vl-t tbody tr').nth(4).locator('.vb-pk').click({ modifiers: ['Shift'] });
+  await expect(page.locator('.vb-bulk b')).toHaveText('5 selected');
+  // bulk priority, undone
+  await page.click('[data-act=vbPrio]'); await page.locator('#ctx button', { hasText: 'Critical' }).click();
+  const byName = (u, f) => page.evaluate(([u, f]) => { const e = DB.entries.find(x => x.caseId === 'c-portal' && primary(x) === u); return f === 'tags' ? e.tags : f === 'v' ? entryVerdict(e) : e[f]; }, [u, f]);
+  for (const u of U) expect(await byName(u, 'priority')).toBe('critical');
+  await page.locator('.toast').last().getByRole('button', { name: 'Undo' }).click();
+  const prio0 = await page.evaluate(() => Object.fromEntries(DB.entries.filter(e => e.caseId === 'c-portal' && e.type === 'username').map(e => [primary(e), e.priority])));
+  expect(prio0[U[1]]).not.toBe(undefined); expect(await byName(U[1], 'priority')).toBe(prio0[U[1]]);
+  // verdict, tags (add and take off), star, watch
+  await page.click('[data-act=vbVerdict]'); await page.locator('#ctx button', { hasText: 'Suspicious' }).click();
+  for (const u of U) expect(await byName(u, 'v')).toBe('suspicious');
+  await page.click('[data-act=vbTag]'); await page.fill('#vbTagIn', 'sprayers, wave-3'); await page.click('#dlg button[type=submit]');
+  expect(await byName(U[4], 'tags')).toEqual(expect.arrayContaining(['sprayers', 'wave-3']));
+  await page.click('[data-act=vbTag]'); await page.fill('#vbTagIn', '-wave-3'); await page.click('#dlg button[type=submit]');
+  expect(await byName(U[4], 'tags')).toContain('sprayers'); expect(await byName(U[4], 'tags')).not.toContain('wave-3');
+  await page.click('[data-act=vbStar]'); for (const u of U) expect(await byName(u, 'starred')).toBe(true);
+  await page.click('[data-act=vbWatch]'); expect(await page.evaluate(U => U.filter(u => isWatched(entryKey(DB.entries.find(x => x.caseId === 'c-portal' && primary(x) === u)))).length, U)).toBe(5);
+  // select all shown, delete to the trash with their links, then undo
+  const nU = await page.evaluate(() => derive('c-portal').entries.filter(e => e.type === 'username').length);
+  await page.click('[data-act=vbAll]'); await expect(page.locator('.vb-bulk b')).toHaveText(`${nU} selected`);
+  const links0 = await page.evaluate(() => DB.links.length);
+  await page.click('[data-act=vbDel]'); await page.click('[data-act=confirmOk]');
+  expect(await page.evaluate(() => DB.entries.filter(e => e.caseId === 'c-portal' && e.type === 'username').length)).toBe(0);
+  expect(await page.evaluate(() => DB.trash.filter(t => t.kind === 'entry').length)).toBe(nU);
+  await page.locator('.toast').last().getByRole('button', { name: 'Undo' }).click();
+  expect(await page.evaluate(() => [DB.entries.filter(e => e.caseId === 'c-portal' && e.type === 'username').length, DB.links.length, DB.trash.filter(t => t.kind === 'entry').length])).toEqual([nU, links0, 0]);
+  // Esc clears the selection; another case starts with no filters
+  await page.locator('.vl-t tbody tr').first().locator('.vb-pk').click(); await page.click('[data-act=vbAll]'); await page.evaluate(() => document.activeElement.blur()); await page.keyboard.press('Escape'); await expect(page.locator('.vb-bulk')).toHaveCount(0);
+  await page.evaluate(() => go(caseHash('c-lantern', 'vault'))); await expect(page.locator('.vb-s.on')).toHaveCount(0);
+  noErrors(errors);
+});
+
+test('Ctrl K: filters narrow every result and are suggested as you type, and a result can be acted on without leaving the search', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  const errors = await open(page, '#/home');
+  await page.keyboard.press('Control+k'); await expect(page.locator('#srQ')).toBeFocused();
+  // typing an operator's name suggests it, but Enter still goes to the best result
+  await page.keyboard.type('ca'); await expect(page.locator('.sr-it').first()).toContainText('case:');
+  await expect(page.locator('.sr-it[aria-selected=true]')).not.toContainText('case:');
+  // after the colon, values are suggested and Enter/Tab finishes the filter
+  await page.fill('#srQ', ''); await page.keyboard.type('type:i');
+  await expect(page.locator('.sr-it[aria-selected=true]')).toContainText('type:ip');
+  await page.keyboard.press('Tab'); await expect(page.locator('#srQ')).toHaveValue('type:ip ');
+  await page.keyboard.type('verdict:mal'); await page.keyboard.press('Enter'); await expect(page.locator('#srQ')).toHaveValue('type:ip verdict:malicious ');
+  // only malicious IPs, from the vault and the indicators — nothing else
+  const kinds = await page.locator('.sr-it small').allTextContents();
+  expect(kinds.length).toBeGreaterThan(0);
+  for (const k of kinds) expect(k).toMatch(/^IP/);
+  const want = await page.evaluate(() => [...globalEnts()].filter(([id, g]) => /^ip/.test(g.k) && verdictOf(id) === 'malicious').length);
+  await expect(page.locator('[data-act=srScope][data-v=ent] span')).toHaveText(String(want));
+  await expect(page.locator('.sr-fl .sr-fc')).toHaveCount(2);
+  // a filter chip drops its filter
+  await page.locator('.sr-fc', { hasText: 'malicious' }).click(); await expect(page.locator('#srQ')).toHaveValue('type:ip ');
+  // tag: and is: filters
+  await page.evaluate(() => { const e = DB.entries.find(x => x.caseId === 'c-lantern' && x.type === 'domain'); e.tags = ['zz-wave']; e.starred = true; mutate('t'); });
+  await page.keyboard.press('Escape'); await page.keyboard.press('Control+k');
+  await page.keyboard.type('tag:zz'); await expect(page.locator('.sr-it[aria-selected=true]')).toContainText('tag:zz-wave'); await page.keyboard.press('Enter');
+  await expect(page.locator('.sr-it')).toHaveCount(1);
+  await page.fill('#srQ', 'is:starred type:domain'); await page.locator('#srQ').dispatchEvent('input');
+  const starred = await page.evaluate(() => DB.entries.filter(e => e.starred && e.type === 'domain').length);
+  await expect(page.locator('.sr-it')).toHaveCount(starred);
+  // the timeline offer only appears for timeline-only filters
+  await expect(page.locator('.sr-it', { hasText: 'Filter the' })).toHaveCount(0);
+  await page.fill('#srQ', 'host:DC01'); await page.locator('#srQ').dispatchEvent('input'); await expect(page.locator('.sr-it', { hasText: 'Filter the' })).toHaveCount(1);
+  // actions on the selected result: Alt+1 copies, Alt+3 watches, the search stays open
+  await page.fill('#srQ', '203.0.113.47 in:indicators'); await page.locator('#srQ').dispatchEvent('input');
+  await expect(page.locator('.sp-a').first()).toContainText('Copy');
+  await page.keyboard.press('Alt+1'); expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('203.0.113.47');
+  await page.keyboard.press('Alt+2'); expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('203[.]0[.]113[.]47');
+  const w0 = await page.evaluate(() => isWatched('ipv4:203.0.113.47'));
+  await page.locator('.sp-a', { hasText: /Watch|Stop watching/ }).click();
+  expect(await page.evaluate(() => isWatched('ipv4:203.0.113.47'))).toBe(!w0);
+  await expect(page.locator('#srQ')).toBeVisible(); await expect(page.locator('.sp-a', { hasText: w0 ? /^Watch/ : 'Stop watching' })).toHaveCount(1);
+  // an action that goes somewhere closes the search
+  await page.locator('.sp-a', { hasText: 'Find in every case' }).click(); await expect(page.locator('#srQ')).toHaveCount(0);
+  await expect(page).toHaveURL(/#\/entities/); await expect(page.locator('#entq')).toHaveValue('203.0.113.47');
+  noErrors(errors);
+});
+
+test('the vault filters and selection, and Ctrl K with filters, hints and actions, have no accessibility problems, light and dark', async ({ page }) => {
+  test.setTimeout(120_000);
+  const AxeBuilder = require('@axe-core/playwright').default;
+  const errors = await open(page, '#/case/c-lantern/vault');
+  const found = [], check = async name => { const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
+    for (const v of r.violations) if (['serious', 'critical'].includes(v.impact)) for (const n of v.nodes.slice(0, 2)) found.push(`${name} ${v.id}: ${n.target.join(' ')}`); };
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate(t => { DB.prefs.theme = t; applyPrefs(); DB.prefs.vLay = 'cards'; UI.vPick = new Set(); go(caseHash('c-lantern', 'vault')); renderMain(); }, theme);
+    await page.selectOption('#vb-Vd', 'malicious'); await page.locator('.ecard').first().hover(); await page.locator('.ecard >> .vb-pk').first().click(); await page.mouse.move(0, 0);
+    await check(theme + ' vault cards');
+    await page.evaluate(() => { DB.prefs.vLay = 'list'; renderMain(); }); await check(theme + ' vault list');
+    await page.evaluate(() => { UI.vPick = new Set(); renderMain(); });
+    await page.keyboard.press('Control+k'); await page.keyboard.type('type:'); await check(theme + ' search hints');
+    await page.fill('#srQ', '203.0.113.47 verdict:malicious'); await page.locator('#srQ').dispatchEvent('input'); await check(theme + ' search actions');
+    await expect(page.locator('#srQ')).toHaveAttribute('aria-activedescendant', 'sro0');
+    await page.keyboard.press('ArrowDown'); await expect(page.locator('#srQ')).toHaveAttribute('aria-activedescendant', 'sro1');
+    await page.keyboard.press('Escape');
+  }
+  expect(found, found.join('\n')).toEqual([]);
+  noErrors(errors.filter(e => !/Connecting to 'file:[^']*\.css/.test(e)));
+});

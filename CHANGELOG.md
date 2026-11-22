@@ -2,6 +2,22 @@
 
 All notable changes to OSINTrix, newest first. The format is based on [Keep a Changelog](https://keepachangelog.com); this file is generated from `js/data/changelog.js` by `tools/changelog.py`.
 
+## [1.54] — A big vault, workable; filters and actions in Ctrl K (2026-11-21)
+
+_A case with thousands of entries can be filtered, sorted, paged and changed in bulk, with undo. Ctrl K gains filters that are suggested as you type and actions on a result without leaving the search._
+
+### Added
+- Vault → filters for a big case: verdict, type, tag, and “not linked to anything”, “also in other cases”, watched, with open questions, not seen in any record or with notes — with how many match, and Clear. Cards can now be sorted too (priority, newest, oldest, most records, last seen, value, type).
+- Vault → select many entries: the box on a card or row, Shift+click for a range in the order on screen, or every entry shown — then set priority or verdict, tag (or take a tag off with −tag), star, watch, export as CSV or delete them at once. Every bulk change can be undone; deleted entries go to the trash with their relationships. Esc clears the selection.
+- Ctrl K → filters that narrow every result: verdict:, type:, tag: and is: (starred, watched, open, solved), combined with each other and with case: and in:. They are suggested as you type — operator names first, then their values (your case codes, tags and types) — and Tab or Enter finishes one. The filters in force show above the results, each with a × to drop it; type:ip finds IPv4 and IPv6, not IP:port.
+- Ctrl K → act on a result without leaving the search: copy, copy defanged, watch, star, show in the graph, find in every case, open a lookup, copy masked, open a case’s vault or timeline — listed beside the result with Alt+1…9.
+
+### Changed
+- A vault of thousands of entries opens at once: the first 150 cards (400 rows) are drawn and the rest come with Show more. 3,000 entries went from about half a second to 15 ms.
+
+### Fixed
+- Ctrl K is announced properly to screen readers: the box owns the result list and says which result is highlighted, results come in named groups, and the scope buttons are a labelled group. Case codes on results and the red Delete button in dark mode now have enough contrast.
+
 ## [1.53] — Polish, a menu on every indicator, masking, big files, a search builder (2026-11-21)
 
 _Every screen checked at desktop, laptop, tablet and phone widths: text that was cut off can be read, strips of tabs that do not fit scroll with a soft edge, scrollbars are thin, and nothing is wider than a phone. Right-click any indicator for copy, details, every case it is in, watch and lookups._

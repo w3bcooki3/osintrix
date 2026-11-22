@@ -259,7 +259,7 @@ function entryCard(e){
   const t = TYPES[e.type], v = entryVerdict(e), X = entryCtx(e), mono = MONO_TYPES.has(e.type);
   const seen = X.recs.length ? `${X.recs.length} record${X.recs.length > 1 ? 's' : ''}${X.first ? ' · ' + shortDay(X.first) + (X.last && shortDay(X.last) !== shortDay(X.first) ? '–' + shortDay(X.last) : '') : ''}` : '';
   return `<div class="ecard ec2${v === 'malicious' ? ' bad' : v === 'suspicious' ? ' sus' : ''}" data-id="${e.id}" aria-current="${!!(UI.sel && UI.sel.id === e.id)}"><button class="gcard-hit" data-act="selEntry" data-id="${e.id}" aria-label="${esc(t.label + ': ' + primary(e))}"></button>
-    <div class="h">${X.pic ? `<span class="ec-pic"><img data-pid="${esc(X.pic.id)}" data-pk="${/^video/.test(X.pic.type) ? 'video' : 'image'}" alt=""></span>` : tbadge(e.type)}<div class="tt"><div class="kind">${esc(t.label)}${X.other.length ? ` <span class="ec-also" title="Also in ${esc(X.other.map(c => c.code).join(', '))}">${ico('git-compare-arrows','sm')}${X.other.length === 1 ? esc(X.other[0].code) : X.other.length + ' cases'}</span>` : ''}</div>
+    ${typeof vbPickBtn === 'function' ? vbPickBtn(e) : ''}<div class="h">${X.pic ? `<span class="ec-pic"><img data-pid="${esc(X.pic.id)}" data-pk="${/^video/.test(X.pic.type) ? 'video' : 'image'}" alt=""></span>` : tbadge(e.type)}<div class="tt"><div class="kind">${esc(t.label)}${X.other.length ? ` <span class="ec-also" title="Also in ${esc(X.other.map(c => c.code).join(', '))}">${ico('git-compare-arrows','sm')}${X.other.length === 1 ? esc(X.other[0].code) : X.other.length + ' cases'}</span>` : ''}</div>
       <div class="val${mono ? ' mono' : ''}" title="${esc(primary(e))}">${esc(primary(e))}</div></div>
       ${X.watched ? `<span class="ec-w" title="Watched — you hear when it shows up again">${ico('eye','sm')}</span>` : ''}<span class="star${e.starred ? ' on' : ''}" data-act="star" data-id="${e.id}" role="button" tabindex="0" aria-label="${e.starred ? 'Unstar' : 'Star'}">${ico('star','sm')}</span></div>
     ${X.facts.length ? `<dl>${X.facts.map(([n, l]) => `<dt>${esc(l)}</dt><dd title="${esc(e.fields[n])}">${esc(e.fields[n])}</dd>`).join('')}</dl>` : ''}
@@ -272,38 +272,49 @@ function entryCard(e){
       <span class="ec-act">${X.k ? `<button class="iconbtn" data-act="ecCopy" data-id="${e.id}" aria-label="Copy ${esc(primary(e))}" title="Copy">${ico('copy','sm')}</button>` : ''}${X.k && X.recs.length ? `<button class="iconbtn" data-act="pivot" data-id="${esc(X.k)}" aria-label="Its events in the timeline" title="Its events in the timeline">${ico('clock','sm')}</button>` : ''}<button class="iconbtn" data-act="showInGraph" data-id="${e.id}" aria-label="Show in the graph" title="Show in the graph">${ico('waypoints','sm')}</button></span></div></div>`;
 }
 /* the dense list: one row per entry, sortable */
-function entryRows(list){
+/* the list's column sort, applied to the whole filtered list before it is cut into pages */
+function entryRowsSort(list){
   const sk = UI.vsk || '', sd = UI.vsd || 'desc', val = e => { const X = entryCtx(e); return sk === 'value' ? primary(e).toLowerCase() : sk === 'type' ? TYPES[e.type].label : sk === 'verdict' ? ({malicious:3, suspicious:2, benign:0}[entryVerdict(e)] ?? 1) : sk === 'prio' ? {critical:3, high:2, medium:1, low:0}[e.priority] : sk === 'recs' ? X.recs.length : sk === 'last' ? X.last || 0 : sk === 'links' ? X.links.length : 0; };
-  const L = sk ? list.slice().sort((a, b) => { const x = val(a), y = val(b); return (x < y ? -1 : x > y ? 1 : 0) * (sd === 'asc' ? 1 : -1); }) : list;
+  return sk ? list.slice().sort((a, b) => { const x = val(a), y = val(b); return (x < y ? -1 : x > y ? 1 : 0) * (sd === 'asc' ? 1 : -1); }) : list; }
+function entryRows(list, pick){
+  const sk = UI.vsk || '', sd = UI.vsd || 'desc';
+  const L = pick ? list : entryRowsSort(list);
   const th = (k, l, c) => `<th class="${c || ''}"${sk === k ? ` aria-sort="${sd === 'asc' ? 'ascending' : 'descending'}"` : ''}><button data-act="vSort" data-v="${k}">${l}${sk === k ? ico(sd === 'asc' ? 'chevron-up' : 'chevron-down','sm') : ''}</button></th>`;
-  return `<div class="card ev-list" style="overflow:auto"><table class="tbl vl-t"><thead><tr><th class="c-st"><span class="sr">Star</span></th>${th('value', 'Entry')}${th('type', 'Type', 'hide-m')}<th class="hide-m">Details</th>${th('verdict', 'Verdict')}${th('prio', 'Priority', 'hide-m')}${th('recs', 'Records', 'n')}${th('last', 'Last seen', 'hide-m')}${th('links', 'Links', 'n hide-m')}</tr></thead><tbody>
+  return `<div class="card ev-list" style="overflow:auto"><table class="tbl vl-t"><thead><tr>${pick ? '<th class="c-pk"><span class="sr">Select</span></th>' : ''}<th class="c-st"><span class="sr">Star</span></th>${th('value', 'Entry')}${th('type', 'Type', 'hide-m')}<th class="hide-m">Details</th>${th('verdict', 'Verdict')}${th('prio', 'Priority', 'hide-m')}${th('recs', 'Records', 'n')}${th('last', 'Last seen', 'hide-m')}${th('links', 'Links', 'n hide-m')}</tr></thead><tbody>
     ${L.map(e => { const X = entryCtx(e), v = entryVerdict(e), t = TYPES[e.type];
-      return `<tr data-act="selEntry" data-id="${e.id}" tabindex="0" aria-current="${!!(UI.sel && UI.sel.id === e.id)}"><td class="c-st"><span class="star${e.starred ? ' on' : ''}" data-act="star" data-id="${e.id}" role="button" tabindex="0" aria-label="${e.starred ? 'Unstar' : 'Star'}">${ico('star','sm')}</span></td>
+      return `<tr data-act="selEntry" data-id="${e.id}" tabindex="0" aria-current="${!!(UI.sel && UI.sel.id === e.id)}">${pick ? `<td class="c-pk">${vbPickBtn(e)}</td>` : ''}<td class="c-st"><span class="star${e.starred ? ' on' : ''}" data-act="star" data-id="${e.id}" role="button" tabindex="0" aria-label="${e.starred ? 'Unstar' : 'Star'}">${ico('star','sm')}</span></td>
         <td><div class="vl-v">${tbadge(e.type)}<span class="${MONO_TYPES.has(e.type) ? 'mono' : ''}" title="${esc(primary(e))}">${esc(primary(e))}</span>${X.watched ? `<span class="ec-w" title="Watched">${ico('eye','sm')}</span>` : ''}${X.other.length ? `<span class="ec-also">${ico('git-compare-arrows','sm')}${esc(X.other.map(c => c.code).join(', '))}</span>` : ''}</div></td>
         <td class="hide-m t2">${esc(t.label)}</td><td class="hide-m t2 vl-d">${esc(X.facts.map(([n]) => e.fields[n]).join(' · '))}</td><td>${v ? vdLabel(v) : '<span class="t3">—</span>'}</td><td class="hide-m">${prioLabel(e.priority)}</td>
         <td class="n">${X.recs.length || '<span class="t3">0</span>'}</td><td class="hide-m t2 mono">${X.last ? esc(E.fmtFull(X.last, tz()).slice(5, 16)) : '<span class="t3">—</span>'}</td><td class="n hide-m">${X.links.length || '<span class="t3">0</span>'}</td></tr>`; }).join('')}</tbody></table></div>`;
 }
 function caseVault(c, D){
-  const q = UI.vq.toLowerCase(), cat = UI.vcat;
-  let list = D.entries.filter(e => (cat === 'all' || (cat === 'starred' ? e.starred : cat === 'priority' ? /high|critical/.test(e.priority) : TYPES[e.type].group === cat)) &&
+  const q = UI.vq.toLowerCase(), cat = UI.vcat, F = vbF(c.id);
+  const base = D.entries.filter(e => (cat === 'all' || (cat === 'starred' ? e.starred : cat === 'priority' ? /high|critical/.test(e.priority) : TYPES[e.type].group === cat)) &&
     (!q || (Object.values(e.fields).join(' ') + ' ' + e.tags.join(' ') + ' ' + e.notes + ' ' + TYPES[e.type].label).toLowerCase().includes(q)));
-  const prio = {critical:0, high:1, medium:2, low:3};
-  list.sort((a, b) => (b.starred - a.starred) || prio[a.priority] - prio[b.priority]);
+  const asList0 = DB.prefs.vLay === 'list', list = (asList0 && UI.vsk ? entryRowsSort : x => x)(vbSort(vbFilter(base, F), F.sort));
+  if(UI.vPick && UI.vPick.size){ const have = new Set(D.entries.map(e => e.id)); for(const i of [...UI.vPick]) if(!have.has(i)) UI.vPick.delete(i); }
+  const asList = DB.prefs.vLay === 'list', lim = (asList ? VB_LIM.list : VB_LIM.cards) * ((UI.vLim || 0) + 1), byGroup = cat === 'all' && F.sort === 'prio' && !asList;
+  /* draw only the first few hundred; the rest come with "show more" */
+  const shown = byGroup ? GROUPS.flatMap(([g]) => list.filter(e => TYPES[e.type].group === g)) : list;   /* the order on screen, for ranges and pages */
+  const drawn = shown.slice(0, lim); UI.vShown = shown.map(e => e.id);
+  const more = list.length > drawn.length ? `<div class="vb-more"><span class="t3">Showing ${drawn.length.toLocaleString()} of ${list.length.toLocaleString()}</span><button class="btn sm" data-act="vbMore">Show ${Math.min(asList ? VB_LIM.list : VB_LIM.cards, list.length - drawn.length).toLocaleString()} more</button>${list.length - drawn.length > (asList ? VB_LIM.list : VB_LIM.cards) ? `<button class="btn sm ghost" data-act="vbMore" data-v="all">Show all</button>` : ''}</div>` : '';
   const auto = [...D.ents.values()].filter(x => KIND_TO_TYPE[x.k] && x.k !== 'hostport' && !D.byKey.has(x.id) && verdictOf(x.id) !== 'benign' && (cat === 'all' || TYPES[KIND_TO_TYPE[x.k]].group === cat) && (!q || x.v.toLowerCase().includes(q)));
   const catBtn = (id, label, n, col) => `<button class="vcat" data-act="vcat" data-v="${id}" aria-pressed="${cat === id}">${col ? `<span class="sw" style="--c:var(${col})"></span>` : ''}${label}<span class="cnt">${n}</span></button>`;
-  const groups = cat === 'all' ? GROUPS.filter(([g]) => list.some(e => TYPES[e.type].group === g)) : null;
-  return `<div class="scroll"><div class="vault">
+  const groups = byGroup ? GROUPS.filter(([g]) => drawn.some(e => TYPES[e.type].group === g)) : null;
+  return `<div class="scroll"><div class="vault${UI.vPick && UI.vPick.size ? ' picking' : ''}">
     <aside class="vcats"><div class="caps" style="padding:0 10px 8px">Views</div>
       ${catBtn('all','All entries', D.entries.length)}${catBtn('starred','Starred', D.entries.filter(e => e.starred).length)}${catBtn('priority','High priority', D.entries.filter(e => /high|critical/.test(e.priority)).length)}
       <div class="caps" style="padding:18px 10px 8px">Categories</div>
       ${GROUPS.map(([g, l,, col]) => catBtn(g, l, D.entries.filter(e => TYPES[e.type].group === g).length, col)).join('')}</aside>
     <div class="vmain">
       <div class="toolbar"><div class="search-in">${ico('search')}<label class="sr" for="vq">Search this vault</label><input id="vq" class="inp" placeholder="Search entries, fields, tags…" value="${esc(UI.vq)}"></div>
-        <span class="t3" style="font-size:calc(13.5px * var(--ts,1))">${list.length} entries</span><span style="flex:1"></span>${(n => n ? `<button class="btn sm" data-act="dupOpen">${ico('merge','sm')}${n} possible duplicate${n > 1 ? 's' : ''}</button>` : '')(typeof dupGroups === 'function' ? dupGroups(c.id).length : 0)}${layoutSeg('vLay', DB.prefs.vLay || 'cards', [['cards','layout-grid','Cards'],['list','rows-3','List']])}
+        <span class="t3" style="font-size:calc(13.5px * var(--ts,1))">${list.length === D.entries.length ? list.length.toLocaleString() + ' entries' : list.length.toLocaleString() + ' of ' + D.entries.length.toLocaleString() + ' entries'}</span><span style="flex:1"></span>${(n => n ? `<button class="btn sm" data-act="dupOpen">${ico('merge','sm')}${n} possible duplicate${n > 1 ? 's' : ''}</button>` : '')(typeof dupGroups === 'function' ? dupGroups(c.id).length : 0)}${layoutSeg('vLay', DB.prefs.vLay || 'cards', [['cards','layout-grid','Cards'],['list','rows-3','List']])}
         ${DB.entries.some(e => e.type === 'person' || e.type === 'organization') ? `<button class="btn sm" data-act="idpList">${ico('users','sm')}Identity profiles</button>` : ''}<button class="btn primary" data-act="addEntry">${ico('plus','sm')}Add entry</button></div>
-      ${list.length && DB.prefs.vLay === 'list' ? entryRows(list) : list.length ? (groups ? groups.map(([g, l, i, col]) => { const gl = list.filter(e => TYPES[e.type].group === g);
-          return `<div class="vgroup"><span class="tb sm" style="--c:var(${col})">${ico(i)}</span><h3>${l}</h3><span class="t3">${gl.length}</span></div><div class="egrid">${gl.map(entryCard).join('')}</div>`; }).join('')
-        : `<div class="egrid">${list.map(entryCard).join('')}</div>`)
+      ${D.entries.length ? vbBar(D.entries, F) : ''}${vbBulk(list)}
+      ${drawn.length && asList ? entryRows(drawn, true) : drawn.length ? (groups ? groups.map(([g, l, i, col]) => { const gl = drawn.filter(e => TYPES[e.type].group === g), all = list.filter(e => TYPES[e.type].group === g).length;
+          return `<div class="vgroup"><span class="tb sm" style="--c:var(${col})">${ico(i)}</span><h3>${l}</h3><span class="t3">${all.toLocaleString()}</span></div><div class="egrid">${gl.map(entryCard).join('')}</div>`; }).join('')
+        : `<div class="egrid">${drawn.map(entryCard).join('')}</div>`) + more
+        : D.entries.length ? empty('filter', 'Nothing matches', 'Clear a filter or change the search.', `<button class="btn" data-act="vbClear">Clear filters</button>`)
         : empty('layers','Nothing here yet','Add an entry by hand, or capture evidence and promote what it finds.', `<button class="btn primary" data-act="addEntry">${ico('plus','sm')}Add entry</button>`)}
       ${auto.length ? `<div class="vgroup" style="margin-top:34px"><span class="tb sm" style="--c:var(--accent)">${ico('scan')}</span><h3>Found in evidence, not in the vault yet</h3><span class="t3">${auto.length}</span></div>
         <p class="t2" style="margin:-4px 0 14px;font-size:calc(14px * var(--ts,1))">Extracted automatically from captured records. Promote one to give it fields, a priority and a place on the graph.</p>

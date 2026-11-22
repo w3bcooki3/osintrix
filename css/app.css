@@ -1598,7 +1598,7 @@ div.kv:last-child{border-bottom:0} div.kv>span:first-child{color:var(--text-3)} 
 .sr-tx small{font-size:calc(12px * var(--ts,1));color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sr-tx em{font-style:normal;font-size:calc(12.5px * var(--ts,1));color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px} .sr-tx em.mono{font-size:calc(12px * var(--ts,1))}
 .sr-list mark,.sr-prev mark{background:color-mix(in srgb,var(--amber) 30%,transparent);color:inherit;border-radius:3px;padding:0 1px}
-.sr-case{flex:0 0 auto;font:600 calc(11px * var(--ts,1)) var(--mono);padding:1px 6px;border-radius:5px;background:color-mix(in srgb,var(--cc) 14%,transparent);color:color-mix(in srgb,var(--cc) 80%,var(--text))}
+.sr-case{flex:0 0 auto;font:600 calc(11px * var(--ts,1)) var(--mono);padding:1px 6px;border-radius:5px;background:color-mix(in srgb,var(--cc) 14%,transparent);color:color-mix(in srgb,var(--cc) 42%,var(--text))}
 .sr-go{color:var(--text-3);opacity:0;display:grid} .sr-it:is([aria-selected=true],[aria-current=true]) .sr-go{opacity:1;color:var(--accent)}
 .sr-recent{display:flex;flex-wrap:wrap;gap:6px;padding:4px 10px 8px}
 .sr-recent button{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:8px;background:var(--surface-2);border:1px solid var(--border-soft);font-size:calc(13px * var(--ts,1));color:var(--text-2)}
