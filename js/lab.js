@@ -51,7 +51,7 @@ function removeSample(){
     if(DB.nb){ const bk = new Set(DB.nb.books.filter(b => b.sample).map(b => b.id)), sc = new Set(DB.nb.sections.filter(s => bk.has(s.bookId)).map(s => s.id)); DB.nb.books = DB.nb.books.filter(b => !bk.has(b.id)); DB.nb.sections = DB.nb.sections.filter(s => !sc.has(s.id)); DB.nb.pages = DB.nb.pages.filter(p => !sc.has(p.sectionId)); nbGC(); if(!nbPage(UI.nbPage)){ UI.nbView = 'lib'; UI.nbPage = null; } UI.nbRev = null; }
     for(const [k, v] of Object.entries(seedV)) if(DB.verdicts[k] === v) delete DB.verdicts[k];
     DB.queryLog = (DB.queryLog || []).filter(l => !ids.has(l.caseId));
-    if(!DB.cases.length) DB.cases.push({id:uid('c'), name:'My first case', code:'TN-' + new Date().getFullYear() + '-001', status:'active', owner:'You', created:Date.now(), updated:Date.now(), scope:'', color:CASE_COLORS[0], icon:'briefcase'});
+    if(!DB.cases.length) DB.cases.push({id:uid('c'), name:'My first case', placeholder:true, code:'TN-' + new Date().getFullYear() + '-001', status:'active', owner:'You', created:Date.now(), updated:Date.now(), scope:'', color:CASE_COLORS[0], icon:'briefcase'});
     DB.active = DB.cases[0].id; DB.sample = false; UI.sel = null; UI.ctfSel = null; mutate('removed sample data'); go('#/home'); renderAll();
     toast('Sample data removed', 'Undo', () => { DB = prev; mutate('restored sample data'); renderAll(); }); });
 }
@@ -85,35 +85,6 @@ function ensureCTF(){
     mk('Rot in peace', 'crypto', 100, 'solved', {flag:'FLAG{c4es4r_w4s_h3r3}', notes:'ROT13 then Base64. Decoder → ROT13, then Base64 decode.'}),
     mk('Hidden layers', 'stego', 200, 'todo', {notes:'PNG with a tEXt chunk and data after IEND. File inspector shows both.'}),
   ]};
-}
-function viewCTF(){
-  ensureCTF();
-  const C = DB.ctf, evId = UI.ctfEv && C.events.some(e => e.id === UI.ctfEv) ? UI.ctfEv : 'all', q = (UI.ctfq || '').toLowerCase(), cf = UI.ctfCat || '';
-  const list = C.chals.filter(c => (evId === 'all' || c.eventId === evId) && (!cf || c.cat === cf) && (!q || (c.name + ' ' + c.notes + ' ' + c.flag).toLowerCase().includes(q)));
-  const solved = list.filter(c => c.status === 'solved'), pts = solved.reduce((s, c) => s + (+c.points || 0), 0), total = list.reduce((s, c) => s + (+c.points || 0), 0);
-  const cur = C.chals.find(c => c.id === UI.ctfSel);
-  const byCat = countBy(list, c => c.cat);
-  const card = c => { const [cn, col, ic] = ctfCat(c.cat), ev = C.events.find(e => e.id === c.eventId), cs = c.caseId ? theCase(c.caseId) : null;
-    return `<article class="chal${c.status === 'solved' ? ' done' : ''}" style="--c:${col}"><button class="gcard-hit" data-act="ctfSel" data-id="${c.id}" aria-label="Open ${esc(c.name)}"></button>
-      <div class="chal-h"><span class="chal-ic">${ico(ic,'sm')}</span><span class="chal-cat">${esc(cn)}</span><span class="chal-pts">${esc(c.points || 0)} pts</span></div>
-      <h3>${esc(c.name)}</h3>
-      ${c.status === 'solved' && c.flag ? `<code class="chal-flag">${esc(c.flag)}</code>` : c.notes ? `<p>${esc(c.notes.split('\n')[0])}</p>` : ''}
-      <div class="chal-f">${evId === 'all' && ev ? `<span class="t3">${esc(ev.name)}</span>` : ''}${cs ? `<span class="chal-case" style="--cc:${esc(cs.color)}">${esc(cs.code)}</span>` : ''}</div></article>`; };
-  return `<div class="scroll"><div class="page wide">
-    ${libHead('CTF', 'Track challenges, flags and write-ups. Link a challenge to a case to keep the evidence next to it.',
-      `<button class="btn" data-act="ctfEvNew">${ico('flag','sm')}New event</button><button class="btn" data-act="ctfExport">${ico('download','sm')}Export write-ups</button><button class="btn primary" data-act="ctfNew">${ico('plus','sm')}New challenge</button>`, '')}
-    <div class="ctf-sum">
-      <div class="ctf-score"><div><b>${pts}</b><span>of ${total} points</span></div><div><b>${solved.length}/${list.length}</b><span>solved</span></div></div>
-      <div class="ctf-cats">${Object.entries(CTF_CATS).filter(([k]) => byCat.some(([c]) => c === k)).map(([k, [n, col]]) => { const all = list.filter(c => c.cat === k), d = all.filter(c => c.status === 'solved').length;
-        return `<button class="ctf-cat" data-act="ctfCat" data-v="${cf === k ? '' : k}" aria-pressed="${cf === k}" style="--c:${col}"><span>${esc(n)}</span><b>${d}/${all.length}</b><i><u style="width:${all.length ? Math.round(d / all.length * 100) : 0}%"></u></i></button>`; }).join('')}</div>
-    </div>
-    <div class="toolbar ltb"><div class="search-in">${ico('search')}<label class="sr" for="ctfq">Search challenges</label><input id="ctfq" class="inp" placeholder="Search challenges, notes, flags…" value="${esc(UI.ctfq || '')}"></div>
-      <label class="sr" for="ctfEvSel">Event</label><select id="ctfEvSel" class="gsel bord"><option value="all">All events</option>${C.events.map(e => `<option value="${e.id}"${evId === e.id ? ' selected' : ''}>${esc(e.name)}</option>`).join('')}</select>
-      ${evId !== 'all' ? `<button class="btn sm ghost" data-act="ctfEvEdit" data-id="${evId}">${ico('pencil','sm')}Event settings</button>` : ''}</div>
-    ${list.length ? `<div class="kanban">${CTF_STATUS.map(([s, l, ic]) => { const col = list.filter(c => c.status === s).sort((a, b) => (b.points || 0) - (a.points || 0));
-      return `<section class="kcol"><header>${ico(ic,'sm')}<h3>${l}</h3><span>${col.length}</span></header><div class="kcards">${col.map(card).join('') || '<p class="kempty">Nothing here.</p>'}</div></section>`; }).join('')}</div>`
-      : empty('flag','No challenges yet','Add the challenges from your CTF or lab and track flags and notes as you solve them.', `<button class="btn primary" data-act="ctfNew">${ico('plus','sm')}New challenge</button>`)}
-  </div></div>${cur ? drawer(ctfEditor(cur), 'ctfClose', cur.name, ico(ctfCat(cur.cat)[2],'sm') + 'Challenge') : ''}`;
 }
 function ctfEditor(c){
   const C = DB.ctf, ev = C.events.find(e => e.id === c.eventId), fmt = ev && ev.flagRe;

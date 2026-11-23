@@ -81,8 +81,9 @@ test('wrong shapes in stored data (an old version, a hand-edited backup, a damag
     DB.links.push({id:'lx', a:5, b:null}, {id:'ly', a:'ex1', b:'nope', label:{}, conf:'x'}); DB.cases.push({id:'cx', name:{}, code:5});
     DB.srcRel = [1, 2]; DB.phoneCC = {a:1}; DB.hunts = 'x'; DB.autoDone = 5; DB.autoLog = {}; DB.verdicts = DB.verdicts || {};
     DB.trash = [...(DB.trash || []), null, 5, {id:'tx1'}, {id:'tx2', kind:'rule', data:{}}, {id:'tx5', kind:'tool', data:{t:'x'}}, {id:'tx6', kind:'note', data:{n:null}}, {id:'tx7', kind:'entry', data:{e:{}}}, {id:'tx8', kind:'hunt', data:{h:5}}, {id:'tx3', kind:'nope', label:{}, data:'x', at:'yesterday'}, {id:'tx4', kind:'record', label:'r', data:{}}];
-    DB.savedAt = Date.now() + 60000; const j = JSON.stringify(DB); TABS.writer = false; clearTimeout(saveT); await IDB.set(STORE_KEY, j); localStorage.setItem(STORE_KEY, j); })(copy); location.reload(); });
-  await page.waitForTimeout(300); await expect.poll(() => page.evaluate(() => typeof DB !== 'undefined' && !!document.querySelector('#sidenav .nv'))).toBe(true);
+    DB.savedAt = Date.now() + 60000; const j = JSON.stringify(DB); TABS.writer = false; clearTimeout(saveT); await IDB.set(STORE_KEY, j); localStorage.setItem(STORE_KEY, j); })(copy); });
+  /* the reload is done from here, so the test waits for the new page instead of racing the old one */
+  await page.reload(); await expect.poll(() => page.evaluate(() => typeof DB !== 'undefined' && !!document.querySelector('#sidenav .nv'))).toBe(true);
   const crawl = await crawler(page, false);
   await crawl('loaded');
   // restoring broken trash items explains instead of breaking

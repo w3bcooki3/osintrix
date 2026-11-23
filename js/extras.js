@@ -93,7 +93,7 @@ const uuid4 = () => crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xx
 function exportIOCs(fmt){
   const c = theCase(); if(!c) return needCase(); const list = caseIOCs(c.id), name = slug(c.name) + '-iocs';
   if(!list.length) return toast('No indicators in this case yet');
-  if(fmt === 'csv'){ const q = s => '"' + String(csvFormula(s)).replace(/"/g, '""') + '"';
+  if(fmt === 'csv'){ const q = csvQ;
     return download(name + '.csv', ['type,value,verdict,in_vault,records,case'].concat(list.map(x => [E.LABEL[x.k] || x.k, x.v, x.verdict || 'unknown', x.vault ? 'yes' : 'no', x.recs, c.code].map(q).join(','))).join('\n'), 'text/csv'); }
   if(fmt === 'txt') return download(name + '-defanged.txt', `# ${c.code} · ${c.name}\n# ${list.length} indicators · defanged · ${new Date().toISOString()}\n\n` + list.map(x => defang(x.v) + (x.verdict ? '    # ' + x.verdict : '')).join('\n'), 'text/plain');
   const now = new Date().toISOString(), ident = {type:'identity', spec_version:'2.1', id:'identity--' + uuid4(), created:now, modified:now, name:'OSINTrix · ' + c.code, identity_class:'individual'};
@@ -118,9 +118,10 @@ function printReport(){
 }
 /* ---------- import a single case ---------- */
 function importCase(){
-  pickFile('.json,application/json', raw => maybeDecrypt(raw, txt => { let d; try{ d = JSON.parse(txt); }catch(e){ return toast('That file is not JSON'); }
+  pickFile('.json,application/json', raw => maybeDecrypt(raw, async txt => { let d; try{ d = JSON.parse(txt); }catch(e){ return toast('That file is not JSON'); }
     if(!d || d.format !== 'osintrix-case' || !d.case || !Array.isArray(d.entries)) return toast('Not an OSINTrix case — export one from a case menu');
     { const errs = checkImport(d, 'case'); if(errs.length) return importRefused('The case', errs); }
+    if(!await stoGuard(txt.length * 2, 'import this case')) return;
     const map = new Map(), nid = (old, p) => { const n = uid(p); map.set(old, n); return n; };
     const c = normCase({...d.case, id:uid('c'), updated:Date.now()}); if(DB.cases.some(x => x.code === c.code)) c.code = nextCaseCode(); if(clash(DB.cases, c.name)) c.name = nextName(String(c.name || 'Imported case').trim() + ' (imported)', DB.cases.map(x => x.name));
     const entries = d.entries.map(e => normEntry({...e, id:nid(e.id, 'v'), caseId:c.id}));
@@ -261,6 +262,6 @@ function bindDecoder(){ const i = $('decIn'); if(!i) return; i.oninput = () => {
 
 /* ---------- entities: search + CSV ---------- */
 function exportEntities(list){
-  const q = s => '"' + String(csvFormula(s)).replace(/"/g, '""') + '"';
+  const q = csvQ;
   download('osintrix-entities.csv', ['type,value,verdict,records,cases'].concat(list.map(e => [E.LABEL[e.k] || e.k, e.v, verdictOf(e.id) || 'unknown', e.recs.length, [...e.cases].map(id => (theCase(id) || {}).code).join(' ')].map(q).join(','))).join('\n'), 'text/csv');
 }

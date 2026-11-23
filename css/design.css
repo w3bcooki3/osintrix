@@ -3366,3 +3366,92 @@ button.rsum-i:hover{background:var(--hover);color:var(--text)}
 /* the red that reads as text on dark is too light to carry white text: a filled danger button uses a deeper red there */
 .ds:not([data-theme=light]) .btn.dangerbtn{background:#c42b2b!important}
 .ds:not([data-theme=light]) .btn.dangerbtn:hover{background:#a82323!important}
+/* graph: focus and filters */
+.ds .gview{position:absolute;left:16px;top:14px;z-index:6;display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 8px;max-width:min(calc(100% - 32px), 720px);border:1px solid var(--border-soft)}
+.ds .gv-f{display:inline-flex;align-items:center;gap:6px;padding:0 2px 0 8px;height:28px;border-radius:8px;background:var(--accent-soft);color:var(--text)}
+.ds .gv-f b{font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ds .gv-h button{min-width:30px;padding:0 8px;height:28px}
+.ds .gv-s{height:28px;font-size:calc(12.5px * var(--ts,1));max-width:150px;width:auto}
+.ds .gv-s.on{border-color:var(--accent-line);background-color:var(--accent-soft);color:var(--text)}
+.ds .gview .btn[aria-pressed=true]{background:var(--accent-soft);border-color:var(--accent-line);color:var(--text)}
+.ds .gv-n{font-size:calc(12px * var(--ts,1));color:var(--text-3);font-variant-numeric:tabular-nums;padding:0 4px}
+.ds .gcanvas:has(.gview) .gmiss{top:104px}   /* below the focus bar, even when it wraps to two lines */
+@media (max-width:760px){.ds .gview{left:8px;right:8px;top:8px;max-width:none}.ds .gv-s{max-width:120px}}
+.ds .gv-l{display:flex;flex-direction:column;gap:2px;margin:6px -6px 0;max-height:330px;overflow:auto}
+.ds .gv-o{display:flex;align-items:center;gap:9px;padding:7px 8px;border:0;background:none;border-radius:8px;font:inherit;color:var(--text);text-align:left;cursor:pointer}
+.ds .gv-o:hover,.ds .gv-o:focus-visible{background:var(--hover)}
+.ds .gv-o svg{color:var(--text-3);flex:none}.ds .gv-o span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ds .gv-o small{color:var(--text-3);flex:none}
+/* vault import */
+.ds .vim-src{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 8px}
+.ds .vim-src svg{color:var(--text-3)}
+.ds .vim-t{margin:10px 0 14px}
+.ds .vim-t td{vertical-align:middle}
+.ds .vim-t td small{display:block;margin-top:2px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ds .vim-t select{height:32px;min-width:180px}
+.ds .vim-sum{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 10px}
+.ds .vim-sum>div{flex:1 1 110px;background:var(--surface-2);border-radius:10px;padding:10px 12px}
+.ds .vim-sum b{display:block;font-size:calc(20px * var(--ts,1));font-variant-numeric:tabular-nums}
+.ds .vim-sum span{font-size:calc(12.5px * var(--ts,1));color:var(--text-3)}
+/* duplicates review */
+.ds .dp-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between;margin-bottom:10px}
+.ds .dp-top .cnt{font-size:11.5px;color:var(--text-3);margin-left:4px;font-variant-numeric:tabular-nums}
+.ds .dp-p{margin:0 0 14px;font-size:calc(13.5px * var(--ts,1))}
+.ds .dp-done{display:flex;align-items:center;gap:8px;padding:18px 4px;color:var(--text-2)}
+.ds .dp-done svg{color:var(--green)}
+/* saved views */
+.ds .sv-caps{padding:14px 10px 8px}
+.ds .sv-row{display:flex;align-items:center;gap:2px}
+.ds .sv-row .sv-b{flex:1;min-width:0}
+.ds .sv-b span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ds .sv-b svg{color:var(--text-3);flex:none}
+.ds .sv-x{opacity:0}
+.ds .sv-row:hover .sv-x,.ds .sv-x:focus-visible{opacity:1}
+@media (hover:none){.ds .sv-x{opacity:1}}
+.ds .sr-save{margin-right:6px}
+/* @ mentions in notes */
+.ds .nment{display:inline;border:0;padding:0 3px;margin:0 1px;border-radius:4px;background:var(--accent-soft);color:var(--text);font:inherit;font-weight:560;cursor:pointer}
+.ds .nment:hover{background:color-mix(in srgb,var(--accent-bg) 26%,transparent)}
+.ds .nment.gone{background:none;color:var(--text-3);text-decoration:line-through dotted}
+.ds .men-box{position:fixed;z-index:9000;width:320px;max-height:280px;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);padding:4px}
+.ds .men-box button{display:flex;align-items:center;gap:8px;width:100%;padding:6px 8px;border:0;background:none;border-radius:7px;font:inherit;font-size:calc(13px * var(--ts,1));color:var(--text);text-align:left;cursor:pointer}
+.ds .men-box button[aria-selected=true],.ds .men-box button:hover{background:var(--hover)}
+.ds .men-box button span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ds .men-box small{color:var(--text-3);flex:none}
+.ds .men-h{margin:4px 8px 2px;font-size:11.5px;color:var(--text-3)}
+.ds .men-n{display:flex;align-items:flex-start;gap:10px;padding:8px 0;width:100%}
+.ds .men-c{width:8px;height:8px;border-radius:50%;background:var(--nc);margin-top:6px;flex:none}
+.ds .men-n small{display:block;margin-top:2px}
+/* case snapshots */
+.ds .snc-src{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 14px}
+.ds .snc-src svg{color:var(--text-3)}
+.ds .snc-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.ds .snc-cols h4{margin:0 0 8px;font-size:calc(12px * var(--ts,1));text-transform:uppercase;letter-spacing:.04em;color:var(--text-3);font-weight:560}
+.ds .snc-s{margin:0 0 8px}
+.ds .snc-s summary{cursor:pointer;font-size:calc(13.5px * var(--ts,1))}
+.ds .snc-s ul{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:4px;max-height:220px;overflow:auto}
+.ds .snc-s li{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:calc(13px * var(--ts,1));word-break:break-word}
+.ds .snc-s li small{flex-basis:100%;margin-left:28px}
+@media (max-width:760px){.ds .snc-cols{grid-template-columns:1fr}}
+/* seen over time */
+.ds .sight-kv{margin:0 0 10px}
+.ds .sight-none{margin:0 0 8px;font-size:calc(12.5px * var(--ts,1))}
+.ds .sight-bars{display:flex;align-items:flex-end;gap:2px;height:44px;padding:4px 0;border-bottom:1px solid var(--border-soft)}
+.ds .sight-bars i{flex:1;min-width:2px;background:var(--accent-bg);opacity:.75;border-radius:2px 2px 0 0}
+.ds .sight-ax{display:flex;justify-content:space-between;font-size:11.5px;color:var(--text-3);margin:4px 0 10px;font-variant-numeric:tabular-nums}
+.ds .sight-cases{list-style:none;margin:0 0 10px;padding:0;display:flex;flex-direction:column;gap:4px;font-size:calc(13px * var(--ts,1))}
+.ds .sight-cases li{display:grid;grid-template-columns:auto auto 1fr;gap:10px;align-items:baseline}
+.ds .sight-cases a{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--text);text-decoration:none}
+.ds .sight-cases a:hover{text-decoration:underline}
+.ds .sight-cases li span:last-child{text-align:right}
+.ds .sight-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;max-height:60vh;overflow:auto}
+.ds .sight-list .li{display:grid;grid-template-columns:132px 110px 1fr;gap:10px;align-items:baseline;width:100%;padding:7px 4px;text-align:left}
+.ds .sight-list small{grid-column:3}
+.ds .sight-t{font-size:12px;color:var(--text-2)}
+.ds .sight-c{font-family:var(--mono);font-size:12px;font-weight:600}
+@media (max-width:760px){.ds .sight-list .li{grid-template-columns:1fr}.ds .sight-list small{grid-column:1}}
+/* keyboard shortcuts */
+.ds .keys{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:18px 28px}
+.ds .keys-g h3{margin:0 0 8px;font-size:calc(12px * var(--ts,1));text-transform:uppercase;letter-spacing:.04em;color:var(--text-3);font-weight:560}
+.ds .keys-r{display:grid;grid-template-columns:minmax(96px,auto) 1fr;gap:12px;align-items:baseline;padding:5px 0;font-size:calc(13.5px * var(--ts,1));border-bottom:1px solid var(--border-soft)}
+.ds .keys-r:last-child{border-bottom:0}
+.ds .keys-k{white-space:nowrap}

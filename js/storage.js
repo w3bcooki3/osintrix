@@ -22,6 +22,18 @@ async function storageCheck(){
 }
 const STO_QUOTA = () => STORE.quota || 0;
 const stoBytes = n => n >= 1073741824 ? (n / 1073741824).toFixed(1) + ' GB' : n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : n >= 1024 ? Math.round(n / 1024) + ' KB' : (n || 0) + ' B';
+/* before something big is added: is there room for it? The browser's own numbers, with a margin for the
+   copy made while saving. Unknown quota (an old browser) counts as room. */
+async function stoRoom(bytes){ await storageEstimate(); return !STO_QUOTA() || (STO_QUOTA() - (STORE.usage || 0)) > bytes * 1.5 + 5e6; }
+/* …and if there is not: say so, change nothing, and point to where space can be freed */
+async function stoGuard(bytes, what){
+  if(await stoRoom(bytes)) return true;
+  const free = Math.max(0, STO_QUOTA() - (STORE.usage || 0));
+  openDlg(dhead('Not enough space in this browser') + `<div class="in"><p style="margin:0 0 10px">To ${esc(what)} needs about <b>${stoBytes(bytes * 1.5 + 5e6)}</b>, and this browser has <b>${stoBytes(free)}</b> left for OSINTrix. <b>Nothing was changed.</b></p>
+    <p class="t2" style="margin:0">Free space in Settings → Storage: empty the trash, remove restore points, or save finished cases as snapshot files on your computer and delete them here.</p></div>
+    <footer><button class="btn" data-act="dclose">Close</button><button class="btn primary" data-act="stoManage">Manage storage</button></footer>`);
+  return false;
+}
 /* re-measure after saves, at most every 20 seconds */
 const _flush = flush; let stoT = 0;
 flush = function(){ const r = _flush.apply(this, arguments); if(Date.now() - stoT > 20000 && DB && !SEC.locked){ stoT = Date.now(); setTimeout(storageCheck, 1500); } return r; };
@@ -79,6 +91,7 @@ function storageCard(){
 function storagePaint(){ const c = $('storage'); if(c) c.outerHTML = storageCard(); }
 async function storageRefresh(){ await storageBreakdown(); storagePaint(); }
 const STO_ACTS = {
+  stoManage:() => { closeDlg(); go('#/settings'); },
   stoRefresh:() => storageRefresh(),
   stoPersist:async () => { let ok = false; try{ ok = await navigator.storage.persist(); }catch(e){} STORE.persisted = ok; storagePaint(); toast(ok ? 'The browser will keep this data' : 'The browser said no — it usually agrees once the site is bookmarked or used often. Keep backups.'); },
   stoNbFree:() => confirmDlg('Free deleted notebook pictures now?', 'Pictures and files from deleted pages are removed for good, except those a restore point still needs. Undo can no longer bring them back.', 'Free space', async () => { const n = nbGC(true); mutate('freed notebook space'); await storageRefresh(); toast('Freed ' + n + ' item' + (n === 1 ? '' : 's')); }),

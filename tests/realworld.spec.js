@@ -3,7 +3,7 @@
 // that must and must not merge, odd timelines, broken files, and random input fed to
 // every engine. Each check states the right answer, not just "no crash".
 const { test, expect } = require('@playwright/test');
-const { open, noErrors } = require('./helpers');
+const { open, noErrors, budget } = require('./helpers');
 
 test('indicators: defanged, unicode, IPv6, hashes and the things that are NOT indicators', async ({ page }) => {
   const errors = await open(page, '#/home');
@@ -988,7 +988,7 @@ test('endpoint views stay quick on a large case: 60,000 events', async ({ page }
   });
   console.log('endpoint timings', JSON.stringify(ms));
   expect(ms.hosts).toBe(10); expect(ms.edges).toBeGreaterThan(10);
-  expect(ms.trees + ms.moves + ms.rare + ms.render).toBeLessThan(8000);
+  expect(ms.trees + ms.moves + ms.rare + ms.render).toBeLessThan(await budget(page, 8000));
   noErrors(errors);
 });
 

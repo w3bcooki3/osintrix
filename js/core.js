@@ -235,7 +235,7 @@ function entryPill(e){
 }
 const vdLabel = v => { v = String(v || ''); return v ? `<span class="vd" data-v="${esc(v)}">${esc(v[0].toUpperCase() + v.slice(1))}</span>` : ''; };
 const prioLabel = p => { p = String(p || 'medium'); return `<span class="prio" data-p="${esc(p)}">${esc(p[0].toUpperCase() + p.slice(1))}</span>`; };
-const statusTag = s => `<span class="status" data-s="${esc(s)}">${esc({active:'Active', review:'In review', closed:'Closed'}[s] || s)}</span>`;
+const statusTag = s => `<span class="status" data-s="${esc(s)}">${esc({active:'Active', review:'In review', closed:'Archived'}[s] || s)}</span>`;
 const conf = n => { n = [1, 2, 3].includes(+n) ? +n : 1; return `<span class="conf" data-c="${n}" title="Confidence: ${['','low','medium','high'][n]}"><i></i><i></i><i></i></span>`; };
 const impl = i => `<span class="impl" data-i="${i}">${{real:'Working', mock:'Sample data', planned:'Planned'}[i]}</span>`;
 const typeLabel = t => ({evidence:'Evidence', note:'Note', finding:'Finding', lead:'Question'}[t] || t);
@@ -243,6 +243,9 @@ const ILL_FOR = {waypoints:'graph', layers:'vault', 'folder-open':'vault', clock
 function empty(icon, title, body, acts){ const il = ILLUS[ILL_FOR[icon]]; return `<div class="empty" role="status">${il ? `<div class="illus">${il}</div>` : `<div class="art">${ico(icon)}</div>`}<h3>${title}</h3><div>${body}</div>${acts ? `<div class="acts">${acts}</div>` : ''}</div>`; }
 /* spreadsheet formula injection: a text cell starting with = + - @ (or a tab/CR) is run as a formula by Excel and Sheets — prefix it with ' */
 const csvFormula = v => typeof v === 'string' && /^[\s\u3000]*[=+\-@\t\r|\uFF1D\uFF0B\uFF0D\uFF20]/.test(v) ? "'" + v : v;
+/* one CSV cell: text is made safe from spreadsheet formulas (numbers stay numbers), quoted only when it has to be (csvCell) or always (csvQ) */
+const csvCell = v => { v = String(v == null ? '' : csvFormula(v)); return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+const csvQ = v => '"' + String(v == null ? '' : csvFormula(v)).replace(/"/g, '""') + '"';
 /* a file name that is safe on every system: no path parts, control or reserved characters, not too long */
 function safeName(n, fb = 'download'){
   let s = String(n || '').normalize('NFC').replace(/[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]/g, '').replace(/[\\/:*?"<>|]+/g, '_').replace(/^[\s.]+|[\s.]+$/g, '');
@@ -256,8 +259,6 @@ function download(name, text, mime){
     document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(u); a.remove(); }, 150); toast('Saved ' + name); }catch(e){ toast('The browser blocked the download'); }
 }
 const hostOf = u => { try{ return new URL(u).hostname.replace(/^www\./, ''); }catch(e){ return ''; } };
-const AVC = ['#5470f5','#8b5cf6','#0ea5a4','#e8590c','#d6336c','#2f9e44','#b07b00','#3b82f6','#9333ea','#0891b2'];
-const avColor = s => AVC[[...String(s)].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7) % AVC.length];
 /* Standard page header: icon tile, title, subtitle, actions, and an optional KPI strip */
 function pageHead(icon, color, title, sub, acts, kpis){
   return `<header class="phd"><div class="phd-t"><div class="phd-tt"><h1>${title}</h1>${sub ? `<p>${sub}</p>` : ''}</div>${acts ? `<div class="phd-a">${acts}</div>` : ''}</div>

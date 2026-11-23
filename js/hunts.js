@@ -61,7 +61,6 @@ function huntSubmit(){
   closeDlg(); mutate('saved hunt ' + name); UI.dview = 'hunts'; if(UI.route.area !== 'detections') go('#/detections'); else renderMain();
   toast(`Hunt saved — ${huntRun(h).matches.length} match${huntRun(h).matches.length === 1 ? '' : 'es'} now; new ones will be flagged`);
 }
-const huntNewCount = () => { try{ return huntList().reduce((n, h) => n + huntRun(h).fresh.length, 0); }catch(e){ return 0; } };
 const HU_ACTS = {
   huNew:() => huntDlg(), huSave:() => huntDlg({q:UI.q || '', name:''}),
   huKind:(id, v) => { UI.huKind = v; document.querySelectorAll('#dlg [data-act=huKind]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === v))); document.querySelectorAll('#dlg [data-hk]').forEach(x => x.hidden = x.dataset.hk !== v); },

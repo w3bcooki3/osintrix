@@ -1,6 +1,6 @@
 // OSINT additions in v1.48: active hours, the identity checklist, page changes, identity profiles and old Office metadata — each against realistic data.
 const { test, expect } = require('@playwright/test');
-const { open, noErrors } = require('./helpers');
+const { open, noErrors, budget } = require('./helpers');
 const fs = require('fs'), path = require('path');
 const FX = (...p) => path.join(__dirname, 'fixtures', ...p);
 
@@ -590,7 +590,7 @@ test('regex builder My patterns: save with sample lines, fields and tests, keep 
   await page.click('[data-act=rxlSave]'); await page.click('form[data-form=rxlSave] [type=submit]');
   await expect(page.locator('.toast').last()).toContainText('version 2');
   // after a reload it is still there and opens as it was, tests and all
-  await page.waitForTimeout(400); await page.reload(); await page.evaluate(() => go('#/regex'));
+  await page.waitForTimeout(400); await page.reload(); await expect.poll(() => page.evaluate(() => typeof DB !== 'undefined' && !!DB && !!document.querySelector('#sidenav .nv'))).toBe(true); await page.evaluate(() => go('#/regex'));
   await expect(page.locator('.rxl-o')).toHaveCount(1); await expect(page.locator('.rxl-o')).toContainText('version 2');
   await page.click('.rxl-o');
   await expect(page.locator('.rx-libn')).toHaveText('SSH logins'); await expect(page.locator('.rx-tchip')).toHaveText('1 test pass');
@@ -697,7 +697,7 @@ test('a 3,000-node graph fits on screen whole, and the screens with it stay quic
   const t = await page.evaluate(() => { const N = 3000; for (let i = 0; i < N; i++) DB.entries.push({ id: 'gv' + i, caseId: 'c-portal', type: i % 3 ? 'domain' : 'ip', fields: i % 3 ? { domain: 'host' + i + '.example.org' } : { ip: '203.0.113.' + (i % 250) }, priority: 'medium', starred: false, tags: [], notes: '', src: '', created: Date.now(), pos: null });
     for (let i = 1; i < N; i++) DB.links.push({ id: 'gl' + i, caseId: 'c-portal', a: 'gv' + i, b: 'gv' + Math.floor(i / 3), label: 'resolves', conf: 2, src: '' }); mutate('g');
     const out = {}; for (const tab of ['overview', 'vault', 'entities', 'graph']) { const s = performance.now(); location.hash = caseHash('c-portal', tab); onRoute(); out[tab] = performance.now() - s; } return out; });
-  for (const k in t) expect(t[k], k).toBeLessThan(3000);
+  for (const k in t) expect(t[k], k).toBeLessThan(await budget(page, 3000));
   await page.waitForTimeout(1500);
   const v = await page.evaluate(() => { const bb = cy.elements().renderedBoundingBox(), W = cy.width(), H = cy.height(); return { z: cy.zoom(), fits: bb.w <= W + 2 && bb.h <= H + 2 }; });
   expect(v.z).toBeLessThan(.7); expect(v.fits).toBe(true);
@@ -747,9 +747,9 @@ test('mask from anywhere: a record’s captured text, the scratchpad, and any se
   // selected text in a page: copy masked and copy defanged (only the indicators are defanged)
   await page.evaluate(() => select('rec', 'r-mask'));
   const pre = page.locator('#insp .rawbox');
-  await pre.evaluate(el => { const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); });
-  await pre.click({ button: 'right', position: { x: 20, y: 10 } });
-  await expect(page.locator('#ctx .ctx-title')).toHaveText('Selected text');
+  /* the panel may still redraw once after opening, which drops a selection made in the same instant — select and right-click again until the menu shows */
+  await expect(async () => { await pre.evaluate(el => { const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); });
+    await pre.click({ button: 'right', position: { x: 20, y: 10 } }); await expect(page.locator('#ctx .ctx-title')).toHaveText('Selected text', { timeout: 600 }); }).toPass({ timeout: 8000 });
   await page.locator('#ctx button', { hasText: 'Copy defanged' }).click();
   const d = await clip(); expect(d).toContain('185[.]220[.]101[.]7'); expect(d).toContain('Accepted password for jsmith'); expect(d).not.toContain('[.]\n');
   await pre.evaluate(el => { const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); });
@@ -816,7 +816,7 @@ test('a vault of 3,000 entries: filters, sorting, pages, a Shift+click range, bu
     for (let i = 1; i < 3000; i += 3) DB.links.push({ id: 'gl' + i, caseId: 'c-portal', a: 'gv' + i, b: 'gv' + (i - 1), label: 'uses', conf: 2, src: '' });
     DB.verdicts['domain:host5.example.org'] = 'malicious'; mutate('big'); });
   const t0 = Date.now(); await page.evaluate(() => go(caseHash('c-portal', 'vault'))); await expect(page.locator('.ecard').first()).toBeVisible();
-  expect(Date.now() - t0).toBeLessThan(3000);
+  expect(Date.now() - t0).toBeLessThan(await budget(page, 3000));
   const total = await page.evaluate(() => derive('c-portal').entries.length);
   // only the first page is drawn, the rest on request
   await expect(page.locator('.vmain .ecard:not(.auto)')).toHaveCount(150);
@@ -939,4 +939,341 @@ test('the vault filters and selection, and Ctrl K with filters, hints and action
   }
   expect(found, found.join('\n')).toEqual([]);
   noErrors(errors.filter(e => !/Connecting to 'file:[^']*\.css/.test(e)));
+});
+
+test('graph focus: steps out from one entry, expand a node, filter by verdict and tag, hide single links — and the whole graph keeps its layout', async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = await open(page, '#/home');
+  await page.evaluate(() => { const N = 3000; for (let i = 0; i < N; i++) DB.entries.push({ id: 'gv' + i, caseId: 'c-portal', type: i % 3 ? 'domain' : 'ip', fields: i % 3 ? { domain: 'host' + i + '.example.org' } : { ip: '203.0.113.' + (i % 250) }, priority: 'medium', starred: false, tags: i % 9 === 0 ? ['wave-2'] : [], notes: '', src: '', created: Date.now(), pos: null });
+    for (let i = 1; i < N; i++) DB.links.push({ id: 'gl' + i, caseId: 'c-portal', a: 'gv' + i, b: 'gv' + Math.floor(i / 3), label: 'resolves', conf: 2, src: '' });
+    DB.verdicts['domain:host16.example.org'] = 'malicious'; mutate('g'); go(caseHash('c-portal', 'graph')); });
+  await expect(page.locator('.gview')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => cy && cy.nodes().length)).toBeGreaterThan(3000);
+  const pos0 = await page.evaluate(() => DB.entries.filter(e => e.caseId === 'c-portal').map(e => JSON.stringify(e.pos)).join('|'));
+  // pick the focus by typing; host5 links to host1 (its parent) and host15, host16, host17 (its children)
+  await page.click('[data-act=gvPick]'); await page.fill('#gvQ', 'host5.ex'); await expect(page.locator('#gvL .gv-o').first()).toContainText('host5.example.org'); await page.keyboard.press('Enter');
+  const ids = () => page.evaluate(() => cy.nodes().map(n => n.id()).sort());
+  await expect.poll(ids).toEqual(['gv1', 'gv15', 'gv16', 'gv17', 'gv5']);
+  await expect(page.locator('.gv-n')).toHaveText('5 of 3,003');
+  // two steps: the parent's parent and siblings, and the children's children
+  await page.click('[data-act=gvHops][data-v="2"]');
+  const two = await page.evaluate(() => { const adj = new Map(); for (const l of DB.links.filter(l => l.caseId === 'c-portal')) { (adj.get(l.a) || adj.set(l.a, []).get(l.a)).push(l.b); (adj.get(l.b) || adj.set(l.b, []).get(l.b)).push(l.a); }
+    const V = new Set(['gv5']); let e = ['gv5']; for (let h = 0; h < 2; h++) { const nx = []; for (const x of e) for (const n of adj.get(x) || []) if (!V.has(n)) { V.add(n); nx.push(n); } e = nx; } return [...V].sort(); });
+  await expect.poll(ids).toEqual(two);
+  // expand one of the nodes at the edge: its links join the view
+  await page.click('[data-act=gvHops][data-v="1"]');
+  await page.evaluate(() => GV_ACTS.gvExpand('gv16'));
+  await expect.poll(ids).toEqual(['gv1', 'gv15', 'gv16', 'gv17', 'gv48', 'gv49', 'gv5', 'gv50']);
+  // verdict and tag narrow what the steps go through; hide single links drops the leaves
+  await page.selectOption('#gvVd', 'malicious'); await expect.poll(ids).toEqual(['gv16', 'gv5']);
+  await page.selectOption('#gvVd', ''); await page.click('[data-act=gvLeaves]');
+  await expect.poll(ids).toEqual(['gv16', 'gv5']);
+  await page.click('[data-act=gvLeaves]'); await page.click('[data-act=gvFocus][data-v=""]');
+  await page.selectOption('#gvTag', 'wave-2');
+  const tagged = await page.evaluate(() => DB.entries.filter(e => e.caseId === 'c-portal' && e.tags.includes('wave-2')).length);
+  await expect.poll(() => page.evaluate(() => cy.nodes().length)).toBe(tagged);
+  // the right-click menu offers focus and expand
+  await page.click('[data-act=gvClear]'); await expect.poll(() => page.evaluate(() => cy.nodes().length)).toBeGreaterThan(3000);
+  await page.evaluate(() => nodeMenu('gv5', 400, 400)); await page.locator('#ctx button', { hasText: 'Focus here' }).click();
+  await expect.poll(ids).toEqual(['gv1', 'gv15', 'gv16', 'gv17', 'gv5']);
+  await page.evaluate(() => nodeMenu('gv16', 400, 400)); await expect(page.locator('#ctx button', { hasText: 'Expand — 3 more linked' })).toBeVisible(); await page.keyboard.press('Escape');
+  // dragging in a focused view never moves the saved layout
+  await page.evaluate(() => { const n = cy.getElementById('gv5'); n.position({ x: n.position('x') + 300, y: 0 }); n.emit('dragfree'); });
+  expect(await page.evaluate(() => DB.entries.filter(e => e.caseId === 'c-portal').map(e => JSON.stringify(e.pos)).join('|'))).toBe(pos0);
+  // another case has its own view
+  await page.evaluate(() => go(caseHash('c-lantern', 'graph'))); await expect(page.locator('.gv-f')).toHaveCount(0);
+  noErrors(errors);
+});
+
+test('import into a case: a Maltego graph, a SpiderFoot scan and a CSV become entries and links, reuse what is there, can be re-typed or skipped, and undone', async ({ page }) => {
+  const F = require('path').join(__dirname, 'fixtures', 'import');
+  const errors = await open(page, '#/case/c-lantern/vault');
+  const pick = async f => { const [fc] = await Promise.all([page.waitForEvent('filechooser'), page.click('.vmain .toolbar [data-act=vimOpen]')]); await fc.setFiles(require('path').join(F, f)); };
+  const imported = () => page.evaluate(() => DB.entries.filter(e => e.caseId === 'c-lantern' && e.tags.some(t => t.startsWith('import:'))).map(e => e.type + ':' + primary(e)).sort());
+  const linksOf = () => page.evaluate(() => DB.links.filter(l => l.caseId === 'c-lantern').map(l => primary(entryById(l.a)) + ' -' + l.label + '-> ' + primary(entryById(l.b))));
+  const n0 = await page.evaluate(() => [DB.entries.length, DB.links.length]);
+  // Maltego .mtgx: each entity kind is matched to a type; the phrase has no obvious type and is left out
+  await pick('maltego-harbourline.mtgx');
+  await expect(page.locator('.vim-src')).toContainText('Maltego · 9 things · 8 links');
+  await expect(page.locator('[data-vimk="maltego.affiliation.Twitter"]')).toHaveValue('username');
+  await expect(page.locator('[data-vimk="maltego.Phrase"]')).toHaveValue('auto');
+  await expect(page.locator('.vim-sum > div').nth(0)).toHaveText('8new entries'); await expect(page.locator('.vim-sum > div').nth(2)).toHaveText('7new links'); await expect(page.locator('.vim-sum > div').nth(3)).toHaveText('1left out');
+  // re-type one kind before importing: the person becomes an alias, then back
+  await page.selectOption('[data-vimk="maltego.Person"]', 'alias'); await expect(page.locator('[data-vimk="maltego.Person"]')).toHaveValue('alias');
+  await page.selectOption('[data-vimk="maltego.Person"]', 'person');
+  await page.click('[data-act=vimGo]'); await expect(page.locator('#dlg .vim')).toHaveCount(0);
+  expect(await imported()).toEqual(['domain:example.org', 'domain:harbourline-support.com', 'domain:mail.harbourline-support.com', 'email:billing@harbourline-support.com', 'ip:185.220.101.7', 'person:Dana Whitfield', 'phone:+44 20 7946 0958', 'username:dwhitfield_ops']);
+  const L = await linksOf();
+  for (const l of ['harbourline-support.com -resolves to-> 185.220.101.7', 'Dana Whitfield -uses-> billing@harbourline-support.com', 'Dana Whitfield -is-> dwhitfield_ops', 'harbourline-support.com -linked to-> mail.harbourline-support.com']) expect(L).toContain(l);
+  expect(L.some(l => /-0->/.test(l))).toBe(false);
+  expect(await page.evaluate(() => DB.entries.find(e => primary(e) === 'dwhitfield_ops').notes)).toContain('Network: Twitter');
+  // the same graph as GraphML again: everything is already there
+  await pick('maltego-harbourline.graphml');
+  await expect(page.locator('.vim-sum > div').nth(0)).toHaveText('0new entries'); await expect(page.locator('.vim-sum > div').nth(1)).toHaveText('8already in the case'); await expect(page.locator('[data-act=vimGo]')).toBeDisabled(); await page.click('#dlg [data-act=dclose]');
+  // SpiderFoot: the false positive and raw DNS text are left out; existing entries are reused and linked
+  await pick('spiderfoot-harbourline.csv');
+  await expect(page.locator('#dlg')).toContainText('1 row marked false positive in SpiderFoot was left out.');
+  await page.click('[data-act=vimGo]'); await expect(page.locator('#dlg .vim')).toHaveCount(0);
+  expect(await imported()).toContain('domain:portal-harbourline.net');
+  expect(await page.evaluate(() => DB.entries.filter(e => e.caseId === 'c-lantern' && primary(e) === '185.220.101.7').length)).toBe(1);
+  expect(await page.evaluate(() => DB.entries.some(e => /noreply@/.test(primary(e)) || /spf1/.test(primary(e))))).toBe(false);
+  expect(await linksOf()).toContain('185.220.101.7 -led to-> portal-harbourline.net');
+  // a CSV with a type column, notes and tags; the formula-looking row has no recognisable type and stays out
+  await pick('indicators.csv'); await page.click('[data-act=vimGo]'); await expect(page.locator('#dlg .vim')).toHaveCount(0);
+  const h = await page.evaluate(() => DB.entries.find(e => primary(e) === 'd41d8cd98f00b204e9800998ecf8427e'));
+  expect(h.type).toBe('file'); expect(h.notes).toBe('Empty attachment');
+  expect(await page.evaluate(() => DB.entries.some(e => /cmd\|calc/.test(primary(e))))).toBe(false);
+  // undo takes back only the last import
+  await page.locator('.toast').last().getByRole('button', { name: 'Undo' }).click();
+  expect(await page.evaluate(() => DB.entries.some(e => primary(e) === 'd41d8cd98f00b204e9800998ecf8427e'))).toBe(false);
+  expect(await imported()).toContain('domain:portal-harbourline.net');
+  // a round trip: this case's own GraphML export, into an empty case, keeps the types and the links
+  const xml = await page.evaluate(() => { let out = ''; const d0 = window.download; window.download = (n, t) => { out = t; }; exportGraph('graphml'); window.download = d0; return out; });
+  await page.evaluate(() => { const c = { ...DB.cases[0], id: 'c-empty', code: 'TN-EMPTY', name: 'Empty' }; DB.cases.push(c); mutate('c'); go(caseHash('c-empty', 'vault')); });
+  await page.evaluate(x => vimFile(new File([x], 'lantern-graph.graphml')), xml);
+  await page.click('[data-act=vimGo]'); await expect(page.locator('#dlg .vim')).toHaveCount(0);
+  const src = await page.evaluate(() => [derive('c-lantern').entries.map(e => e.type + ':' + primary(e)).sort(), derive('c-lantern').links.length]);
+  const dst = await page.evaluate(() => [derive('c-empty').entries.map(e => e.type + ':' + primary(e)).sort(), derive('c-empty').links.length]);
+  expect(dst[0]).toEqual(src[0]); expect(dst[1]).toBe(src[1]);
+  // files that are not what they claim are refused with a reason
+  await page.evaluate(() => vimFile(new File(['<graphml><node id="a">'], 'broken.graphml'))); await expect(page.locator('.toast').last()).toContainText('not well-formed');
+  await page.evaluate(() => vimFile(new File([new Uint8Array([80, 75, 3, 4, 0, 0])], 'fake.mtgx'))); await expect(page.locator('.toast').last()).toContainText('not a Maltego graph');
+  noErrors(errors);
+});
+
+test('duplicates in a big vault: found quickly, merged all at once into the fullest entry with links kept, undone in one step', async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors = await open(page, '#/home');
+  const r = await page.evaluate(() => {
+    const add = (id, type, fields, extra = {}) => DB.entries.push({ id, caseId: 'c-portal', type, fields, priority: 'medium', starred: false, tags: [], notes: '', src: '', created: 1e12, pos: null, ...extra });
+    // 200 domains written twice (case, defanged, www.), the second copy fuller; 4,000 distinct names
+    for (let i = 0; i < 200; i++) { add('da' + i, 'domain', { domain: 'Shop' + i + '.Example.org' }); add('db' + i, 'domain', { domain: 'www.shop' + i + '[.]example.org', registrar: 'NameCheap' }, { tags: ['seen-twice'] });
+      DB.links.push({ id: 'lk' + i, caseId: 'c-portal', a: 'da' + i, b: 'db' + ((i + 1) % 200), label: 'redirects to', conf: 2, src: '' }); }
+    /* 4,000 varied names, as a real vault would have: first and last names mixed, few of them one letter apart */
+    const F = ['Amara','Bastian','Chiara','Dmitri','Elif','Farah','Gustavo','Hana','Ibrahim','Joanna','Kenji','Leila','Mateus','Nadia','Oskar','Priya','Quentin','Rosa','Sven','Tamsin'], L = ['Okafor','Lindqvist','Moreau','Haddad','Kowalski','Tanaka','Silva','Byrne','Novak','Petrov','Adeyemi','Larsen','Rossi','Ibarra','Kaur','Fischer','Mendes','Walsh','Yilmaz','Costa'];
+    for (let i = 0; i < 4000; i++) add('p' + i, 'person', { name: F[i % 20] + ' ' + L[Math.floor(i / 20) % 20] + ' ' + (1000 + i * 7919 % 9000) });
+    add('h1', 'username', { username: 'nightlamp_ops' }); add('h2', 'username', { username: 'nightlamp_op' });
+    mutate('d'); const t = performance.now(); const G = dupGroups('c-portal'); return { ms: performance.now() - t, sure: G.filter(g => g.sure).length, maybe: G.filter(g => !g.sure).map(g => g.G.map(e => primary(e)).sort().join(' / ')) };
+  });
+  expect(r.ms).toBeLessThan(await budget(page, 1500));
+  expect(r.sure).toBeGreaterThanOrEqual(200);
+  expect(r.maybe).toContain('nightlamp_op / nightlamp_ops');
+  await page.evaluate(() => go(caseHash('c-portal', 'vault'))); await page.evaluate(() => clickAct('dupOpen'));
+  await expect(page.locator('[data-act=dupTab][data-v=sure] .cnt')).toHaveText(String(r.sure));
+  await expect(page.locator('.dp-g')).toHaveCount(40); await page.click('[data-act=dupMore]'); await expect(page.locator('.dp-g')).toHaveCount(80);
+  const before = await page.evaluate(() => [DB.entries.length, DB.links.length]);
+  await page.click('[data-act=dupAll]');
+  const after = await page.evaluate(() => ({ n: DB.entries.length, keep: DB.entries.filter(e => /^d[ab]\d/.test(e.id)).map(e => e.id), shop5: DB.entries.find(e => /^d[ab]5$/.test(e.id)),
+    links: DB.links.filter(l => /^lk/.test(l.id)).map(l => [l.a, l.b]) }));
+  // the fuller copy (with the registrar and tag) is kept in every group
+  expect(after.keep.length).toBe(200); expect(after.keep.every(id => id.startsWith('db'))).toBe(true);
+  expect(after.shop5.fields.registrar).toBe('NameCheap'); expect(after.shop5.tags).toContain('seen-twice');
+  // links now join the kept entries
+  expect(after.links.every(([a, b]) => a.startsWith('db') && b.startsWith('db'))).toBe(true); expect(after.links.length).toBe(200);
+  await expect(page.locator('[data-act=dupTab][data-v=sure]')).toBeDisabled();
+  await expect(page.locator('[data-act=dupTab][data-v=maybe]')).toHaveAttribute('aria-pressed', 'true');
+  // one undo puts every merge back
+  await page.locator('.toast').last().getByRole('button', { name: 'Undo' }).click();
+  expect(await page.evaluate(() => [DB.entries.length, DB.links.length])).toEqual(before);
+  // the near match is a separate decision: "Not the same" is remembered
+  await page.click('[data-act=dupTab][data-v=maybe]');
+  await expect(page.locator('[data-act=dupTab][data-v=maybe]')).toHaveAttribute('aria-pressed', 'true');
+  const sig = await page.evaluate(() => dupGroups('c-portal').find(g => g.G.some(e => primary(e) === 'nightlamp_op')).sig);
+  await page.evaluate(s => DUP_ACTS.dupNot(null, s), sig);
+  expect(await page.evaluate(s => dupGroups('c-portal').some(g => g.sig === s), sig)).toBe(false);
+  noErrors(errors);
+});
+
+test('case snapshots: saved as a file (not in the browser), compared later, removed things brought back, the whole case rolled back with the current state downloaded first, and undone', async ({ page }, info) => {
+  const fs = require('fs'), path = require('path');
+  const errors = await open(page, '#/case/c-lantern/vault');
+  const usage0 = await page.evaluate(async () => { await snapsLoad(); return SNAPS.length; });
+  await page.click('.acts [data-act=caseMenu]'); await page.locator('#ctx button', { hasText: 'Save a snapshot' }).click(); await page.fill('#sncName', 'before edits');
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#dlg button[type=submit]')]);
+  expect(dl.suggestedFilename()).toMatch(/^TN-2026-014-snapshot-\d{4}-\d\d-\d\d-\d{4}-before-edits\.json$/);
+  const file = info.outputPath('snap.json'); await dl.saveAs(file);
+  const snap = JSON.parse(fs.readFileSync(file, 'utf8'));
+  expect(snap.format).toBe('osintrix-case'); expect(snap.snapshot.name).toBe('before edits'); expect(snap.case.id).toBe('c-lantern');
+  // nothing was kept in the browser for it
+  expect(await page.evaluate(async () => { await snapsLoad(); return SNAPS.length; })).toBe(usage0);
+  // change the case: remove an entry (and its links), edit one, add one
+  const ch = await page.evaluate(() => { const es = DB.entries.filter(e => e.caseId === 'c-lantern'), gone = es.find(e => DB.links.some(l => l.a === e.id || l.b === e.id)), ed = es.find(e => e !== gone);
+    const links = DB.links.filter(l => l.a === gone.id || l.b === gone.id).length; DB.entries = DB.entries.filter(e => e !== gone); DB.links = DB.links.filter(l => l.a !== gone.id && l.b !== gone.id);
+    ed.tags.push('edited-now'); DB.entries.push({ id: 'v-new', caseId: 'c-lantern', type: 'domain', fields: { domain: 'new-since.example' }, priority: 'low', starred: false, tags: [], notes: '', src: '', created: Date.now(), pos: null }); mutate('x'); renderAll();
+    return { gone: primary(gone), goneId: gone.id, links, ed: primary(ed) }; });
+  const compare = async f => { await page.click('.acts [data-act=caseMenu]'); const [fc] = await Promise.all([page.waitForEvent('filechooser'), page.locator('#ctx button', { hasText: 'Compare with a snapshot' }).click()]); await fc.setFiles(f); };
+  await compare(file);
+  const cols = page.locator('.snc-cols > div');
+  await expect(cols.nth(0)).toContainText('1 entry'); await expect(cols.nth(0)).toContainText('new-since.example');
+  await expect(cols.nth(1)).toContainText(ch.gone); await expect(cols.nth(1)).toContainText(`${ch.links} link`);
+  await expect(cols.nth(2)).toContainText(ch.ed); await expect(cols.nth(2)).toContainText('tagged #edited-now');
+  // bring back only what was removed: the new entry and the edit stay
+  await page.click('[data-act=sncBack]');
+  await expect.poll(() => page.evaluate(id => [!!entryById(id), !!entryById('v-new'), DB.links.filter(l => l.a === id || l.b === id).length], ch.goneId)).toEqual([true, true, ch.links]);
+  // roll back everything: the state before is downloaded first
+  await compare(file);
+  await page.click('[data-act=sncRoll]');
+  const [dl2] = await Promise.all([page.waitForEvent('download'), page.click('[data-act=confirmOk]')]);
+  expect(dl2.suggestedFilename()).toContain('before-rolling-back');
+  await expect.poll(() => page.evaluate(() => !!entryById('v-new'))).toBe(false);
+  expect(await page.evaluate(() => DB.entries.some(e => e.tags.includes('edited-now')))).toBe(false);
+  expect(await page.evaluate(() => DB.entries.filter(e => e.caseId === 'c-lantern').length)).toBe(snap.entries.length);
+  await page.locator('.toast').last().getByRole('button', { name: 'Undo' }).click();
+  expect(await page.evaluate(() => [!!entryById('v-new'), DB.entries.some(e => e.tags.includes('edited-now'))])).toEqual([true, true]);
+  // a snapshot of another case, or something that is not one, is refused
+  const other = info.outputPath('other.json'); fs.writeFileSync(other, JSON.stringify({ ...snap, case: { ...snap.case, id: 'c-portal', code: 'TN-2026-011' } }));
+  await compare(other); await expect(page.locator('.toast').last()).toContainText('snapshot is of TN-2026-011');
+  const junk = info.outputPath('junk.json'); fs.writeFileSync(junk, '{"hello":1}');
+  await compare(junk); await expect(page.locator('.toast').last()).toContainText('Not an OSINTrix case snapshot');
+  noErrors(errors);
+});
+
+test('the browser never runs out of space: big imports are refused when they would not fit, and restore points make room or step aside', async ({ page }) => {
+  const errors = await open(page, '#/case/c-lantern/vault');
+  const F = require('path').join(__dirname, 'fixtures', 'import');
+  // pretend the browser is nearly full: 100 MB quota, 97 MB used
+  await page.evaluate(() => { Object.defineProperty(navigator.storage, 'estimate', { configurable: true, value: async () => ({ quota: 100e6, usage: 97e6 }) }); });
+  const n0 = await page.evaluate(() => [DB.entries.length, DB.links.length]);
+  const [fc] = await Promise.all([page.waitForEvent('filechooser'), page.click('.vmain .toolbar [data-act=vimOpen]')]); await fc.setFiles(require('path').join(F, 'maltego-harbourline.mtgx'));
+  await page.click('[data-act=vimGo]');
+  await expect(page.locator('#dlg')).toContainText('Not enough space in this browser'); await expect(page.locator('#dlg')).toContainText('Nothing was changed.');
+  expect(await page.evaluate(() => [DB.entries.length, DB.links.length])).toEqual(n0);
+  await page.click('#dlg [data-act=stoManage]'); await expect(page).toHaveURL(/#\/settings/);
+  // restore points: with no room even after dropping the old ones, none is made, and it says so once
+  const made = await page.evaluate(async () => { await snapsLoad(); const before = SNAPS.length; const ok = await snapshot('test'); return { ok, before, after: SNAPS.length }; });
+  expect(made.ok).toBe(false); expect(made.after).toBe(0);
+  await expect(page.locator('.toast').last()).toContainText('No restore point was made');
+  // with room again, everything works as before
+  await page.evaluate(() => { Object.defineProperty(navigator.storage, 'estimate', { configurable: true, value: async () => ({ quota: 10e9, usage: 1e6 }) }); });
+  expect(await page.evaluate(() => snapshot('test'))).toBe(true);
+  await page.evaluate(() => go(caseHash('c-lantern', 'vault')));
+  const [fc2] = await Promise.all([page.waitForEvent('filechooser'), page.click('.vmain .toolbar [data-act=vimOpen]')]); await fc2.setFiles(require('path').join(F, 'maltego-harbourline.mtgx'));
+  await page.click('[data-act=vimGo]'); await expect.poll(() => page.evaluate(() => DB.entries.length)).toBeGreaterThan(n0[0]);
+  noErrors(errors);
+});
+
+test('saved views: a vault view, a graph view and a search are named, listed where they belong and in Ctrl K, opened again exactly, and deleted with undo', async ({ page }) => {
+  const errors = await open(page, '#/case/c-lantern/vault');
+  // a vault view
+  await page.selectOption('#vb-Vd', 'suspicious'); await page.selectOption('#vb-Sort', 'value');
+  await page.click('[data-act=svSave][data-v=vault]'); await page.fill('#svName', 'Suspicious A–Z'); await page.click('#dlg button[type=submit]');
+  await expect(page.locator('.sv-b', { hasText: 'Suspicious A–Z' })).toBeVisible();
+  // the same name twice is refused
+  await page.click('[data-act=svSave][data-v=vault]'); await page.fill('#svName', 'suspicious a–z'); await page.click('#dlg button[type=submit]'); await expect(page.locator('#svName')).toHaveAttribute('aria-invalid', 'true'); await page.click('#dlg [data-act=dclose]');
+  await page.click('[data-act=vbClear]'); await expect(page.locator('#vb-Vd')).toHaveValue('');
+  await page.locator('.sv-b', { hasText: 'Suspicious A–Z' }).click();
+  await expect(page.locator('#vb-Vd')).toHaveValue('suspicious'); await expect(page.locator('#vb-Sort')).toHaveValue('value'); await expect(page.locator('.sv-b.on')).toHaveCount(1);
+  // a graph view
+  const fid = await page.evaluate(() => DB.entries.find(e => e.caseId === 'c-lantern' && DB.links.some(l => l.a === e.id || l.b === e.id)).id);
+  await page.evaluate(id => { go(caseHash('c-lantern', 'graph')); GV_ACTS.gvFocus(null, id); GV_ACTS.gvHops(null, '2'); }, fid);
+  await page.click('[data-act=svSave][data-v=graph]'); await page.fill('#svName', 'Around the actor'); await page.click('#dlg button[type=submit]');
+  await page.click('[data-act=gvClear]'); await expect(page.locator('#svG')).toBeVisible();
+  await page.selectOption('#svG', { label: 'Around the actor' });
+  expect(await page.evaluate(() => { const G = gvS('c-lantern'); return [G.focus, G.hops]; })).toEqual([fid, 2]);
+  // a search, from Ctrl K
+  await page.keyboard.press('Control+k'); await page.keyboard.type('type:ip verdict:malicious ');
+  await page.click('#srSave'); await expect(page.locator('#srQ')).toHaveCount(0); await page.fill('#svName', 'Bad IPs everywhere'); await page.click('#dlg button[type=submit]');
+  await page.evaluate(() => go('#/home'));
+  // every saved view is found by name in Ctrl K and opens where it belongs
+  await page.keyboard.press('Control+k'); await page.keyboard.type('Suspicious A');
+  await expect(page.locator('.sr-it').first()).toContainText('Suspicious A–Z'); await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/#\/case\/c-lantern\/vault/); await expect(page.locator('#vb-Vd')).toHaveValue('suspicious');
+  await page.keyboard.press('Control+k'); await page.keyboard.type('Bad IPs'); await page.keyboard.press('Enter');
+  await expect(page.locator('#srQ')).toHaveValue('type:ip verdict:malicious ');
+  await page.keyboard.press('Escape');
+  // delete, then undo
+  await page.locator('.sv-row', { hasText: 'Suspicious A–Z' }).hover(); await page.locator('.sv-row', { hasText: 'Suspicious A–Z' }).locator('[data-act=svDel]').click();
+  await expect(page.locator('.sv-b', { hasText: 'Suspicious A–Z' })).toHaveCount(0);
+  await page.locator('.toast').last().getByRole('button', { name: 'Undo' }).click(); await expect(page.locator('.sv-b', { hasText: 'Suspicious A–Z' })).toHaveCount(1);
+  // stored views are cleaned on load
+  expect(await page.evaluate(() => { const d = { views: [{ kind: 'vault', caseId: 'c-x', name: ' ok ', s: { vd: 'malicious', sort: 'value', hack: '<x>' } }, { kind: 'evil', name: 'x' }, { kind: 'graph', name: '' }, { kind: 'search', name: 's', s: { q: 5 } }, null] }; normStored(d); return d.views.map(v => [v.kind, v.name, v.s.hack, v.s.vd || v.s.q]); }))
+    .toEqual([['vault', 'ok', undefined, 'malicious'], ['search', 's', undefined, '']]);
+  noErrors(errors);
+});
+
+test('@ in a note links a vault entry: suggested as you type, shown as a link, opens the entry, and the entry lists the notes that mention it', async ({ page }) => {
+  const errors = await open(page, '#/case/c-lantern/overview');
+  const ent = await page.evaluate(() => { const e = DB.entries.find(x => x.caseId === 'c-lantern' && x.type === 'email'); return { id: e.id, v: primary(e) }; });
+  await page.evaluate(() => go('#/notes'));
+  await page.evaluate(() => { const n = { id: 'n-men', caseId: 'c-lantern', color: 'blue', pinned: false, text: 'Check ', due: '', created: Date.now(), updated: Date.now() }; DB.notes.push(n); mutate('n'); renderAll(); });
+  await page.evaluate(() => clickAct('nEdit', 'n-men'));
+  const t = page.locator('#nText'); await t.click(); await page.keyboard.press('End'); await page.keyboard.type('@' + ent.v.slice(0, 6));
+  await expect(page.locator('#menBox [role=option]').first()).toContainText(ent.v);
+  await expect(page.locator('#menLive')).toContainText('1 of');
+  await page.keyboard.press('Enter');
+  await expect(t).toHaveValue(`Check @[${ent.v}] `);
+  await page.keyboard.type('and @[Nobody Here] too'); await page.click('#dlg button[type=submit]');
+  // rendered as links; the unknown one faded
+  const card = page.locator('.note-card', { hasText: 'Check' });
+  await expect(card.locator('.nment').first()).toHaveText('@' + ent.v); await expect(card.locator('.nment.gone')).toHaveText('@Nobody Here');
+  // the entry lists the note
+  await card.locator('.nment').first().click();
+  await expect(page.locator('#insp')).toContainText('Mentioned in notes'); await expect(page.locator('#insp .men-n')).toContainText('Check');
+  // a mention of nothing offers to add the entry
+  await page.evaluate(() => go('#/notes')); await page.locator('.note-card', { hasText: 'Check' }).locator('.nment.gone').click();
+  await expect(page.locator('.toast').last()).toContainText('No entry called “Nobody Here”');
+  noErrors(errors);
+});
+
+test('a new user can start empty from the welcome screen, and the first real case takes the placeholder case’s place and number', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto(require('path').join('file://', __dirname, '..', 'index.html'));
+  await page.getByRole('button', { name: 'Start with an empty workspace' }).click();
+  await page.click('[data-act=confirmOk]');
+  expect(await page.evaluate(() => DB.cases.map(c => [c.name, !!c.placeholder]))).toEqual([['My first case', true]]);
+  await page.locator('#main').getByRole('button', { name: /New case/ }).first().click(); await page.fill('#cName', 'Harbourline phishing'); await page.click('#dlg button[type=submit]');
+  expect(await page.evaluate(() => DB.cases.map(c => c.code + ' ' + c.name))).toEqual([await page.evaluate(() => 'TN-' + new Date().getFullYear() + '-001') + ' Harbourline phishing']);
+  // the vault's empty state points to what the evidence already found
+  await page.keyboard.press('n'); await page.locator('#dlg textarea').first().fill('Mail from billing@harbourline-support.com via 185.220.101.7'); await page.click('#dlg .btn.primary');
+  await page.evaluate(() => go(caseHash(DB.active, 'vault')));
+  await expect(page.locator('#main .empty h3')).toHaveText('Nothing in the vault yet'); await expect(page.locator('#main .empty')).toContainText('already names');
+  await page.click('[data-act=vbJumpAuto]'); await expect(page.locator('#vAuto')).toBeInViewport();
+  // a placeholder with something in it, or renamed, stays
+  await page.evaluate(() => { DB.cases.push({ id: 'c-ph', name: 'My first case', placeholder: true, code: 'TN-X', status: 'active', owner: 'You', created: 1, updated: 1, scope: '', color: '#5470f5', icon: 'briefcase' }); DB.records.push({ id: 'r-ph', caseId: 'c-ph', type: 'evidence', title: 'x', body: 'x', tsRaw: '', tsZone: 'explicit', ts: 0, source: '', host: '', tags: [], ents: [], answer: '', addedBy: 'You', addedAt: 1, hash: '' }); mutate('x'); });
+  await page.evaluate(() => caseDlg()); await page.fill('#cName', 'Second'); await page.click('#dlg button[type=submit]');
+  expect(await page.evaluate(() => DB.cases.some(c => c.id === 'c-ph'))).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('archiving a case says Archived everywhere and can be undone from its message', async ({ page }) => {
+  const errors = await open(page, '#/cases');
+  await page.locator('.cs2-acts [data-act=caseMenu]').first().click();
+  const code = await page.evaluate(() => document.querySelector('#ctx .ctx-title').textContent.trim());
+  await page.locator('#ctx button', { hasText: 'Archive' }).click();
+  await expect(page.locator('.toast').last()).toContainText(code + ' archived');
+  await page.click('[data-act=cf][data-v=closed], .seg [data-v=closed]').catch(() => {});
+  await expect(page.locator('.status[data-s=closed]').first()).toHaveText('Archived');
+  await page.locator('.toast').last().getByRole('button', { name: 'Undo' }).click();
+  expect(await page.evaluate(c => DB.cases.find(x => x.code === c).status, code)).toBe('active');
+  noErrors(errors);
+});
+
+test('seen over time: first and last sighting, by case and in date order across cases; and ? lists every keyboard shortcut', async ({ page }) => {
+  const errors = await open(page, '#/case/c-lantern/vault');
+  const want = await page.evaluate(() => { const g = globalEnts().get('ipv4:203.0.113.47'); const t = g.recs.filter(r => r.ts).sort((a, b) => a.ts - b.ts); return { n: g.recs.length, cases: g.cases.size, first: E.fmtDate(t[0].ts, tz()), last: E.fmtDate(t[t.length - 1].ts, tz()), firstCase: theCase(t[0].caseId).code, order: t.map(r => r.id) }; });
+  await page.evaluate(() => select('ent', 'ipv4:203.0.113.47'));
+  const sec = page.locator('#insp .sight');
+  await expect(sec.locator('h4')).toContainText(`${want.n} records · ${want.cases} cases`);
+  await expect(sec.locator('.sight-kv')).toContainText(`First seen${want.first} in ${want.firstCase}`); await expect(sec.locator('.sight-kv')).toContainText(`Last seen${want.last}`);
+  await expect(sec.locator('.sight-cases li')).toHaveCount(want.cases);
+  await expect(sec.locator('.sight-bars')).toHaveAttribute('aria-label', new RegExp(`^${want.order.length} sightings from`));
+  await sec.locator('[data-act=sightAll]').click();
+  expect(await page.locator('.sight-list [data-act=sightOpen]').evaluateAll(b => b.map(x => x.dataset.id))).toEqual(want.order);
+  // opening one goes to its case's timeline with it selected
+  const last = want.order[want.order.length - 1];
+  await page.locator(`.sight-list [data-id="${last}"]`).click();
+  expect(await page.evaluate(() => [UI.sel && UI.sel.id, location.hash])).toEqual([last, await page.evaluate(id => caseHash(recById(id).caseId, 'timeline'), last)]);
+  // a vault entry that is an indicator shows the same
+  const eid = await page.evaluate(() => DB.entries.find(e => entryKey(e) === 'ipv4:203.0.113.47').id);
+  await page.evaluate(id => { const e = entryById(id); DB.active = e.caseId; select('entry', id); }, eid); await expect(page.locator('#insp .sight h4')).toContainText(`${want.n} records`);
+  // ? opens the shortcuts, but not while typing
+  await page.evaluate(() => { UI.sel = null; renderAll(); document.activeElement && document.activeElement.blur(); });
+  await page.keyboard.press('?'); await expect(page.locator('#dlg .keys')).toContainText('Alt'); await expect(page.locator('#dlg .keys-g h3')).toHaveCount(6);
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => go('#/notes')); await page.locator('textarea.ned').first().click(); await page.keyboard.type('why?');
+  await expect(page.locator('#dlg .keys')).toHaveCount(0); await expect(page.locator('textarea.ned').first()).toHaveValue('why?');
+  // Help shows the same list
+  await page.evaluate(() => go('#/help')); await expect(page.locator('#main .keys .keys-g')).toHaveCount(6);
+  noErrors(errors);
 });

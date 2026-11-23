@@ -51,7 +51,7 @@ function caseGraph(c, D){
       <div class="gset g-d"><label class="sr" for="gLayout">Arrange</label><select id="gLayout" class="gsel"><option value="">Arrange…</option><option value="cose">Force-directed</option><option value="concentric">By importance</option><option value="breadthfirst">Hierarchy</option><option value="circle">Circle</option><option value="grid">Grid</option></select>
         ${tb('gCo', gm.co ? 'eye' : 'eye', 'Co-occurrence', `aria-pressed="${!!gm.co}"`)}${tb('gExport','download','Export')}</div>
     </div>
-    <div class="gcanvas${gm.panel ? ' haspanel' : ''}"><div id="cy" role="application" aria-label="Relationship graph for ${esc(c.name)}"></div>
+    <div class="gcanvas${gm.panel ? ' haspanel' : ''}"><div id="cy" role="application" aria-label="Relationship graph for ${esc(c.name)}"></div>${typeof gvBar === 'function' ? gvBar(D) : ''}
       <div id="gpanel"></div>
       ${nMiss && !(gm.noteOff && gm.noteOff.has(c.id)) && !gm.mode && !gm.path ? `<div class="gfloat gmiss">${ico('layers','sm')}<span title="The graph shows vault entries. Adding an entity puts it in the vault and on the graph."><b>${nMiss}</b> <em class="g-dt">${nMiss === 1 ? 'entity' : 'entities'} from the evidence ${nMiss === 1 ? 'is' : 'are'} not on the graph yet</em><em class="g-mt">not on the graph</em></span><button class="btn xs primary" data-act="gPick">Choose…</button><button class="btn xs g-d" data-act="gBuild">Add by rule…</button><button class="iconbtn" data-act="gNoteOff" aria-label="Hide">${ico('x','sm')}</button></div>` : ''}
       ${gm.mode === 'path' ? `<div class="gfloat gmode">${ico('route','sm')}<span>Now click the entry to find a path to</span><button class="btn xs" data-act="gPathOff">Cancel</button></div>` : ''}
@@ -68,13 +68,13 @@ function caseGraph(c, D){
 
 function graphElements(D){
   const els = [];
-  const hide = UI.graph.hide || new Set(), vis = new Set();
+  const hide = UI.graph.hide || new Set(), vis = new Set(), V = typeof gvVisible === 'function' ? gvVisible(D) : null, focused = !!(V && gvS().focus);
   for(const e of D.entries){
-    if(hide.has(TYPES[e.type].group)) continue; vis.add(e.id);
+    if(hide.has(TYPES[e.type].group) || (V && !V.has(e.id))) continue; vis.add(e.id);
     const t = TYPES[e.type], col = cssVar(t.color), v = entryVerdict(e);
     els.push({group:'nodes', data:{id:e.id, label:primary(e).length > 28 ? primary(e).slice(0, 26) + '…' : primary(e), kind:t.label, col, icon:nodeIcon(t.icon, col),
       ring:v === 'malicious' ? cssVar('--red') : v === 'suspicious' ? cssVar('--amber') : col, w:e.priority === 'critical' ? 62 : e.priority === 'high' ? 54 : 46, star:e.starred ? 1 : 0},
-      position:e.pos ? {...e.pos} : undefined});
+      position:e.pos && !focused ? {...e.pos} : undefined});
   }
   for(const l of D.links) if(vis.has(l.a) && vis.has(l.b)) els.push({group:'edges', data:{id:l.id, source:l.a, target:l.b, label:l.label, w:.8 + l.conf * .7, kind:'asserted', auto:l.auto ? 1 : 0}});
   if(UI.graph.co){
@@ -91,12 +91,12 @@ function mountGraph(){
   radialHide(); const gFont = cssVar('--font') || 'Inter, sans-serif';
   const D = derive(), text = cssVar('--text'), text2 = cssVar('--text-2'), bg = cssVar('--bg'), surface = cssVar('--surface'), accent = cssVar('--accent');
   let hasPos = D.entries.every(e => e.pos);
-  const big = D.entries.length > BIG_GRAPH;
-  if(!hasPos && big){ const P = fastLayout(D.entries.map(e => e.id), D.links.map(l => [l.a, l.b])); for(const e of D.entries) if(!e.pos) e.pos = P.get(e.id); hasPos = true; save(); }
+  const V = typeof gvVisible === 'function' ? gvVisible(D) : null, focused = !!(V && gvS().focus), bigAll = D.entries.length > BIG_GRAPH, big = (V ? V.size : D.entries.length) > BIG_GRAPH;
+  if(!hasPos && bigAll){ const P = fastLayout(D.entries.map(e => e.id), D.links.map(l => [l.a, l.b])); for(const e of D.entries) if(!e.pos) e.pos = P.get(e.id); hasPos = true; save(); }
   const muted = cssVar('--text-3');
   if(cy){ cy.destroy(); cy = null; }
   cy = cytoscape({container:el, elements:graphElements(D), minZoom:big ? .05 : .2, maxZoom:3, boxSelectionEnabled:false, hideEdgesOnViewport:big, textureOnViewport:big, pixelRatio:big ? 1 : 'auto',
-    layout:hasPos ? {name:'preset'} : {name:'cose', animate:false, nodeRepulsion:() => 14000, idealEdgeLength:() => 95, nodeOverlap:20, padding:40, randomize:false, numIter:1500},
+    layout:focused ? gvLayout(D) : hasPos ? {name:'preset'} : {name:'cose', animate:false, nodeRepulsion:() => 14000, idealEdgeLength:() => 95, nodeOverlap:20, padding:40, randomize:false, numIter:1500},
     style:[
       {selector:'node', style:{width:'data(w)', height:'data(w)', 'background-color':surface, 'background-image':'data(icon)', 'background-width':'62%', 'background-height':'62%',
         'border-width':2.5, 'border-color':'data(ring)', label:'data(label)', color:text, 'font-family':gFont, 'font-size':14.5, 'font-weight':600, 'min-zoomed-font-size':big ? 11 : 7,
@@ -118,16 +118,17 @@ function mountGraph(){
       {selector:'node.rk1', style:{'underlay-color':cssVar('--amber'), 'underlay-opacity':.22, 'underlay-padding':8, 'underlay-shape':'ellipse'}},
       {selector:'node.rk2', style:{'underlay-color':cssVar('--amber'), 'underlay-opacity':.45, 'underlay-padding':11, 'underlay-shape':'ellipse'}},
       {selector:'node.rk3', style:{'underlay-color':cssVar('--red'), 'underlay-opacity':.45, 'underlay-padding':13, 'underlay-shape':'ellipse'}},
+      {selector:'node.gvfocus', style:{'underlay-color':accent, 'underlay-opacity':.28, 'underlay-padding':12, 'underlay-shape':'ellipse', 'border-width':4}},
       {selector:'node.hit', style:{'underlay-color':cssVar('--amber'), 'underlay-opacity':.4, 'underlay-padding':10, 'underlay-shape':'ellipse'}},
     ]});
-  if(!hasPos){ cy.nodes().forEach(n => { const e = entryById(n.id()); if(e) e.pos = {...n.position()}; }); save(); }
+  if(!hasPos && !focused){ cy.nodes().forEach(n => { const e = entryById(n.id()); if(e) e.pos = {...n.position()}; }); save(); }
   const fitNice = () => { cy.resize(); cy.fit(undefined, 56); if(cy.zoom() > 1.25) { cy.zoom(1.25); cy.center(); } if(cy.zoom() < .7 && !big){ cy.zoom(.7); cy.center(); }   /* a big graph fits whole; names appear as you zoom in */ if(!UI.graph.legendMin && cy.width() > 900) cy.panBy({x:100, y:0}); };
   const view = UI.graph.views && UI.graph.views[DB.active];
   let ready = !!view; const me = cy;
   if(view){ cy.zoom(view.z); cy.pan(view.p); } else { fitNice(); setTimeout(() => { if(cy === me){ fitNice(); ready = true; } }, 90); }
   cy.on('viewport', () => { radialHide(); if(!ready || cy !== me) return; (UI.graph.views || (UI.graph.views = {}))[DB.active] = {z:cy.zoom(), p:{...cy.pan()}}; });
   cy.on('grab', 'node', radialHide);
-  cy.on('dragfree', 'node', ev => { const e = entryById(ev.target.id()); if(e){ e.pos = {...ev.target.position()}; save(); } });
+  cy.on('dragfree', 'node', ev => { if(focused) return;   /* a focused view's places are its own; the whole graph keeps its layout */ const e = entryById(ev.target.id()); if(e){ e.pos = {...ev.target.position()}; save(); } });
   cy.on('tap', 'node', ev => {
     const id = ev.target.id();
     if(UI.graph.mode === 'path'){ const a = UI.graph.first; if(!a || a === id) return; UI.graph.mode = null; UI.graph.first = null; return findPath(a, id); }
@@ -152,6 +153,7 @@ function mountGraph(){
   cy.on('mouseout', 'node', () => { cy.elements().removeClass('faded'); applyFind(); });
   if(UI.sel && UI.sel.kind === 'entry'){ const n = cy.getElementById(UI.sel.id); if(n.length){ n.select(); if(UI.gFocus === UI.sel.id){ UI.gFocus = null; cy.animate({center:{eles:n}, zoom:Math.max(cy.zoom(), 1.1)}, {duration:280}); } } }
   if(UI.graph.first){ const n = cy.getElementById(UI.graph.first); if(n.length) n.addClass('src'); }
+  if(focused){ const n = cy.getElementById(gvS().focus); if(n.length) n.addClass('gvfocus'); }
   applyFind(); applyPath(); applyAsof();
   if(UI.graph.panel){ const gp = $('gpanel'); if(gp){ gp.innerHTML = gPanelHTML(); bindGPanel(gp); } }
   applyClusters(); if(typeof applyRisk === 'function') applyRisk();
@@ -240,6 +242,9 @@ function nodeMenu(id, x, y){
     {label:'Expand from evidence', icon:'sparkles', disabled:!k, fn:() => expandNode(id)},
     {label:'Expand online', icon:'globe', disabled:!k || typeof lkFor !== 'function' || !lkFor(entSplit(k).k).length, fn:() => expandOnline(id)},
     {label:isWatched(k) ? 'Stop watching' : 'Watch for new sightings', icon:'eye', disabled:!k, fn:() => toggleWatch(k)},
+    ...(typeof gvS === 'function' ? (() => { const S = gvS(), D = derive(), V = gvVisible(D), hid = gvHidden(id, D, V);
+      return [S.focus === id ? {label:'Stop focusing', icon:'crosshair', fn:() => GV_ACTS.gvFocus(null, '')} : {label:'Focus here', icon:'crosshair', fn:() => GV_ACTS.gvFocus(null, id)},
+        ...(V && hid ? [{label:`Expand — ${hid} more linked`, icon:'git-fork', fn:() => GV_ACTS.gvExpand(id)}] : [])]; })() : []),
     {label:'Find path to…', icon:'route', fn:() => { UI.graph.mode = 'path'; UI.graph.first = id; UI.graph.path = null; renderMain(); }},
     {label:'Highlight neighbours', icon:'waypoints', fn:() => { const nb = cy.getElementById(id).closedNeighborhood(); cy.elements().removeClass('faded').not(nb).addClass('faded'); }},
     {label:'Show evidence on timeline', icon:'clock', disabled:!k, fn:() => { UI.pivot = k; UI.tlMode = 'events'; go(caseHash(DB.active, 'timeline')); }},
@@ -295,7 +300,7 @@ function applyAsof(){ if(!cy) return; const D = derive(), cut = asofCut(D); cy.e
   for(const l of D.links){ const r = recById(l.src); if(r && r.ts > cut) cy.getElementById(l.id).addClass('later'); } }
 function exportGraph(fmt){
   const c = theCase(), D = derive(), X = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'), name = slug(c.name) + '-graph';
-  if(fmt === 'csv'){ const q = s => '"' + String(s == null ? '' : csvFormula(s)).replace(/"/g, '""') + '"';
+  if(fmt === 'csv'){ const q = csvQ;
     const nodes = ['id,label,type,verdict,priority,tags'].concat(D.entries.map(e => [e.id, primary(e), TYPES[e.type].label, entryVerdict(e) || '', e.priority, e.tags.join(' ')].map(q).join(',')));
     const edges = ['source,target,source_label,target_label,relationship,confidence'].concat(D.links.map(l => [l.a, l.b, primary(entryById(l.a)), primary(entryById(l.b)), l.label, l.conf].map(q).join(',')));
     download(name + '-nodes.csv', nodes.join('\n'), 'text/csv'); return setTimeout(() => download(name + '-edges.csv', edges.join('\n'), 'text/csv'), 400); }

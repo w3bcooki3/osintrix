@@ -4,6 +4,7 @@ const exe = process.env.CHROMIUM_PATH; // optional: point at an existing Chromiu
 module.exports = defineConfig({
   testDir: './tests',
   timeout: 60_000,
+  expect: { timeout: 10_000 },   // waiting assertions get room on a busy machine; a passing one still returns at once
   fullyParallel: true,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',

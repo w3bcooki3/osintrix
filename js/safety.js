@@ -65,7 +65,7 @@ function delRecord(ids){
 }
 
 /* ---------- restore points (full snapshots in IndexedDB, outside the main state) ---------- */
-let SNAPS = null; const SNAP_MAX = 8;
+let SNAPS = null, snapSkipWarned = false; const SNAP_MAX = 8;
 let SNAPS_BAD = false;
 /* the list of restore points; if it cannot be read (wrong key, damaged), it is rebuilt from the
    restore points themselves and nothing is pruned, so no restore point is lost to a bad index */
@@ -95,6 +95,10 @@ function snapshot(why){ const run = SNAP_Q.then(() => snapshot0(why)); SNAP_Q = 
 async function snapshot0(why){
   if(!STORE.idb) return false; await snapsLoad(); if(typeof ctiLoad === 'function') await ctiLoad();
   const at = Date.now(), json = JSON.stringify(Object.assign({}, DB, typeof CTI !== 'undefined' && CTI.iocs ? {ctiIocs:CTI.iocs} : {}));   // the indicator store goes back with it
+  /* a restore point is a whole copy: it must never be what fills the browser. Make room by dropping the oldest ones; if there is still none, skip it and say so */
+  if(typeof stoRoom === 'function' && !await stoRoom(json.length * 2)){
+    while(SNAPS.length && !SNAPS_BAD){ const o = SNAPS.pop(); await IDB.del('osintrix-snap:' + o.at); await IDB.set('osintrix-snaps', await sealStr(JSON.stringify(SNAPS))); if(await stoRoom(json.length * 2)) break; }
+    if(!await stoRoom(json.length * 2)){ if(!snapSkipWarned){ snapSkipWarned = true; toast('No restore point was made — not enough space in this browser. Save a case snapshot to your computer instead.', 'Manage storage', () => go('#/settings')); } return false; } }
   if(!await IDB.set('osintrix-snap:' + at, await sealStr(json))) return false;
   SNAPS.unshift({at, why, size:json.length, cases:DB.cases.length, records:DB.records.length, refs:refsOf(DB)});
   if(!SNAPS_BAD) while(SNAPS.length > SNAP_MAX){ const o = SNAPS.pop(); IDB.del('osintrix-snap:' + o.at); }
@@ -372,7 +376,9 @@ function logImportDlg(){
       document.querySelectorAll('[data-lm]').forEach(s => s.onchange = () => { L.map[s.dataset.lm] = s.value; paint(); }); paint(); });
 }
 async function logGo(){
-  const L = LOGIMP; if(!L) return; await snapshot('Before importing ' + L.name);
+  const L = LOGIMP; if(!L) return;
+  if(!await stoGuard(JSON.stringify(L.rows.slice(0, 5000)).length * 3, 'import these rows')) return;
+  await snapshot('Before importing ' + L.name);
   const made = L.rows.slice(0, 5000).map(r => logRec(r, L.map, L.name)); DB.records.push(...made); LOGIMP = null; closeDlg();
   mutate('imported ' + made.length + ' log rows'); await hashRecords(); afterCapture(L.caseId, made.map(r => r.id)); watchNotify(made); UI.tlMode = 'events'; go(caseHash(L.caseId, 'timeline'));
   const ids = new Set(made.map(r => r.id)), timed = made.filter(r => r.ts).length;

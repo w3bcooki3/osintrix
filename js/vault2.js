@@ -40,7 +40,7 @@ function vbBar(all, F){
     ${tags.length ? sel('vb-Tag', 'Tag', F.tag, [['', 'Any tag']].concat(tags.slice(0, 200).map(([t, n]) => [t, `#${t} (${n})`]))) : ''}
     ${sel('vb-Only', 'Show', F.only, VB_ONLY)}
     ${vbActive(F) ? `<button class="btn xs ghost" data-act="vbClear" title="Clear every filter">${ico('x','sm')}Clear</button>` : ''}
-    <span class="sp"></span>${sel('vb-Sort', 'Sort by', F.sort, VB_SORT.map(([v, l]) => [v, 'Sort: ' + l]))}</div>`;
+    <span class="sp"></span>${vbActive(F) || UI.vq || F.sort !== 'prio' || (UI.vcat && UI.vcat !== 'all') ? `<button class="btn xs ghost" data-act="svSave" data-v="vault" title="Name this view to come back to it">${ico('bookmark','sm')}Save view</button>` : ''}${sel('vb-Sort', 'Sort by', F.sort, VB_SORT.map(([v, l]) => [v, 'Sort: ' + l]))}</div>`;
 }
 /* the bulk bar while entries are picked */
 function vbBulk(shown){
@@ -64,7 +64,8 @@ function vbChange(label, fn){
 }
 /* the list shown right now, in its order (for ranges and "select all") */
 const VB_ACTS = {
-  vbClear:() => { const F = vbF(DB.active); F.vd = F.type = F.tag = F.only = ''; UI.vq = ''; UI.vLim = null; renderMain(); },
+  vbClear:() => { UI.svOn = null; const F = vbF(DB.active); F.vd = F.type = F.tag = F.only = ''; UI.vq = ''; UI.vLim = null; renderMain(); },
+  vbJumpAuto:() => { const a = $('vAuto'); if(a){ a.scrollIntoView({behavior:'smooth', block:'start'}); const b = a.parentElement.querySelector('#vAuto ~ .egrid button, #vAuto ~ * button'); if(b) b.focus({preventScroll:true}); } },
   vbMore:(id, v) => { UI.vLim = (UI.vLim || 0) + (v === 'all' ? 1e9 : 1) ; renderMain(); },
   vbPick:(id, v, t, ev) => { const P = UI.vPick || (UI.vPick = new Set()), list = UI.vShown || [];
     if(ev && ev.shiftKey && UI.vLast && list.includes(UI.vLast) && list.includes(id)){ const a = list.indexOf(UI.vLast), b = list.indexOf(id), on = !P.has(id); for(const x of list.slice(Math.min(a, b), Math.max(a, b) + 1)) on ? P.add(x) : P.delete(x); }
@@ -84,7 +85,7 @@ const VB_ACTS = {
     if(!keys.length) return toast('None of these can be watched — watching works on IPs, domains, emails, handles, hashes and wallets');
     const on = !keys.every(k => isWatched(k)); vbChange(on ? 'watched' : 'stopped watching', () => { DB.watch = DB.watch || {}; for(const k of keys){ if(on && !DB.watch[k]) DB.watch[k] = {at:Date.now()}; if(!on) delete DB.watch[k]; } });
     if(keys.length < es.length) toast(`${keys.length} watched — the other ${es.length - keys.length} are names or notes, which cannot be watched`); },
-  vbCsv:() => { const es = [...UI.vPick].map(entryById).filter(Boolean), cell = v => { v = String(v ?? ''); if(/^[=+\-@\t\r]/.test(v)) v = "'" + v; return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  vbCsv:() => { const es = [...UI.vPick].map(entryById).filter(Boolean), cell = csvCell;
     download(theCase().code + '-entries.csv', [['type', 'value', 'verdict', 'priority', 'starred', 'tags', 'records', 'links', 'notes', 'fields'].join(',')].concat(es.map(e => { const X = entryCtx(e);
       return [TYPES[e.type].label, primary(e), entryVerdict(e), e.priority, e.starred ? 'yes' : '', e.tags.join(' '), X.recs.length, X.links.length, e.notes, Object.entries(e.fields).map(([k, v]) => k + '=' + v).join('; ')].map(cell).join(','); })).join('\r\n'), 'text/csv'); },
   vbDel:() => { const es = [...UI.vPick].map(entryById).filter(Boolean); if(!es.length) return;
@@ -102,6 +103,6 @@ function vbTagSubmit(){
 }
 /* the filter selects, and Esc to drop the selection */
 function bindVaultBar(){
-  document.querySelectorAll('[data-vbf]').forEach(s => s.onchange = () => { const F = vbF(DB.active); F[s.dataset.vbf] = s.value; UI.vLim = null; renderMain(); const n = $(s.id); if(n) n.focus(); });
+  document.querySelectorAll('[data-vbf]').forEach(s => s.onchange = () => { UI.svOn = null; const F = vbF(DB.active); F[s.dataset.vbf] = s.value; UI.vLim = null; renderMain(); const n = $(s.id); if(n) n.focus(); });
 }
 document.addEventListener('keydown', ev => { if(ev.key === 'Escape' && UI.vPick && UI.vPick.size && /\/vault$/.test(location.hash) && $('scrim').hidden && !document.querySelector('#ctx') && !ev.target.closest('input, textarea, select')){ UI.vPick = new Set(); renderMain(); } });

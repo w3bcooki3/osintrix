@@ -1,0 +1,10 @@
+Scan Name,Updated,Type,Module,Source,F/P,Data
+harbourline,2026-11-20 10:01:02,Internet Name,sfp_dnsresolve,harbourline-support.com,0,mail.harbourline-support.com
+harbourline,2026-11-20 10:01:03,IP Address,sfp_dnsresolve,harbourline-support.com,0,185.220.101.7
+harbourline,2026-11-20 10:01:04,IP Address,sfp_dnsresolve,mail.harbourline-support.com,0,185.220.101.7
+harbourline,2026-11-20 10:01:05,Email Address,sfp_email,harbourline-support.com,0,billing@harbourline-support.com
+harbourline,2026-11-20 10:01:06,Email Address,sfp_email,harbourline-support.com,1,noreply@harbourline-support.com
+harbourline,2026-11-20 10:01:07,Co-Hosted Site,sfp_cohosted,185.220.101.7,0,portal-harbourline.net
+harbourline,2026-11-20 10:01:08,Raw DNS Records,sfp_dnsraw,harbourline-support.com,0,v=spf1 include:_spf.google.com ~all
+harbourline,2026-11-20 10:01:09,Human Name,sfp_names,billing@harbourline-support.com,0,Dana Whitfield
+harbourline,2026-11-20 10:01:10,Domain Name,sfp_dnsresolve,harbourline-support.com,0,harbourline-support.com

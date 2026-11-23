@@ -23,7 +23,18 @@ async function capture(page, text, caseId) {
   if (caseId) await page.selectOption('#capCase', caseId);
   await page.fill('#capBody', text);
   await page.click('[data-act=capSave]');
-  await page.waitForTimeout(400);
+  await expect(page.locator('#capBody')).toHaveCount(0);   // saved: the capture window has closed
+}
+/* A time limit that holds on a busy machine: a fixed workload is timed first (about 25 ms when idle), and the
+   limit grows with how much slower it ran — at most 6×, so a real slowdown in the app still fails. */
+const CAL_MS = 25;
+async function budget(page, ms) {
+  const runs = [];
+  for (let i = 0; i < 3; i++) runs.push(await page.evaluate(() => { const t = performance.now(); let x = 0; const a = [];
+    for (let i = 0; i < 200000; i++) { x += Math.sqrt(i) * Math.sin(i); if (i % 50 === 0) a.push({ i, s: 'v' + i }); }
+    JSON.parse(JSON.stringify(a)); const m = new Map(); for (let i = 0; i < 60000; i++) m.set('k' + (i % 5000), i); return performance.now() - t + (x > Infinity ? 1 : 0); }));
+  runs.sort((a, b) => a - b);
+  return ms * Math.min(6, Math.max(1, runs[1] / CAL_MS));
 }
 const noErrors = errors => expect(errors, errors.join('\n')).toEqual([]);
-module.exports = { APP, fixture, open, capture, noErrors };
+module.exports = { APP, fixture, open, capture, noErrors, budget };

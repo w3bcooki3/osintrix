@@ -38,7 +38,8 @@ function noiseRanges(b, ext){
 }
 
 /* ---------- ZIP / Office ---------- */
-async function zipInfo(b){
+/* a zip's table of contents and a way to read one file from it as text (the size cap guards against zip bombs) — null if it is not a zip */
+function zipOpen(b){
   let eocd = -1; for(let i = b.length - 22; i >= Math.max(0, b.length - 70000); i--) if(u32le(b, i) === 0x06054b50){ eocd = i; break; }
   if(eocd < 0) return null;
   const n = u16le(b, eocd + 10), cdOff = u32le(b, eocd + 16), clen = u16le(b, eocd + 20), comment = latin1(b, eocd + 22, eocd + 22 + clen);
@@ -50,9 +51,14 @@ async function zipInfo(b){
     files.push({name, size, csize, method, enc:!!(flag & 1), date:Date.UTC(((dd >> 9) & 127) + 1980, ((dd >> 5) & 15) - 1, dd & 31, dt >> 11, (dt >> 5) & 63, (dt & 31) * 2), lho});
     o += 46 + fl + xl + cl;
   }
-  const read = async name => { const f = files.find(x => x.name === name); if(!f || f.enc) return null; const lh = f.lho; if(u32le(b, lh) !== 0x04034b50) return null;
+  const read = async (name, max) => { const f = files.find(x => x.name === name); if(!f || f.enc) return null; const lh = f.lho; if(u32le(b, lh) !== 0x04034b50) return null;
     const start = lh + 30 + u16le(b, lh + 26) + u16le(b, lh + 28), data = b.subarray(start, start + f.csize);
-    try{ return new TextDecoder().decode(f.method === 0 ? data : await inflateRaw(data)); }catch(e){ return null; } };
+    try{ return new TextDecoder().decode(f.method === 0 ? data : await inflateRaw(data, max)); }catch(e){ return null; } };
+  return {files, comment, read};
+}
+async function zipInfo(b){
+  const Z = zipOpen(b); if(!Z) return null;
+  const {files, comment, read} = Z;
   const out = {files, comment, encrypted:files.some(f => f.enc)};
   const isOffice = files.some(f => f.name === '[Content_Types].xml');
   if(isOffice){
@@ -452,8 +458,6 @@ function genBuild(o){
   return {users, corp, personal, name:N};
 }
 /* kept for older callers */
-const usernameVariants = (full, extra) => { const R = genBuild({name:full, nums:extra}); return R ? R.users.map(x => x.v).slice(0, 120) : []; };
-const emailVariants = (full, domain) => { const R = genBuild({name:full, domains:domain}); return R ? R.corp.map(x => x.v) : []; };
 
 /* ---------- image tools ---------- */
 async function loadImageData(file){

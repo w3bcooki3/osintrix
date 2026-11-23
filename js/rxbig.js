@@ -46,11 +46,10 @@ function rxBigPaint(){ const st = UI.rxBig, el = $('rxBigIn'), ft = $('rxBigFt')
     ${st.done && st.miss.length ? `<details class="rx-box"><summary>First missed ${unit} (${Math.min(st.miss.length, 50)} of ${(st.lines - st.hit).toLocaleString()})</summary><pre class="rx-out mono" style="max-height:220px">${esc(st.miss.slice(0, 50).join('\n'))}</pre></details>` : ''}`;
   if(ft) ft.innerHTML = st.done ? `<button class="btn" data-act="dclose">Close</button>${st.miss.length ? `<button class="btn" data-act="rxBigTeach" title="Add some of the missed ${unit} to the sample, to teach the pattern">${ico('plus','sm')}Add 50 missed to the sample</button>` : ''}${st.rows.length ? `<button class="btn primary" data-act="rxBigCsv">${ico('download','sm')}Matches as CSV${st.rowsCut ? ' (first 200,000)' : ''}</button>` : ''}`
     : `<button class="btn" data-act="rxBigStop">Stop</button>`; }
-const rxbCell = v => { v = String(v ?? ''); if(/^[=+\-@\t\r]/.test(v)) v = "'" + v; return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
 const RXB_ACTS = {
   rxBig:() => rxBigPick(),
   rxBigStop:() => { if(UI.rxBig) UI.rxBig.stop = true; },
-  rxBigCsv:() => { const st = UI.rxBig; if(!st) return; download(st.file.replace(/\.[^.]+$/, '') + '-matches.csv', [['line', ...st.names].map(rxbCell).join(',')].concat(st.rows.map(r => r.map(rxbCell).join(','))).join('\r\n'), 'text/csv'); },
+  rxBigCsv:() => { const st = UI.rxBig; if(!st) return; download(st.file.replace(/\.[^.]+$/, '') + '-matches.csv', [['line', ...st.names].map(csvCell).join(',')].concat(st.rows.map(r => r.map(csvCell).join(','))).join('\r\n'), 'text/csv'); },
   rxBigTeach:() => { const st = UI.rxBig, S = RX(); if(!st) return; const add = st.miss.slice(0, 50).filter(l => !S.lines.includes(l)); if(!add.length) return toast('Those are already in the sample');
     const keep = S.fmt >= 0 && S.fmts[S.fmt] ? S.fields.find(f => S.fmts[S.fmt].lines.includes(f.line)) : null;
     const rawAdd = add.flatMap(l => l.split('\n')); S.raw = S.raw.concat(rawAdd).slice(0, RX_MAX_LINES); S.text += '\n' + rawAdd.join('\n');

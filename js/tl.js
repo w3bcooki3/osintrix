@@ -31,7 +31,6 @@ function evBulkHTML(list){
     <button class="btn xs" data-act="evTag">${ico('tag','sm')}Tag…</button><button class="btn xs" data-act="evKey">${ico('star','sm')}Key evidence</button><button class="btn xs" data-act="evCsv">${ico('download','sm')}CSV</button><button class="btn xs" data-act="evRule" title="Draft a Sigma rule from what these events share">${ico('shield-check','sm')}Draft a rule</button><button class="btn xs" data-act="evNote" title="Write a note summarising these events, with citations">${ico('notebook-pen','sm')}Write a note</button>
     <button class="btn xs dangerbtn" data-act="evDel">${ico('trash-2','sm')}Delete</button><button class="iconbtn" data-act="evNone" aria-label="Clear selection">${ico('x','sm')}</button></div>`;
 }
-const csvCell = v => { v = String(v == null ? '' : csvFormula(v)); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
 function recsCsv(rs){ return ['time,title,type,host,source,tags,entities,body'].concat(rs.map(r => [r.ts ? new Date(r.ts).toISOString() : '', r.title, r.type, r.host, r.source, (r.tags || []).join(' '), r.ents.map(e => e.k + ':' + e.v).join(' '), r.body].map(csvCell).join(','))).join('\n'); }
 const TL_ACTS = {
   tlMore:(id, v) => { const cur = UI.tlLim && UI.tlLim.k === v ? UI.tlLim.n : 300; UI.tlLim = {k:v, n:id === 'all' ? 1e9 : cur + 500}; renderMain(); },

@@ -98,7 +98,7 @@ function normRecord(r){
 }
 function normEntry(e){ e.fields = isObj(e.fields) ? Object.fromEntries(Object.entries(e.fields).map(([k, v]) => [k, String(v == null ? '' : v)])) : {}; e.tags = Array.isArray(e.tags) ? e.tags.map(String) : []; e.notes = String(e.notes || ''); e.priority = ['low', 'medium', 'high', 'critical'].includes(e.priority) ? e.priority : 'medium'; e.starred = !!e.starred; return e; }
 /* values that are drawn as labels or classes must be one of the known ones */
-function normCase(c){ c.status = ['active', 'review', 'closed'].includes(c.status) ? c.status : 'active'; c.name = String(c.name || 'Untitled case'); c.code = String(c.code || 'CASE').slice(0, 40); c.scope = String(c.scope || ''); c.color = /^#[0-9a-f]{3,8}$/i.test(c.color) ? c.color : '#5468ff'; c.icon = /^[a-z0-9-]{1,40}$/.test(c.icon) ? c.icon : 'briefcase'; c.autoLook = false; if(c.ach != null) c.ach = normAch(c.ach); if(c.ach === null) delete c.ach; return c; }
+function normCase(c){ if(c.placeholder !== undefined && c.placeholder !== true) delete c.placeholder; c.status = ['active', 'review', 'closed'].includes(c.status) ? c.status : 'active'; c.name = String(c.name || 'Untitled case'); c.code = String(c.code || 'CASE').slice(0, 40); c.scope = String(c.scope || ''); c.color = /^#[0-9a-f]{3,8}$/i.test(c.color) ? c.color : '#5468ff'; c.icon = /^[a-z0-9-]{1,40}$/.test(c.icon) ? c.icon : 'briefcase'; c.autoLook = false; if(c.ach != null) c.ach = normAch(c.ach); if(c.ach === null) delete c.ach; return c; }
 /* competing-hypotheses data: ids are plain, marks are known codes, text is capped */
 function normAch(A){ if(!A || typeof A !== 'object') return null; const sid = v => typeof v === 'string' && /^[\w-]{1,60}$/.test(v) ? v : null, arr = v => Array.isArray(v) ? v.filter(x => x && typeof x === 'object') : [];
   const hyps = arr(A.hyps).slice(0, 50).map(h => ({id:sid(h.id) || uid('h'), t:String(h.t || '').slice(0, 400), status:['open', 'rejected', 'likely'].includes(h.status) ? h.status : 'open', note:String(h.note || '').slice(0, 4000)}));
@@ -242,6 +242,7 @@ function normStored(d){
     if(r.geo != null && !isObj(r.geo)) delete r.geo;
     if(r.hours != null && !(isObj(r.hours) && Array.isArray(r.hours.t) && Array.isArray(r.hours.who))) delete r.hours; if(r.cred != null && !/^[1-6]$/.test(String(r.cred))) delete r.cred; }
   for(const k of ['cases', 'records', 'entries', 'notes', 'tools', 'queries', 'rules', 'playbooks']) if(d[k]) d[k] = d[k].filter(x => typeof x.id === 'string' && x.id);
+  if(d.views !== undefined) d.views = typeof svClean === 'function' ? svClean(d.views) : Array.isArray(d.views) ? d.views : [];
   /* a built search keeps its rows: a short list of {k, v} strings, or nothing */
   if(d.queries) for(const q of d.queries) if(q.b !== undefined){ if(!Array.isArray(q.b)) delete q.b; else { q.b = q.b.filter(r => r && typeof r === 'object' && typeof r.k === 'string' && typeof r.v === 'string' && (typeof QB_KINDS === 'undefined' || QB_KINDS[r.k])).slice(0, 30).map(r => ({k:r.k, v:r.v.slice(0, 500)})); if(!q.b.length) delete q.b; } }
   if(d.links) d.links = d.links.filter(l => typeof l.a === 'string' && typeof l.b === 'string');

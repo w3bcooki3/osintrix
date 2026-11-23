@@ -7,7 +7,6 @@ const RECENT_TOOLS = {certs:['Certificates', 'shield-check'], cloudScan:['Cloud 
 const recentAll = () => (DB.recent = Array.isArray(DB.recent) ? DB.recent : []);
 const recentOf = tool => recentAll().filter(x => x.tool === tool);
 const recentLastMap = () => (DB.work && DB.work.last) || {};
-const recentLast = tool => recentLastMap()[tool] || null;
 const recentIsOpen = x => Object.values(recentLastMap()).includes(x.id);
 const recentKey = (tool, mode) => tool + (mode ? ':' + mode : '');
 function recentSetLast(tool, id){ DB.work = DB.work || {}; DB.work.last = DB.work.last || {}; if(id) DB.work.last[tool] = id; else delete DB.work.last[tool]; }

@@ -45,8 +45,10 @@ function inspEntry(e){
     ${other.length ? `<div class="isec"><div class="note amber"><span class="ic">${ico('link-2','sm')}</span><div><b>Also in ${other.length} other case${other.length > 1 ? 's' : ''}:</b> ${other.map(x => `<a href="${caseHash(x)}">${esc(theCase(x).name)}</a>`).join(', ')}</div></div></div>` : ''}
     <div class="isec"><h4>Relationships <span class="t3">${links.length}</span></h4>
       ${links.map(l => { const out = l.a === e.id, o = entryById(out ? l.b : l.a); return o ? `<div class="rel"><div class="rt"><span class="dir" title="${out ? 'Outgoing' : 'Incoming'}">${ico(out ? 'arrow-up-right' : 'undo-2','sm')}</span><button class="lab" data-act="selLink" data-id="${l.id}">${out ? '' : '← '}${esc(l.label)}</button>${conf(l.conf)}</div>${entryPill(o)}</div>` : ''; }).join('') || '<span class="t3" style="font-size:calc(13.5px * var(--ts,1))">None yet — use Connect.</span>'}</div>
+    ${typeof sightSection === 'function' && entryKey(e) ? sightSection(entryKey(e)) : ''}
     <div class="isec"><h4>Evidence that mentions it <span class="t3">${mentions.length}</span></h4>
       ${mentions.slice(0, 8).map(r => `<button class="li" data-act="selRec" data-id="${r.id}" style="padding:8px 0"><div class="main2"><b style="font-weight:520;font-size:calc(14px * var(--ts,1))">${esc(r.title)}</b><small>${r.ts ? esc(E.fmtFull(r.ts, tz()).slice(5, 16)) : 'no time'}${r.host ? ' · ' + esc(r.host) : ''}</small></div></button>`).join('') || '<span class="t3" style="font-size:calc(13.5px * var(--ts,1))">No captured record mentions this yet.</span>'}</div>
+    ${typeof menSection === 'function' ? menSection(e) : ''}
     ${tools.length ? `<div class="isec"><h4>From your toolbox</h4><div class="wrap">${tools.map(x => { const u = E.safeUrl(x.url); return u ? `<a class="btn sm" href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(x.name)} ${ico('external-link','sm')}</a>` : ''; }).join('')}</div>
       <p class="heur">Opens the tool's site. The value is not sent anywhere.</p></div>` : ''}
   </div>`;
@@ -88,7 +90,8 @@ function inspEnt(id){
     ${typeof srcEntLine === 'function' ? srcEntLine(id) : ''}
     <div class="isec"><h4>Verdict <span class="t3">applies in every case</span></h4><div class="seg v">${[['malicious','Malicious'],['suspicious','Suspicious'],['benign','Benign'],['','Unknown']].map(([x, l]) => `<button data-act="entVerdict" data-id="${esc(id)}" data-v="${x}" aria-pressed="${vd === x}">${l}</button>`).join('')}</div>${typeof verdictAgeNote === 'function' ? verdictAgeNote(id) : ''}</div>
     <div class="isec"><h4>Appears in <span class="t3">${recs.length} records · ${g ? g.cases.size : 0} cases</span></h4>${recs.slice(0, 10).map(r => `<button class="li" data-act="selRec" data-id="${r.id}" style="padding:8px 0"><div class="main2"><b style="font-weight:520;font-size:calc(14px * var(--ts,1))">${esc(r.title)}</b><small>${esc(theCase(r.caseId).code)}${r.ts ? ' · ' + esc(E.fmtFull(r.ts, tz()).slice(5, 16)) : ''}</small></div></button>`).join('')}</div>
-    <div class="wrap" style="margin-top:16px"><button class="btn sm" data-act="pivot" data-id="${esc(id)}">${ico('filter','sm')}Filter timeline to this</button></div></div>`;
+    <div class="wrap" style="margin-top:16px"><button class="btn sm" data-act="pivot" data-id="${esc(id)}">${ico('filter','sm')}Filter timeline to this</button></div>
+    ${typeof sightSection === 'function' ? sightSection(id) : ''}</div>`;
 }
 function inspFeed(f){
   if(!f) return '';
@@ -164,7 +167,7 @@ function caseDlg(edit){
     <div class="field"><label for="cScope">Scope</label><textarea id="cScope" rows="3" placeholder="What is in and out of scope, and what authorises the work">${esc(c ? c.scope : '')}</textarea></div>
     <div class="field"><span class="label">Colour</span><div class="swatches" id="sw">${CASE_COLORS.map(x => `<button type="button" data-act="pickColor" data-v="${x}" style="--c:${x}" aria-pressed="${st.color === x}" aria-label="Colour ${x}"></button>`).join('')}</div></div>
     <div class="field"><span class="label">Icon</span><div class="icopick" id="ip">${CASE_ICONS.map(x => `<button type="button" data-act="pickIcon" data-v="${x}" aria-pressed="${st.icon === x}" aria-label="${x}">${ico(x)}</button>`).join('')}</div></div>
-    ${c ? `<div class="field" style="margin:0"><label for="cStatus">Status</label><select id="cStatus">${['active','review','closed'].map(s => `<option value="${s}"${c.status === s ? ' selected' : ''}>${{active:'Active', review:'In review', closed:'Closed'}[s]}</option>`).join('')}</select></div>` : ''}
+    ${c ? `<div class="field" style="margin:0"><label for="cStatus">Status</label><select id="cStatus">${['active','review','closed'].map(s => `<option value="${s}"${c.status === s ? ' selected' : ''}>${{active:'Active', review:'In review', closed:'Archived'}[s]}</option>`).join('')}</select></div>` : ''}
     ${c ? `<div class="dzone"><div><b>Danger zone</b><span>Archiving hides the case from the sidebar but keeps everything. Deleting removes it for good.</span></div>
       <div class="wrap"><button class="btn sm" type="button" data-act="archiveCase">${ico('lock','sm')}${c.status === 'closed' ? 'Reopen' : 'Archive'}</button><button class="btn sm dangerbtn" type="button" data-act="deleteCaseDlg">${ico('trash-2','sm')}Delete case…</button></div></div>` : ''}
   </div><footer><button class="btn" type="button" data-act="dclose">Cancel</button><button class="btn primary" type="submit">${c ? 'Save' : 'Create case'}</button></footer></form>`);

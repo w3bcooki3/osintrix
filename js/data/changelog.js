@@ -4,6 +4,90 @@
    Each change has a type: "added" | "changed" | "fixed" | "removed". */
 const CHANGELOG_DATA = [
   {
+    "version": "1.56",
+    "name": "Case snapshots, saved views, @ links in notes, and a guard on space",
+    "date": "2026-11-22",
+    "summary": "Save a case to a file and compare or roll back to it later, name the views you come back to, link notes to entries with @, and never let an import fill the browser.",
+    "changes": [
+      {
+        "type": "added",
+        "text": "Seen over time, in an indicator’s details and in a vault entry that is one: first and last seen (and in which case), how long between, a small chart of sightings by day, week or month, how many records in each case — and Every sighting, oldest first, across every case, each one opening on its case’s timeline. Built only from your own evidence."
+      },
+      {
+        "type": "added",
+        "text": "Press ? anywhere (except while typing) for every keyboard shortcut. Help shows the same list, which now includes the newer ones: Alt+1–9 and Tab in Ctrl K, @ in notes, the Regex builder’s keys, Shift+click ranges, ← → between tabs."
+      },
+      {
+        "type": "changed",
+        "text": "Duplicates: names one digit apart (“Hana Okafor 2033” and “Hana Okafor 2433”, “user7” and “user8”) are no longer offered as probably the same — a different number usually means a different thing. A digit added or dropped still is. At most 2,000 near matches are listed."
+      },
+      {
+        "type": "added",
+        "text": "Welcome → Start with an empty workspace, for when you want to begin your own case straight away instead of looking at the sample first."
+      },
+      {
+        "type": "changed",
+        "text": "The empty “My first case” made when the sample is removed now gives way to the first case you create, which takes its number — no leftover empty case."
+      },
+      {
+        "type": "changed",
+        "text": "An empty vault whose evidence already names indicators says so, with a button to the ones found, instead of just “Nothing here yet”."
+      },
+      {
+        "type": "fixed",
+        "text": "From a walk through a whole investigation: an archived case was labelled “Closed” on its card while everything else said “Archived”; archiving now has Undo; the vault toolbar no longer drops Add entry to a second line when duplicates are found (shorter “1 duplicate?” and “Profiles”); on the graph the “not on the graph yet” note sits below the focus bar instead of under it."
+      },
+      {
+        "type": "added",
+        "text": "Case snapshots: from a case’s ⋯ menu (or Ctrl K), save the case as it is now to a file on your computer — named, with or without attached files. It takes no space in this browser. Later, Compare with a snapshot shows what was added, removed and edited since (and what changed in each edited entry); Bring back puts back only what was removed, Roll back returns the whole case to the snapshot after downloading the case as it is now, and Undo works after both. A snapshot of another case, or a file that is not one, is refused. A snapshot also imports as a case."
+      },
+      {
+        "type": "added",
+        "text": "Saved views: name a vault view (search, category, filters, sort, layout), a graph view (focus, steps, filters) or a Ctrl K search, and come back to it in one click — from the vault’s side panel, the graph bar, or Ctrl K, where typing a view’s name puts it first. Delete with undo."
+      },
+      {
+        "type": "added",
+        "text": "@ in notes: type @ in a note and pick a vault entry; it is written as @[value], links to the entry, and the entry lists the notes that mention it under Mentioned in notes. A mention whose entry is gone shows faded and offers to add it back. The suggestions are read out to screen readers."
+      },
+      {
+        "type": "changed",
+        "text": "Space is checked before anything big is added — a vault import, a case import, a backup restore, a log import — and if it would not fit, nothing changes and you are told how much is needed and how much is left. Restore points (whole copies kept in the browser) now make room by dropping their oldest copies, and are skipped with a warning rather than filling the browser."
+      },
+      {
+        "type": "fixed",
+        "text": "CSV exports that missed part of the protection against spreadsheet formulas (the whole-file regex matches, the vault’s selected entries) now get all of it; every CSV export shares one way of writing cells."
+      },
+      {
+        "type": "changed",
+        "text": "Tidier code underneath: one zip reader instead of two, one list of action maps instead of two kept in step, and fourteen functions nothing used any more removed. No change to what you see."
+      }
+    ]
+  },
+  {
+    "version": "1.55",
+    "name": "Focus in a big graph, imports from other tools, merge all duplicates",
+    "date": "2026-11-22",
+    "summary": "A big case's graph can be read a neighbourhood at a time, earlier work comes in from Maltego, GraphML, SpiderFoot or a CSV, and duplicates merge all at once.",
+    "changes": [
+      {
+        "type": "added",
+        "text": "Board → Focus on…: show only what is 1, 2 or 3 steps from one entry (pick it by typing, or right-click a node → Focus here), grow the view a node at a time with Expand, and narrow it by verdict or tag. Hide single links drops entries that hang off one link. A focused view is laid out around the focus and never moves your saved layout; each case keeps its own view, and Show all puts everything back. In a graph of over 300 entries the bar is always there; on a smaller one it appears once you focus."
+      },
+      {
+        "type": "added",
+        "text": "Vault → Import: bring earlier work into a case — a Maltego graph (.mtgx, or exported as GraphML), any GraphML (yEd, Gephi, an OSINTrix export), SpiderFoot scan results (CSV), or a CSV of values or of links (source, target, relationship). Each kind of thing in the file is matched to an entry type you can change or skip before anything is added, with a count of new entries, entries already in the case (reused, not duplicated or changed) and new links. Other properties go into the entry’s notes; SpiderFoot’s false positives are left out. The whole import can be undone."
+      },
+      {
+        "type": "added",
+        "text": "Duplicates → Merge all: every group with the same value merges into its fullest entry (or the one you picked) in one step, with one undo. The review has two tabs — same value, and probably the same (one letter apart), which stay one-by-one — and shows 40 groups at a time."
+      },
+      {
+        "type": "changed",
+        "text": "Finding names one letter apart no longer compares every pair: 4,000 names are checked in well under a second, and merging many groups re-points the links in one pass."
+      }
+    ]
+  },
+  {
     "version": "1.54",
     "name": "A big vault, workable; filters and actions in Ctrl K",
     "date": "2026-11-21",

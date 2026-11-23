@@ -3,7 +3,7 @@
    The mark: a lens (the O of OSINT) with a dotted thread running through it
    from a known point to a new lead (cyan). Gradient squircle, white line.
    ========================================================================== */
-const BRAND = {name:'OSINTrix', tagline:'Follow every thread.', version:'v1.54'};
+const BRAND = {name:'OSINTrix', tagline:'Follow every thread.', version:'v1.56'};
 function logoMark(size = 32, id = 'lg' + Math.random().toString(36).slice(2, 6)){
   return `<svg class="mark" width="${size}" height="${size}" viewBox="0 0 32 32" aria-hidden="true">
     <defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5468ff"/><stop offset=".6" stop-color="#7c5cff"/><stop offset="1" stop-color="#a855f7"/></linearGradient>
@@ -63,14 +63,6 @@ function ensurePositions(){
     h.layout({name:'cose', animate:false, randomize:true, nodeRepulsion:() => 40000, idealEdgeLength:() => 110, nodeOverlap:40, numIter:2500, gravity:.6, componentSpacing:120}).run();
     h.nodes().forEach(n => { const e = entryById(n.id()); if(e && !e.pos) e.pos = {...n.position()}; }); h.destroy();
   }
-}
-function sparkline(values, color = 'var(--accent)', w = 96, h = 30){
-  const mx = Math.max(1, ...values), step = w / Math.max(1, values.length - 1);
-  const pts = values.map((v, i) => [i * step, h - 3 - (v / mx) * (h - 6)]);
-  const d = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
-  const gid = 'sp' + Math.random().toString(36).slice(2, 7);
-  return `<svg class="spark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" aria-hidden="true"><defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".35"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
-    <path d="${d} L${w} ${h} L0 ${h}Z" fill="url(#${gid})"/><path d="${d}" stroke="${color}" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 }
 function donut(parts, size = 132){
   const total = parts.reduce((a, p) => a + p.n, 0) || 1, r = 50, c = 2 * Math.PI * r; let off = 0;

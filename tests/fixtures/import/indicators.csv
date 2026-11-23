@@ -1,0 +1,5 @@
+indicator,type,description,tags
+185.220.101.7,ip,Tor exit seen in the logins,tor;wave-2
+harbourline-support.com,domain,Lookalike of harbourline.co.uk,phishing
+d41d8cd98f00b204e9800998ecf8427e,md5,Empty attachment,
+=cmd|calc,text,formula injection attempt,

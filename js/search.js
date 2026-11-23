@@ -36,9 +36,12 @@ function srchIndex(){
     ['Build a regex from log lines','regex','regex regular expression pattern grok rex kql parse log fields extract', () => go('#/regex')], ['Identify a hash','fingerprint','hash md5 ntlm bcrypt hashcat', () => { UI.labTab = 'hash'; go('#/lab'); }], ['Convert coordinates','compass','gps dms map geolocation', () => { UI.labTab = 'geo'; go('#/lab'); }],
     ['Export IOCs of this case','download','ioc csv stix export indicators', () => { go(caseHash(DB.active, 'report')); }], ['Print the report','file-text','pdf print report', () => { go(caseHash(DB.active, 'report')); setTimeout(printReport, 200); }],
     ['Run a playbook on this case','list-checks','playbook checklist', () => go('#/playbooks')], ['Export a backup of everything','download','backup export json', () => clickAct('exportAll')],
-    ['Import a backup','upload','restore import backup', () => clickAct('importAll')], ['Import a case','upload','import case json', () => clickAct('importCase')],
+    ['Import a backup','upload','restore import backup', () => clickAct('importAll')], ['Import a case','upload','import case json', () => clickAct('importCase')], ['Import into this case — Maltego, GraphML, SpiderFoot, CSV','upload','import maltego graphml spiderfoot csv vault entries', () => clickAct('vimOpen')],
     ['Switch theme','moon','dark light theme mode', () => clickAct('theme')], ['Add a tool','wrench','tool add new', () => toolDlg()]];
+  if(c0) acts.push(['Save a snapshot of this case to your computer','history','snapshot save backup version point in time case file', () => sncSaveDlg()], ['Compare this case with a snapshot','git-compare','snapshot compare diff changes roll back restore case', () => sncLoad()]);
   if(DB.sample) acts.push(['Remove sample data','trash-2','sample demo delete remove', () => clickAct('removeSample')]);
+  /* saved views open from here too */
+  if(typeof svList === 'function') for(const v of svList()){ const c = v.caseId ? theCase(v.caseId) : null; add('action', {id:'sv' + v.id, title:v.name, sub:SV_KIND[v.kind][0] + (c ? ' · ' + c.code : '') + ' · ' + svDescribe(v), icon:SV_KIND[v.kind][1], text:v.name + ' view saved ' + SV_KIND[v.kind][0] + ' ' + svDescribe(v), run:() => svOpen(v.id), w:4}); }
   for(const [t, i, x, fn] of acts) add('action', {id:'a' + t, title:t, sub:'Action', icon:i, text:t + ' ' + x, run:fn, w:3});
   for(const c of DB.cases) add('case', {id:c.id, title:c.name, sub:c.code + ' · ' + ({active:'Active', review:'In review', closed:'Archived'}[c.status] || c.status), icon:c.icon, color:c.color, text:c.name + ' ' + c.code + ' ' + (c.scope || ''), body:c.scope, caseId:c.id, w:6});
   for(const e of DB.entries){ const t = TYPES[e.type]; if(!t) continue; const c = theCase(e.caseId);
@@ -109,6 +112,8 @@ function srchRun(){
   const all = S.index.map(it => ({it, s:srchScore(it, P)})).filter(x => x.s > 0).sort((a, b) => b.s - a.s);
   const counts = {}; for(const {it} of all) counts[it.kind] = (counts[it.kind] || 0) + 1;
   const special = [];
+  /* a saved view whose name starts with what was typed comes before everything else */
+  const ql = q.toLowerCase(), svHits = ql.length >= 3 ? S.index.filter(x => x.kind === 'action' && /^sv/.test(x.id) && x.title.toLowerCase().startsWith(ql)).slice(0, 3) : [];
   const ioc = q && !P.tl.length ? E.extract(q).find(e => e.v.toLowerCase() === refang(q).toLowerCase() || e.v.toLowerCase() === q.toLowerCase()) : null;
   if(ioc) special.push({kind:'ioc', id:'ioc', title:ioc.v, sub:'Indicator · ' + (E.LABEL[ioc.k] || ioc.k), icon:'crosshair', mono:true, k:ioc.k, v:ioc.v});
   const tlOwn = P.tl.some(x => !SR_F.test(x));   /* host:, source:, after: … only mean something on a timeline */
@@ -120,9 +125,10 @@ function srchRun(){
   } else groups = [{k:scope, items:all.filter(x => x.it.kind === scope).slice(0, 80).map(x => x.it), total:counts[scope] || 0}];
   if(!q && scope === 'all') groups = [{k:'action', items:S.index.filter(x => x.kind === 'action' && x.w >= 2).slice(0, 18), total:0}];
   if(special.length) groups.unshift({k:'special', items:special, total:0});
+  if(svHits.length) groups.unshift({k:'special', items:svHits, total:0});
   const hints = srHints(S.q); if(hints.length) groups.unshift({k:'hint', items:hints, total:0});
   const smart = q && (scope === 'all' || scope === 'ent') && typeof nlqGroup === 'function' ? nlqGroup(q) : null;
-  if(smart){ groups.unshift({k:'smart', items:smart.items, total:smart.total, N:smart.N}); counts.ent = (counts.ent || 0) + smart.total; }
+  if(smart){ groups.splice(groups.findIndex(g => g.items === svHits) + 1, 0, {k:'smart', items:smart.items, total:smart.total, N:smart.N}); counts.ent = (counts.ent || 0) + smart.total; }   /* after a saved view the name matched */
   return {groups, counts, total:all.length + (smart ? smart.total : 0), P, scope, hintFirst:/(?:^|\s)[a-z]+:[^\s:]*$/i.test(S.q)};
 }
 /* what the word being typed could become: an operator, or a value for one */
@@ -180,6 +186,7 @@ function srchPaint(){
       + `<div class="sr-tips" role="group" aria-label="Tips"><div><b>Search everything</b><span>Cases, vault, evidence, indicators, notes, tools, queries, rules, playbooks, CTF and news.</span></div>
         <div><code>malicious IPs last week</code><code>domains registered this month</code><code>what talks to 203.0.113.47</code><code>unchecked hashes</code><code>in:tools shodan</code><code>case:TN-2026-014 dns</code><code>"lamp loader"</code><code>beacon -firewall</code><code>type:ip verdict:malicious</code><code>tag:phishing</code><code>is:watched</code><code>host:DC01</code><code>203.0.113.47</code></div></div>` + h; }
   const fl = $('srFl'); if(fl){ const x = S.q.trim() ? srFilterLine(R.P) : ''; fl.innerHTML = x; fl.hidden = !x; }
+  const sv = $('srSave'); if(sv) sv.hidden = !S.q.trim();
   $('srList').innerHTML = h; srchPreview(); srAria();
   const s = $('srList').querySelector('[aria-selected=true]'); if(s) s.scrollIntoView({block:'nearest'});
 }
@@ -245,7 +252,7 @@ function srchOpen(prefill){ setTimeout(() => scrollHints(), 80);
   w.hidden = false;
   w.innerHTML = `<div class="sr-scrim" data-act="srClose"></div><div class="sr-box" role="dialog" aria-modal="true" aria-label="Search everything">
     <div class="sr-top">${ico('search')}<label class="sr" for="srQ">Search everything</label><input id="srQ" role="combobox" aria-expanded="true" aria-controls="srList" aria-autocomplete="list" placeholder="Search cases, evidence, indicators, tools, notes, rules, CTF…" autocomplete="off" spellcheck="false" value="${esc(S.q)}">
-      <kbd class="hide-m">Esc</kbd><button class="iconbtn sr-x" data-act="srClose" aria-label="Close search">${ico('x')}</button></div>
+      <button class="btn xs ghost sr-save" id="srSave" data-act="svSave" data-v="search" hidden title="Name this search to come back to it">${ico('bookmark','sm')}Save search</button><kbd class="hide-m">Esc</kbd><button class="iconbtn sr-x" data-act="srClose" aria-label="Close search">${ico('x')}</button></div>
     <div class="sr-scopes" id="srScopes" role="group" aria-label="Where to search"></div><div id="srFl" hidden></div>
     <div class="sr-body"><div class="sr-list" id="srList" role="listbox" aria-label="Results"></div><aside class="sr-prev" id="srPrev"></aside></div>
     <div class="sr-foot hide-m"><span><kbd>↑</kbd><kbd>↓</kbd> move</span><span><kbd>Enter</kbd> open</span><span><kbd>Tab</kbd> next scope or finish a filter</span><span><kbd>Alt</kbd> <kbd>1–9</kbd> actions</span><span><kbd>Esc</kbd> close</span><span class="t3">${S.index.length.toLocaleString()} items indexed</span></div></div>`;

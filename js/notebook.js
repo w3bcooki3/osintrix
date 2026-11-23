@@ -167,7 +167,7 @@ async function nbMediaDl(id){ const m = nbM(id), b = await nbBlob(id); if(!m || 
 function nbHydrate(root){ (root || document).querySelectorAll('img[data-nbm]:not([src])').forEach(async im => { const u = await nbURL(im.dataset.nbm); if(u) im.src = u; else { im.alt = 'Picture missing from this browser'; im.classList.add('nb-missing'); } }); }
 new MutationObserver(() => { if(document.querySelector('img[data-nbm]:not([src])')) nbHydrate(); }).observe(document.documentElement, {childList:true, subtree:true});
 /* refuse a file that would not fit, instead of failing half-way */
-async function nbRoomFor(bytes){ await storageEstimate(); return !STORE.quota || (STORE.quota - (STORE.usage || 0)) > bytes * 1.5 + 5e6; }
+const nbRoomFor = bytes => stoRoom(bytes);
 
 /* ==========================================================================
    View
@@ -698,9 +698,6 @@ AmcacheParser.exe -f Amcache.hve --csv out</pre><div class="nb-call"><p><b>Caref
 async function nbBackupFiles(){ const out = {}; if(!DB.nb) return out; for(const m of Object.values(DB.nb.media)){ if(m.data || m.demo || m.gone) continue; const u = await nbDataURL(m.id); if(u) out[m.id] = u; } return out; }
 async function nbRestoreFiles(files){ let n = 0; for(const [id, url] of Object.entries(files || {})){ const m = nbM(id); if(!m || typeof url !== 'string' || !/^data:[\w.+-]+\/[\w.+-]+;base64,/.test(url) || url.length > 3e7) continue;
     try{ if(await nbPut(id, nbURLBlob(url))) delete m.data; else m.data = url; n++; }catch(e){} } return n; }
-async function nbReseal(fromKey){ if(!DB.nb || !STORE.idb) return; for(const id of Object.keys(DB.nb.media)){ let v = await IDB.get('nbm:' + id); if(!v) continue;
-    if(v.enc){ if(!fromKey) continue; const pt = await crypto.subtle.decrypt({name:'AES-GCM', iv:b64d8(v.iv)}, fromKey, v.ct); v = new Blob([pt], {type:v.type}); } await IDB.set('nbm:' + id, await sealBlob(v)); }
-  NB_URLS.clear(); NB_DATA.clear(); }
 /* Notebook data from a backup is checked field by field: wrong types are dropped, text is capped, and every page is cleaned again. */
 const nbColor = c => /^#[0-9a-f]{3,8}$/i.test(String(c || '')) ? c : NB_COLORS[0];
 const nbStr = (v, n) => typeof v === 'string' ? v.slice(0, n) : '';

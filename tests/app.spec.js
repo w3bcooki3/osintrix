@@ -1,6 +1,6 @@
 // End-to-end checks for OSINTrix. Every test opens the real app from disk, like a user would.
 const { test, expect } = require('@playwright/test');
-const { open, capture, fixture, noErrors, APP } = require('./helpers');
+const { open, capture, fixture, noErrors, APP, budget } = require('./helpers');
 
 const ROUTES = ['#/home', '#/cases', '#/cloud', '#/pad', '#/whatsnew', '#/case/c-lantern/overview', '#/case/c-lantern/vault', '#/case/c-lantern/entities', '#/case/c-lantern/timeline',
   '#/case/c-lantern/graph', '#/case/c-lab/map', '#/case/c-lantern/questions', '#/case/c-lantern/report', '#/toolbox', '#/queries', '#/detections',
@@ -194,11 +194,13 @@ test('auto-decode finds layered and uncommon encodings', async ({ page }) => {
   noErrors(errors);
 });
 
-test('clicks every control on the main screens without an error', async ({ page }) => {
+/* split into four parts so they run side by side; each part clicks through a quarter of the screens */
+const CLICK_ROUTES = ['#/home', '#/case/c-lantern/overview', '#/case/c-lantern/entities', '#/case/c-lantern/timeline', '#/case/c-lantern/graph', '#/case/c-lab/map', '#/case/c-lantern/questions', '#/toolbox', '#/lab', '#/security', '#/reference', '#/playbooks', '#/help', '#/cloud', '#/whatsnew', '#/pad', '#/ctf', '#/detections', '#/notebook', 'nb-page'];
+for (const part of [0, 1, 2, 3]) test(`clicks every control on the main screens without an error (${part + 1}/4)`, async ({ page }) => {
   test.setTimeout(240_000);
   const errors = await open(page);
   const SKIP = new Set(['exportAll', 'resetDemo', 'freshStart', 'removeSample', 'importAll', 'importCase', 'secOn', 'secLock', 'secOff', 'secChange', 'capFiles', 'capLog', 'capWeb', 'attAdd', 'attOpen', 'attDl', 'rsAll', 'printReport', 'helpWelcome', 'refFind', 'pbGo', 'wuImport', 'placesKml', 'placesCsv', 'wuExportAll', 'wuExport', 'nbImport', 'nbAttach', 'nbMediaDl', 'nbLinkGo']);
-  for (let r of ['#/home', '#/case/c-lantern/overview', '#/case/c-lantern/entities', '#/case/c-lantern/timeline', '#/case/c-lantern/graph', '#/case/c-lab/map', '#/case/c-lantern/questions', '#/toolbox', '#/lab', '#/security', '#/reference', '#/playbooks', '#/help', '#/cloud', '#/whatsnew', '#/pad', '#/ctf', '#/detections', '#/notebook', 'nb-page']) {
+  for (let r of CLICK_ROUTES.filter((_, i) => i % 4 === part)) {
     const nbp = r === 'nb-page'; if (nbp) r = '#/notebook';
     await page.evaluate(([h, nbp]) => { if (h === '#/notebook'){ UI.nbView = nbp ? 'page' : 'lib'; UI.nbPage = DB.nb.pages[2].id; } location.hash = h; renderMain(); }, [r, nbp]); await page.waitForTimeout(200);
     const acts = await page.evaluate(() => [...document.querySelectorAll('#main [data-act]')].map((e, i) => [i, e.dataset.act]));
@@ -331,7 +333,7 @@ test('imports are checked: bad IDs are refused, markup in names stays text, file
 test('extractor stays fast on hostile input', async ({ page }) => {
   await open(page);
   const ms = await page.evaluate(() => { const t = performance.now(); Engine.extract('a.'.repeat(50000)); Engine.extract('1.'.repeat(50000)); Engine.extract('a-'.repeat(50000) + '@'); return performance.now() - t; });
-  expect(ms).toBeLessThan(1500);
+  expect(ms).toBeLessThan(await budget(page, 1500));
 });
 
 test('the audit chain and custody reports cannot be forged by editing data', async ({ page }) => {
@@ -382,8 +384,8 @@ test('large cases save in pieces and open on the board without freezing', async 
     const g0 = performance.now(); location.hash = '#/case/' + c + '/graph'; for (let i = 0; i < 750 && !(cy && cy.nodes().length > 1000); i++) await new Promise(res => setTimeout(res, 20));
     return { chunks, ms, n, changed, graphMs: performance.now() - g0, nodes: cy ? cy.nodes().length : 0 };
   });
-  expect(r.chunks).toBeGreaterThan(1); expect(r.ms).toBeLessThan(250); expect(r.n).toBeGreaterThan(2400); expect(r.changed).toBe('changed');
-  expect(r.nodes).toBeGreaterThan(1000); expect(r.graphMs).toBeLessThan(15000);
+  expect(r.chunks).toBeGreaterThan(1); expect(r.ms).toBeLessThan(await budget(page, 250)); expect(r.n).toBeGreaterThan(2400); expect(r.changed).toBe('changed');
+  expect(r.nodes).toBeGreaterThan(1000); expect(r.graphMs).toBeLessThan(await budget(page, 15000));
   noErrors(errors);
 });
 
@@ -431,16 +433,16 @@ test('places, reference and packs load', async ({ page }) => {
   noErrors(errors);
 });
 
-test('no serious accessibility problems on the main screens, light and dark', async ({ page }) => {
+for (const theme of ['light', 'dark']) for (const part of [0, 1]) test(`no serious accessibility problems on the main screens, ${theme} (${part + 1}/2)`, async ({ page }) => {
   test.setTimeout(300_000);
   const AxeBuilder = require('@axe-core/playwright').default;
   const errors = await open(page, '#/home');
   const routes = ['#/home', '#/case/c-lantern/graph', '#/case/c-lantern/timeline', '#/case/c-lantern/entities', '#/case/c-lab/map', '#/case/c-lantern/questions', '#/case/c-lantern/overview', '#/case/c-lantern/vault',
     '#/toolbox', '#/queries', '#/lab', '#/cloud', '#/ctf', '#/reference', '#/playbooks', '#/feeds', '#/detections', '#/notes', '#/security', '#/whatsnew', '#/help', '#/settings', 'ctf-ws', 'ctf-cheats', 'ctf-wu', 'nb-page', 'nb-export', '#/notebook', 'cx-dec', 'cx-chain', 'cx-csr', 'cx-pe', 'cx-cmp', 'cx-ct', 'cx-guide', 'welcome'];
   const found = [];
-  for (const theme of ['light', 'dark']) {
+  {
     await page.evaluate(t => { DB.prefs.theme = t; applyPrefs(); renderAll(); }, theme);
-    for (const r of routes) {
+    for (const r of routes.filter((_, i) => i % 2 === part)) {
       await page.evaluate(r => { closeWelcome();
         if (r === 'welcome') return showWelcome();
         if (r === 'nb-page' || r === 'nb-export'){ closeDlg(); UI.nbPage = DB.nb.pages.find(p => p.title === 'Kerberoasting').id; UI.nbView = 'page'; location.hash = '#/notebook'; setTimeout(() => { renderMain(); if (r === 'nb-export') nbExportDlg('page', UI.nbPage); }, 30); return; }
@@ -1020,7 +1022,8 @@ test('threat intel indicators: STIX, MISP, CSV and ThreatFox imports are validat
   await expect(page.locator('.ti-tr3.hit:has-text("203.0.113.47")')).toBeVisible();
   await page.click('.ti-tr3.hit:has-text("203.0.113.47") [data-act=ctiIocCase]'); await expect(page.locator('#insp')).toContainText('In your feeds');
   // it survives a reload
-  await page.reload(); await expect.poll(() => page.evaluate(async () => { await ctiLoad(); return CTI.iocs.length; })).toBeGreaterThan(5);
+  await page.reload(); await expect.poll(() => page.evaluate(() => typeof DB !== 'undefined' && !!DB && !!document.querySelector('#sidenav .nv')), { timeout: 15000 }).toBe(true);
+  await expect.poll(() => page.evaluate(async () => { await ctiLoad(); return CTI.iocs.length; }), { timeout: 15000 }).toBeGreaterThan(5);
   // delete one, then export the shown set as MISP
   await page.evaluate(() => { UI.itab = 'iocs'; renderMain(); });
   const before = await page.evaluate(() => CTI.iocs.length);
@@ -1366,12 +1369,12 @@ test('speed: a 10,000-record case stays responsive (copilot, smart search, risk,
   const T = await page.evaluate(async () => { const t = (f) => { const a = performance.now(); f(); return performance.now() - a; };
     const r = {}; CP.memo.clear(); r.copilot = t(() => copilot()); r.nlq = t(() => nlqRun(nlqParse('malicious domains last week'))); r.risk = t(() => gRisk()); r.suggest = t(() => suggestLinks(DB.active));
     go(caseHash(DB.active, 'overview')); await new Promise(res => setTimeout(res, 200)); r.edit = t(() => { mutate('x'); renderMain(); }); r.byId = t(() => { for (let i = 0; i < 20000; i++) recById('rb' + (i % 10000)); }); return r; });
-  expect(T.copilot).toBeLessThan(2500); expect(T.nlq).toBeLessThan(400); expect(T.risk).toBeLessThan(200); expect(T.suggest).toBeLessThan(500); expect(T.edit).toBeLessThan(800); expect(T.byId).toBeLessThan(100);
+  expect(T.copilot).toBeLessThan(await budget(page, 2500)); expect(T.nlq).toBeLessThan(await budget(page, 400)); expect(T.risk).toBeLessThan(await budget(page, 200)); expect(T.suggest).toBeLessThan(await budget(page, 500)); expect(T.edit).toBeLessThan(await budget(page, 800)); expect(T.byId).toBeLessThan(await budget(page, 100));
   await expect(page.locator('#cpCard')).toContainText('Next steps', { timeout: 10000 });
   noErrors(errors);
 });
 
-test('no serious accessibility problems on the newer screens (copilot, investigate, coverage, health, look-alikes, identity, report, watchlist), light and dark', async ({ page }) => {
+for (const theme of ['light', 'dark']) test(`no serious accessibility problems on the newer screens (copilot, investigate, coverage, health, look-alikes, identity, report, watchlist), ${theme}`, async ({ page }) => {
   test.setTimeout(300_000);
   const AxeBuilder = require('@axe-core/playwright').default;
   const errors = await open(page, '#/home');
@@ -1410,7 +1413,7 @@ test('no serious accessibility problems on the newer screens (copilot, investiga
     watch: () => { DB.watch = { 'ipv4:203.0.113.47': { at: Date.now(), checked: Date.now(), snap: { band: 'malicious', score: 80 }, alerts: [{ at: Date.now(), d: [{ hot: true, t: 'New port: 3389' }] }], unseen: true } }; location.hash = '#/watch'; },
   };
   const found = [];
-  for (const theme of ['light', 'dark']) {
+  {
     await page.evaluate(t => { DB.prefs.theme = t; applyPrefs(); renderAll(); }, theme);
     for (const name of Object.keys(setups)) {
       if (name === 'health') await page.evaluate(() => ruleHealth());
@@ -1447,9 +1450,9 @@ test('security: a crafted backup cannot redirect the relay or switch on lookups;
   const txt = require('fs').readFileSync(await dl.path(), 'utf8'); expect(txt).not.toContain('SECRET-K'); expect(txt).not.toContain('SECRET-T'); expect(txt).toContain('"cases"');
   // the STIX pattern reader is linear
   const ms = await page.evaluate(() => { const t = performance.now(); for (let i = 0; i < 50; i++) stixPatternValues("[a:" + ' '.repeat(19990) + "x = 'y']"); return performance.now() - t; });
-  expect(ms).toBeLessThan(500);
+  expect(ms).toBeLessThan(await budget(page, 500));
   // redaction on a long run of dots is fast
-  expect(await page.evaluate(() => { const r = redactor({ entries: [] }, true), t = performance.now(); r('a.'.repeat(20000)); return performance.now() - t; })).toBeLessThan(300);
+  expect(await page.evaluate(() => { const r = redactor({ entries: [] }, true), t = performance.now(); r('a.'.repeat(20000)); return performance.now() - t; })).toBeLessThan(await budget(page, 300));
   noErrors(errors);
 });
 
@@ -1524,7 +1527,7 @@ test('big lists: a 10,000-record timeline and 11,000-entity table draw only what
     DB.active = c.id; mutate("gen");
   })());
   const t0 = Date.now(); await page.evaluate(() => go(caseHash(DB.active, 'timeline'))); await page.waitForSelector('#tlV .ev'); const ms = Date.now() - t0;
-  expect(ms).toBeLessThan(2500);
+  expect(ms).toBeLessThan(await budget(page, 2500));
   expect(await page.locator('#tlV .ev').count()).toBeLessThan(60);                           // not 10,000
   await page.evaluate(() => { const s = document.querySelector('#main .scroll'); s.scrollTop = s.scrollHeight; }); await page.waitForTimeout(300);
   await page.evaluate(() => { const s = document.querySelector('#main .scroll'); s.scrollTop = s.scrollHeight; }); await page.waitForTimeout(300);
@@ -1570,7 +1573,7 @@ test('audit fixes: imported case labels cannot inject markup; backup keeps this 
   const ms = await page.evaluate(async () => { const t = performance.now();
     const z = nbZip([{ name: '[Content_Types].xml', data: '<Types/>' }, { name: 'docProps/core.xml', data: '<title'.repeat(40000) }, { name: 'word/_rels/document.xml.rels', data: 'Target="a" '.repeat(20000) }]);
     await zipInfo(new Uint8Array(await z.arrayBuffer())); return performance.now() - t; });
-  expect(ms).toBeLessThan(1500);
+  expect(ms).toBeLessThan(await budget(page, 1500));
   // menus: one line per item however long the label
   await page.evaluate(() => showMenu(300, 200, [{ label: 'CISA advisories: CISA Adds Two Known Exploited Vulnerabilities to Catalog — and a much longer tail', icon: 'newspaper', fn: () => {} }, { label: 'Short', icon: 'plus', fn: () => {} }]));
   const hs = await page.evaluate(() => [...document.querySelectorAll('#ctx .ctx-it')].map(b => Math.round(b.getBoundingClientRect().height)));
@@ -1827,7 +1830,7 @@ test('fast long lists: 50,000 indicators and 5,000 rules draw only what is on sc
     const base = DB.rules[0]; for (let i = 0; i < 5000; i++) DB.rules.push({ ...base, id: 'rx' + i, title: 'Rule ' + i }); mutate('x'); UI.itab = 'iocs'; go('#/feeds'); });
   await expect(page.locator('#ioV [data-vi]').first()).toBeVisible();
   expect(await page.locator('#ioV [data-vi]').count()).toBeLessThan(120);
-  const t = await page.evaluate(() => { const t0 = performance.now(); renderMain(); return performance.now() - t0; }); expect(t).toBeLessThan(400);
+  const t = await page.evaluate(() => { const t0 = performance.now(); renderMain(); return performance.now() - t0; }); expect(t).toBeLessThan(await budget(page, 400));
   await page.evaluate(() => { DB.prefs.dLay = 'table'; UI.dview = 'rules'; go('#/detections'); });
   await page.evaluate(() => { const v = document.querySelector('[data-act=dLay][data-v=table], [data-act=rLay][data-v=table]'); if (v) v.click(); });
   await expect(page.locator('#dtV [data-vi], #ideV [data-vi]').first()).toBeVisible();
@@ -1846,7 +1849,7 @@ test('a large workspace stays usable: 50,000 records and their indicators', asyn
     UI.tlMode = 'patterns'; let s = performance.now(); renderMain(); out.patterns = Math.round(performance.now() - s);
     out.heap = performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : 0; return out; });
   console.log('large workspace', JSON.stringify(r));
-  for (const k of ['overview', 'timeline', 'entities', 'patterns']) expect(r[k]).toBeLessThan(6000);
+  for (const k of ['overview', 'timeline', 'entities', 'patterns']) expect(r[k]).toBeLessThan(await budget(page, 6000));
   if (r.heap) expect(r.heap).toBeLessThan(1500);
   noErrors(errors);
 });
