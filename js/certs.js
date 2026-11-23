@@ -26,7 +26,7 @@ function cxLoad(input, opts = {}){
   if(!R.certs.length && !R.csrs.length && !R.pe){ if(!R.keys.length) toast(R.errors[0] || 'No certificate found'); S.R = R.keys.length ? null : S.R; return cxPaint(); }
   R.at = Date.now(); R.rec = opts.rec || null; S.sel = 0; S.rec = opts.rec || null;
   if(!opts.rec && !/^Example/.test(opts.src || '')) cxKeep(opts.name || (typeof input === 'string' ? cxNameOf(R) : 'certificate'), input, opts.cmp ? 'cmp' : '');
-  R.src = opts.src || (opts.rec ? 'Saved in ' + ((theCase(DB.active) || {}).code || 'this case') : opts.name || 'Pasted');
+  R.src = opts.src || (opts.rec ? 'Saved in ' + (caseNm(DB.active) || 'this case') : opts.name || 'Pasted');
   if(R.pe){ R.pe.name = opts.name || 'program'; R.u = input; }
   if(opts.cmp){ R.certs.forEach(c => { if(!S.cmpX.some(x => cxId(x) === cxId(c))) S.cmpX.push(c); }); if(R.certs[0]) S.cmpB = 'x:' + cxId(R.certs[0]); S.tab = 'compare'; cxPaint(); return Promise.all(R.certs.map(c => X5.prints(c))).then(() => cxPaint()); }
   S.R = R;
@@ -72,7 +72,7 @@ if(typeof RECENT_OPEN !== 'undefined'){
 /* the History window: recent inputs in this browser, and what is saved in the case — each one deletable */
 function cxHistory(){
   const extra = () => { const recs = cxRecs();
-    return `<section><h3>Saved in ${esc(theCase(DB.active) ? theCase(DB.active).code : 'this case')}<small>${recs.length}</small></h3>
+    return `<section><h3>Saved in ${esc(theCase(DB.active) ? caseNm(theCase(DB.active)) : 'this case')}<small>${recs.length}</small></h3>
       ${recs.length ? `<ul class="rc-l">${recs.slice(0, 60).map(rec => `<li class="rc-r"><span class="rc-ic">${ico('archive','sm')}</span><button class="rc-o" data-act="cxHistRec" data-id="${rec.id}"><b>${esc(rec.title.replace(/^(Certificate|Signing request|Signed program): /, ''))}</b><small>${esc(rec.title.split(':')[0])} · ${esc(E.fmtAgo(Math.max(0, Date.now() - (rec.addedAt || rec.ts || 0))))}${cxS().rec === rec.id ? ' · open now' : ''}</small></button>
         <button class="iconbtn rc-d" data-act="cxHistDel" data-id="${rec.id}" aria-label="Move ${esc(rec.title)} to the trash" title="Move to trash">${ico('trash-2','sm')}</button></li>`).join('')}</ul>` : '<p class="rc-none">Nothing saved in this case yet. Use Save to case on a certificate to keep it as evidence.</p>'}
       <p class="rc-note">${ico('info','sm')}Saved items are evidence records. Deleting one moves it to the trash, where it can be restored for 30 days.</p></section>`; };
@@ -285,7 +285,7 @@ function cxIndCard(c, inds, seen){
 }
 function cxSeenCard(seen){
   return `<section class="card crt-s" id="cxSeen"><h3>${ico('folder-open','sm')}Already in your cases<span class="crt-n">${seen.length}</span></h3>
-    <div class="crt-sl">${seen.slice(0, 12).map(h => { const cs = theCase(h.r.caseId) || {}; return `<button class="crt-sli" data-act="cxOpenRec" data-id="${h.r.id}"><span class="crt-cc">${esc(cs.code || '?')}</span><span><b>${esc(h.r.title || '(untitled)')}</b><small>${h.exact.length ? 'Mentions ' + h.exact.slice(0, 3).map(esc).join(', ') + (h.exact.length > 3 ? ' +' + (h.exact.length - 3) : '') : 'Same registered domain: ' + h.near.slice(0, 2).map(esc).join(', ')}${h.r.ts ? ' · ' + esc(cxYmd(h.r.ts)) : ''}</small></span>${ico('arrow-right','sm')}</button>`; }).join('')}</div>
+    <div class="crt-sl">${seen.slice(0, 12).map(h => { const cs = theCase(h.r.caseId) || {}; return `<button class="crt-sli" data-act="cxOpenRec" data-id="${h.r.id}"><span class="crt-cc">${esc(caseNm(cs) || '?')}</span><span><b>${esc(h.r.title || '(untitled)')}</b><small>${h.exact.length ? 'Mentions ' + h.exact.slice(0, 3).map(esc).join(', ') + (h.exact.length > 3 ? ' +' + (h.exact.length - 3) : '') : 'Same registered domain: ' + h.near.slice(0, 2).map(esc).join(', ')}${h.r.ts ? ' · ' + esc(cxYmd(h.r.ts)) : ''}</small></span>${ico('arrow-right','sm')}</button>`; }).join('')}</div>
     ${seen.length > 12 ? `<p class="crt-e">+${seen.length - 12} more records</p>` : ''}</section>`;
 }
 /* a plain-English read of the certificate for the case notes or a report */
@@ -707,14 +707,14 @@ async function cxSave(){
   const r = {id:uid('r'), caseId:cid, type:'evidence', title, body, tsRaw:c.kind === 'cert' && isFinite(c.notBefore) ? new Date(c.notBefore).toISOString() : '', tsZone:'explicit', ts:c.kind === 'cert' && isFinite(c.notBefore) ? c.notBefore : null,
     source:'certificate', host:'', tags:['certificate', 'tls'].concat(c.kind === 'csr' ? ['csr'] : [], R.pe ? ['authenticode', 'code-signing'] : [], bad ? ['suspicious'] : []), ents:extractRich(body), answer:'', addedBy:'You', addedAt:Date.now(), hash:'', pv:1, att:[]};
   DB.records.push(r); mutate('saved certificate ' + c.title); await hashRecords(); S.rec = r.id; R.rec = r.id; cxPaint(); renderNav();
-  toast('Saved to ' + theCase(cid).code + ' — names and fingerprints are now entities', 'Open', () => { UI.sel = {kind:'rec', id:r.id}; UI.inspOpen = true; go(caseHash(cid, 'timeline')); });
+  toast('Saved to ' + caseNm(theCase(cid)) + ' — names and fingerprints are now entities', 'Open', () => { UI.sel = {kind:'rec', id:r.id}; UI.inspOpen = true; go(caseHash(cid, 'timeline')); });
 }
 async function cxCtSave(){
   const S = cxS(), A = S.ct; if(!A) return; const cid = DB.active, body = cxCtSummary(A);
   const r = {id:uid('r'), caseId:cid, type:'evidence', title:'Certificate Transparency: ' + (A.dom || 'names') + ' (' + A.names.length + ' names)', body, tsRaw:new Date(A.last).toISOString(), tsZone:'explicit', ts:A.last,
     source:'ct-log', host:'crt.sh', tags:['certificate', 'ct', 'subdomains'], ents:extractRich(body), answer:'', addedBy:'You', addedAt:Date.now(), hash:'', pv:1, att:[]};
   DB.records.push(r); mutate('saved CT results ' + A.dom); await hashRecords(); S.ctRec = r.id; cxPaint(); renderNav();
-  toast(A.names.length + ' names saved to ' + theCase(cid).code, 'Open', () => { UI.sel = {kind:'rec', id:r.id}; UI.inspOpen = true; go(caseHash(cid, 'timeline')); });
+  toast(A.names.length + ' names saved to ' + caseNm(theCase(cid)), 'Open', () => { UI.sel = {kind:'rec', id:r.id}; UI.inspOpen = true; go(caseHash(cid, 'timeline')); });
 }
 /* exports: a JSON description and a text report in the style of openssl x509 -text */
 function cxJson(c){
@@ -827,7 +827,7 @@ const CX_ACTS = {
       made.push({id:uid('v'), caseId:DB.active, type, fields:{[TYPES[type].fields[0][0]]:x.v}, priority:cxWorst(cxFindings(c)) === 'bad' ? 'high' : 'medium', starred:false, tags:['certificate'], notes:'From the certificate “' + c.title + '”' + (c.fp ? ' (SHA-256 ' + c.fp.sha256 + ')' : ''), src:S.rec || '', created:Date.now(), pos:null}); }
     if(!made.length) return toast('Those are already on the graph');
     DB.entries.push(...made); ensurePositions(); S.indPick = new Set(); mutate('added ' + made.length + ' certificate indicators to the graph'); cxPaint.keep = true; cxPaint(); renderNav();
-    toast(made.length + ' added to ' + theCase(DB.active).code + '’s graph', 'Open graph', () => go(caseHash(DB.active, 'graph'))); },
+    toast(made.length + ' added to ' + caseNm(theCase(DB.active)) + '’s graph', 'Open graph', () => go(caseHash(DB.active, 'graph'))); },
   cxPivMenu:(id, v, t) => { const i = v.indexOf(':'), L = pivotLinks(v.slice(0, i), v.slice(i + 1)), r = t.getBoundingClientRect(); showMenu(r.left, r.bottom + 6, L.map(([n, u]) => ({label:n, icon:'external-link', fn:() => { const w = window.open(u, '_blank', 'noopener'); if(w) w.opener = null; }})), 'Look up ' + v.slice(i + 1)); },
   cxSeenGo:() => { const el = $('cxSeen'); if(el) el.scrollIntoView({behavior:'smooth', block:'start'}); },
   cxOpenRec:id => { const r = DB.records.find(x => x.id === id); if(!r) return; DB.active = r.caseId; UI.sel = {kind:'rec', id}; UI.inspOpen = true; go(caseHash(r.caseId, 'timeline')); },

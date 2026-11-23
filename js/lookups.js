@@ -134,6 +134,18 @@ const LK_PROVIDERS = [
     parse(j){ const d = lkArr(j.data)[0]; if(!d) return {none:true}; const e = parseFloat(d.epss), p = parseFloat(d.percentile); if(!(e >= 0 && e <= 1)) return {none:true};
       return {sig:e >= 0.5 ? [{t:'mal', w:Math.min(0.8, e), why:'EPSS ' + (e * 100).toFixed(1) + '% chance of exploitation within 30 days'}] : e >= 0.1 ? [{t:'sus', w:0.35, why:'EPSS ' + (e * 100).toFixed(1) + '%'}] : [],
         facts:[['EPSS', (e * 100).toFixed(2) + '% · higher than ' + Math.round(p * 100) + '% of CVEs']], attrs:{epss:e, pct:p}}; }},
+  /* blockchains: who holds a wallet and what moved through it (the full money trail is in chain.js) */
+  {id:'mempool', name:'mempool.space (Bitcoin)', kinds:['btc'], via:'direct', host:'mempool.space', ttl:6, rel:0.95, about:'A Bitcoin wallet’s balance and how many transactions it has. Its full money trail is fetched from the wallet’s details. Free, no key.',
+    req:(k, v) => ({url:'https://mempool.space/api/address/' + encodeURIComponent(v)}), web:(k, v) => 'https://mempool.space/address/' + encodeURIComponent(v), notFound:/Invalid Bitcoin address/i,
+    parse(j){ const c = j.chain_stats || {}, m = j.mempool_stats || {}, n = (+c.tx_count || 0) + (+m.tx_count || 0); if(!n) return {none:true, facts:[['Bitcoin', 'Never used']]};
+      const bal = (+c.funded_txo_sum || 0) - (+c.spent_txo_sum || 0) + (+m.funded_txo_sum || 0) - (+m.spent_txo_sum || 0);
+      return {facts:[['Balance', (bal / 1e8).toFixed(8).replace(/\.?0+$/, '') + ' BTC'], ['Transactions', String(n)], ['Received in all', ((+c.funded_txo_sum || 0) / 1e8).toFixed(8).replace(/\.?0+$/, '') + ' BTC']], attrs:{txs:n}}; }},
+  {id:'bscout', name:'Blockscout (Ethereum)', kinds:['eth'], via:'direct', host:'eth.blockscout.com', ttl:6, rel:0.9, about:'An Ethereum address’s balance, ENS name, public name tags and scam flags. Its full money trail is fetched from the wallet’s details. Free, no key.',
+    req:(k, v) => ({url:'https://eth.blockscout.com/api/v2/addresses/' + encodeURIComponent(v)}), web:(k, v) => 'https://eth.blockscout.com/address/' + encodeURIComponent(v),
+    parse(j){ if(!j || !j.hash) return {none:true}; const tags = lkArr(j.metadata && j.metadata.tags, 20).map(t => lkCap(t.name, 60)).filter(Boolean).concat(lkArr(j.public_tags, 10).map(t => lkCap(t.display_name || t.label, 60)).filter(Boolean)), sig = [];
+      if(j.is_scam) sig.push({t:'mal', w:0.8, why:'Blockscout flags it as a scam address'});
+      let bal = ''; try{ const b = BigInt(String(j.coin_balance || '0')); bal = (Number(b / 10n ** 12n) / 1e6).toLocaleString('en-US', {maximumFractionDigits:6}) + ' ETH'; }catch(e){}
+      return {sig, facts:[['Balance', bal], ['ENS name', lkCap(j.ens_domain_name, 120)], ['Name', lkCap(j.name, 120)], ['Tags', tags.join(', ')], ['Kind', j.is_contract ? 'Contract' + (j.is_verified ? ' (verified)' : '') : 'Wallet (externally owned)']], attrs:{ens:lkCap(j.ens_domain_name, 120)}}; }},
   /* ---------- your key, straight from the browser or through the relay ---------- */
   {id:'shodan', name:'Shodan', kinds:LK_KINDS_IP, via:'both', host:'api.shodan.io', ttl:24, rel:0.75, key:{label:'API key', query:'key'}, about:'Full Shodan host record: banners, certificates, JARM, favicon hashes, products and C2 detections.',
     req:(k, v, key) => ({url:'https://api.shodan.io/shodan/host/' + encodeURIComponent(v) + (key ? '?key=' + encodeURIComponent(key) : ''), relay:'shodan/shodan/host/' + encodeURIComponent(v)}), web:(k, v) => 'https://www.shodan.io/host/' + encodeURIComponent(v),

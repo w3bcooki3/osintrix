@@ -153,7 +153,7 @@ function labSql(){
     <button data-act="sqView" data-v="info" aria-current="${V.kind === 'info'}">${ico('info','sm')}<span>File details</span></button></nav>`;
   return `<section class="card pc-head"><header><span class="fi-ic">${ico('database')}</span><div style="min-width:0;flex:1"><h3>${esc(S.name)}</h3>
       <p class="t3">${apps.length ? esc(apps.join(' · ')) : 'SQLite database'} · ${S.tables.filter(t => t.type === 'table').length} tables · ${fmtBytes(S.size)}${S.wal ? ' · WAL mode' : ''}</p></div>
-      <div class="wrap"><button class="btn sm" data-act="sqSave">${ico('plus','sm')}Save to ${esc(theCase().code)}</button><button class="btn sm ghost" data-act="rcShow" data-v="sqlite">${ico('history','sm')}History<span class="crt-cnt">${recentN('sqlite')}</span></button><button class="btn sm" data-act="sqClear">${ico('x','sm')}Another file</button></div></header></section>
+      <div class="wrap"><button class="btn sm" data-act="sqSave">${ico('plus','sm')}Save to ${esc(caseNm(theCase()))}</button><button class="btn sm ghost" data-act="rcShow" data-v="sqlite">${ico('history','sm')}History<span class="crt-cnt">${recentN('sqlite')}</span></button><button class="btn sm" data-act="sqClear">${ico('x','sm')}Another file</button></div></header></section>
     <div class="sq-grid">${side}<div class="sq-main" id="sqMain">${sqlMain()}</div></div>`;
 }
 function sqlMain(){
@@ -214,7 +214,7 @@ async function sqlSave(){
   const body = L.join('\n'); if(S.size <= 50 * 1048576){ try{ att = await storeFile(S.file); }catch(e){} }
   const r = {id:uid('r'), caseId:cid, type:'evidence', title:'SQLite database: ' + S.name, body, tsRaw:new Date(S.file.lastModified).toISOString(), tsZone:'explicit', ts:S.file.lastModified, source:'sqlite', host:'', tags:['sqlite'], ents:[], answer:'', addedBy:'You', addedAt:Date.now(), hash:'', pv:1, att:att ? [att] : []};
   DB.records.push(r); mutate('saved database ' + S.name); await hashRecords(); renderAll();
-  toast('Saved to ' + theCase(cid).code + ' — use “Send to timeline” to add the rows themselves', 'Open', () => { UI.sel = {kind:'rec', id:r.id}; UI.inspOpen = true; go(caseHash(cid, 'timeline')); });
+  toast('Saved to ' + caseNm(theCase(cid)) + ' — use “Send to timeline” to add the rows themselves', 'Open', () => { UI.sel = {kind:'rec', id:r.id}; UI.inspOpen = true; go(caseHash(cid, 'timeline')); });
 }
 function bindSql(){
   const inp = $('sqIn'), d = $('sqDrop');

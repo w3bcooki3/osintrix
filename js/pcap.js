@@ -307,7 +307,7 @@ function labPcap(){
   const t = PC_TABS.some(x => x[0] === UI.pcTab) ? UI.pcTab : 'sum', cnt = {flows:A.flows.size, hosts:A.hosts.size, dns:A.dns.length, http:A.http.length, tls:A.tls.length, creds:A.creds.length};
   return `${flagBox(A.flags || [])}<section class="card pc-head"><header><span class="fi-ic">${ico('network')}</span><div style="min-width:0;flex:1"><h3>${esc(A.name)}</h3>
       <p class="t3">${esc(A.fmt)} · ${esc(A.links.map(l => PC_LINKS[l] || 'link type ' + l).join(', '))} · ${A.n.toLocaleString()} packets · ${fmtBytes(A.bytes)} · ${A.first ? pcDur(A.last - A.first) : 'no timestamps'}</p></div>
-      <div class="wrap"><button class="btn sm" data-act="pcSave">${ico('plus','sm')}Save to ${esc(theCase().code)}</button><button class="btn sm" data-act="pcEvents">${ico('list-plus','sm')}Send events to timeline</button><button class="btn sm ghost" data-act="rcShow" data-v="pcap">${ico('history','sm')}History<span class="crt-cnt">${recentN('pcap')}</span></button><button class="btn sm" data-act="pcClear">${ico('x','sm')}Another file</button></div></header></section>
+      <div class="wrap"><button class="btn sm" data-act="pcSave">${ico('plus','sm')}Save to ${esc(caseNm(theCase()))}</button><button class="btn sm" data-act="pcEvents">${ico('list-plus','sm')}Send events to timeline</button><button class="btn sm ghost" data-act="rcShow" data-v="pcap">${ico('history','sm')}History<span class="crt-cnt">${recentN('pcap')}</span></button><button class="btn sm" data-act="pcClear">${ico('x','sm')}Another file</button></div></header></section>
     <nav class="seg pc-tabs" aria-label="Capture views">${PC_TABS.map(([k, l]) => `<button data-act="pcTab" data-v="${k}" aria-pressed="${t === k}">${l}${cnt[k] != null ? ` <small>${cnt[k].toLocaleString()}</small>` : ''}</button>`).join('')}</nav>
     ${t === 'sum' ? '' : `<div class="pc-filter search-in">${ico('search')}<label class="sr" for="pcq">Filter</label><input id="pcq" class="inp" placeholder="Filter this table…" value="${esc(UI.pcq || '')}"></div>`}
     <div id="pcBody">${pcTable(A, t)}</div>`;
@@ -392,7 +392,7 @@ async function pcSave(){
   if(A.size <= 50 * 1048576){ try{ att = await storeFile(A.file); }catch(e){} }
   const r = {id:uid('r'), caseId:cid, type:'evidence', title:'Packet capture: ' + A.name, body, tsRaw:A.first ? new Date(A.first).toISOString() : '', tsZone:'explicit', ts:A.first || null, source:'pcap', host:'', tags:['pcap', 'network'], ents:extractRich(body), answer:'', addedBy:'You', addedAt:Date.now(), hash:'', pv:1, att:att ? [att] : []};
   DB.records.push(r); mutate('saved capture ' + A.name); await hashRecords(); renderAll();
-  toast('Saved to ' + theCase(cid).code + (att ? ' with the capture file attached' : ' (file over 50 MB — not attached)'), 'Open', () => { UI.sel = {kind:'rec', id:r.id}; UI.inspOpen = true; go(caseHash(cid, 'timeline')); });
+  toast('Saved to ' + caseNm(theCase(cid)) + (att ? ' with the capture file attached' : ' (file over 50 MB — not attached)'), 'Open', () => { UI.sel = {kind:'rec', id:r.id}; UI.inspOpen = true; go(caseHash(cid, 'timeline')); });
 }
 function pcEvents(){
   const A = UI.pcap; if(!A || A.busy) return; const rows = [], iso = t => t ? new Date(t).toISOString() : '';

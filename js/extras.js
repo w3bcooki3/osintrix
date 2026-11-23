@@ -48,7 +48,7 @@ function toolRunDlg(id){
   const t = DB.tools.find(x => x.id === id); if(!t || !t.tpl) return;
   const g = new Set(t.kinds || []), sug = [...derive().ents.values()].filter(x => g.has('any') || g.has(kindGroup(x.k))).slice(0, 12);
   openDlg(dhead('Run ' + t.name) + `<form data-form="toolRun" data-id="${t.id}"><div class="in"><div class="field"><label for="trV">Value</label><input id="trV" required autofocus placeholder="${esc((TPL_KINDS.find(k => k[0] === (t.kinds || [])[0]) || ['','value'])[1].toLowerCase())}"><span class="hint mono">${esc(t.tpl)}</span></div>
-    ${sug.length ? `<div class="t3" style="font-size:calc(13px * var(--ts,1));margin:4px 0 8px">From ${esc(theCase().code)}:</div><div class="wrap">${sug.map(x => `<button type="button" class="chip" data-act="trPick" data-v="${esc(x.v)}">${esc(x.v.length > 40 ? x.v.slice(0, 39) + '…' : x.v)}</button>`).join('')}</div>` : ''}</div>
+    ${sug.length ? `<div class="t3" style="font-size:calc(13px * var(--ts,1));margin:4px 0 8px">From ${esc(caseNm(theCase()))}:</div><div class="wrap">${sug.map(x => `<button type="button" class="chip" data-act="trPick" data-v="${esc(x.v)}">${esc(x.v.length > 40 ? x.v.slice(0, 39) + '…' : x.v)}</button>`).join('')}</div>` : ''}</div>
     <footer><button class="btn" type="button" data-act="dclose">Cancel</button><button class="btn primary" type="submit">${ico('arrow-up-right','sm')}Open</button></footer></form>`);
 }
 /* research checklist: every lookup for an entity, ticked when you open it */
@@ -94,18 +94,18 @@ function exportIOCs(fmt){
   const c = theCase(); if(!c) return needCase(); const list = caseIOCs(c.id), name = slug(c.name) + '-iocs';
   if(!list.length) return toast('No indicators in this case yet');
   if(fmt === 'csv'){ const q = csvQ;
-    return download(name + '.csv', ['type,value,verdict,in_vault,records,case'].concat(list.map(x => [E.LABEL[x.k] || x.k, x.v, x.verdict || 'unknown', x.vault ? 'yes' : 'no', x.recs, c.code].map(q).join(','))).join('\n'), 'text/csv'); }
-  if(fmt === 'txt') return download(name + '-defanged.txt', `# ${c.code} · ${c.name}\n# ${list.length} indicators · defanged · ${new Date().toISOString()}\n\n` + list.map(x => defang(x.v) + (x.verdict ? '    # ' + x.verdict : '')).join('\n'), 'text/plain');
-  const now = new Date().toISOString(), ident = {type:'identity', spec_version:'2.1', id:'identity--' + uuid4(), created:now, modified:now, name:'OSINTrix · ' + c.code, identity_class:'individual'};
+    return download(name + '.csv', ['type,value,verdict,in_vault,records,case'].concat(list.map(x => [E.LABEL[x.k] || x.k, x.v, x.verdict || 'unknown', x.vault ? 'yes' : 'no', x.recs, c.name].map(q).join(','))).join('\n'), 'text/csv'); }
+  if(fmt === 'txt') return download(name + '-defanged.txt', `# ${c.name}\n# ${list.length} indicators · defanged · ${new Date().toISOString()}\n\n` + list.map(x => defang(x.v) + (x.verdict ? '    # ' + x.verdict : '')).join('\n'), 'text/plain');
+  const now = new Date().toISOString(), ident = {type:'identity', spec_version:'2.1', id:'identity--' + uuid4(), created:now, modified:now, name:'OSINTrix · ' + c.name, identity_class:'individual'};
   const inds = list.filter(x => STIX_PAT[x.k] && (x.verdict === 'malicious' || x.verdict === 'suspicious')).map(x => ({type:'indicator', spec_version:'2.1', id:'indicator--' + uuid4(), created:now, modified:now, created_by_ref:ident.id,
-    name:(E.LABEL[x.k] || x.k) + ' ' + x.v, pattern:STIX_PAT[x.k](x.v), pattern_type:'stix', valid_from:now, indicator_types:[x.verdict === 'malicious' ? 'malicious-activity' : 'anomalous-activity'], labels:[c.code]}));
+    name:(E.LABEL[x.k] || x.k) + ' ' + x.v, pattern:STIX_PAT[x.k](x.v), pattern_type:'stix', valid_from:now, indicator_types:[x.verdict === 'malicious' ? 'malicious-activity' : 'anomalous-activity'], labels:[slug(caseNm(c))]}));
   if(!inds.length) return toast('STIX exports indicators marked malicious or suspicious — mark some first');
   download(name + '.stix.json', JSON.stringify({type:'bundle', id:'bundle--' + uuid4(), objects:[ident, ...inds]}, null, 2), 'application/json');
 }
 function iocMenu(anchor){
   const r = anchor.getBoundingClientRect(), n = caseIOCs(DB.active).length;
   showMenu(r.left, r.bottom + 6, [{label:'CSV — every indicator with verdicts', icon:'download', fn:() => exportIOCs('csv')}, {label:'Text — defanged, for tickets & chat', icon:'file-text', fn:() => exportIOCs('txt')},
-    {label:'STIX 2.1 — malicious & suspicious', icon:'shield-alert', fn:() => exportIOCs('stix')}, {sep:true}, {label:'Share package — page, STIX, MISP, rules…', icon:'share-2', fn:() => shareDlg()}, {label:'Whole case as JSON (with files)', icon:'download', fn:() => clickAct('exportCase', DB.active)}], n + ' indicators in ' + theCase().code);
+    {label:'STIX 2.1 — malicious & suspicious', icon:'shield-alert', fn:() => exportIOCs('stix')}, {sep:true}, {label:'Share package — page, STIX, MISP, rules…', icon:'share-2', fn:() => shareDlg()}, {label:'Whole case as JSON (with files)', icon:'download', fn:() => clickAct('exportCase', DB.active)}], n + ' indicators in ' + caseNm(theCase()));
 }
 /* ---------- print / save as PDF ---------- */
 function printReport(){
@@ -137,8 +137,8 @@ function importCase(){
     const vin = normVerdicts(d.verdicts); let vn = 0; DB.verdicts = DB.verdicts || {}; for(const [k, x] of Object.entries(vin)) if(!DB.verdicts[k]){ DB.verdicts[k] = x; vn++; }
     DB.cases.push(c); DB.entries.push(...entries); DB.records.push(...records); if(notes.length){ ensureNotes(); DB.notes.push(...notes); } DB.links.push(...links.filter(l => entries.some(e => e.id === l.a) && entries.some(e => e.id === l.b)));
     if(d.files) rekeyFiles(d.files, records).then(() => renderAll());
-    mutate('imported case ' + c.code); hashRecords(); ensurePositions(); DB.active = c.id; go(caseHash(c.id));
-    toast(`Imported ${c.code} — ${entries.length} entries, ${records.length} records${notes.length ? ', ' + notes.length + ' note' + (notes.length > 1 ? 's' : '') : ''}${vn ? ', ' + vn + ' verdict' + (vn > 1 ? 's' : '') : ''}`); }));
+    mutate('imported case ' + caseNm(c)); hashRecords(); ensurePositions(); DB.active = c.id; go(caseHash(c.id));
+    toast(`Imported ${caseNm(c)} — ${entries.length} entries, ${records.length} records${notes.length ? ', ' + notes.length + ' note' + (notes.length > 1 ? 's' : '') : ''}${vn ? ', ' + vn + ' verdict' + (vn > 1 ? 's' : '') : ''}`); }));
 }
 
 /* ---------- transform workbench (Decoder) ---------- */
@@ -226,12 +226,21 @@ async function runTx(op, input){
     const h = await crypto.subtle.digest(op === 'sha1' ? 'SHA-1' : 'SHA-256', new TextEncoder().encode(input)); return {out:[...new Uint8Array(h)].map(b => b.toString(16).padStart(2, '0')).join('')}; }
   return {out:TX[op][2](input)};
 }
+/* one toolbar: Auto-decode, then a menu per group; the group holding the chosen operation says which one it is */
+const TX_GI = {"Decode":"layers", "Encode & transform":"arrow-right-left", "Analyse":"fingerprint"};
+function txPick(v){ if(!TX[v]) return; UI.txOp = v; const bar = document.querySelector('.txbar'); if(bar) bar.outerHTML = txBar(v); const sel = $('txSel'); if(sel) sel.value = v; const n = $('txOpName'); if(n) n.textContent = TX[v][0]; return paintTx(); }
+function txBar(op){
+  const grp = Object.entries(TX_GROUPS).find(([, ks]) => ks.includes(op)), g0 = grp ? grp[0] : 'Decode';
+  return `<div class="txbar" role="toolbar" aria-label="Operation"><button class="txb-auto" data-act="txOp" data-v="auto" aria-pressed="${op === 'auto'}">${ico('sparkles','sm')}<span><b>Auto-decode</b><small>Finds the layers for you</small></span></button>
+    ${Object.entries(TX_GROUPS).map(([g, ks]) => { const L = ks.filter(k => TX[k] && k !== 'auto'), on = g === g0 && op !== 'auto';
+      return `<button class="txb-m" data-act="txMenu" data-v="${esc(g)}" aria-haspopup="menu" aria-pressed="${on}">${ico(TX_GI[g] || 'list','sm')}<span><small>${esc(g)} · ${L.length}</small>${on ? `<b>${esc(TX[op][0])}</b>` : `<b class="txb-ex">${esc(L.slice(0, 3).map(k => TX[k][0].replace(/ (decode|encode)$/i, '').replace(/ —.*$/, '')).join(', '))}…</b>`}</span>${ico('chevron-down','sm')}</button>`; }).join('')}</div>`;
+}
 function viewDecoder(){
   const op = UI.txOp || 'auto';
   return `<div class="scroll"><div class="page wide">
     ${libHead('Decoder', 'Decode, encode, defang, hash and pull indicators out of anything — entirely in this browser.', `<button class="btn" data-act="decSample">${ico('play','sm')}Try a sample</button>`, '')}
     <div class="mpick"><label for="txSel" class="ix">Operation</label><select id="txSel" class="gsel bord">${Object.entries(TX_GROUPS).map(([g, ks]) => `<optgroup label="${g}">${ks.filter(k => TX[k]).map(k => `<option value="${k}"${op === k ? ' selected' : ''}>${esc(TX[k][0])}</option>`).join('')}</optgroup>`).join('')}</select><p class="t3 small">${esc(op === 'auto' ? 'Detects the encoding for you and peels layers until the text is readable.' : '')}</p></div>
-    <div class="txops txg" role="toolbar" aria-label="Operation">${Object.entries(TX_GROUPS).map(([g, ks]) => `<div class="txg-r"><span class="txg-l">${g}</span><div class="txg-b">${ks.filter(k => TX[k]).map(k => `<button data-act="txOp" data-v="${k}" aria-pressed="${op === k}">${ico(TX[k][1],'sm')}${TX[k][0]}</button>`).join('')}</div></div>`).join('')}</div>
+    ${txBar(op)}
     <div id="txFlags"></div>
     <div class="txgrid">
       <section class="card txpane"><header><h3>Input</h3><span class="t3" id="txInN">${(UI.decIn || '').length} chars</span><span style="flex:1"></span><button class="btn xs ghost" data-act="txClear">Clear</button></header>
@@ -240,7 +249,7 @@ function viewDecoder(){
         <button class="btn xs ghost" data-act="txCopy">${ico('copy','sm')}Copy</button><button class="btn xs ghost" data-act="txChain" title="Use the output as the next input">${ico('arrow-left','sm')}Use as input</button></header>
         <pre id="txOut" class="txout" tabindex="0"></pre><div id="txSteps" class="txsteps"></div></section>
     </div>
-    <section class="card txents"><header><h3>${ico('fingerprint','sm')}Indicators in the result</h3><span style="flex:1"></span><button class="btn sm primary" data-act="decSave">${ico('plus','sm')}${theCase() ? 'Save to ' + esc(theCase().code) + ' as evidence' : 'Save as evidence'}</button></header><div class="body"><div class="wrap" id="txEnts"></div></div></section>
+    <section class="card txents"><header><h3>${ico('fingerprint','sm')}Indicators in the result</h3><span style="flex:1"></span><button class="btn sm primary" data-act="decSave">${ico('plus','sm')}${theCase() ? 'Save to ' + esc(caseNm(theCase())) + ' as evidence' : 'Save as evidence'}</button></header><div class="body"><div class="wrap" id="txEnts"></div></div></section>
   </div></div>`;
 }
 let txT = null;
@@ -263,5 +272,5 @@ function bindDecoder(){ const i = $('decIn'); if(!i) return; i.oninput = () => {
 /* ---------- entities: search + CSV ---------- */
 function exportEntities(list){
   const q = csvQ;
-  download('osintrix-entities.csv', ['type,value,verdict,records,cases'].concat(list.map(e => [E.LABEL[e.k] || e.k, e.v, verdictOf(e.id) || 'unknown', e.recs.length, [...e.cases].map(id => (theCase(id) || {}).code).join(' ')].map(q).join(','))).join('\n'), 'text/csv');
+  download('osintrix-entities.csv', ['type,value,verdict,records,cases'].concat(list.map(e => [E.LABEL[e.k] || e.k, e.v, verdictOf(e.id) || 'unknown', e.recs.length, [...e.cases].map(id => caseNm(id)).join(' ')].map(q).join(','))).join('\n'), 'text/csv');
 }

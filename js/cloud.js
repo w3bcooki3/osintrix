@@ -53,7 +53,7 @@ function cloudScannerView(){
       <div class="cld-f-w">${f.where ? `<code>${esc(f.where)}</code>` : ''}${f.line ? `<span class="t3">line ${f.line}</span>` : ''}</div></article>`).join('');
   return `<section class="cld-pane">
     <div class="cld-res-h"><div><h2>${esc(R.name || 'Pasted config')}</h2><p class="t3">${esc(R.kindLabel)}${R.resources ? ' · ' + R.resources + ' resource' + (R.resources === 1 ? '' : 's') : ''} · ${total} finding${total === 1 ? '' : 's'}</p></div>
-      <div class="cld-res-a"><button class="btn" data-act="cloudRescan">${ico('arrow-left','sm')}New scan</button><button class="btn ghost" data-act="cloudHist" data-v="cloudScan">${ico('history','sm')}History<span class="crt-cnt">${typeof recentOf === 'function' ? recentOf('cloudScan').length : 0}</span></button>${total ? `<button class="btn" data-act="cloudExport">${ico('download','sm')}Export</button>${DB.cases.length ? `<button class="btn" data-act="cloudToCase">${ico('list-plus','sm')}Add to ${esc((theCase() || DB.cases[0]).code)}</button>` : ''}` : ''}</div></div>
+      <div class="cld-res-a"><button class="btn" data-act="cloudRescan">${ico('arrow-left','sm')}New scan</button><button class="btn ghost" data-act="cloudHist" data-v="cloudScan">${ico('history','sm')}History<span class="crt-cnt">${typeof recentOf === 'function' ? recentOf('cloudScan').length : 0}</span></button>${total ? `<button class="btn" data-act="cloudExport">${ico('download','sm')}Export</button>${DB.cases.length ? `<button class="btn" data-act="cloudToCase">${ico('list-plus','sm')}Add to ${esc(caseNm(theCase() || DB.cases[0]))}</button>` : ''}` : ''}</div></div>
     ${R.kind === 'unknown' ? `<div class="note red"><span class="ic">${ico('triangle-alert','sm')}</span><div><b>Not recognised.</b> This doesn't look like a policy, IaC or Kubernetes file. Check it is valid JSON/YAML/HCL.</div></div>`
       : total ? `<div class="cld-sevbar">${chips}</div><div class="cld-flist">${rows}</div>`
       : `<div class="cld-clean">${ico('shield-check')}<b>No misconfigurations found</b><p>The ${R.resources} resource${R.resources === 1 ? '' : 's'} in this ${esc(R.kindLabel)} passed every check. This is a focused linter, not a full audit — keep using your cloud provider's own tools too.</p><button class="btn" data-act="cloudRescan">Scan another</button></div>`}
@@ -156,8 +156,8 @@ function cloudFindingsToCase(){
     R.findings.map(f => `[${f.sev.toUpperCase()}] ${f.title}${f.where ? '  @' + f.where : ''}\n  ${f.detail}\n  Fix: ${f.fix}`).join('\n\n');
   const r = {id:uid('r'), caseId:cid, type:'finding', title:'Cloud scan: ' + R.findings.length + ' finding' + (R.findings.length === 1 ? '' : 's') + ' in ' + (R.name || R.kindLabel), body,
     tsRaw:'', tsZone:'', ts:null, source:'cloud-scan', host:'', tags:['cloud', 'misconfig', R.kind], ents:[], answer:'', addedBy:'You', addedAt:Date.now(), hash:'', pv:1, att:[]};
-  DB.records.push(r); mutate('added cloud scan to ' + theCase(cid).code); hashRecords().then(renderAll);
-  toast('Added to ' + theCase(cid).code, 'Open', () => { UI.sel = {kind:'rec', id:r.id}; UI.inspOpen = true; go(caseHash(cid, 'timeline')); });
+  DB.records.push(r); mutate('added cloud scan to ' + caseNm(theCase(cid))); hashRecords().then(renderAll);
+  toast('Added to ' + caseNm(theCase(cid)), 'Open', () => { UI.sel = {kind:'rec', id:r.id}; UI.inspOpen = true; go(caseHash(cid, 'timeline')); });
 }
 function cloudLogsToTimeline(){
   const R = UI.cloudLogs; if(!R || !R.rows.length) return; if(!DB.cases.length) return toast('Create a case first');

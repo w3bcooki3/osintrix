@@ -140,7 +140,7 @@ function dlTestsPane(r, code){
         <code class="mono">${esc(x.t.text.slice(0, 400))}</code><span class="dl-r">${x.err ? esc(x.err) : x.ok ? ico('check','sm') + 'Pass' : ico('x','sm') + (x.got ? 'Fired' : 'Did not fire')}</span><button type="button" class="iconbtn" data-act="dlTestDel" data-id="${esc(x.t.id)}" aria-label="Remove test">${ico('trash-2','sm')}</button></li>`).join('')}</ul>` : ''}
     <div class="field"><label for="dlTestIn">New test event <span class="t3">— a log line, key=value pairs or JSON</span></label><textarea id="dlTestIn" class="inp mono" rows="3" spellcheck="false" placeholder='Image="C:\\Windows\\System32\\cmd.exe" CommandLine="cmd /c whoami"'></textarea></div>
     <div class="wrap"><button type="button" class="btn sm" data-act="dlTestAdd" data-v="hit">${ico('plus','sm')}Must fire</button><button type="button" class="btn sm" data-act="dlTestAdd" data-v="miss">${ico('plus','sm')}Must not fire</button>
-      ${theCase() ? `<button type="button" class="btn sm ghost" data-act="dlTestFromCase">${ico('folder-open','sm')}Add what it fires on in ${esc(theCase().code)}</button>` : ''}</div>`;
+      ${theCase() ? `<button type="button" class="btn sm ghost" data-act="dlTestFromCase">${ico('folder-open','sm')}Add what it fires on in ${esc(caseNm(theCase()))}</button>` : ''}</div>`;
 }
 
 /* ---------- evasion check ---------- */
@@ -159,7 +159,7 @@ const DL_MUT = [
 /* a sample to work on: a must-fire test, an evidence hit, or one built from the rule's own values */
 function dlSample(r, code){
   const t = (r.tests || []).find(x => x.kind === 'hit' && (() => { try{ return dlFires(r, code, x.text); }catch(e){ return false; } })()); if(t) return {text:t.text, from:'your must-fire test'};
-  if(theCase()){ const h = testRule({...r, code}, DB.active); if(h.hits && h.hits.length) return {text:h.hits[0].body, from:'an event in ' + theCase().code}; }
+  if(theCase()){ const h = testRule({...r, code}, DB.active); if(h.hits && h.hits.length) return {text:h.hits[0].body, from:'an event in ' + caseNm(theCase())}; }
   const P = sigmaParse(code), T = sigmaCondTree(P.cond); if(!T) return null;
   const pick = n => n.sel ? [n.sel] : n.of ? Object.keys(P.det).filter(k => n.pat === 'them' || (n.pat.endsWith('*') ? k.startsWith(n.pat.slice(0, -1)) : k === n.pat)).slice(0, n.of === 'all' ? 99 : 1) : n.op === 'and' ? pick(n.a).concat(pick(n.b)) : n.op === 'or' ? pick(n.a) : [];
   const kv = {};
@@ -215,7 +215,7 @@ function dlFromEvents(recs){
   const y = v => /[:#'"{}\[\],&*?|<>=!%@`\\]|^\s|\s$/.test(v) ? "'" + v.replace(/'/g, "''") + "'" : v;
   const lines = sel.filter(([k]) => !(cat && k === 'eventid')).slice(0, 6).map(([k, m, vs]) => vs.length === 1 && !m.includes('all') ? `        ${fieldName(k)}${m ? '|' + m : ''}: ${y(vs[0])}` : `        ${fieldName(k)}${m ? '|' + m : ''}:\n${vs.map(v => '            - ' + y(v)).join('\n')}`);
   if(!lines.length) return null;
-  const code = `title: Draft from ${recs.length} event${recs.length > 1 ? 's' : ''}${theCase() ? ' in ' + theCase().code : ''}\nid: ${crypto.randomUUID ? crypto.randomUUID() : uid('s')}\nstatus: experimental\ndescription: Drafted by OSINTrix from what the selected events share. Review the values and test it before use.\nauthor: You\ndate: ${new Date().toISOString().slice(0, 10).replace(/-/g, '/')}\nlogsource:\n${cat ? '    category: ' + cat + '\n    product: windows' : '    product: windows'}\ndetection:\n    selection:\n${eid && !cat ? '        EventID: ' + eid + '\n' : ''}${lines.join('\n')}\n    condition: selection\nfalsepositives:\n    - Unknown — check against normal activity\nlevel: medium`;
+  const code = `title: Draft from ${recs.length} event${recs.length > 1 ? 's' : ''}${theCase() ? ' in ' + caseNm(theCase()) : ''}\nid: ${crypto.randomUUID ? crypto.randomUUID() : uid('s')}\nstatus: experimental\ndescription: Drafted by OSINTrix from what the selected events share. Review the values and test it before use.\nauthor: You\ndate: ${new Date().toISOString().slice(0, 10).replace(/-/g, '/')}\nlogsource:\n${cat ? '    category: ' + cat + '\n    product: windows' : '    product: windows'}\ndetection:\n    selection:\n${eid && !cat ? '        EventID: ' + eid + '\n' : ''}${lines.join('\n')}\n    condition: selection\nfalsepositives:\n    - Unknown — check against normal activity\nlevel: medium`;
   return code;
 }
 function dlDraftFromPick(){
@@ -250,9 +250,9 @@ const DL_ACTS = {
   dlTestAdd:(id, v) => { const r = DB.rules.find(z => z.id === UI.rule), t = $('dlTestIn').value.trim(); if(!r) return; if(!t) return fieldErr('dlTestIn', 'Paste the event first.');
     r.tests = (r.tests || []).concat([{id:uid('t'), kind:v === 'hit' ? 'hit' : 'miss', text:t.slice(0, 4000)}]).slice(-50); mutate('test added to ' + r.title); dlPaneFill(); },
   dlTestDel:id => { const r = DB.rules.find(z => z.id === UI.rule); if(!r) return; r.tests = (r.tests || []).filter(t => t.id !== id); mutate('test removed from ' + r.title); dlPaneFill(); },
-  dlTestFromCase:() => { const r = DB.rules.find(z => z.id === UI.rule), ta = $('rCode'); if(!r || !theCase()) return; const h = testRule({...r, code:ta ? ta.value : r.code}, DB.active); if(h.error) return toast(h.error); if(!h.hits.length) return toast('It fires on nothing in ' + theCase().code);
+  dlTestFromCase:() => { const r = DB.rules.find(z => z.id === UI.rule), ta = $('rCode'); if(!r || !theCase()) return; const h = testRule({...r, code:ta ? ta.value : r.code}, DB.active); if(h.error) return toast(h.error); if(!h.hits.length) return toast('It fires on nothing in ' + caseNm(theCase()));
     const have = new Set((r.tests || []).map(t => t.text)); const add = h.hits.filter(x => !have.has(x.body)).slice(0, 5).map(x => ({id:uid('t'), kind:'hit', text:x.body.slice(0, 4000)}));
-    r.tests = (r.tests || []).concat(add).slice(-50); mutate('tests from ' + theCase().code); dlPaneFill(); toast(add.length + ' event' + (add.length === 1 ? '' : 's') + ' added as must-fire tests'); },
+    r.tests = (r.tests || []).concat(add).slice(-50); mutate('tests from ' + caseNm(theCase())); dlPaneFill(); toast(add.length + ' event' + (add.length === 1 ? '' : 's') + ' added as must-fire tests'); },
   evRule:() => dlDraftFromPick(),
   dlFixDash:() => { const ta = $('rCode'); if(!ta) return; const before = ta.value;
     ta.value = ta.value.replace(/^(\s*-?\s*(?:ParentCommandLine|CommandLine)(?:\|[\w]+)*)(?=\s*:)/gm, m => /\|windash\b/.test(m) ? m : m + '|windash');

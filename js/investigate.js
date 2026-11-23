@@ -48,7 +48,7 @@ function lkCard(p, r, pending){
 function ctiLookView(){
   const S = lkSettings(), onN = LK_PROVIDERS.filter(lkOn).length, relay = lkRelay();
   const form = `<form class="lk-q" data-form="ctiLook"><div class="search-in">${ico('scan-search')}<label class="sr" for="lkQ">Indicator to investigate</label><input id="lkQ" class="inp mono" placeholder="IP, domain, URL, file hash, CVE or ASN" value="${esc(UI.look ? UI.look.v : '')}" autocomplete="off" spellcheck="false"></div>
-    <button class="btn primary" type="submit">${ico('radar','sm')}Investigate</button><button class="btn" type="button" data-act="lookCase">${ico('list-checks','sm')}Investigate ${esc(theCase().code)}</button>
+    <button class="btn primary" type="submit">${ico('radar','sm')}Investigate</button><button class="btn" type="button" data-act="lookCase">${ico('list-checks','sm')}Investigate ${esc(caseNm(theCase()))}</button>
     <button class="iconbtn" type="button" data-act="feedSources" data-v="look" aria-label="Lookup sources" title="Lookup sources">${ico('settings','sm')}</button></form>
     ${onN ? `<p class="lk-note">${ico('globe','sm')}${onN} source${onN > 1 ? 's' : ''} on${relay ? ' · relay ' + esc(hostOf(relay.url)) : ' · no relay — VirusTotal, AbuseIPDB, GreyNoise, urlscan and abuse.ch need one'}. Only the indicator you investigate is sent, and only to those sources.</p>`
       : `<div class="ti-relay">${ico('wifi-off','sm')}<span>No lookup source is switched on. Each one is off until you choose it — the indicator is sent to that service when you investigate.</span><button class="btn sm primary" data-act="lkFreeOn">${ico('wifi','sm')}Turn on the free sources</button><button class="btn sm" data-act="feedSources" data-v="look">Choose…</button></div>`}`;
@@ -64,7 +64,7 @@ function ctiLookView(){
       <div class="lk-acts">
         <button class="btn sm" data-act="lookAgain">${ico('refresh-cw', busy ? 'sm spin' : 'sm')}Check again</button>
         ${/malicious|suspicious|benign/.test(V.band) && mine !== V.band ? `<button class="btn sm primary" data-act="lookVerdict" data-v="${V.band}">${ico('check','sm')}Mark ${esc(V.band)}</button>` : mine ? `<span class="t3 small">Your verdict: ${vdLabel(mine)}</span>` : ''}
-        ${KIND_TO_TYPE[k] || k === 'cve' ? `<button class="btn sm" data-act="lookAdd">${ico('plus','sm')}Add to ${esc(theCase().code)}</button>` : ''}
+        ${KIND_TO_TYPE[k] || k === 'cve' ? `<button class="btn sm" data-act="lookAdd">${ico('plus','sm')}Add to ${esc(caseNm(theCase()))}</button>` : ''}
         <button class="btn sm${isWatched(key) ? ' on' : ''}" data-act="watch" data-id="${esc(key)}">${ico(isWatched(key) ? 'eye-off' : 'eye','sm')}${isWatched(key) ? 'Unwatch' : 'Watch'}</button>
         <button class="btn sm ghost" data-act="lookNote">${ico('copy','sm')}Copy summary</button></div></section>
     <div class="lk-grid">
@@ -73,8 +73,8 @@ function ctiLookView(){
           : `<p class="t3">${busy ? 'Waiting for answers…' : V.answered.length ? 'No source has anything against it, or for it.' : 'Nothing asked yet.'}</p>`}
           ${V.failed.length ? `<p class="t3 small">${esc(V.failed.join(', '))} did not answer.</p>` : ''}</section>
         ${pivots.length ? `<section class="card lk-piv"><h3>What it is</h3><dl>${pivots.map(([l, x]) => `<dt>${esc(l)}</dt><dd>${esc(x)}</dd>`).join('')}</dl></section>` : ''}
-        ${rel.length ? `<section class="card lk-rel"><h3>Leads to <span class="t3">${rel.length}</span>${rel.length > 1 ? `<button class="btn sm ghost" data-act="lookRelAll">${ico('plus','sm')}Add all to ${esc(theCase().code)}</button>` : ''}</h3>
-          <ul>${rel.slice(0, 40).map((x, i) => `<li>${kindBadge(x.k, 'sm')}<span class="mono">${esc(x.v)}</span><small>${esc(x.rel.join(', '))}</small><button class="iconbtn" data-act="lookRel" data-v="${i}" aria-label="Investigate ${esc(x.v)}" title="Investigate">${ico('radar','sm')}</button><button class="iconbtn" data-act="lookRelAdd" data-v="${i}" aria-label="Add ${esc(x.v)} to the case" title="Add to ${esc(theCase().code)}">${ico('plus','sm')}</button></li>`).join('')}</ul>
+        ${rel.length ? `<section class="card lk-rel"><h3>Leads to <span class="t3">${rel.length}</span>${rel.length > 1 ? `<button class="btn sm ghost" data-act="lookRelAll">${ico('plus','sm')}Add all to ${esc(caseNm(theCase()))}</button>` : ''}</h3>
+          <ul>${rel.slice(0, 40).map((x, i) => `<li>${kindBadge(x.k, 'sm')}<span class="mono">${esc(x.v)}</span><small>${esc(x.rel.join(', '))}</small><button class="iconbtn" data-act="lookRel" data-v="${i}" aria-label="Investigate ${esc(x.v)}" title="Investigate">${ico('radar','sm')}</button><button class="iconbtn" data-act="lookRelAdd" data-v="${i}" aria-label="Add ${esc(x.v)} to the case" title="Add to ${esc(caseNm(theCase()))}">${ico('plus','sm')}</button></li>`).join('')}</ul>
           ${rel.length > 40 ? `<p class="t3 small">${rel.length - 40} more not shown.</p>` : ''}</section>` : ''}
       </div>
       <div class="lk-cards">${P.slice().sort((a, b) => order(a) - order(b)).map(p => lkCard(p, LKV.res[p.id], LKV.pending.has(p.id))).join('')}</div>
@@ -95,7 +95,7 @@ function lkCaseItems(){
   return out.slice(0, 300);
 }
 async function lookCase(){
-  const items = lkCaseItems(); if(!items.length) return toast(LK_PROVIDERS.some(lkOn) ? 'No public IPs, domains, URLs, hashes or CVEs in ' + theCase().code : 'Turn on lookup sources first');
+  const items = lkCaseItems(); if(!items.length) return toast(LK_PROVIDERS.some(lkOn) ? 'No public IPs, domains, URLs, hashes or CVEs in ' + caseNm(theCase()) : 'Turn on lookup sources first');
   const B = LKV.bulk = {caseId:DB.active, items:items.map(x => ({...x, V:null, res:null})), done:0, stop:false}; UI.look = null; renderMain();
   let i = 0; const worker = async () => { while(i < B.items.length && !B.stop && LKV.bulk === B){ const it = B.items[i++];
     it.res = await lkInvestigate(it.k, it.v); it.V = lkVerdict(it.k, it.v, it.res); lkHist(it.k, it.v, it.V); B.done++; lkPaint(); } };
@@ -106,7 +106,7 @@ function lkBulkView(){
   const B = LKV.bulk, L = B.items.filter(x => x.V).sort((a, b) => b.V.score - a.V.score), pct = Math.round(B.done / B.items.length * 100), cnt = b => L.filter(x => x.V.band === b).length;
   const C = B.corr, byKey = new Map(B.items.map(x => [x.key, x]));
   return `<div class="lk">
-    <section class="card lk-bh"><div><h3>${esc(theCase(B.caseId).code)} — ${B.items.length} indicators</h3><p class="t3">${B.fin ? 'Done.' : B.stop ? 'Stopped.' : 'Checking ' + B.done + ' of ' + B.items.length + '…'} ${['malicious', 'suspicious', 'benign'].map(b => cnt(b) ? `<span class="lk-band" style="--c:${VD_COL[b]}">${cnt(b)} ${b}</span>` : '').join(' ')}</p></div>
+    <section class="card lk-bh"><div><h3>${esc(caseNm(theCase(B.caseId)))} — ${B.items.length} indicators</h3><p class="t3">${B.fin ? 'Done.' : B.stop ? 'Stopped.' : 'Checking ' + B.done + ' of ' + B.items.length + '…'} ${['malicious', 'suspicious', 'benign'].map(b => cnt(b) ? `<span class="lk-band" style="--c:${VD_COL[b]}">${cnt(b)} ${b}</span>` : '').join(' ')}</p></div>
       <div class="lk-prog" role="progressbar" aria-label="Investigating the case" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
       <div class="lk-acts">${B.fin || B.stop ? '' : `<button class="btn sm" data-act="lookStop">${ico('square','sm')}Stop</button>`}
         ${L.some(x => /malicious|suspicious/.test(x.V.band) && !verdictOf(x.key)) ? `<button class="btn sm primary" data-act="lookBulkVerdict">${ico('check','sm')}Mark the ${L.filter(x => /malicious|suspicious/.test(x.V.band) && !verdictOf(x.key)).length} flagged</button>` : ''}
@@ -167,10 +167,10 @@ const LK_ACTS = {
   lookHistDel:(id, v) => { DB.intel.lookHist.splice(+v, 1); mutate('removed an investigation from history'); renderMain(); },
   lookHistClear:() => confirmDlg('Clear the investigation history?', 'The list of recent investigations is emptied. Saved answers from the sources stay until they expire (Sources → Lookups → Clear saved answers).', 'Clear', () => { DB.intel.lookHist = []; mutate('cleared investigation history'); renderMain(); }),
   lookVerdict:(id, v) => { const key = UI.look.k + ':' + UI.look.v, old = DB.verdicts[key]; DB.verdicts[key] = v; mutate('marked ' + UI.look.v + ' ' + v); renderMain(); toast('Marked ' + v + ' — applies in every case', 'Undo', () => { if(old) DB.verdicts[key] = old; else delete DB.verdicts[key]; mutate('undo verdict'); renderMain(); }); },
-  lookAdd:() => { const {k, v} = UI.look, V = lkVerdict(k, v, LKV.res); if(ctiAddEntry(k, v, VD_NAME[V.band] + ' (' + V.score + ') — ' + V.reasons.slice(0, 2).map(e => e.why).join('; '))){ mutate('added ' + v); toast(v + ' added to ' + theCase().code); } else toast('Already in ' + theCase().code); },
+  lookAdd:() => { const {k, v} = UI.look, V = lkVerdict(k, v, LKV.res); if(ctiAddEntry(k, v, VD_NAME[V.band] + ' (' + V.score + ') — ' + V.reasons.slice(0, 2).map(e => e.why).join('; '))){ mutate('added ' + v); toast(v + ' added to ' + caseNm(theCase())); } else toast('Already in ' + caseNm(theCase())); },
   lookRel:(id, v) => { const V = lkVerdict(UI.look.k, UI.look.v, LKV.res), x = V.related.filter(r => r.k + ':' + r.v !== UI.look.k + ':' + UI.look.v)[+v]; if(x) lookGo(x.k, x.v); },
-  lookRelAdd:(id, v) => { const V = lkVerdict(UI.look.k, UI.look.v, LKV.res), x = V.related.filter(r => r.k + ':' + r.v !== UI.look.k + ':' + UI.look.v)[+v]; if(!x) return; ctiAddEntry(x.k, x.v, x.rel.join(', ') + ' of ' + UI.look.v); mutate('added ' + x.v); toast(x.v + ' added to ' + theCase().code); },
-  lookRelAll:() => { const V = lkVerdict(UI.look.k, UI.look.v, LKV.res), L = V.related.filter(r => r.k + ':' + r.v !== UI.look.k + ':' + UI.look.v).slice(0, 100); let n = 0; L.forEach(x => { if(ctiAddEntry(x.k, x.v, x.rel.join(', ') + ' of ' + UI.look.v)) n++; }); mutate('added related indicators'); toast(n + ' added to ' + theCase().code); },
+  lookRelAdd:(id, v) => { const V = lkVerdict(UI.look.k, UI.look.v, LKV.res), x = V.related.filter(r => r.k + ':' + r.v !== UI.look.k + ':' + UI.look.v)[+v]; if(!x) return; ctiAddEntry(x.k, x.v, x.rel.join(', ') + ' of ' + UI.look.v); mutate('added ' + x.v); toast(x.v + ' added to ' + caseNm(theCase())); },
+  lookRelAll:() => { const V = lkVerdict(UI.look.k, UI.look.v, LKV.res), L = V.related.filter(r => r.k + ':' + r.v !== UI.look.k + ':' + UI.look.v).slice(0, 100); let n = 0; L.forEach(x => { if(ctiAddEntry(x.k, x.v, x.rel.join(', ') + ' of ' + UI.look.v)) n++; }); mutate('added related indicators'); toast(n + ' added to ' + caseNm(theCase())); },
   lookNote:async () => { try{ await navigator.clipboard.writeText(lkSummary()); toast('Summary copied'); }catch(e){ toast('Copy failed'); } },
   lookBulkVerdict:() => { const L = LKV.bulk.items.filter(x => x.V && /malicious|suspicious/.test(x.V.band) && !verdictOf(x.key)); L.forEach(x => DB.verdicts[x.key] = x.V.band); mutate('marked ' + L.length + ' indicators'); renderMain();
     toast(L.length + ' marked', 'Undo', () => { L.forEach(x => delete DB.verdicts[x.key]); mutate('undo verdicts'); renderMain(); }); },

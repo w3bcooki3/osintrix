@@ -164,8 +164,8 @@ function runPlaybook(id, caseId){
   const have = new Set(DB.records.filter(r => r.caseId === c.id && r.type === 'lead').map(r => r.title.toLowerCase())); let n = 0;
   for(const s of p.steps){ if(have.has(s.t.toLowerCase())) continue;
     DB.records.push({id:uid('q'), caseId:c.id, type:'lead', title:s.t, body:s.h || '', tsRaw:'', ts:null, source:'playbook', host:'', tags:[pbTag(p.id)], ents:E.extract(s.t), answer:'', addedBy:'You', addedAt:Date.now(), hash:''}); n++; }
-  mutate('ran playbook ' + p.name + ' on ' + c.code); hashRecords(); renderAll();
-  toast(n ? n + ' steps added to ' + c.code + ' as questions' : 'Those steps are already on ' + c.code, 'Open', () => { DB.active = c.id; go(caseHash(c.id, 'questions')); });
+  mutate('ran playbook ' + p.name + ' on ' + caseNm(c)); hashRecords(); renderAll();
+  toast(n ? n + ' steps added to ' + caseNm(c) + ' as questions' : 'Those steps are already on ' + caseNm(c), 'Open', () => { DB.active = c.id; go(caseHash(c.id, 'questions')); });
 }
 function pbThread(p, caseId){
   const recs = DB.records.filter(r => r.caseId === caseId && r.type === 'lead' && (r.tags || []).includes(pbTag(p.id)));
@@ -182,7 +182,7 @@ function viewPlaybooks(){
   const q = (UI.pbq || '').toLowerCase(), f = UI.pbf || 'all', view = UI.pbView || DB.prefs.pbView || 'grid';
   const lv = UI.pbl || 'all', words = q.split(/\s+/).filter(Boolean);
   const list = DB.playbooks.filter(p => (f === 'all' || p.cat === f) && (lv === 'all' || (p.level || 'core') === lv) && (!words.length || ((t) => words.every(w => t.includes(w)))((p.name + ' ' + p.desc + ' ' + p.steps.map(s => s.t + ' ' + (s.h || '')).join(' ')).toLowerCase())));
-  const cats = countBy(DB.playbooks, p => p.cat), code = theCase() ? esc(theCase().code) : 'a case';
+  const cats = countBy(DB.playbooks, p => p.cat), code = theCase() ? esc(caseNm(theCase())) : 'a case';
   const num = p => 'PB-' + String(DB.playbooks.indexOf(p) + 1).padStart(2, '0');
   const card = p => { const [cn, col] = PB_CATS[p.cat] || PB_CATS.custom, a = pbProgress(p, DB.active), used = pbCases(p);
     return `<article class="pbk" style="--cc:${col}"><button class="gcard-hit" data-act="pbOpen" data-id="${p.id}" aria-label="Open ${esc(p.name)}"></button>
@@ -217,14 +217,14 @@ function pbDetail(p){
         <header class="pbx-h"><span class="pbl-cat"><i></i>${esc(cn)}${p.custom ? ' · Custom' : ''}</span><h1>${esc(p.name)}</h1><p>${esc(p.desc)}</p></header>
         <ol class="pbx-steps">${p.steps.map((s, i) => { const t = pbTool(s, p), st = doneOf(s);
           return `<li class="${st}"><span class="n">${st === 'done' ? ico('check','sm') : i + 1}</span><div class="pbx-s"><b>${esc(s.t)}</b>${s.h ? `<p>${esc(s.h)}</p>` : ''}
-            ${t ? `<button class="pbx-go" data-act="pbGo" data-v="${esc(t.go)}">${ico(t.i,'sm')}${esc(t.l)}${ico('arrow-right','sm')}</button>` : ''}</div>${st ? `<span class="pbx-st ${st}">${st === 'done' ? 'Answered' : 'Open'} in ${esc(theCase().code)}</span>` : ''}</li>`; }).join('')}</ol>
+            ${t ? `<button class="pbx-go" data-act="pbGo" data-v="${esc(t.go)}">${ico(t.i,'sm')}${esc(t.l)}${ico('arrow-right','sm')}</button>` : ''}</div>${st ? `<span class="pbx-st ${st}">${st === 'done' ? 'Answered' : 'Open'} in ${esc(caseNm(theCase()))}</span>` : ''}</li>`; }).join('')}</ol>
       </div>
       <aside class="pbx-side">
         <section class="card"><div class="body">
           <h4>Run on a case</h4><p class="t3 small">Each step becomes an open question on the case. Answer them as you go — progress shows here and on the case.</p>
-          <label class="sr" for="pbCase">Case</label><select id="pbCase" class="gsel bord">${DB.cases.filter(c => c.status !== 'closed').map(c => `<option value="${c.id}"${c.id === DB.active ? ' selected' : ''}>${esc(c.code + ' · ' + c.name.split(' — ')[0])}</option>`).join('')}</select>
+          <label class="sr" for="pbCase">Case</label><select id="pbCase" class="gsel bord">${DB.cases.filter(c => c.status !== 'closed').map(c => `<option value="${c.id}"${c.id === DB.active ? ' selected' : ''}>${esc(c.name.split(' — ')[0])}</option>`).join('')}</select>
           <button class="btn primary" data-act="pbRunSel" data-id="${p.id}">${ico('play','sm')}Run playbook</button></div></section>
-        ${used.length ? `<section class="card"><div class="body"><h4>In progress</h4>${used.map(x => `<a href="${caseHash(x.c.id, 'questions')}" class="pbd-u"><i style="background:${esc(x.c.color)}"></i><span>${esc(x.c.code)}</span><span class="pb-prog"><i style="width:${Math.round(x.done / x.total * 100)}%"></i></span><b>${x.done}/${x.total}</b></a>`).join('')}</div></section>` : ''}
+        ${used.length ? `<section class="card"><div class="body"><h4>In progress</h4>${used.map(x => `<a href="${caseHash(x.c.id, 'questions')}" class="pbd-u"><i style="background:${esc(x.c.color)}"></i><span>${esc(caseNm(x.c))}</span><span class="pb-prog"><i style="width:${Math.round(x.done / x.total * 100)}%"></i></span><b>${x.done}/${x.total}</b></a>`).join('')}</div></section>` : ''}
         <section class="card"><div class="body pbx-meta"><div><span>Steps</span><b>${p.steps.length}</b></div><div><span>Shortcuts</span><b>${p.steps.filter(x => pbTool(x, p)).length}</b></div><div><span>Source</span><b>${p.custom ? 'Yours' : 'Built in'}</b></div>
           <div class="pbx-acts"><button class="btn sm" data-act="pbEdit" data-id="${p.id}">${ico('pencil','sm')}Edit</button><button class="btn sm" data-act="pbDup" data-id="${p.id}">${ico('copy','sm')}Duplicate</button><button class="btn sm ghost pbx-del" data-act="pbDelAsk" data-id="${p.id}">${ico('trash-2','sm')}Delete</button></div></div></section>
       </aside></div></div></div>`;

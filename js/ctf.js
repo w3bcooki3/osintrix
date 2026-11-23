@@ -66,7 +66,7 @@ function ctfBoard(){
       <div class="chal-h"><span class="chal-ic">${ico(ic,'sm')}</span><span class="chal-cat">${esc(cn)}</span><span class="chal-pts">${esc(c.points || 0)} pts</span></div>
       <h3>${esc(c.name)}</h3>
       ${c.status === 'solved' && c.flag ? `<code class="chal-flag">${esc(c.flag)}</code>` : last ? `<p>${ico(LOG_KIND[last.kind] ? LOG_KIND[last.kind][1] : 'pencil','sm')} ${esc(last.text.slice(0, 120))}</p>` : c.notes ? `<p>${esc(c.notes.split('\n')[0])}</p>` : ''}
-      <div class="chal-f">${evId === 'all' && ev ? `<span class="t3">${esc(ev.name)}</span>` : ''}${c.log.length ? `<span class="t3">· ${c.log.length} tr${c.log.length === 1 ? 'y' : 'ies'}</span>` : ''}${cs ? `<span class="chal-case" style="--cc:${esc(cs.color)}">${esc(cs.code)}</span>` : ''}</div></article>`; };
+      <div class="chal-f">${evId === 'all' && ev ? `<span class="t3">${esc(ev.name)}</span>` : ''}${c.log.length ? `<span class="t3">· ${c.log.length} tr${c.log.length === 1 ? 'y' : 'ies'}</span>` : ''}${cs ? `<span class="chal-case" style="--cc:${esc(cs.color)}">${esc(caseNm(cs))}</span>` : ''}</div></article>`; };
   return `<div class="ctf-sum">
       <div class="ctf-score"><div><b>${pts}</b><span>of ${total} points</span></div><div><b>${solved.length}/${list.length}</b><span>solved</span></div></div>
       <div class="ctf-cats">${Object.entries(CTF_CATS).filter(([k]) => byCat.some(([c]) => c === k)).map(([k, [n, col]]) => { const all = list.filter(c => c.cat === k), d = all.filter(c => c.status === 'solved').length;
@@ -99,7 +99,7 @@ function ctfWorkspace(c){
         <section class="card meta" style="--c:${col}"><span class="ws-cat"><i></i>${esc(cn)}${ev ? ' · ' + esc(ev.name) : ''}</span><h2>${esc(c.name)}</h2>
           <dl class="kv"><dt>Points</dt><dd class="mono">${esc(c.points || 0)}</dd><dt>Status</dt><dd><span class="ws-st ${c.status}">${ico(st[2],'sm')}${st[1]}</span></dd>
             <dt>Flag format</dt><dd class="mono">${esc(ev && ev.flagRe ? fmtFlag(ev.flagRe) : 'FLAG{…}')}</dd>
-            <dt>Case</dt><dd>${cs ? `<a href="${caseHash(cs.id)}" class="mono">${esc(cs.code)}</a>` : `<button class="linkbtn" data-act="chCase" data-id="${c.id}">Create one</button>`}</dd></dl></section>
+            <dt>Case</dt><dd>${cs ? `<a href="${caseHash(cs.id)}" >${esc(caseNm(cs))}</a>` : `<button class="linkbtn" data-act="chCase" data-id="${c.id}">Create one</button>`}</dd></dl></section>
         <section class="card ws-notes"><label for="ctfNotes" class="ws-h">${ico('sticky-note','sm')}Notes</label><textarea id="ctfNotes" rows="7" placeholder="The challenge text, hints, anything worth keeping.">${esc(c.notes)}</textarea></section>
         ${ents.length ? `<section class="card ws-ents"><div class="ws-h">${ico('fingerprint','sm')}Found in this challenge</div><div class="ents">${ents.map(e => `<button class="ent" data-act="flagCopy" data-v="${esc(e.v)}" title="${esc((E.LABEL && E.LABEL[e.k]) || e.k)} · click to copy"><i style="--cc:var(--k-${esc(e.k)},var(--accent))"></i>${esc(e.v.length > 34 ? e.v.slice(0, 32) + '…' : e.v)}</button>`).join('')}</div></section>` : ''}
       </div>

@@ -155,8 +155,8 @@ async function cpDrain(){
 
 const CP_ACTS = {
   cpAll:() => { UI.cpAll = !UI.cpAll; renderMain(); },
-  cpAuto:(id, v, t) => { const c = theCase(); c.autoLook = !!t.checked; mutate((c.autoLook ? 'turned on' : 'turned off') + ' auto-check for ' + c.code);
-    if(c.autoLook){ const n = cpIndicators(c.id).filter(x => !cpHist().has(x.key)).length; toast(n ? 'Checking ' + plural(n, 'indicator') + ' in ' + c.code + '…' : 'New indicators in ' + c.code + ' will be checked as they arrive'); cpAutoScan(); } },
+  cpAuto:(id, v, t) => { const c = theCase(); c.autoLook = !!t.checked; mutate((c.autoLook ? 'turned on' : 'turned off') + ' auto-check for ' + caseNm(c));
+    if(c.autoLook){ const n = cpIndicators(c.id).filter(x => !cpHist().has(x.key)).length; toast(n ? 'Checking ' + plural(n, 'indicator') + ' in ' + caseNm(c) + '…' : 'New indicators in ' + caseNm(c) + ' will be checked as they arrive'); cpAutoScan(); } },
   cpMarkFeed:() => { const I = cpIndicators(DB.active).filter(x => { const i = CTI.iocIx && CTI.iocIx.get(x.key); return i && iocLive(i) && !verdictOf(x.key); }); I.forEach(x => DB.verdicts[x.key] = 'malicious'); mutate('marked ' + I.length + ' feed indicators malicious'); renderMain();
     toast(plural(I.length, 'indicator') + ' marked malicious', 'Undo', () => { I.forEach(x => delete DB.verdicts[x.key]); mutate('undo'); renderMain(); }); },
   cpReviewFlagged:() => { const H = cpHist(), L = cpIndicators(DB.active).filter(x => H.has(x.key) && /malicious|suspicious/.test(H.get(x.key).band) && !verdictOf(x.key));
@@ -169,6 +169,6 @@ const CP_ACTS = {
   cpWatch:() => { const D = derive(), I = cpIndicators(DB.active), L = [...new Set([...D.entries.filter(e => entryVerdict(e) === 'malicious').map(entryKey), ...I.filter(x => verdictOf(x.key) === 'malicious').map(x => x.key)].filter(k => k && !isWatched(k)))];
     DB.watch = DB.watch || {}; L.forEach(k => { DB.watch[k] = {at:Date.now()}; }); mutate('watching ' + L.length + ' indicators'); renderMain(); toast('Watching ' + plural(L.length, 'indicator'), 'Watchlist', () => go('#/watch')); },
   cpRules:() => ruleFromCase(),
-  cpCopy:async () => { try{ await navigator.clipboard.writeText(theCase().code + ' — ' + theCase().name + '\n\n' + cpStoryText()); toast('Story copied'); }catch(e){ toast('Copy failed'); } },
-  cpNote:() => { const c = theCase(), now = Date.now(); DB.notes = DB.notes || []; DB.notes.unshift({id:uid('n'), caseId:c.id, color:'blue', pinned:false, text:('# Story so far — ' + E.fmtDate(now, tz()) + '\n\n' + cpStoryText()).slice(0, 4000), due:'', created:now, updated:now}); mutate('saved the case story as a note'); renderMain(); toast('Saved as a note in ' + c.code); },
+  cpCopy:async () => { try{ await navigator.clipboard.writeText(theCase().name + '\n\n' + cpStoryText()); toast('Story copied'); }catch(e){ toast('Copy failed'); } },
+  cpNote:() => { const c = theCase(), now = Date.now(); DB.notes = DB.notes || []; DB.notes.unshift({id:uid('n'), caseId:c.id, color:'blue', pinned:false, text:('# Story so far — ' + E.fmtDate(now, tz()) + '\n\n' + cpStoryText()).slice(0, 4000), due:'', created:now, updated:now}); mutate('saved the case story as a note'); renderMain(); toast('Saved as a note in ' + caseNm(c)); },
 };

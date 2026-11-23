@@ -176,7 +176,7 @@ test('identity profiles: one person across three cases — joined by a shared em
   const card = page.locator('#dlg .idp');
   await expect(card.locator('.idp-kf.warn')).toHaveCount(2); await expect(card.locator('.idp-kf', { hasText: 'Date of birth' })).toContainText('1991-04-02'); await expect(card.locator('.idp-kf', { hasText: 'Date of birth' })).toContainText('1990-04-02');
   await expect(card.locator('.idp-sum')).toContainText('Appears in 3 cases under 3 names. Tied to J. Haven by a shared email address — a strong link. Possibly also Giveaway admin, through a username only.');
-  await expect(card.locator('.idp-gaps li', { hasText: 'Giveaway admin in ID-C is joined only by a username' })).toHaveCount(1);
+  await expect(card.locator('.idp-gaps li', { hasText: 'Giveaway admin in Giveaway spam is joined only by a username' })).toHaveCount(1);
   await expect(card.locator('.idp-map svg line')).not.toHaveCount(0);
   await expect(card.locator('.idp-same')).toHaveCount(2);
   await expect(card.locator('.idp-same', { hasText: 'J. Haven' })).toContainText('Confirmed');
@@ -550,8 +550,12 @@ test('polish on a desktop: a case summary cut off with … shows in full when po
   const errors = await open(page, '#/home', { osintSample: true });
   const cut = page.locator('#main small').filter({ hasText: 'Fake refund support' }).first();
   await cut.hover(); await expect(cut).toHaveAttribute('title', /went quiet: who runs it, where the money goes, and when they work/);
-  await page.evaluate(() => go('#/decoder')); await expect(page.locator('.txg-l')).toHaveText(['Decode', 'Encode & transform', 'Analyse']);
-  await page.click('[data-act=txOp][data-v=b64d]'); await expect(page.locator('[data-act=txOp][data-v=b64d]')).toHaveAttribute('aria-pressed', 'true');
+  await page.evaluate(() => go('#/decoder')); await expect(page.locator('.txbar > button')).toHaveCount(4);   // one row: Auto-decode, then a menu per group
+  await expect(page.locator('[data-act=txMenu] small')).toHaveText([/^Decode · \d+$/, /^Encode & transform · \d+$/, /^Analyse · \d+$/]);
+  await page.click('[data-act=txMenu][data-v=Decode]'); await page.locator('#ctx .ctx-it', { hasText: 'Base64 decode' }).click();
+  await expect(page.locator('[data-act=txMenu][data-v=Decode]')).toHaveAttribute('aria-pressed', 'true'); await expect(page.locator('[data-act=txMenu][data-v=Decode] b')).toHaveText('Base64 decode');
+  await expect(page.locator('[data-act=txOp][data-v=auto]')).toHaveAttribute('aria-pressed', 'false');
+  await page.fill('#decIn', 'aGVsbG8gd29ybGQ='); await expect(page.locator('#txOut')).toHaveText('hello world');
   noErrors(errors);
 });
 
@@ -636,7 +640,7 @@ mail from j.harbour@proton.me via mx.harbourline-deals.shop C:\\Users\\jdoe\\App
   await page.click('[data-act=rxMaskCopy]'); expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(out);
   await page.click('[data-act=rxMaskUse]'); await expect(page.locator('.rx-ln').first()).not.toContainText('web01');
   // in the Decoder
-  await page.evaluate(() => go('#/decoder')); await page.click('[data-act=txOp][data-v=mask]');
+  await page.evaluate(() => go('#/decoder')); await page.click('[data-act=txMenu][data-v="Encode & transform"]'); await page.locator('#ctx .ctx-it', { hasText: 'Mask identifiers' }).click();
   await page.fill('#decIn', 'login by alice from 198.51.100.23 to fileserver.acme-corp.com'); await page.waitForTimeout(500);
   const dec = await page.locator('#txOut').textContent(); expect(dec).not.toContain('198.51.100.23'); expect(dec).not.toContain('acme-corp'); expect(dec).toContain('domain-1.example');
   noErrors(errors);
@@ -1090,7 +1094,7 @@ test('case snapshots: saved as a file (not in the browser), compared later, remo
   const usage0 = await page.evaluate(async () => { await snapsLoad(); return SNAPS.length; });
   await page.click('.acts [data-act=caseMenu]'); await page.locator('#ctx button', { hasText: 'Save a snapshot' }).click(); await page.fill('#sncName', 'before edits');
   const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#dlg button[type=submit]')]);
-  expect(dl.suggestedFilename()).toMatch(/^TN-2026-014-snapshot-\d{4}-\d\d-\d\d-\d{4}-before-edits\.json$/);
+  expect(dl.suggestedFilename()).toMatch(/^op-lantern-snapshot-\d{4}-\d\d-\d\d-\d{4}-before-edits\.json$/);
   const file = info.outputPath('snap.json'); await dl.saveAs(file);
   const snap = JSON.parse(fs.readFileSync(file, 'utf8'));
   expect(snap.format).toBe('osintrix-case'); expect(snap.snapshot.name).toBe('before edits'); expect(snap.case.id).toBe('c-lantern');
@@ -1122,7 +1126,7 @@ test('case snapshots: saved as a file (not in the browser), compared later, remo
   expect(await page.evaluate(() => [!!entryById('v-new'), DB.entries.some(e => e.tags.includes('edited-now'))])).toEqual([true, true]);
   // a snapshot of another case, or something that is not one, is refused
   const other = info.outputPath('other.json'); fs.writeFileSync(other, JSON.stringify({ ...snap, case: { ...snap.case, id: 'c-portal', code: 'TN-2026-011' } }));
-  await compare(other); await expect(page.locator('.toast').last()).toContainText('snapshot is of TN-2026-011');
+  await compare(other); await expect(page.locator('.toast').last()).toContainText('snapshot is of Customer portal');
   const junk = info.outputPath('junk.json'); fs.writeFileSync(junk, '{"hello":1}');
   await compare(junk); await expect(page.locator('.toast').last()).toContainText('Not an OSINTrix case snapshot');
   noErrors(errors);
@@ -1239,19 +1243,19 @@ test('a new user can start empty from the welcome screen, and the first real cas
 test('archiving a case says Archived everywhere and can be undone from its message', async ({ page }) => {
   const errors = await open(page, '#/cases');
   await page.locator('.cs2-acts [data-act=caseMenu]').first().click();
-  const code = await page.evaluate(() => document.querySelector('#ctx .ctx-title').textContent.trim());
+  const code = await page.evaluate(() => document.querySelector('#ctx .ctx-title').textContent.trim());   // the case's name
   await page.locator('#ctx button', { hasText: 'Archive' }).click();
   await expect(page.locator('.toast').last()).toContainText(code + ' archived');
   await page.click('[data-act=cf][data-v=closed], .seg [data-v=closed]').catch(() => {});
   await expect(page.locator('.status[data-s=closed]').first()).toHaveText('Archived');
   await page.locator('.toast').last().getByRole('button', { name: 'Undo' }).click();
-  expect(await page.evaluate(c => DB.cases.find(x => x.code === c).status, code)).toBe('active');
+  expect(await page.evaluate(c => DB.cases.find(x => caseNm(x) === c).status, code)).toBe('active');
   noErrors(errors);
 });
 
 test('seen over time: first and last sighting, by case and in date order across cases; and ? lists every keyboard shortcut', async ({ page }) => {
   const errors = await open(page, '#/case/c-lantern/vault');
-  const want = await page.evaluate(() => { const g = globalEnts().get('ipv4:203.0.113.47'); const t = g.recs.filter(r => r.ts).sort((a, b) => a.ts - b.ts); return { n: g.recs.length, cases: g.cases.size, first: E.fmtDate(t[0].ts, tz()), last: E.fmtDate(t[t.length - 1].ts, tz()), firstCase: theCase(t[0].caseId).code, order: t.map(r => r.id) }; });
+  const want = await page.evaluate(() => { const g = globalEnts().get('ipv4:203.0.113.47'); const t = g.recs.filter(r => r.ts).sort((a, b) => a.ts - b.ts); return { n: g.recs.length, cases: g.cases.size, first: E.fmtDate(t[0].ts, tz()), last: E.fmtDate(t[t.length - 1].ts, tz()), firstCase: caseNm(t[0].caseId), order: t.map(r => r.id) }; });
   await page.evaluate(() => select('ent', 'ipv4:203.0.113.47'));
   const sec = page.locator('#insp .sight');
   await expect(sec.locator('h4')).toContainText(`${want.n} records · ${want.cases} cases`);
@@ -1275,5 +1279,22 @@ test('seen over time: first and last sighting, by case and in date order across 
   await expect(page.locator('#dlg .keys')).toHaveCount(0); await expect(page.locator('textarea.ned').first()).toHaveValue('why?');
   // Help shows the same list
   await page.evaluate(() => go('#/help')); await expect(page.locator('#main .keys .keys-g')).toHaveCount(6);
+  noErrors(errors);
+});
+
+test('cases are called by their names on screen — the TN-… number is not shown, but still finds the case', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  const routes = ['#/home', '#/cases', '#/case/c-lantern/overview', '#/case/c-lantern/vault', '#/case/c-lantern/timeline', '#/case/c-lantern/entities', '#/case/c-lantern/report', '#/entities', '#/notes', '#/detections', '#/playbooks', '#/today'];
+  const seen = [];
+  for (const r of routes) { await page.evaluate(h => go(h), r); await page.waitForTimeout(150);
+    const t = await page.evaluate(() => document.body.innerText); const m = t.match(/\b(TN|LAB)-20\d\d-\d{3}\b/g); if (m) seen.push(r + ': ' + [...new Set(m)].join(', ')); }
+  expect(seen).toEqual([]);
+  // the indicator seen in both demo cases names them
+  await page.evaluate(() => select('ent', 'ipv4:203.0.113.47'));
+  await expect(page.locator('#insp .sight-cases')).toContainText('Op Lantern'); await expect(page.locator('#insp .sight-cases')).toContainText('Customer portal');
+  // the number still works where people type it, and so does the name
+  await page.keyboard.press('Control+k'); await page.fill('#srQ', 'case:TN-2026-011 ');
+  await expect(page.locator('#srFl')).toContainText('in Customer portal');
+  await page.fill('#srQ', 'case:op-l'); await expect(page.getByText('case:op-lantern', { exact: true }).first()).toBeVisible();
   noErrors(errors);
 });

@@ -123,7 +123,7 @@ function rwSections(c, D, red, tpl){
 /* ---------- Word (.docx) export of the report ---------- */
 function reportDocHtml(c, D, M, tplName){
   const ci = x => x && x.n ? ` [${x.n}]` : '';
-  const L = [`<h1>${esc(M.red(c.name))}</h1><p class="nbx-meta">${esc(c.code)} · ${esc(tplName)} report · ${esc(tz())}${UI.redact ? ' · redacted' : ''} · ${esc(E.fmtDate(Date.now(), tz()))}</p>`];
+  const L = [`<h1>${esc(M.red(c.name))}</h1><p class="nbx-meta">${esc(tplName)} report · ${esc(tz())}${UI.redact ? ' · redacted' : ''} · ${esc(E.fmtDate(Date.now(), tz()))}</p>`];
   for(const s of M.S){ L.push(`<h2>${esc(s.h)}</h2>`); const rows = s.items.filter(it => it.k === 'row'), recs = s.items.filter(it => it.k === 'rec');
     for(const it of s.items){ if(it.k === 'p') L.push(`<p>${it.b ? '<b>' + esc(it.b) + '</b>' : ''}${esc(it.t)}${ci(it.c)}</p>`);
       else if(it.k === 'bl') L.push(`<div class="nbx-call"><p><b>Bottom line (${esc(RW_CONF[it.level])}).</b> ${esc(it.t)}</p></div>`);

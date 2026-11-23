@@ -126,7 +126,7 @@ function viewTrash(){
   if(!SNAPS){ snapsLoad().then(() => { if(UI.route.area === 'trash') renderMain(); }); }
   const T = DB.trash || [];
   const row = x => { const [ic, kl] = TRASH_KIND[x.kind] || ['file','Item'], c = x.caseId && theCase(x.caseId), left = Math.max(0, TRASH_DAYS - Math.floor((Date.now() - x.at) / 864e5)), nf = filesOfItem(x).length;
-    return `<div class="binrow"><span class="binic">${ico(ic)}</span><div class="main2"><b>${esc(x.label || '(untitled)')}</b><small>${kl}${c && c.id ? ' · ' + esc(c.code || c.name) : ''}${nf ? ' · ' + nf + ' file' + (nf > 1 ? 's' : '') : ''} · deleted ${esc(ago(x.at))} · ${left} day${left === 1 ? '' : 's'} left</small></div>
+    return `<div class="binrow"><span class="binic">${ico(ic)}</span><div class="main2"><b>${esc(x.label || '(untitled)')}</b><small>${kl}${c && c.id ? ' · ' + esc(caseNm(c) || c.code) : ''}${nf ? ' · ' + nf + ' file' + (nf > 1 ? 's' : '') : ''} · deleted ${esc(ago(x.at))} · ${left} day${left === 1 ? '' : 's'} left</small></div>
       <button class="btn xs" data-act="trRestore" data-id="${x.id}">${ico('undo-2','sm')}Restore</button><button class="iconbtn" data-act="trDel" data-id="${x.id}" title="Delete forever" aria-label="Delete forever">${ico('trash-2','sm')}</button></div>`; };
   const S2 = SNAPS || [];
   return `<div class="scroll"><div class="page narrow"><div class="ph"><div><h1>Trash &amp; restore points</h1><div class="sub">Deleted items wait here for ${TRASH_DAYS} days. Restore points are full copies of your workspace made before big changes.</div></div></div>

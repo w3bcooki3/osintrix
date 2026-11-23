@@ -80,7 +80,7 @@ function labTwist(){
     ${L.length ? `<p class="t3" style="margin:4px 0 12px">${L.length} candidates — ${kinds.slice(0, 8).map(([k, n]) => esc(TW_NAME[k] || k) + ' ' + n).join(' · ')}</p>` : '<p class="t3">Enter a domain you want to protect — or one from a case — to see how it could be imitated.</p>'}
     ${T.running || done ? `<div class="lk-prog" role="progressbar" aria-label="Checking look-alikes" aria-valuenow="${Math.round(done / Math.max(1, L.length) * 100)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${Math.round(done / Math.max(1, L.length) * 100)}%"></i></div>` : ''}
     ${reg.length ? `<div class="wrap" style="margin:12px 0 8px"><b>${reg.length} exist</b><span class="t3">${reg.filter(x => x.mx.length).length} can receive mail · ${reg.filter(x => x.created && Date.now() - x.created < 90 * 864e5).length} registered in the last 90 days</span><span class="sp"></span>
-        <button class="btn sm" data-act="twAdd">${ico('plus','sm')}Add the risky ones to ${esc(theCase().code)}</button><button class="btn sm ghost" data-act="twCsv">${ico('download','sm')}CSV</button></div>
+        <button class="btn sm" data-act="twAdd">${ico('plus','sm')}Add the risky ones to ${esc(caseNm(theCase()))}</button><button class="btn sm ghost" data-act="twCsv">${ico('download','sm')}CSV</button></div>
       <table class="tbl tw-tbl"><thead><tr><th>Domain</th><th>How</th><th class="n">Risk</th><th class="hide-m">Why</th><th class="hide-m">Address · mail</th><th></th></tr></thead><tbody>
         ${reg.slice(0, 150).map(x => `<tr><td><span class="mono">${esc(x.show)}</span>${x.show !== x.d ? `<br><small class="mono t3">${esc(x.d)}</small>` : ''}</td><td class="t2">${esc(TW_NAME[x.kind] || x.kind)}</td><td class="n"><b style="color:${x.r.s >= 70 ? 'var(--red)' : x.r.s >= 45 ? 'var(--amber)' : 'var(--text-2)'}">${x.r.s}</b></td>
           <td class="hide-m t2">${esc(x.r.why.join(', '))}</td><td class="hide-m mono t3">${esc((x.ips[0] || '—') + (x.mx.length ? ' · MX ' + x.mx[0] : ''))}</td><td><button class="iconbtn" data-act="twLook" data-v="${esc(x.d)}" aria-label="Investigate ${esc(x.d)}" title="Investigate">${ico('radar','sm')}</button></td></tr>`).join('')}</tbody></table>`
@@ -129,7 +129,7 @@ function labIdent(){
     const vars = [...new Set([u, u.replace(/[._-]/g, ''), u.replace(/\d+$/, ''), u.replace(/_/g, '.'), u.replace(/\./g, '_')].filter(x => x && x !== u))].slice(0, 4);
     body = `<p class="t2">Open each place and mark what you found — there, not there, or private — with a note. Kept with <span class="mono">@${esc(u)}</span> in every case.${vars.length ? ' Also try: ' + vars.map(v => `<button class="chip" data-act="idTry" data-v="${esc(v)}">${esc(v)}</button>`).join(' ') : ''}</p>
       ${ckList('user', u)}
-      <div class="wrap" style="margin-top:12px"><button class="btn sm" data-act="idAdd" data-v="${esc('@' + u)}">${ico('plus','sm')}Add @${esc(u)} to ${esc(theCase().code)}</button></div>`; }
+      <div class="wrap" style="margin-top:12px"><button class="btn sm" data-act="idAdd" data-v="${esc('@' + u)}">${ico('plus','sm')}Add @${esc(u)} to ${esc(caseNm(theCase()))}</button></div>`; }
   else if(kind === 'email'){ const E2 = idEmail(q);
     if(!E2) body = '<p class="t3">That does not look like an email address.</p>';
     else { const mx = UI.idmx && UI.idmx.dom === E2.dom ? UI.idmx : null, prov = mx && mx.mx.length ? (ID_PROVIDER.find(([re]) => mx.mx.some(h => re.test(h))) || [, 'Own mail servers'])[1] : '';
@@ -141,11 +141,11 @@ function labIdent(){
           <dt>Mail servers</dt><dd>${mx ? mx.err ? esc(mx.err) : mx.mx.length ? `<span class="mono">${esc(mx.mx.slice(0, 3).join(', '))}</span> — ${esc(prov)}` : '<b style="color:var(--red)">None — this domain cannot receive mail</b>' : `<button class="btn xs" data-act="idMx" data-v="${esc(E2.dom)}">Look up (Google DNS)</button>`}</dd>
           <dt>Gravatar</dt><dd><a href="${esc(E2.gravatar)}" target="_blank" rel="noopener noreferrer">Profile picture and links, if any ${ico('arrow-up-right','sm')}</a></dd></dl>
         <h4 class="ck-h">Places to check</h4>${ckList('email', E2.e)}
-        <div class="wrap" style="margin-top:10px"><button class="btn sm primary" data-act="idAdd" data-v="${esc(E2.e)}">${ico('plus','sm')}Add to ${esc(theCase().code)}</button></div>`; } }
+        <div class="wrap" style="margin-top:10px"><button class="btn sm primary" data-act="idAdd" data-v="${esc(E2.e)}">${ico('plus','sm')}Add to ${esc(caseNm(theCase()))}</button></div>`; } }
   else if(kind === 'phone'){ const P = idPhone(q);
     body = P && P.e164 ? `<dl class="id-dl"><dt>International</dt><dd class="mono">${esc(P.e164)}</dd><dt>Country</dt><dd>${esc(P.country)} (+${esc(P.cc)})</dd><dt>National number</dt><dd class="mono">${esc(P.national)}</dd></dl>
       <h4 class="ck-h">Places to check</h4>${ckList('phone', P.e164)}
-      <div class="wrap" style="margin-top:10px"><button class="btn sm primary" data-act="idAdd" data-v="${esc(P.e164)}">${ico('plus','sm')}Add to ${esc(theCase().code)}</button></div>` : `<p class="t3">${esc(P ? P.note : 'Not a phone number.')}</p>`; }
+      <div class="wrap" style="margin-top:10px"><button class="btn sm primary" data-act="idAdd" data-v="${esc(P.e164)}">${ico('plus','sm')}Add to ${esc(caseNm(theCase()))}</button></div>` : `<p class="t3">${esc(P ? P.note : 'Not a phone number.')}</p>`; }
   return `<div class="labgrid one wide"><section class="card"><header><h3>${ico('fingerprint','sm')} Identity pivots</h3><span class="t3">a username, an email address or a phone number</span></header><div class="body">
     <form class="lk-q" data-form="idGo"><div class="search-in">${ico('at-sign')}<label class="sr" for="idQ">Username, email or phone</label><input id="idQ" class="inp mono" value="${esc(q)}" placeholder="n1ghtlamp · someone@example.com · +44 20 7946 0000" autocomplete="off" spellcheck="false"></div><button class="btn primary" type="submit">${ico('search','sm')}Pivot</button></form>
     ${body || '<p class="t3">Nothing is sent anywhere until you open a link or look up mail servers.</p>'}</div></section></div>`;
@@ -172,11 +172,11 @@ const OS_ACTS = {
   twCheck:() => twRun(), twStop:() => { if(UI.tw && UI.tw.sig) UI.tw.sig.stop = true; },
   twDnsOn:() => { const S = lkSettings(); S.on.dns = true; S.on.rdap = true; mutate('turned on Google DNS and RDAP lookups'); renderMain(); },
   twLook:(id, v) => lookGo('domain', v),
-  twAdd:() => { const L = (UI.tw.list || []).filter(x => x.exists && twRisk(x, UI.tw.orig).s >= 45); let n = 0; L.forEach(x => { if(ctiAddEntry('domain', x.d, 'Look-alike of ' + UI.tw.d + ' (' + (TW_NAME[x.kind] || x.kind) + '): ' + twRisk(x, UI.tw.orig).why.join(', '))) n++; }); mutate('added look-alike domains'); toast(n ? n + ' added to ' + theCase().code : 'They are already in ' + theCase().code); },
+  twAdd:() => { const L = (UI.tw.list || []).filter(x => x.exists && twRisk(x, UI.tw.orig).s >= 45); let n = 0; L.forEach(x => { if(ctiAddEntry('domain', x.d, 'Look-alike of ' + UI.tw.d + ' (' + (TW_NAME[x.kind] || x.kind) + '): ' + twRisk(x, UI.tw.orig).why.join(', '))) n++; }); mutate('added look-alike domains'); toast(n ? n + ' added to ' + caseNm(theCase()) : 'They are already in ' + caseNm(theCase())); },
   twCsv:() => download(safeName(UI.tw.d + '-lookalikes.csv'), ['domain,unicode,how,risk,why,ips,mx,ns,created'].concat((UI.tw.list || []).filter(x => x.exists).map(x => { const r = twRisk(x, UI.tw.orig); return [x.d, x.show, TW_NAME[x.kind] || x.kind, r.s, r.why.join('; '), x.ips.join(' '), x.mx.join(' '), x.ns.join(' '), x.created ? new Date(x.created).toISOString().slice(0, 10) : ''].map(csvCell).join(','); })).join('\n'), 'text/csv'),
   idTry:(id, v) => { UI.idq = v; renderMain(); },
   idAdd:(id, v) => { const n = iocNorm(v) || (/^@/.test(v) ? {k:'handle', v} : /^\+\d/.test(v) ? {k:'phone', v} : null); if(!n) return toast('Cannot add that');
-    if(ctiAddEntry(n.k, n.v, 'Identity pivot')){ mutate('added ' + n.v); toast(n.v + ' added to ' + theCase().code); } else toast('Already in ' + theCase().code + ', or not a kind the vault keeps'); },
+    if(ctiAddEntry(n.k, n.v, 'Identity pivot')){ mutate('added ' + n.v); toast(n.v + ' added to ' + caseNm(theCase())); } else toast('Already in ' + caseNm(theCase()) + ', or not a kind the vault keeps'); },
   idMx:async (id, v) => { if(!lkOn(lkProv('dns'))) return toast('Switch on Google DNS in Threat Intel → Sources → Lookups first');
     try{ const j = JSON.parse((await lkFetch('https://dns.google/resolve?name=' + encodeURIComponent(v) + '&type=MX', {timeout:10000})).text); UI.idmx = {dom:v, mx:(j.Answer || []).filter(y => y.type === 15).map(y => cap(String(y.data).replace(/^\d+\s+/, '').replace(/\.$/, ''), 253).toLowerCase())}; }
     catch(e){ UI.idmx = {dom:v, mx:[], err:e.message}; } renderMain(); },

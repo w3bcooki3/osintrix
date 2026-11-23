@@ -20,7 +20,7 @@ function shareDlg(){
     UI.share = {tlp:SH_TLP.some(x => x[0] === P.tlp) ? P.tlp : 'amber', red:P.red !== false, all:P.all === true, parts}; }
   const S = UI.share; DB.prefs.share = {tlp:S.tlp, red:S.red, all:S.all, parts:Object.assign({}, S.parts)};
   const items = shareItems(c, S), rules = (DB.rules || []).filter(r => r.caseId === c.id);
-  openDlg(dhead('Share ' + c.code) + `<div class="in sh">
+  openDlg(dhead('Share ' + esc(caseNm(c))) + `<div class="in sh">
     <p class="t2" style="margin:0 0 12px">One ZIP with everything another analyst or team needs. Pick what goes in; a manifest with a SHA-256 for every file lets them check nothing changed.</p>
     <div class="field"><label>Traffic Light Protocol</label><div class="sh-tlp" role="radiogroup" aria-label="TLP">${SH_TLP.map(([k, l, d, bg, fg]) => `<button type="button" role="radio" aria-checked="${S.tlp === k}" data-act="shTlp" data-v="${k}" title="${esc(d)}"><i style="background:${bg};color:${fg}">${esc(l)}</i></button>`).join('')}</div><small class="t3">${esc(SH_TLP.find(x => x[0] === S.tlp)[2])}</small></div>
     <div class="sh-parts">${SH_PARTS.map(([k, l, d]) => { const n = k === 'rules' ? rules.length : k === 'stix' || k === 'misp' || k === 'csv' ? items.length : null;
@@ -32,7 +32,7 @@ function shareDlg(){
 function shareItems(c, S){
   const H = typeof cpHist === 'function' ? cpHist() : new Map();
   return ctiCaseItems(c.id).filter(x => !(S.red && SH_PEOPLE.has(x.k))).map(x => { const key = x.k + ':' + x.v, v = verdictOf(key) || (x.tags || []).find(t => /malicious|suspicious|benign/.test(t)) || '', h = H.get(key);
-    return {...x, verdict:v, tlp:S.tlp, tags:[...new Set([...(x.tags || []), c.code])], conf:v === 'malicious' ? 85 : v === 'suspicious' ? 50 : h ? h.score : undefined, desc:cap(x.desc || (h ? 'Live lookups: ' + h.band + ' ' + h.score + '/100' : ''), 500)}; })
+    return {...x, verdict:v, tlp:S.tlp, tags:[...new Set([...(x.tags || []), slug(caseNm(c))])], conf:v === 'malicious' ? 85 : v === 'suspicious' ? 50 : h ? h.score : undefined, desc:cap(x.desc || (h ? 'Live lookups: ' + h.band + ' ' + h.score + '/100' : ''), 500)}; })
     .filter(x => x.verdict !== 'benign' && (S.all || /malicious|suspicious/.test(x.verdict) || (H.get(x.k + ':' + x.v) && /malicious|suspicious/.test(H.get(x.k + ':' + x.v).band))));
 }
 /* the read-only page: plain HTML and CSS, its own CSP forbids loading or running anything */
@@ -66,20 +66,20 @@ footer{color:var(--mu);font-size:12.5px;text-align:center;margin-top:18px}
 function sigmaYaml(r){ const c = String(r.code || ''); return /^\s*title\s*:/m.test(c) ? c : 'title: ' + String(r.title || 'Untitled').replace(/\n/g, ' ') + '\n' + c; }
 async function shareGo(){
   const c = theCase(), D = derive(), S = UI.share, tpl = DB.prefs.repT || 'full', tplName = REP_T.find(x => x[0] === tpl)[1], M = reportModel(c, D, tpl, !!S.red), items = shareItems(c, S);
-  const base = safeName(c.code + '-' + slug(c.name.split(' — ')[0])).slice(0, 60) || 'case', T = SH_TLP.find(x => x[0] === S.tlp), files = [];
+  const base = safeName(slug(c.name.split(' — ')[0])).slice(0, 60) || 'case', T = SH_TLP.find(x => x[0] === S.tlp), files = [];
   if(S.parts.page) files.push({name:base + '/' + base + '.html', data:sharePage(c, D, M, tplName, S, items)});
-  if(S.parts.stix && items.length) files.push({name:base + '/' + base + '.stix.json', data:JSON.stringify(ctiStix(items, c.code + ' — ' + M.red(c.name), S.tlp), null, 2)});
-  if(S.parts.misp && items.length) files.push({name:base + '/' + base + '.misp.json', data:JSON.stringify(ctiMisp(items, c.code + ' — ' + M.red(c.name), S.tlp), null, 2)});
+  if(S.parts.stix && items.length) files.push({name:base + '/' + base + '.stix.json', data:JSON.stringify(ctiStix(items, M.red(c.name), S.tlp), null, 2)});
+  if(S.parts.misp && items.length) files.push({name:base + '/' + base + '.misp.json', data:JSON.stringify(ctiMisp(items, M.red(c.name), S.tlp), null, 2)});
   if(S.parts.csv && items.length) files.push({name:base + '/' + base + '-indicators.csv', data:ctiCsv(items)});
   if(S.parts.md) files.push({name:base + '/' + base + '-report.md', data:reportMdText(c, D, M, tplName)});
   if(S.parts.rules) for(const r of (DB.rules || []).filter(x => x.caseId === c.id)) files.push({name:base + '/rules/' + safeName(slug(r.title)).slice(0, 60) + (r.type === 'yara' ? '.yar' : '.yml'), data:r.type === 'yara' ? r.code : sigmaYaml(r)});
   if(!files.length) return toast('Choose at least one thing to include');
   const enc = new TextEncoder(), sums = await Promise.all(files.map(async f => { const h = await crypto.subtle.digest('SHA-256', enc.encode(f.data)); return [...new Uint8Array(h)].map(b => b.toString(16).padStart(2, '0')).join(''); }));
-  const manifest = [`${c.code} — ${M.red(c.name)}`, `${T[1]} — ${T[2]}`, `Made with ${BRAND.name} on ${new Date().toISOString()}${S.red ? ' · personal data redacted' : ''}`, '', 'SHA-256 of each file:', ...files.map((f, i) => sums[i] + '  ' + f.name.slice(base.length + 1)), '',
+  const manifest = [`${M.red(c.name)}`, `${T[1]} — ${T[2]}`, `Made with ${BRAND.name} on ${new Date().toISOString()}${S.red ? ' · personal data redacted' : ''}`, '', 'SHA-256 of each file:', ...files.map((f, i) => sums[i] + '  ' + f.name.slice(base.length + 1)), '',
     'Check on Linux or macOS:  shasum -a 256 -c MANIFEST.txt  (from inside the folder, after removing these notes)', 'Check on Windows:         Get-FileHash <file> -Algorithm SHA256'].join('\n');
   files.push({name:base + '/MANIFEST.txt', data:manifest});
   const blob = nbZip(files), a = document.createElement('a'), u = URL.createObjectURL(blob); a.href = u; a.download = base + '-' + S.tlp.replace('+', '-') + '.zip'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000);
-  closeDlg(); auditAdd && auditAdd('shared ' + c.code + ' as ' + T[1] + ' (' + files.length + ' files)'); save(); toast('Share package ready — ' + (files.length - 1) + ' file' + (files.length > 2 ? 's' : '') + ' and a manifest');
+  closeDlg(); auditAdd && auditAdd('shared ' + caseNm(c) + ' as ' + T[1] + ' (' + files.length + ' files)'); save(); toast('Share package ready — ' + (files.length - 1) + ' file' + (files.length > 2 ? 's' : '') + ' and a manifest');
 }
 const SH_ACTS = {
   shareDlg:() => shareDlg(), shGo:() => shareGo(),

@@ -72,6 +72,7 @@ const IPF_REAL = new Set(('tmobile.com microsoftonline.com office365.com live.co
 /* letters that look alike: each group reads as its first letter */
 const IPF_GLYPH = (() => { const m = {}; for(const g of ['oο0оօ', 'l1iӏіιǀ|ı', 'eе3éèêëє', 'aаα4àáâäåɑ@', 'sѕ5$ś', 'tτт7', 'gɡ9ǥ', 'cсçϲć', 'pрρ', 'xхχ', 'yуγý', 'kκкḱ', 'hһ', 'jј', 'dԁ', 'vνѵ', 'wѡԝ', 'mм', 'uυüùúû', 'nոñ', 'bЬ', 'rг', 'qԛ', 'zᴢ2']) for(const ch of g) m[ch] = g[0]; return m; })();
 const IPF_SCRIPT = ch => { const c = ch.codePointAt(0); if(c < 0x80) return /[a-z]/i.test(ch) ? 'Latin' : ''; if(c <= 0x024f) return 'Latin'; if(c >= 0x0370 && c <= 0x03ff) return 'Greek'; if(c >= 0x0400 && c <= 0x052f) return 'Cyrillic'; if(c >= 0x0530 && c <= 0x058f) return 'Armenian'; if(c >= 0x0590 && c <= 0x05ff) return 'Hebrew'; if(c >= 0x0600 && c <= 0x06ff) return 'Arabic'; if(c >= 0x4e00 && c <= 0x9fff) return 'Chinese'; if(c >= 0x3040 && c <= 0x30ff) return 'Japanese'; if(c >= 0xac00 && c <= 0xd7af) return 'Korean'; return 'Other'; };
+const IPF_SKB = new Map();
 const ipfSkel = s => [...s.normalize('NFC')].map(ch => IPF_GLYPH[ch] || ch).join('');
 const ipfCharName = ch => { const c = ch.codePointAt(0), s = IPF_SCRIPT(ch); return /[0-9]/.test(ch) ? 'the digit ' + ch : (s && s !== 'Latin' ? s + ' ' : c > 0x7f ? 'accented ' : '') + '“' + ch + '” (U+' + c.toString(16).toUpperCase().padStart(4, '0') + ')'; };
 /* Damerau distance, capped at 2 */
@@ -103,7 +104,7 @@ function ipfDomain(host, F, out){
   if(!IPF_REAL.has(RA.reg) && !IPF_SET[RA.reg]){
     const mine = ipfMine(), sk = ipfSkel(name), alts = new Set([sk, sk.replace(/rn/g, 'm'), sk.replace(/vv/g, 'w'), sk.replace(/cl/g, 'd')]);
     const seen = new Set();
-    const toks = name.split('-'), check = (map, whose) => { for(const [b, real] of map){ if(seen.has(real) || RA.reg === real || ipfEnds(RA.reg, real)) continue; let hit = null; const sb = ipfSkel(b), tk = toks.length > 1 ? toks.find(t => t !== b && ipfSkel(t) === sb) : null;
+    const toks = name.split('-'), tsk = toks.map(ipfSkel), check = (map, whose) => { for(const [b, real] of map){ if(seen.has(real) || RA.reg === real || ipfEnds(RA.reg, real)) continue; let hit = null; const sb = IPF_SKB.get(b) || (IPF_SKB.set(b, ipfSkel(b)), IPF_SKB.get(b)), tk = toks.length > 1 ? toks.find((t, j) => t !== b && tsk[j] === sb) : null;
       if(name !== b && [...alts].includes(sb)){ const diff = [...name].map((c, i) => c !== b[i] && name.length === b.length ? c : '').filter(Boolean); hit = ['bad', 'Looks like ' + real, (diff.length ? 'Uses ' + [...new Set(diff)].slice(0, 3).map(ipfCharName).join(', ') + ' where ' + real + ' has ' + [...new Set([...name].map((c, i) => c !== b[i] ? b[i] : '').filter(Boolean))].slice(0, 3).map(x => '“' + x + '”').join(', ') : 'Letters drawn alike (rn for m, vv for w)') + '. On screen the two read the same.']; }
       else if(name === b && R.suffix !== ipfReg(real).suffix){ const cc = /^[a-z]{2}$/.test(R.suffix) || /^(co|com)\.[a-z]{2}$/.test(R.suffix); hit = cc ? ['info', 'Same name as ' + real + ', country ending .' + R.suffix, 'Often the brand’s own site for that country — but check who registered it.'] : /^(com|net|org|edu|gov|mil|int)$/.test(R.suffix) ? ['info', 'Same name as ' + real + ' on .' + R.suffix, 'Brands often own this too — check who registered it.'] : ['warn', 'Same name as ' + real + ' on another ending (.' + R.suffix + ')', 'Brands rarely use this ending; imitators often do.']; }
       else if(tk){ hit = ['bad', 'Looks like ' + real + ' with other words', '“' + tk + '” is drawn to read as ' + b + ' — ' + [...tk].filter((c, i) => c !== b[i]).slice(0, 3).map(ipfCharName).join(', ') + ' stands in.']; }
@@ -186,6 +187,22 @@ function ipfBech(a){ a = a.toLowerCase(); const p = a.lastIndexOf('1'); if(p < 1
   const G = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3]; let chk = 1;
   for(const x of [...[...hrp].map(c => c.charCodeAt(0) >> 5), 0, ...[...hrp].map(c => c.charCodeAt(0) & 31), ...data]){ const b = chk >>> 25; chk = ((chk & 0x1ffffff) << 5) ^ x; for(let i = 0; i < 5; i++) if((b >>> i) & 1) chk ^= G[i]; }
   chk >>>= 0; const kind = chk === 1 ? 'bech32' : chk === 0x2bc830a3 ? 'bech32m' : false; if(!kind) return false; return (data[0] === 0) === (kind === 'bech32') ? kind : false; }
+/* SHA-256, synchronous, for Base58Check (small inputs only) */
+function ipfSha256(m){
+  const K = IPF_K || (IPF_K = (() => { const k = [], p = []; for(let n = 2; p.length < 64; n++) if(p.every(q => n % q)) p.push(n); for(const q of p) k.push((Math.cbrt(q) % 1) * 2 ** 32 | 0); return k; })());
+  const H = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19], l = m.length, n = ((l + 9 + 63) >> 6) << 6, b = new Uint8Array(n); b.set(m); b[l] = 0x80; new DataView(b.buffer).setUint32(n - 4, l * 8); const W = new Int32Array(64), r = (x, y) => x >>> y | x << 32 - y;
+  for(let o = 0; o < n; o += 64){ for(let i = 0; i < 16; i++) W[i] = b[o + i * 4] << 24 | b[o + i * 4 + 1] << 16 | b[o + i * 4 + 2] << 8 | b[o + i * 4 + 3];
+    for(let i = 16; i < 64; i++){ const a = W[i - 15], c = W[i - 2]; W[i] = (r(a, 7) ^ r(a, 18) ^ a >>> 3) + W[i - 16] + (r(c, 17) ^ r(c, 19) ^ c >>> 10) + W[i - 7] | 0; }
+    let [A, B, C, D, E2, F, G, X] = H;
+    for(let i = 0; i < 64; i++){ const t1 = X + (r(E2, 6) ^ r(E2, 11) ^ r(E2, 25)) + (E2 & F ^ ~E2 & G) + K[i] + W[i] | 0, t2 = (r(A, 2) ^ r(A, 13) ^ r(A, 22)) + (A & B ^ A & C ^ B & C) | 0; X = G; G = F; F = E2; E2 = D + t1 | 0; D = C; C = B; B = A; A = t1 + t2 | 0; }
+    H[0] = H[0] + A | 0; H[1] = H[1] + B | 0; H[2] = H[2] + C | 0; H[3] = H[3] + D | 0; H[4] = H[4] + E2 | 0; H[5] = H[5] + F | 0; H[6] = H[6] + G | 0; H[7] = H[7] + X | 0; }
+  const out = new Uint8Array(32); H.forEach((h, i) => new DataView(out.buffer).setUint32(i * 4, h)); return out;
+}
+let IPF_K = null;
+/* Base58Check: the last 4 bytes are the first 4 of a double SHA-256 of the rest */
+function ipfB58(a){ const A = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'; let n = 0n; for(const ch of a){ const i = A.indexOf(ch); if(i < 0) return false; n = n * 58n + BigInt(i); }
+  const bytes = []; while(n > 0n){ bytes.unshift(Number(n & 255n)); n >>= 8n; } for(const ch of a){ if(ch !== '1') break; bytes.unshift(0); } if(bytes.length < 5) return false;
+  const body = new Uint8Array(bytes.slice(0, -4)), sum = ipfSha256(ipfSha256(body)); return bytes.slice(-4).every((x, i) => x === sum[i]); }
 function ipfMisc(k, v, F, out){
   const low = String(v).toLowerCase();
   if(/^(md5|sha1|sha256|sha512)$/.test(k)){ F.push(['Algorithm', {md5:'MD5 · 128 bits', sha1:'SHA-1 · 160 bits', sha256:'SHA-256 · 256 bits', sha512:'SHA-512 · 512 bits'}[k]]);
@@ -196,7 +213,7 @@ function ipfMisc(k, v, F, out){
   else if(k === 'btc'){ const net = /^(tb1|bcrt1|[mn2])/.test(v) ? 'Testnet' : 'Bitcoin';
     const t = /^(bc1q|tb1q)/i.test(v) ? (v.length > 50 ? 'Native SegWit script (P2WSH) — often multisig' : 'Native SegWit (P2WPKH)') : /^(bc1p|tb1p)/i.test(v) ? 'Taproot (P2TR)' : /^[13mn2]/.test(v) ? (/^[1mn]/.test(v) ? 'Legacy (P2PKH)' : 'Script hash (P2SH) — multisig or wrapped SegWit') : 'Unknown';
     F.push(['Network', net]); F.push(['Type', t]);
-    if(/^(bc|tb|bcrt)1/i.test(v)){ const c = ipfBech(v); if(c === false) out.push({lvl:'bad', t:'Checksum fails', why:'Not a valid address — a typo, a truncated copy, or made up. Funds sent to it would be refused.'}); else if(c) F.push(['Checksum', 'Valid (' + c + ')']); } else F.push(['Checksum', 'Not checked here for this type — a block explorer will refuse a mistyped one']);
+    if(/^(bc|tb|bcrt)1/i.test(v)){ const c = ipfBech(v); if(c === false) out.push({lvl:'bad', t:'Checksum fails', why:'Not a valid address — a typo, a truncated copy, or made up. Funds sent to it would be refused.'}); else if(c) F.push(['Checksum', 'Valid (' + c + ')']); } else if(ipfB58(v)) F.push(['Checksum', 'Valid (Base58Check)']); else out.push({lvl:'bad', t:'Checksum fails', why:'Not a valid address — a typo, a truncated copy, or made up. Funds sent to it would be refused.'});
     if(net === 'Testnet') out.push({lvl:'info', t:'Testnet address', why:'Test coins with no value — from a developer, or a fake.'}); }
   else if(k === 'eth'){ F.push(['Type', 'Ethereum-style address (also BSC, Polygon, Arbitrum…)']); if(/^0x0{40}$/.test(low)) out.push({lvl:'info', t:'The zero address', why:'Used to burn tokens and in contract creation; nobody owns it.'}); else if(/^0x0{20,}/.test(low) || /^0x0+dead$/.test(low)) out.push({lvl:'info', t:'Burn or vanity address', why:'Long runs of zeros are made on purpose.'}); F.push(['Checksum', /[a-f]/.test(v.slice(2)) && /[A-F]/.test(v.slice(2)) ? 'Mixed case (EIP-55 checksummed form)' : 'Not in checksummed form']); }
   else if(k === 'email' && typeof idEmail === 'function'){ const I = idEmail(v); if(!I) return;

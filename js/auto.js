@@ -29,7 +29,7 @@ function autoSay(R){
   const ONE = {ip:'IP address', domain:'domain', url:'URL', hash:'file hash', email:'email address', cve:'CVE', handle:'username', wallet:'crypto wallet', phone:'phone number'};
   const w = R.when || {}, k = (w.kinds || []).map(x => ONE[x]).filter(Boolean), list = k.length > 1 ? k.slice(0, -1).join(', ') + ' or ' + k[k.length - 1] : k[0] || 'indicator';
   const when = w.ev === 'ind' ? 'a new ' + list + ' appears' : w.ev === 'tag' ? 'evidence mentions “' + (w.text || '') + '”' : 'an indicator is judged ' + (w.verdict || 'malicious');
-  const where = R.scope && R.scope !== 'all' ? ' in ' + ((theCase(R.scope) || {}).code || 'a deleted case') : ' in any of my cases';
+  const where = R.scope && R.scope !== 'all' ? ' in ' + (caseNm(R.scope) || 'a deleted case') : ' in any of my cases';
   return 'When ' + when + where + ' → ' + (R.then || []).map(t => t.a === 'question' ? 'ask “' + t.text + '”' : t.a === 'verdict' ? 'mark it ' + t.v : t.a === 'playbook' ? 'run “' + ((DB.playbooks || []).find(p => p.id === t.id) || {name:'a playbook'}).name + '”' : t.a === 'vault' ? 'add it to the vault' : AUTO_DO[t.a].replace(/^\w/, ch => ch.toLowerCase())).join(', ');
 }
 /* the cases a rule looks at: one case, or all of the user's own (never the demo cases) */
@@ -62,7 +62,7 @@ function autoTick(){
   return acts;
 }
 function autoDo(R, t, x){
-  const c = x.c, fill = s => String(s || '').replace(/\{value\}/g, x.v || '').replace(/\{kind\}/g, x.k ? (E.LABEL[x.k] || x.k) : '').replace(/\{case\}/g, c.code).replace(/\{title\}/g, x.rec ? x.rec.title : '');
+  const c = x.c, fill = s => String(s || '').replace(/\{value\}/g, x.v || '').replace(/\{kind\}/g, x.k ? (E.LABEL[x.k] || x.k) : '').replace(/\{case\}/g, caseNm(c)).replace(/\{title\}/g, x.rec ? x.rec.title : '');
   switch(t.a){
     case 'store': { if(!x.k || typeof CTI === 'undefined' || !CTI.iocIx) return ''; const i = CTI.iocIx.get(x.key); if(!i || !iocLive(i)) return '';
       if(!DB.verdicts[x.key]) DB.verdicts[x.key] = 'suspicious'; return x.v + ' is in the indicator store' + (i.threat ? ' (' + i.threat + ')' : '') + ' — marked suspicious'; }
@@ -95,7 +95,7 @@ function autoView(){
     <section class="card au-intro"><div><h2>${ico('workflow','sm')} Automations</h2><p class="t2">Rules that do the routine work for you. They run in this browser while OSINTrix is open — nothing runs when the tab is closed, and only lookups go online, to the sources you switched on. Each rule acts once per indicator, record or case.</p></div><button class="btn primary" data-act="auNew">${ico('plus','sm')}New automation</button></section>
     ${DB.autos.length ? `<section class="card au-list">${DB.autos.map(rule).join('')}</section>` : ''}
     ${AUTO_TPL.some(T => !used.has(T.id)) ? `<h3 class="au-h">Ready-made</h3><div class="au-tpl">${AUTO_TPL.filter(T => !used.has(T.id)).map(T => `<article class="card"><b>${esc(T.name)}</b><p class="t2">${esc(T.why)}</p><small class="t3">${esc(autoSay(T))}</small><button class="btn sm" data-act="auTpl" data-id="${T.id}">${ico('plus','sm')}Add</button></article>`).join('')}</div>` : ''}
-    <h3 class="au-h">What they did</h3>${log.length ? `<section class="card au-log"><ul>${log.map(l => `<li><span class="t3 mono">${esc(E.fmtFull(l.at, tz()).slice(5, 16))}</span><b>${esc((theCase(l.c) || {}).code || '—')}</b><span>${esc(l.what)}</span><small class="t3">${esc(l.name)}</small></li>`).join('')}</ul></section>` : '<p class="t3">Nothing yet. Rules act a moment after evidence arrives.</p>'}
+    <h3 class="au-h">What they did</h3>${log.length ? `<section class="card au-log"><ul>${log.map(l => `<li><span class="t3 mono">${esc(E.fmtFull(l.at, tz()).slice(5, 16))}</span><b>${esc(caseNm(l.c) || '—')}</b><span>${esc(l.what)}</span><small class="t3">${esc(l.name)}</small></li>`).join('')}</ul></section>` : '<p class="t3">Nothing yet. Rules act a moment after evidence arrives.</p>'}
   </div>`;
 }
 function autoDlg(R){
@@ -109,7 +109,7 @@ function autoDlg(R){
       <label class="au-o"><input type="radio" name="auEv" value="tag" ${w.ev === 'tag' ? 'checked' : ''}> Evidence is tagged with, or mentions <input id="auText" class="inp" value="${esc(w.text || '')}" placeholder="phishing" maxlength="80" aria-label="Text to look for"></label>
       <label class="au-o"><input type="radio" name="auEv" value="verdict" ${w.ev === 'verdict' ? 'checked' : ''}> An indicator is judged <select id="auVer" aria-label="Verdict">${['malicious', 'suspicious'].map(v => `<option${w.verdict === v ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
     </fieldset>
-    <div class="field"><label for="auScope">In</label><select id="auScope"><option value="all">Any of my cases (not the demo cases, not closed ones)</option>${cases.map(c => `<option value="${c.id}"${r.scope === c.id ? ' selected' : ''}>${esc(c.code + ' · ' + c.name)}</option>`).join('')}</select></div>
+    <div class="field"><label for="auScope">In</label><select id="auScope"><option value="all">Any of my cases (not the demo cases, not closed ones)</option>${cases.map(c => `<option value="${c.id}"${r.scope === c.id ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div>
     <fieldset><legend>Then</legend>
       ${['store', 'lookup', 'watch'].map(a => `<label class="au-o"><input type="checkbox" name="auDo" value="${a}" ${has(a) ? 'checked' : ''}> ${AUTO_DO[a]}</label>`).join('')}
       <label class="au-o"><input type="checkbox" name="auDo" value="vault" ${has('vault') ? 'checked' : ''}> Add it to the vault with priority <select id="auPrio" aria-label="Priority">${['low', 'medium', 'high', 'critical'].map(p => `<option${((has('vault') || {}).prio || 'medium') === p ? ' selected' : ''}>${p}</option>`).join('')}</select></label>

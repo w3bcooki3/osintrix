@@ -19,12 +19,12 @@ async function sncBuild(cid, withFiles){
 const sncStamp = t => new Date(t).toISOString().slice(0, 16).replace('T', '-').replace(':', '');
 async function sncSave(cid, name, withFiles){
   UI.snc = {name}; const o = await sncBuild(cid, withFiles), c = theCase(cid);
-  download(`${c.code}-snapshot-${sncStamp(o.snapshot.at)}${name ? '-' + slug(name).slice(0, 40) : ''}.json`, JSON.stringify(o), 'application/json');
+  download(`${slug(caseNm(c))}-snapshot-${sncStamp(o.snapshot.at)}${name ? '-' + slug(name).slice(0, 40) : ''}.json`, JSON.stringify(o), 'application/json');
   return o;
 }
 function sncSaveDlg(){
   const c = theCase(), n = derive(c.id), hasFiles = DB.records.some(r => r.caseId === c.id && (r.files || []).length);
-  openDlg(dhead('Save a snapshot of ' + esc(c.code)) + `<form data-form="sncSave"><div class="in">
+  openDlg(dhead('Save a snapshot of ' + esc(caseNm(c))) + `<form data-form="sncSave"><div class="in">
     <p class="t2" style="margin:0 0 12px">The case as it is now — ${n.entries.length.toLocaleString()} entries, ${n.links.length.toLocaleString()} links, ${n.recs.length.toLocaleString()} records — saved as a file on your computer. It takes no space in this browser. Open it later to see what changed, bring back what was removed, or roll back.</p>
     <div class="field"><label for="sncName">Name <span class="t3">(optional)</span></label><input id="sncName" maxlength="80" placeholder="Before the Maltego import" autocomplete="off"></div>
     ${hasFiles ? `<label class="chk"><input type="checkbox" id="sncFiles"> Include attached files (pictures, documents) — a bigger file</label>` : ''}</div>
@@ -64,7 +64,7 @@ function sncLoad(){
     if(!d || d.format !== 'osintrix-case' || !d.case || !Array.isArray(d.entries)) return toast('Not an OSINTrix case snapshot — save one from the case menu');
     { const errs = checkImport(d, 'case'); if(errs.length) return importRefused('The snapshot', errs); }
     const c = theCase();
-    if(d.case.id !== c.id) return toast(`That snapshot is of ${String(d.case.code || 'another case').slice(0, 30)}, not ${c.code} — open it from that case, or import it as a new case from Cases`);
+    if(d.case.id !== c.id) return toast(`That snapshot is of ${theCase(d.case.id) ? caseNm(theCase(d.case.id)) : String(d.case.name || d.case.code || 'another case').split(' — ')[0].slice(0, 48)}, not ${caseNm(c)} — open it from that case, or import it as a new case from Cases`);
     d.entries = d.entries.map(e => normEntry({...e})); d.records = (d.records || []).map(r => normRecord({...r})); d.links = (d.links || []).map(l => normLink({...l})); d.notes = Array.isArray(d.notes) ? d.notes.filter(n => n && typeof n.text === 'string') : [];
     UI.sncF = {name:f.name, d}; sncDlg(); };
   i.click();
@@ -76,7 +76,7 @@ function sncDlg(){
   const same = !Object.entries(X).some(([k, v]) => Array.isArray(v) && v.length), back = X.eDel.length + X.lDel.length + X.rDel.length + X.nDel.length;
   openDlg(dhead('Since the snapshot') + `<div class="in snc">
     <p class="snc-src">${ico('history','sm')}<b>${esc(d.snapshot && d.snapshot.name || F.name)}</b><span class="t3">${at ? esc(E.fmtFull(at, tz()).slice(0, 16)) + ' · ' + esc(E.fmtAgo(Math.max(0, Date.now() - at))) : esc(F.name)}</span></p>
-    ${same ? `<p class="dp-done">${ico('check','sm')}<b>Nothing has changed in ${esc(c.code)} since this snapshot.</b></p>` : `
+    ${same ? `<p class="dp-done">${ico('check','sm')}<b>Nothing has changed in ${esc(caseNm(c))} since this snapshot.</b></p>` : `
     <div class="snc-cols"><div><h4>Added since</h4>${sec('entries', X.eAdd, e => `<li>${tbadge(e.type)}${nm(e)}</li>`)}${sec('links', X.lAdd, ln)}${sec('records', X.rAdd, r => `<li>${esc(r.title)}</li>`)}${sec('notes', X.nAdd, n => `<li>${esc(noteLabel(n))}</li>`)}${X.eAdd.length + X.lAdd.length + X.rAdd.length + X.nAdd.length ? '' : '<p class="t3">Nothing</p>'}</div>
       <div><h4>Removed since</h4>${sec('entries', X.eDel, e => `<li>${tbadge(e.type)}${nm(e)}</li>`)}${sec('links', X.lDel, ln)}${sec('records', X.rDel, r => `<li>${esc(r.title)}</li>`)}${sec('notes', X.nDel, n => `<li>${esc(noteLabel(n))}</li>`)}${back ? '' : '<p class="t3">Nothing</p>'}</div>
       <div><h4>Edited since</h4>${sec('entries', X.eMod, e => `<li>${tbadge(e.type)}${nm(e)}<small class="t3">${esc(sncWhat(E0.get(e.id), e))}</small></li>`)}${sec('notes', X.nMod, n => `<li>${esc(noteLabel(n))}</li>`)}${X.eMod.length + X.nMod.length ? '' : '<p class="t3">Nothing</p>'}</div></div>`}</div>
@@ -99,7 +99,7 @@ async function sncBringBack(){
 }
 function sncRoll(){
   const F = UI.sncF; if(!F) return; const c = theCase();
-  confirmDlg(`Roll ${c.code} back to the snapshot?`, `Its entries, links, records and notes become what they were in the snapshot. A snapshot of the case as it is now is saved to your downloads first, and you can undo right after.`, 'Roll back', async () => {
+  confirmDlg(`Roll ${caseNm(c)} back to the snapshot?`, `Its entries, links, records and notes become what they were in the snapshot. A snapshot of the case as it is now is saved to your downloads first, and you can undo right after.`, 'Roll back', async () => {
     const d = F.d, X = sncDiff(d, c.id);
     if(!await stoGuard(sncBytes(X.eDel, X.lDel, X.rDel, X.nDel), 'roll back')) return;
     await sncSave(c.id, 'before rolling back', false);
@@ -111,8 +111,8 @@ function sncRoll(){
     const vin = normVerdicts(d.verdicts); DB.verdicts = DB.verdicts || {}; for(const [k, v] of Object.entries(vin)) DB.verdicts[k] = v;
     if(d.files && X.rDel.length && typeof rekeyFiles === 'function') await rekeyFiles(d.files, X.rDel);
     if(UI.sel && !entryById(UI.sel.id) && !recById(UI.sel.id)) UI.sel = null;
-    UI.sncF = null; mutate('rolled ' + c.code + ' back to a snapshot'); renderAll();
-    toast(`${c.code} rolled back — the state before is in your downloads`, 'Undo', () => { Object.assign(DB, before); mutate('undid the roll-back'); renderAll(); }); });
+    UI.sncF = null; mutate('rolled ' + caseNm(c) + ' back to a snapshot'); renderAll();
+    toast(`${caseNm(c)} rolled back — the state before is in your downloads`, 'Undo', () => { Object.assign(DB, before); mutate('undid the roll-back'); renderAll(); }); });
 }
 const SNC_ACTS = {
   sncSaveDlg:() => sncSaveDlg(),

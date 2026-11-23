@@ -86,7 +86,7 @@ const VB_ACTS = {
     const on = !keys.every(k => isWatched(k)); vbChange(on ? 'watched' : 'stopped watching', () => { DB.watch = DB.watch || {}; for(const k of keys){ if(on && !DB.watch[k]) DB.watch[k] = {at:Date.now()}; if(!on) delete DB.watch[k]; } });
     if(keys.length < es.length) toast(`${keys.length} watched — the other ${es.length - keys.length} are names or notes, which cannot be watched`); },
   vbCsv:() => { const es = [...UI.vPick].map(entryById).filter(Boolean), cell = csvCell;
-    download(theCase().code + '-entries.csv', [['type', 'value', 'verdict', 'priority', 'starred', 'tags', 'records', 'links', 'notes', 'fields'].join(',')].concat(es.map(e => { const X = entryCtx(e);
+    download(slug(caseNm(theCase())) + '-entries.csv', [['type', 'value', 'verdict', 'priority', 'starred', 'tags', 'records', 'links', 'notes', 'fields'].join(',')].concat(es.map(e => { const X = entryCtx(e);
       return [TYPES[e.type].label, primary(e), entryVerdict(e), e.priority, e.starred ? 'yes' : '', e.tags.join(' '), X.recs.length, X.links.length, e.notes, Object.entries(e.fields).map(([k, v]) => k + '=' + v).join('; ')].map(cell).join(','); })).join('\r\n'), 'text/csv'); },
   vbDel:() => { const es = [...UI.vPick].map(entryById).filter(Boolean); if(!es.length) return;
     confirmDlg(`Delete ${es.length.toLocaleString()} ${es.length === 1 ? 'entry' : 'entries'}?`, `They go to the trash with their ${(() => { const s = new Set(es.map(e => e.id)); return DB.links.filter(l => s.has(l.a) || s.has(l.b)).length; })()} relationships, and can be restored from there for 30 days — or undone right after.`, 'Delete', () => {

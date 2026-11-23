@@ -146,7 +146,7 @@ function viewDetections(){
       ${vlist('dtV', list.map(r => ({k:r.id, h:66, r:() => { const c = r.caseId ? theCase(r.caseId) : null;
         return `<tr data-act="rSel" data-id="${esc(r.id)}" data-pick="${esc(r.id)}" class="${rPicked(r.id) ? 'sel' : ''}" aria-current="${!!(open && cur.id === r.id)}" tabindex="0">
           <td class="c-pick">${rPickBox(r)}</td><td class="c-star"><button class="tb-ic${r.starred ? ' on star' : ''}" data-act="rStar" data-id="${esc(r.id)}" aria-label="Star">${ico('star','sm')}</button></td>
-          <td class="c-name"><b>${esc(r.title)}</b><span>${esc(r.desc || '')}</span>${c ? `<em class="c-case" style="--c:${esc(c.color)}">${esc(c.code)}</em>` : ''}</td>
+          <td class="c-name"><b>${esc(r.title)}</b><span>${esc(r.desc || '')}</span>${c ? `<em class="c-case" style="--c:${esc(c.color)}">${esc(caseNm(c))}</em>` : ''}</td>
           <td class="c-cat">${typeTag(r)}</td><td class="c-sev">${sevTag(r)}</td><td class="c-tech mono">${esc(r.technique || '—')}</td><td class="c-plat">${esc(r.platform || '—')}</td><td class="c-upd">${ago(r)}</td>
           <td class="c-act">${ico('chevron-right','sm')}</td></tr>`; }})), {tbody:true, cols:9})}</table></div>`;
   return `<div class="scroll"><div class="page wide">${head}
@@ -158,7 +158,7 @@ function ruleEditor(r){
   const issues = validateRule(r.type, r.code, r.title), [tl, ti, tc, td] = RTYPE[r.type], [sl, sc] = sevOf(r.severity), c = r.caseId ? theCase(r.caseId) : null;
   const tab = UI.rtab || 'rule';
   return `<form data-form="rule" data-id="${esc(r.id)}" class="rx">
-    <div class="rx-h"><span class="pill" style="--c:${tc}">${ico(ti,'sm')}${tl} · ${td}</span><span class="pill" style="--c:${sc}" id="rSevPill">${sl}</span>${c ? `<a class="pill" href="${caseHash(c.id)}" style="--c:${esc(c.color)}">${ico('folder-open','sm')}${esc(c.code)}</a>` : ''}
+    <div class="rx-h"><span class="pill" style="--c:${tc}">${ico(ti,'sm')}${tl} · ${td}</span><span class="pill" style="--c:${sc}" id="rSevPill">${sl}</span>${c ? `<a class="pill" href="${caseHash(c.id)}" style="--c:${esc(c.color)}">${ico('folder-open','sm')}${esc(caseNm(c))}</a>` : ''}
       <span style="flex:1"></span><span class="rx-dirty">Unsaved changes</span>
       <button type="button" class="iconbtn${r.starred ? ' on' : ''}" data-act="rStar" data-id="${esc(r.id)}" aria-label="${r.starred ? 'Unstar' : 'Star'}" title="Star">${ico('star','sm')}</button>
       <button type="button" class="iconbtn" data-act="rMenu" data-id="${esc(r.id)}" aria-label="More actions" title="More">${ico('ellipsis','sm')}</button></div>
@@ -171,7 +171,7 @@ function ruleEditor(r){
       <div class="cx"><div class="cx-g" id="rGut" aria-hidden="true"></div><div class="cx-ed"><pre class="cx-hl" id="rHl" aria-hidden="true"></pre>
         <label class="sr" for="rCode">Rule source</label><textarea id="rCode" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off">${esc(r.code)}</textarea></div></div>
       <div class="cx-bar" id="rStatus"></div>
-      <div class="rtest"><button type="button" class="btn sm" data-act="rTest" data-id="${esc(r.id)}">${ico('play','sm')}Test against ${esc((theCase() || {code:'case'}).code)} evidence</button>${r.type === 'yara' ? `<button type="button" class="btn sm" data-act="rTestFile" data-id="${esc(r.id)}">${ico('file-search','sm')}Scan a file…</button>` : ''}<span class="t3">Runs locally on the current rule text — saved or not.</span></div>
+      <div class="rtest"><button type="button" class="btn sm" data-act="rTest" data-id="${esc(r.id)}">${ico('play','sm')}Test against ${esc((caseNm(theCase()) || 'case'))} evidence</button>${r.type === 'yara' ? `<button type="button" class="btn sm" data-act="rTestFile" data-id="${esc(r.id)}">${ico('file-search','sm')}Scan a file…</button>` : ''}<span class="t3">Runs locally on the current rule text — saved or not.</span></div>
       <div id="rTestOut"></div>
       ${r.type === 'sigma' && !/^\s*title\s*:/m.test(r.code) ? `<p class="hint rx-note">${ico('circle-help','sm')}The title above is added as <span class="mono">title:</span> when you copy or download this rule.</p>` : ''}</div>
     <div class="rx-pane" data-pane="lab"${/^(tests|queries|evasion|history)$/.test(tab) ? '' : ' hidden'}><div id="dlPane" aria-live="polite"></div></div>
@@ -179,7 +179,7 @@ function ruleEditor(r){
       <div class="frow"><div class="field"><label for="rSev">Severity</label><select id="rSev">${Object.entries(SEV).map(([k, [l]]) => `<option value="${k}"${r.severity === k ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
         <div class="field"><label for="rTech">ATT&amp;CK technique</label><input id="rTech" value="${esc(r.technique)}" placeholder="T1059.001" class="mono"></div></div>
       <div class="frow"><div class="field"><label for="rPlat">Platform</label><input id="rPlat" value="${esc(r.platform)}" placeholder="Windows, Linux, Any…"></div>
-        <div class="field"><label for="rCase">Linked case</label><select id="rCase"><option value="">None</option>${DB.cases.map(x => `<option value="${x.id}"${r.caseId === x.id ? ' selected' : ''}>${esc(x.code + ' · ' + x.name.split(' — ')[0])}</option>`).join('')}</select></div></div>
+        <div class="field"><label for="rCase">Linked case</label><select id="rCase"><option value="">None</option>${DB.cases.map(x => `<option value="${x.id}"${r.caseId === x.id ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div></div>
       <div class="frow"><div class="field"><label for="rAuthor">Author</label><input id="rAuthor" value="${esc(r.author)}"></div>
         <div class="field"><label for="rTags">Tags</label><input id="rTags" value="${esc(r.tags.join(', '))}" placeholder="comma, separated"></div></div>
       <p class="hint">Created ${esc(new Date(r.created).toISOString().slice(0, 10))} · ${r.code.split('\n').length} lines · ${esc(r.id)}</p></div>
@@ -261,11 +261,11 @@ function ruleFromCase(){
   const slugId = c.code.toLowerCase().replace(/[^a-z0-9]+/g, '_');
   const sig = `title: ${c.name.split(' — ')[0]} — network indicators\nid: ${crypto.randomUUID ? crypto.randomUUID() : slugId}\nstatus: experimental\ndescription: Connections to infrastructure judged malicious in ${c.code}. Generated by OSINTrix — review before use.\nreferences:\n    - ${c.code}\nlogsource:\n    category: network_connection\n    product: windows\ndetection:\n    selection_ip:\n        DestinationIp:\n${(ips.length ? ips : ['0.0.0.0']).map(v => '            - ' + v).join('\n')}\n${doms.length ? `    selection_dns:\n        DestinationHostname|endswith:\n${doms.map(v => '            - ' + v).join('\n')}\n` : ''}    condition: 1 of selection_*\nlevel: high`;
   const strs = [...doms, ...urls, ...ips].slice(0, 20).map((v, i) => `        $n${i} = "${v.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}" ascii wide nocase`);
-  const yar = `rule ${slugId}_indicators {\n    meta:\n        description = "Strings from ${c.code} (${c.name.split(' — ')[0].replace(/"/g, '')}). Generated by OSINTrix — review before use."\n        author = "You"\n        case = "${c.code}"\n${hashes.length ? hashes.map(h => `        hash = "${h}"`).join('\n') + '\n' : ''}    strings:\n${strs.join('\n')}\n    condition:\n        any of them\n}`;
+  const yar = `rule ${slugId}_indicators {\n    meta:\n        description = "Strings from ${c.name.split(' — ')[0].replace(/"/g, '')}. Generated by OSINTrix — review before use."\n        author = "You"\n        case = "${c.code}"\n${hashes.length ? hashes.map(h => `        hash = "${h}"`).join('\n') + '\n' : ''}    strings:\n${strs.join('\n')}\n    condition:\n        any of them\n}`;
   const now = Date.now();
   const a = {id:uid('r'), type:'sigma', title:c.name.split(' — ')[0] + ' — network indicators', desc:'Generated from ' + mal.size + ' malicious entities in ' + c.code, code:sig, severity:'high', category:'network', technique:'T1071', author:'You', platform:'Windows', tags:['generated', c.code], refs:[], created:now, modified:now, starred:false, caseId:c.id};
   const b = {id:uid('r'), type:'yara', title:c.name.split(' — ')[0] + ' — indicator strings', desc:'Generated from ' + mal.size + ' malicious entities in ' + c.code, code:yar, severity:'high', category:'malware', technique:'', author:'You', platform:'Any', tags:['generated', c.code], refs:[], created:now, modified:now, starred:false, caseId:c.id};
-  DB.rules.unshift(a, b); UI.rule = a.id; UI.ropen = true; UI.dview = 'rules'; UI.rtab = 'rule'; UI.dtype = 'all'; UI.dcat = ''; mutate('generated 2 rules from ' + c.code);
+  DB.rules.unshift(a, b); UI.rule = a.id; UI.ropen = true; UI.dview = 'rules'; UI.rtab = 'rule'; UI.dtype = 'all'; UI.dcat = ''; mutate('generated 2 rules from ' + caseNm(c));
   if(UI.route.area !== 'detections') go('#/detections'); else renderMain();
   toast('Two starter rules generated from ' + mal.size + ' malicious entities — review before use');
 }

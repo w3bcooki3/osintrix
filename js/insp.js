@@ -34,6 +34,7 @@ function inspEntry(e){
       <a class="btn sm" href="${caseHash(e.caseId,'graph')}" data-act="showInGraph" data-id="${e.id}">${ico('waypoints','sm')}Graph</a><button class="btn sm danger" data-act="delEntry" data-id="${e.id}" aria-label="Delete">${ico('trash-2','sm')}</button></div>
     ${(e.type === 'person' || e.type === 'alias' || e.type === 'organization') && typeof idpBuild === 'function' ? (P => `<div class="isec"><button class="btn sm" data-act="idpOpen" data-id="${e.id}">${ico('users','sm')}Identity profile</button> <span class="t3 small">${P ? P.ids.length + ' identifier' + (P.ids.length === 1 ? '' : 's') + (P.people.length > 1 ? ' · also in ' + (P.people.length - 1) + ' other case' + (P.people.length > 2 ? 's' : '') : '') + (P.conflicts.length ? ' · cases disagree' : '') : ''}</span></div>`)(idpBuild(e.id)) : ''}
     ${k && typeof ipfSection === 'function' ? ipfSection(entSplit(k).k, entSplit(k).v) : ''}
+    ${k && typeof chSection === 'function' ? chSection(entSplit(k).k, entSplit(k).v) : ''}
     ${typeof entryMedia === 'function' ? entryMedia(e) : ''}
     ${e.type === 'phone' && typeof phoneSection === 'function' ? phoneSection(primary(e)) : ''}
     ${pivotSection(k ? entSplit(k).k : e.type, k ? entSplit(k).v : primary(e))}
@@ -85,14 +86,15 @@ function inspEnt(id){
   return ihead('Indicator') + `<div class="ibody"><div style="display:flex;gap:14px;align-items:flex-start">${kindBadge(k,'lg')}<div style="min-width:0"><div class="t3" style="font-size:calc(13px * var(--ts,1))">${esc(E.LABEL[k] || k)} · extracted</div><h2 class="mono" style="font-size:calc(16px * var(--ts,1));font-weight:600;overflow-wrap:anywhere">${esc(v)}</h2>
     ${m ? `<div style="font-size:calc(13px * var(--ts,1));margin-top:3px;color:${m.hot ? 'var(--amber)' : 'var(--text-3)'}">${esc(m.t)}</div>` : ''}<div class="cxts">${ctxChips(k, v)}</div></div></div>
     <div class="wrap" style="margin-top:14px"><button class="btn sm${isWatched(id) ? ' on' : ''}" data-act="watch" data-id="${esc(id)}">${ico(isWatched(id) ? 'eye-off' : 'eye','sm')}${isWatched(id) ? 'Unwatch' : 'Watch'}</button></div>
-    ${canVault && !derive().byKey.has(id) ? `<button class="btn primary sm" data-act="promote" data-id="${esc(id)}" style="margin-top:14px">${ico('plus','sm')}Add to ${esc(theCase().code)} vault</button>` : ''}
+    ${canVault && !derive().byKey.has(id) ? `<button class="btn primary sm" data-act="promote" data-id="${esc(id)}" style="margin-top:14px">${ico('plus','sm')}Add to ${esc(caseNm(theCase()))} vault</button>` : ''}
     ${typeof ipfSection === 'function' ? ipfSection(k, v) : ''}
+    ${typeof chSection === 'function' ? chSection(k, v) : ''}
     ${typeof lkInspSection === 'function' ? lkInspSection(k, v) : ''}
     ${k === 'phone' && typeof phoneSection === 'function' ? phoneSection(v) : ''}
     ${pivotSection(k, v)}
     ${typeof srcEntLine === 'function' ? srcEntLine(id) : ''}
     <div class="isec"><h4>Verdict <span class="t3">applies in every case</span></h4><div class="seg v">${[['malicious','Malicious'],['suspicious','Suspicious'],['benign','Benign'],['','Unknown']].map(([x, l]) => `<button data-act="entVerdict" data-id="${esc(id)}" data-v="${x}" aria-pressed="${vd === x}">${l}</button>`).join('')}</div>${typeof verdictAgeNote === 'function' ? verdictAgeNote(id) : ''}</div>
-    <div class="isec"><h4>Appears in <span class="t3">${recs.length} records · ${g ? g.cases.size : 0} cases</span></h4>${recs.slice(0, 10).map(r => `<button class="li" data-act="selRec" data-id="${r.id}" style="padding:8px 0"><div class="main2"><b style="font-weight:520;font-size:calc(14px * var(--ts,1))">${esc(r.title)}</b><small>${esc(theCase(r.caseId).code)}${r.ts ? ' · ' + esc(E.fmtFull(r.ts, tz()).slice(5, 16)) : ''}</small></div></button>`).join('')}</div>
+    <div class="isec"><h4>Appears in <span class="t3">${recs.length} records · ${g ? g.cases.size : 0} cases</span></h4>${recs.slice(0, 10).map(r => `<button class="li" data-act="selRec" data-id="${r.id}" style="padding:8px 0"><div class="main2"><b style="font-weight:520;font-size:calc(14px * var(--ts,1))">${esc(r.title)}</b><small>${esc(caseNm(theCase(r.caseId)))}${r.ts ? ' · ' + esc(E.fmtFull(r.ts, tz()).slice(5, 16)) : ''}</small></div></button>`).join('')}</div>
     <div class="wrap" style="margin-top:16px"><button class="btn sm" data-act="pivot" data-id="${esc(id)}">${ico('filter','sm')}Filter timeline to this</button></div>
     ${typeof sightSection === 'function' ? sightSection(id) : ''}</div>`;
 }
@@ -102,18 +104,22 @@ function inspFeed(f){
   const g = globalEnts(), x = typeof ctiX === 'function' ? ctiX(f) : {iocs:E.extract(f.title + ' ' + f.body), cve:[], ttp:[], act:[], mal:[], ven:[]}, hits = x.iocs;
   const others = typeof ctiStoryOf === 'function' ? ctiStoryOf(f.id).filter(o => o !== f) : [], t = f.st || 'new';
   const sec = (title, html) => html ? `<div class="isec"><h4>${title}</h4><div class="wrap">${html}</div></div>` : '';
-  return ihead('Story') + `<div class="ibody"><h2>${esc(f.title)}</h2><p class="t3" style="font-size:calc(13px * var(--ts,1));margin:6px 0 14px">${esc(f.source)} · ${esc(E.fmtDate(f.ts, tz()))}${f.sev && f.sev !== 'normal' ? ' · ' + esc(f.sev) : ''}</p>
-    <div class="wrap" style="margin-bottom:14px"><button class="btn sm${f.star ? ' on' : ''}" data-act="ctiStar" data-id="${f.id}" aria-pressed="${!!f.star}">${ico('star','sm')}${f.star ? 'Starred' : 'Star'}</button><button class="btn sm${t === 'relevant' ? ' on' : ''}" data-act="ctiTri" data-id="${f.id}" data-v="relevant" aria-pressed="${t === 'relevant'}">${ico('check','sm')}Relevant</button><button class="btn sm" data-act="ctiTri" data-id="${f.id}" data-v="${t === 'actioned' ? 'new' : 'actioned'}">${ico('check-check','sm')}${t === 'actioned' ? 'Actioned ✓' : 'Actioned'}</button><button class="btn sm" data-act="ctiTri" data-id="${f.id}" data-v="${t === 'dismissed' ? 'new' : 'dismissed'}">${ico(t === 'dismissed' ? 'undo-2' : 'x','sm')}${t === 'dismissed' ? 'Restore' : 'Dismiss'}</button></div>
-    <pre class="rawbox" style="font-family:var(--font);font-size:calc(14px * var(--ts,1))">${esc(f.body)}</pre>
+  /* the summary as an article: paragraphs, no box, no scroll; a long one opens on request */
+  const paras = String(f.body || '').replace(/\r/g, '').split(/\n\s*\n|\n(?=[A-Z•\-–])/).map(x => x.replace(/\s+/g, ' ').trim()).filter(Boolean), P = paras.length > 1 ? paras : String(f.body || '').replace(/\s+/g, ' ').trim().split(/(?<=[.!?])\s+(?=[A-Z])/).reduce((a, x) => { const l = a[a.length - 1]; if(l && l.length < 320) a[a.length - 1] = l + ' ' + x; else a.push(x); return a; }, []);
+  let n = 0, cut = P.findIndex(x => (n += x.length) > 900); if(cut < 1 || P.length - cut < 1) cut = P.length;
+  const para = x => `<p>${esc(x)}</p>`, sev = f.sev && f.sev !== 'normal' ? String(f.sev) : '';
+  return ihead('Story') + `<div class="ibody"><h2>${esc(f.title)}</h2><div class="story-m"><span class="src">${esc(f.source)}</span><span>${esc(E.fmtDate(f.ts, tz()))}</span>${sev ? `<span class="story-sev ${esc(sev.toLowerCase())}">${esc(sev)}</span>` : ''}</div>
+    <div class="story-tri"><button class="btn sm${f.star ? ' on' : ''}" data-act="ctiStar" data-id="${f.id}" aria-pressed="${!!f.star}">${ico('star','sm')}${f.star ? 'Starred' : 'Star'}</button><button class="btn sm${t === 'relevant' ? ' on' : ''}" data-act="ctiTri" data-id="${f.id}" data-v="relevant" aria-pressed="${t === 'relevant'}">${ico('check','sm')}Relevant</button><button class="btn sm" data-act="ctiTri" data-id="${f.id}" data-v="${t === 'actioned' ? 'new' : 'actioned'}">${ico('check-check','sm')}${t === 'actioned' ? 'Actioned ✓' : 'Actioned'}</button><button class="btn sm" data-act="ctiTri" data-id="${f.id}" data-v="${t === 'dismissed' ? 'new' : 'dismissed'}">${ico(t === 'dismissed' ? 'undo-2' : 'x','sm')}${t === 'dismissed' ? 'Restore' : 'Dismiss'}</button></div>
+    <div class="story-b">${P.slice(0, cut).map(para).join('')}${cut < P.length ? `<details class="story-more"><summary>Read the rest of the summary</summary>${P.slice(cut).map(para).join('')}</details>` : ''}</div>
     ${typeof cveChip === 'function' ? sec('Vulnerabilities', x.cve.map(cveChip).join('')) + sec('Actors &amp; malware', [...x.act, ...x.mal].map(actChip).join('')) + sec('ATT&amp;CK techniques', x.ttp.map(ttpChip).join('')) + sec('Vendors', x.ven.map(venChip).join('')) : ''}
     ${hits.length ? `<div class="isec"><h4>Indicators</h4><div class="wrap">${hits.map(e => entPill(entKey(e))).join('')}</div>${hits.some(e => g.has(entKey(e))) ? '<p class="heur">Highlighted indicators already exist in your cases.</p>' : ''}</div>` : ''}
     ${others.length ? `<div class="isec"><h4>Also reported by</h4>${others.map(o => `<button class="li" data-act="selFeed" data-id="${o.id}"><div class="main2"><b>${esc(o.source)}</b><span class="t3">${esc(o.title)}</span></div></button>`).join('')}</div>` : ''}
-    <div class="wrap" style="margin-top:18px"><button class="btn primary" data-act="feedToCase" data-id="${f.id}">${ico('plus','sm')}Add to ${esc(theCase().code)}</button>${E.safeUrl(f.link) ? `<a class="btn" href="${esc(E.safeUrl(f.link))}" target="_blank" rel="noopener noreferrer">Read original ${ico('external-link','sm')}</a>` : ''}</div></div>`;
+    <div class="story-go"><button class="btn primary" data-act="feedToCase" data-id="${f.id}">${ico('plus','sm')}Add to ${esc(caseNm(theCase()))}</button>${E.safeUrl(f.link) ? `<a class="btn" href="${esc(E.safeUrl(f.link))}" target="_blank" rel="noopener noreferrer">Read original ${ico('external-link','sm')}</a>` : ''}</div></div>`;
 }
 
 /* ---------- dialogs ---------- */
 let lastFocus = null;
-function openDlg(html, wide, after){ lastFocus = document.activeElement; $('scrim').hidden = false; const d = $('dlg'); d.className = 'dlg' + (wide ? ' wide' : ''); d.removeAttribute('aria-labelledby'); d.innerHTML = html; if(after) after();
+function openDlg(html, wide, after){ lastFocus = document.activeElement; $('scrim').hidden = false; const d = $('dlg'); d.className = 'dlg' + (wide ? ' wide' : ''); d.removeAttribute('aria-labelledby'); d.innerHTML = html; { const h = d.querySelector(':scope > header h3, :scope > form > header h3'); if(h){ h.id = h.id || 'dlgTitle'; d.setAttribute('aria-labelledby', h.id); } } if(after) after();
   /* touch screens: don't pop the keyboard over the sheet; keyboards: start in the first field, not on the close button */
   const touch = matchMedia('(hover:none) and (pointer:coarse)').matches, body = d.querySelector('.in') || d;
   const f = touch ? null : d.querySelector('[autofocus]') || body.querySelector('textarea:not([readonly]),input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([readonly]),select');
@@ -181,9 +187,9 @@ function deleteCaseDlg(id){
     <div class="in"><p class="t2" style="margin:0 0 14px">This permanently removes the case and everything inside it from this browser. There is no server copy.</p>
       <div class="delcounts"><div><b>${D.entries.length}</b>vault entries</div><div><b>${D.recs.length}</b>evidence records</div><div><b>${D.links.length}</b>relationships</div><div><b>${notes}</b>notes</div></div>
       <div class="note accent" style="margin:16px 0"><span class="ic">${ico('download','sm')}</span><div><b>Keep a copy first?</b> Export the case to a JSON file you can import later. <button class="btn xs" data-act="exportCase" data-id="${c.id}" style="margin-left:6px">Export case</button></div></div>
-      <div class="field" style="margin:0"><label for="delConfirm">Type <b class="mono" style="color:var(--text)">${esc(c.code)}</b> to confirm</label><input id="delConfirm" autocomplete="off" spellcheck="false" placeholder="${esc(c.code)}"></div></div>
+      <div class="field" style="margin:0"><label for="delConfirm">Type <b style="color:var(--text)">${esc(caseNm(c))}</b> to confirm</label><input id="delConfirm" autocomplete="off" spellcheck="false" placeholder="${esc(caseNm(c))}"></div></div>
     <footer><button class="btn" data-act="dclose">Cancel</button><button class="btn dangerfill" data-act="deleteCase" data-id="${c.id}" id="delGo" disabled>${ico('trash-2','sm')}Delete permanently</button></footer>`, false,
-    () => { $('delConfirm').oninput = () => { $('delGo').disabled = $('delConfirm').value.trim() !== c.code; }; });
+    () => { $('delConfirm').oninput = () => { $('delGo').disabled = $('delConfirm').value.trim() !== caseNm(c); }; });
 }
 
 function toolDlg(id){
@@ -226,7 +232,7 @@ function openCapture(prefill){
   if(!draft.caseId || !DB.cases.some(c => c.id === draft.caseId)) draft.caseId = DB.active;
   if(!theCase(draft.caseId)) return needCase();
   const cur = theCase(draft.caseId), open = DB.cases.filter(c => c.status !== 'closed' || c.id === cur.id);
-  openDlg(dhead('Capture evidence') + `<div class="in"><div class="capto"><label for="capCase">Save to</label><span class="capdot" style="background:${esc(cur.color)}"></span><select id="capCase" class="gsel bord">${open.map(c => `<option value="${c.id}"${c.id === cur.id ? ' selected' : ''}>${esc(c.code + ' · ' + c.name)}</option>`).join('')}<option value="__new">+ New case…</option></select>
+  openDlg(dhead('Capture evidence') + `<div class="in"><div class="capto"><label for="capCase">Save to</label><span class="capdot" style="background:${esc(cur.color)}"></span><select id="capCase" class="gsel bord">${open.map(c => `<option value="${c.id}"${c.id === cur.id ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}<option value="__new">+ New case…</option></select>
       <label class="chk capg" title="Add what this evidence mentions to the case graph, and link relations it states"><span class="sw"><input type="checkbox" id="capGraph"${cur.autoGraph ? ' checked' : ''}><span></span></span>Add to graph</label></div>
     <p class="t2" style="margin:0 0 12px;font-size:calc(14px * var(--ts,1))">Paste a log line, a WHOIS record, a forum post, a whole report — anything. Indicators are picked out and checked against every case, your watchlist and the offline context lists.</p>
     <label class="sr" for="capBody">Evidence text</label><textarea id="capBody" class="inp code" rows="6" autofocus placeholder="2026-09-14T09:03:15Z EventID 3 … -> 203.0.113.47:4444">${esc(draft.body)}</textarea>
@@ -253,7 +259,7 @@ function capPreview(){
   let inCase = 0, other = 0, bad = 0, watched = 0;
   const chips = ents.slice(0, 40).map(e => { const id = entKey(e), here = D.byKey.get(id) || D.ents.get(id), ge = G.get(id), oc = ge ? [...ge.cases].filter(x => x !== cid && theCase(x)) : [], vd = verdictOf(id), w = isWatched(id), cx = ctxOf(e.k, e.v);
     if(here) inCase++; if(oc.length) other++; if(vd === 'malicious' || vd === 'suspicious') bad++; if(w) watched++;
-    const note = w ? `<span class="n w">${ico('eye','sm')}watched</span>` : oc.length ? `<span class="n o" title="${esc(oc.map(x => theCase(x).name).join(', '))}">in ${esc(theCase(oc[0]).code)}${oc.length > 1 ? ' +' + (oc.length - 1) : ''}</span>` : `<span class="n">${here ? 'in case' : 'new'}</span>`;
+    const note = w ? `<span class="n w">${ico('eye','sm')}watched</span>` : oc.length ? `<span class="n o" title="${esc(oc.map(x => theCase(x).name).join(', '))}">in ${esc(caseNm(theCase(oc[0])))}${oc.length > 1 ? ' +' + (oc.length - 1) : ''}</span>` : `<span class="n">${here ? 'in case' : 'new'}</span>`;
     const ctx = cx.find(x => x[1] === 'red') || cx.find(x => x[1] === 'amber') || cx.find(x => x[1] === 'blue');
     return `<span class="ent" data-v="${vd}" title="${esc((E.LABEL[e.k] || e.k) + (cx.length ? ' · ' + cx.map(x => x[0]).join(' · ') : ''))}">${kindBadge(e.k)}<span class="v">${esc(e.v)}</span>${ctx ? `<span class="n ctxn ${ctx[1]}">${esc(ctx[0])}</span>` : ''}${note}</span>`; }).join('');
   const sum = [`<b>${ents.length}</b> indicator${ents.length > 1 ? 's' : ''}`, inCase ? `${inCase} already in this case` : '', other ? `<span style="color:var(--accent)">${other} seen in other cases</span>` : '', bad ? `<span style="color:var(--red)">${bad} marked malicious or suspicious</span>` : '', watched ? `<span style="color:var(--amber)">${watched} on your watchlist</span>` : ''].filter(Boolean).join(' · ');
@@ -275,7 +281,7 @@ async function capSave(split){
   DB.records.push(...made); draft.body = ''; mutate('captured ' + made.length + ' record(s)'); await hashRecords(); closeDlg();
   const g = afterCapture(cid, made.map(r => r.id)); watchNotify(made);
   UI.sel = {kind:'rec', id:made[0].id}; UI.inspOpen = true; UI.tlMode = 'events'; go(caseHash(cid, 'timeline'));
-  toast(made.length + ' record' + (made.length > 1 ? 's' : '') + ' captured in ' + theCase(cid).code + (g ? ` · ${g.made.length} added to the graph${g.links.length ? ', ' + g.links.length + ' linked' : ''}` : ''), 'Undo', () => { const ids = new Set(made.map(r => r.id)); DB.records = DB.records.filter(r => !ids.has(r.id));
+  toast(made.length + ' record' + (made.length > 1 ? 's' : '') + ' captured in ' + caseNm(theCase(cid)) + (g ? ` · ${g.made.length} added to the graph${g.links.length ? ', ' + g.links.length + ' linked' : ''}` : ''), 'Undo', () => { const ids = new Set(made.map(r => r.id)); DB.records = DB.records.filter(r => !ids.has(r.id));
     if(g){ const s = new Set(g.made.map(e => e.id)), sl = new Set(g.links.map(l => l.id)); DB.entries = DB.entries.filter(e => !s.has(e.id)); DB.links = DB.links.filter(l => !sl.has(l.id)); } UI.sel = null; mutate('undid capture'); renderAll(); });
 }
 
@@ -289,10 +295,10 @@ function palette(){
   add('Actions','Export a backup of everything','','download', () => clickAct('exportAll')); add('Actions','Import a backup…','','upload', () => clickAct('importAll')); add('Actions','Help — how OSINTrix works','','circle-help', () => go('#/help'));
   add('Actions','Delete the current case…','','trash-2', () => deleteCaseDlg(DB.active)); add('Actions','Add a tool','','wrench', () => toolDlg());
   add('Actions','Switch theme','','moon', () => { DB.prefs.theme = DB.prefs.theme === 'dark' ? 'light' : 'dark'; applyPrefs(); save(); if(cy) mountGraph(); });
-  for(const c of DB.cases) add('Cases', c.name, c.code, 'folder-open', () => go(caseHash(c.id)));
-  for(const e of DB.entries) add('Vault', primary(e), TYPES[e.type].label + ' · ' + theCase(e.caseId).code, TYPES[e.type].icon, () => { DB.active = e.caseId; UI.sel = {kind:'entry', id:e.id}; UI.inspOpen = true; go(caseHash(e.caseId, 'vault')); });
+  for(const c of DB.cases) add('Cases', c.name, '', 'folder-open', () => go(caseHash(c.id)));
+  for(const e of DB.entries) add('Vault', primary(e), TYPES[e.type].label + ' · ' + caseNm(theCase(e.caseId)), TYPES[e.type].icon, () => { DB.active = e.caseId; UI.sel = {kind:'entry', id:e.id}; UI.inspOpen = true; go(caseHash(e.caseId, 'vault')); });
   for(const t of DB.tools) add('Tools', t.name, hostOf(t.url), 'wrench', () => { const u = E.safeUrl(t.url); if(u) window.open(u, '_blank', 'noopener,noreferrer'); });
-  for(const r of DB.records) add('Evidence', r.title, theCase(r.caseId).code, 'file-text', () => { DB.active = r.caseId; UI.sel = {kind:'rec', id:r.id}; UI.inspOpen = true; go(caseHash(r.caseId, 'timeline')); });
+  for(const r of DB.records) add('Evidence', r.title, caseNm(theCase(r.caseId)), 'file-text', () => { DB.active = r.caseId; UI.sel = {kind:'rec', id:r.id}; UI.inspOpen = true; go(caseHash(r.caseId, 'timeline')); });
   openDlg(`<div class="pal"><div class="srch">${ico('search')}<label class="sr" for="palQ">Search everything</label><input id="palQ" placeholder="Search cases, vault entries, tools, evidence, actions…" autocomplete="off" autofocus></div><div class="list" id="palL" role="listbox"></div></div>`, true, () => {
     const paint = () => { const q = $('palQ').value.toLowerCase().trim();
       let l = q ? all.filter(x => (x.label + ' ' + x.hint).toLowerCase().includes(q)) : all.filter(x => x.group === 'Actions' || x.group === 'Cases');

@@ -116,7 +116,7 @@ function vimDlg(){
   const opts = cur => [['auto', 'By what it looks like'], ['', 'Skip']].concat(TYPE_LIST.map(t => [t[0], t[1]])).map(([v, l]) => `<option value="${v}"${cur === v ? ' selected' : ''}>${esc(l)}</option>`).join('');
   const sample = k => I.src.nodes.filter(n => n.kind === k).slice(0, 2).map(n => n.v.length > 40 ? n.v.slice(0, 38) + '…' : n.v).join(', ');
   const skipped = Object.values(P.skip).reduce((a, b) => a + b, 0);
-  openDlg(dhead('Import into ' + esc(theCase().code)) + `<div class="in vim">
+  openDlg(dhead('Import into ' + esc(caseNm(theCase()))) + `<div class="in vim">
     <p class="vim-src">${ico('file-text','sm')}<b>${esc(I.name)}</b><span class="t3">${esc(I.src.fmt)} · ${I.src.nodes.length.toLocaleString()} ${I.src.nodes.length === 1 ? 'thing' : 'things'}${I.src.edges.length ? ' · ' + I.src.edges.length.toLocaleString() + ' links' : ''}</span></p>
     ${I.src.notes.map(n => `<p class="hint">${esc(n)}</p>`).join('')}
     <table class="tbl vim-t"><thead><tr><th>In the file</th><th>How many</th><th>Becomes</th></tr></thead><tbody>${kinds.slice(0, 60).map(([k, n], i) => `<tr><td><b>${esc(k.replace(/^maltego\./i, ''))}</b><small class="t3 mono">${esc(sample(k))}</small></td><td>${n.toLocaleString()}</td>

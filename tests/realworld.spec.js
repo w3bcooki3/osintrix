@@ -691,7 +691,7 @@ test('saved hunts: a search or a rule across all cases; what matched when saved 
   // new evidence in another case: new on the hunt and on Today
   await page.evaluate(() => { DB.records.push({ id: 'r-hnew', caseId: 'c-hQ', type: 'evidence', title: 'Proxy saw 198.51.100.66', body: 'GET http://198.51.100.66/a', ts: Date.now(), source: 'proxy', host: 'PX', tags: [], ents: extractRich('GET http://198.51.100.66/a'), addedAt: Date.now() }); mutate('new'); renderMain(); });
   await expect(page.locator('.hu:has-text("C2 comes back") .chip.red').first()).toContainText('1 new');
-  await expect(page.locator('.hu:has-text("C2 comes back") .hu-c')).toContainText('H-Q');
+  await expect(page.locator('.hu:has-text("C2 comes back") .hu-c')).toContainText('Hunt Q');
   expect(await page.evaluate(() => todayItems().items.some(x => /Hunt “C2 comes back”: 1 new match/.test(x.t)))).toBe(true);
   // open the case from the hunt: the timeline is filtered by the same search
   await page.locator('.hu:has-text("C2 comes back") [data-act=huCase][data-v=c-hQ]').click();
@@ -1359,7 +1359,7 @@ test('money flows: Bitcoin, Ethereum and TRON transactions from seven explorer f
   expect(X.focus).toBe(4);                                                                                    // the three wallets in the report (BTC as one owner of two) and the one looked up on BlockCypher
   // on screen
   await expect(page.locator('.if-c', { hasText: 'What stands out' })).toContainText('Peel chain');
-  await expect(page.locator('.if-c', { hasText: 'In other cases' })).toContainText('EX-7');
+  await expect(page.locator('.if-c', { hasText: 'In other cases' })).toContainText('Exchange subpoena');
   await expect(page.locator('.if-c', { hasText: 'One owner, several addresses' })).toContainText(A.S2);
   await expect(page.locator('.wl-svg .wl-n.mine')).toHaveCount(4);
   await page.locator('.if-t tbody tr', { hasText: '2.2 ETH' }).locator('[data-act=wlRecs]').click();

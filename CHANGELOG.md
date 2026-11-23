@@ -2,6 +2,34 @@
 
 All notable changes to OSINTrix, newest first. The format is based on [Keep a Changelog](https://keepachangelog.com); this file is generated from `js/data/changelog.js` by `tools/changelog.py`.
 
+## [1.59] — Cases go by their names; a cleaner decoder and story view (2026-11-23)
+
+_Everywhere a case was shown as a number like TN-2026-014, it now shows its name._
+
+### Added
+- Ctrl K: case: suggests cases by name (case:op-lantern), and the filter chip says the case’s name.
+
+### Changed
+- Cases are called by their names on screen — chips, breadcrumbs, lists, menus, messages, “also in” and “seen in” notes, Ctrl K, file names of snapshots and share packages. The TN-… number is kept as an internal reference: it still finds the case in Ctrl K (case:TN-2026-014) and in questions (“in TN-2026-014”), and exports carry it for other tools. To delete a case, type its name.
+- Decoder: one row instead of three — Auto-decode, then a menu each for Decode, Encode & transform and Analyse. The menu holding the operation you chose shows its name.
+- A news story reads like an article: the summary in paragraphs with no scroll box (a long one opens with “Read the rest”), source, date and severity on one line, the triage buttons in one row.
+
+## [1.58] — Follow the money (2026-11-23)
+
+_A Bitcoin or Ethereum wallet’s transactions — fetched with your say-so or imported from a file — read into who paid it, whom it paid, which wallets are probably the same owner and whether any is sanctioned, then brought into the case as linked vault entries and timeline events._
+
+### Added
+- Money trail, in a wallet’s details: balance, received, sent (and fees), tokens, first and last activity, the largest counterparties with what each paid or was paid, wallets spent together with it (probably the same owner — CoinJoins left out and flagged), and labels on everything. Open the trail for every counterparty, every transaction and the same-owner list.
+- Fetched from mempool.space (Bitcoin) or Blockscout (Ethereum, with its public name tags, ENS names and scam flags), every page of it. The first fetch asks: only the wallet address is sent, and only to that source. Both are also lookups in Settings → Lookups.
+- Or imported, fully offline, from explorer JSON (Blockstream, mempool.space, blockchain.com, BlockCypher, Etherscan), an Etherscan transactions or token-transfers export, or any CSV with from, to and amount columns (the trail’s own export reads back). Failed transactions move nothing; rows that cannot be read are counted, not guessed.
+- Sanctions: download the OFAC list of crypto addresses (Bitcoin, Ethereum, USDT, USDC, TRON) once, on request; every wallet and counterparty is then checked here, offline. Direct exposure to a sanctioned wallet is flagged.
+- Into the case: pick counterparties (or same-owner wallets) and add them to the vault, linked “paid” with the amount, count and dates — they appear in the graph. Add every payment to the timeline as its own event, once. Label any wallet (exchange, mixer, victim, suspect…) and the label shows wherever it appears. Export the trail as CSV.
+- One with Analysis → Money: whatever is fetched or imported is kept as evidence in the open case (with its SHA-256), so the case’s money flows, owner groups and patterns include it. Every explorer format Money reads imports into the trail too, and Money now also reads Blockscout.
+- Legacy Bitcoin addresses (starting 1 or 3) now have their Base58Check checksum verified too.
+
+### Fixed
+- Dialogs are named by their title for screen readers.
+
 ## [1.57] — Every indicator, read like an analyst would (2026-11-23)
 
 _An indicator’s details now say what it is and what about it should worry you — look-alikes, hosting, link tricks, broken wallets, leaked secrets — worked out from the value alone, with nothing looked up._

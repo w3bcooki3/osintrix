@@ -62,9 +62,23 @@ function wlTron(o){
     return {id:(t.transaction_id || t.transactionHash) + ':' + sym, tx:t.transaction_id || t.transactionHash, chain:'TRON', asset:sym, ts:wlTs(t.block_ts ?? t.block_timestamp ?? t.timestamp), ins:[{a:t.from_address || t.from || t.ownerAddress, v}], outs:[{a:t.to_address || t.to || t.toAddress, v}], failed:t.finalResult && t.finalResult !== 'SUCCESS'}; });
   return txs.length ? {kind:'TRON (Tronscan / TronGrid)', txs} : null;
 }
+/* Blockscout API v2: an address's transactions and token transfers ({items:[…]}), as the money trail keeps them */
+function wlBlockscout(o){
+  const L = o && Array.isArray(o.items) ? o.items : null; if(!L || !L.length || !L.every(t => t && (t.hash || t.transaction_hash) && t.from && typeof t.from === 'object')) return null;
+  const txs = L.filter(t => !t.token_type || t.token_type === 'ERC-20').map(t => { const tok = !!t.transaction_hash, T = t.token || {}, d = tok ? +(t.total && t.total.decimals || T.decimals) || 0 : 18, asset = tok ? String(T.symbol || '?').slice(0, 20) : 'ETH', v = WL_DEC(tok ? t.total && t.total.value : t.value, d);
+    const to = t.to ? t.to.hash : t.created_contract ? t.created_contract.hash : '';
+    return {id:tok ? t.transaction_hash + ':' + asset + ':' + (t.log_index ?? '') : t.hash, tx:t.transaction_hash || t.hash, chain:'ETH', asset, ts:wlTs(t.timestamp), fee:!tok && t.fee ? WL_DEC(t.fee.value, 18) : 0, failed:!tok && (t.status === 'error' || /revert|fail|error/i.test(t.result || '')), ins:[{a:wlNorm(t.from.hash), v}], outs:to ? [{a:wlNorm(to), v}] : []}; });
+  return txs.length ? {kind:'Ethereum (Blockscout)', txs} : null;
+}
+/* keep transactions as evidence in a case — what the Money view reads */
+function walletKeep(text, P, caseId, src){
+  if(DB.records.some(r => r.caseId === caseId && r.body === text)) return null;
+  const ts = P.txs.map(x => x.ts).filter(Boolean), r = {id:uid('r'), caseId, type:'evidence', title:P.label.slice(0, 110), body:text, tsRaw:ts.length ? new Date(Math.min(...ts)).toISOString() : new Date().toISOString(), tsZone:'explicit', ts:ts.length ? Math.min(...ts) : Date.now(), source:'chain:' + (src || P.kind), host:'', tags:['transactions'], ents:extractRich(text.slice(0, 400000)).slice(0, 3000), answer:'', addedBy:'You', addedAt:Date.now(), hash:''};
+  DB.records.push(r); if(typeof hashRecords === 'function') hashRecords(); return r;
+}
 function walletParse(text){
   const t = String(text || '').slice(0, 8 << 20).trim(); if(t.length < 20) return null; let o = null, P = null;
-  if(/^[\[{]/.test(t)){ try{ o = JSON.parse(t); }catch(e){ return null; } P = wlEsplora(o) || wlBlockchainCom(o) || wlBlockcypher(o) || wlEtherscan(o) || wlTron(o); }
+  if(/^[\[{]/.test(t)){ try{ o = JSON.parse(t); }catch(e){ return null; } P = wlEsplora(o) || wlBlockchainCom(o) || wlBlockcypher(o) || wlEtherscan(o) || wlTron(o) || wlBlockscout(o); }
   else P = wlCsv(t);
   if(!P || !P.txs.length) return null; P.txs = P.txs.filter(x => (x.ins.length || x.outs.length)); const assets = [...new Set(P.txs.map(x => x.asset))];
   P.label = `${P.kind} — ${P.txs.length} transaction${P.txs.length > 1 ? 's' : ''}${assets.length <= 3 ? ' · ' + assets.join(', ') : ''}`; return P;
@@ -152,7 +166,7 @@ function walletView(c){
   return `${head}<div class="if-sum card"><div class="tlx-kpi"><div><b>${X.wallets.length}</b><span>addresses</span></div><div><b>${X.owners.size}</b><span>owners after grouping</span></div><div><b>${X.txs.length}</b><span>transactions</span></div>${Object.entries(assets).slice(0, 3).map(([a, v]) => `<div><b>${esc(wlAmt(v, a).split(' ')[0])}</b><span>${esc(a)} moved</span></div>`).join('')}</div>${walletSvg(X)}
       <p class="t3 small">The case's own wallets (those in its evidence and vault) are in the middle, payers to the left, payees to the right. Line width follows the amount.</p></div>
     ${X.notes.length ? `<section class="card if-c"><h3>What stands out</h3><ul class="if-l0">${X.notes.map(n => `<li class="if-g"><div class="if-gh"><span class="chip sq ${n.kind === 'coinjoin' ? '' : 'amber'}">${esc({'fan-in':'Collection point', 'fan-out':'Distribution', 'pass-through':'Pass-through', peel:'Peel chain', coinjoin:'CoinJoin'}[n.kind])}</span>${n.o ? owner(n.o) : ''}</div><div class="t2 small">${esc(n.t)}</div></li>`).join('')}</ul></section>` : ''}
-    ${X.other.size ? `<section class="card if-c"><h3>In other cases</h3><ul class="if-l0">${[...X.other.entries()].map(([a, cs]) => `<li class="if-g"><span class="mono">${esc(a)}</span> — ${cs.map(id => { const k = theCase(id); return k ? `<a href="${caseHash(id, 'overview')}"><b class="mono">${esc(k.code)}</b> ${esc(k.name.split(' — ')[0])}</a>` : ''; }).join(', ')}</li>`).join('')}</ul></section>` : ''}
+    ${X.other.size ? `<section class="card if-c"><h3>In other cases</h3><ul class="if-l0">${[...X.other.entries()].map(([a, cs]) => `<li class="if-g"><span class="mono">${esc(a)}</span> — ${cs.map(id => { const k = theCase(id); return k ? `<a href="${caseHash(id, 'overview')}"><b>${esc(k.name.split(' — ')[0])}</a>` : ''; }).join(', ')}</li>`).join('')}</ul></section>` : ''}
     ${groups.length ? `<section class="card if-c"><h3>One owner, several addresses</h3><p class="t3 small">Addresses spent together in one Bitcoin transaction almost always belong to one wallet (the common-input rule). It can be fooled on purpose — CoinJoin and PayJoin — so treat it as strong, not certain.</p><ul class="if-l0">${groups.map(g => `<li class="if-g"><div class="if-gh">${owner(g.id)}<span class="t3">${g.addrs.length} addresses</span></div><div class="mono small wl-as">${g.addrs.map(a => esc(a)).join('<br>')}</div></li>`).join('')}</ul></section>` : ''}
     <section class="card if-c"><h3>Payments${sel ? ` to and from <span class="mono">${esc(wlOwnerName(X, sel))}</span> <button class="btn xs" data-act="wlOwner" data-v="">Show all</button>` : ''} <span class="t3">${F.length}</span></h3><div class="if-tw"><table class="if-t"><thead><tr><th scope="col">When</th><th scope="col">From</th><th scope="col">To</th><th scope="col">Amount</th><th scope="col">Transactions</th><th scope="col"></th></tr></thead><tbody>
       ${F.slice(0, 500).map(e => `<tr><td class="mono">${esc(when(e.first))}${e.n > 1 && e.last !== e.first ? `<div class="t3">to ${esc(when(e.last))}</div>` : ''}</td><td>${owner(e.f)}</td><td>${owner(e.to)}</td><td class="mono">${esc(wlAmt(e.v, e.asset))}</td><td>${e.n}</td><td><button class="btn xs" data-act="wlRecs" data-v="${esc([...e.recs].join(','))}">Evidence</button> <button class="iconbtn sm" data-act="wlCopy" data-v="${esc(e.txs.join('\n'))}" aria-label="Copy the transaction IDs">${ico('copy','sm')}</button></td></tr>`).join('')}</tbody></table></div>${F.length > 500 ? `<p class="t3 small">Showing 500 of ${F.length}.</p>` : ''}</section>
@@ -167,9 +181,8 @@ function walletPasteDlg(){
 function walletSubmit(){
   const t = String($('wlText').value || '').trim(); if(!t) return fieldErr('wlText', 'Paste the transactions first.'); if(t.length > 8 << 20) return fieldErr('wlText', 'That is over 8 MB — split it into smaller pastes.');
   const P = walletParse(t); if(!P) return fieldErr('wlText', 'Not recognised. Paste the JSON an explorer gives for an address or transaction, or an Etherscan CSV export.');
-  const c = theCase(); if(DB.records.some(r => r.caseId === c.id && r.body === t)) return fieldErr('wlText', 'These exact transactions are already in the case.');
-  const ts = P.txs.map(x => x.ts).filter(Boolean), r = {id:uid('r'), caseId:c.id, type:'evidence', title:P.label.slice(0, 110), body:t, tsRaw:ts.length ? new Date(Math.min(...ts)).toISOString() : new Date().toISOString(), tsZone:'explicit', ts:ts.length ? Math.min(...ts) : Date.now(), source:'chain:' + P.kind, host:'', tags:['transactions'], ents:extractRich(t.slice(0, 400000)).slice(0, 3000), answer:'', addedBy:'You', addedAt:Date.now(), hash:''};
-  DB.records.push(r); closeDlg(); mutate('added ' + P.kind + ' transactions'); if(typeof hashRecords === 'function') hashRecords(); renderMain(); toast(`${P.kind}: ${P.txs.length} transaction${P.txs.length > 1 ? 's' : ''} added`);
+  const c = theCase(); if(!walletKeep(t, P, c.id)) return fieldErr('wlText', 'These exact transactions are already in the case.');
+  closeDlg(); mutate('added ' + P.kind + ' transactions'); renderMain(); toast(`${P.kind}: ${P.txs.length} transaction${P.txs.length > 1 ? 's' : ''} added`);
 }
 document.addEventListener('input', ev => { if(ev.target && ev.target.id === 'wlText'){ const h = $('wlHint'); if(!h) return; clearTimeout(UI.wlT); UI.wlT = setTimeout(() => { let P = null; try{ P = walletParse(ev.target.value); }catch(e){} h.textContent = P ? 'Recognised: ' + P.label : ev.target.value.trim() ? 'Not recognised yet' : ''; }, 250); } });
 const WL_ACTS = {

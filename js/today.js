@@ -18,7 +18,7 @@ function todayItems(){
   /* notes */
   for(const n of DB.notes || []){ if(!n.due || (n.caseId && !ids.has(n.caseId) && own.length)) continue; const open = noteTasks(n).filter(t => !t.done); if(n.due > today || (noteTasks(n).length && !open.length)) continue;
     const late = n.due < today, c = n.caseId ? theCase(n.caseId) : null;
-    add(late ? 3 : 2, 'calendar-clock', `${late ? 'Overdue since ' + n.due : 'Due today'}: ${noteLabel(n).slice(0, 80)}`, (c ? c.code + ' · ' : '') + (open.length ? open.length + ' to-do' + (open.length > 1 ? 's' : '') + ' left: ' + open.slice(0, 2).map(t => t.t).join(' · ') : ''), {act:'nEdit', id:n.id, l:'Open the note'}); }
+    add(late ? 3 : 2, 'calendar-clock', `${late ? 'Overdue since ' + n.due : 'Due today'}: ${noteLabel(n).slice(0, 80)}`, (c ? caseNm(c) + ' · ' : '') + (open.length ? open.length + ' to-do' + (open.length > 1 ? 's' : '') + ' left: ' + open.slice(0, 2).map(t => t.t).join(' · ') : ''), {act:'nEdit', id:n.id, l:'Open the note'}); }
   /* indicators flagged but not judged */
   const keysIn = new Map(); for(const c of cases){ for(const k of derive(c.id).ents.keys()) if(!keysIn.has(k)) keysIn.set(k, c); }
   const looked = ((DB.intel && DB.intel.lookHist) || []).filter(h => /mal|susp/.test(h.band || '') && keysIn.has(h.k + ':' + h.v) && !verdictOf(h.k + ':' + h.v));
@@ -27,20 +27,20 @@ function todayItems(){
     if(H.length) add(2, 'fingerprint', `${H.length} indicator${H.length > 1 ? 's' : ''} in your cases match the indicator store`, H.slice(0, 3).map(h => h.ioc.v + (h.ioc.threat ? ' — ' + h.ioc.threat : '')).join(' · '), {go:'#/feeds', itab:'iocs', l:'See them'}); }
   /* saved hunts with new matches */
   if(typeof huntList === 'function') for(const h of huntList()){ let R; try{ R = huntRun(h); }catch(e){ continue; } if(!R.fresh.length) continue;
-    add(2, 'crosshair', `Hunt “${h.name}”: ${R.fresh.length} new match${R.fresh.length > 1 ? 'es' : ''}`, [...new Set(R.fresh.map(r => (theCase(r.caseId) || {}).code).filter(Boolean))].slice(0, 4).join(' · ') + ' — ' + R.fresh[0].title.slice(0, 80), {act:'huOpen', l:'See them'}); }
+    add(2, 'crosshair', `Hunt “${h.name}”: ${R.fresh.length} new match${R.fresh.length > 1 ? 'es' : ''}`, [...new Set(R.fresh.map(r => caseNm(r.caseId)).filter(Boolean))].slice(0, 4).join(' · ') + ' — ' + R.fresh[0].title.slice(0, 80), {act:'huOpen', l:'See them'}); }
   /* verdicts that have aged past their half-life on indicators in open cases */
   if(typeof verdictStale === 'function'){ const st = [...keysIn.keys()].filter(verdictStale);
     if(st.length) add(1, 'clock-alert', `${st.length} malicious or suspicious verdict${st.length > 1 ? 's are' : ' is'} old`, st.slice(0, 3).map(k => entSplit(k).v + ' (' + iAgo(verdictAt(k)) + ')').join(' · ') + ' — addresses and domains change hands; check again before relying on them.', {act:'selEnt', id:st[0], caseId:keysIn.get(st[0]).id, l:'Check the first'}); }
   /* what arrived while a case was closed */
   if(typeof caseActivity === 'function'){ const S = DB.prefs.seen || {}; for(const c of cases){ if(!S[c.id] || c.id === SEEN.open) continue; const L = caseActivity(c, S[c.id]); if(!L.length) continue;
-    add(L.some(x => x.tone === 'red') ? 2 : 1, 'history', `${c.code}: ${L.length} thing${L.length > 1 ? 's' : ''} since you last looked`, L.slice(0, 3).map(x => x.t).join(' · '), {go:caseHash(c.id, 'overview'), l:'Open the case'}); } }
+    add(L.some(x => x.tone === 'red') ? 2 : 1, 'history', `${caseNm(c)}: ${L.length} thing${L.length > 1 ? 's' : ''} since you last looked`, L.slice(0, 3).map(x => x.t).join(' · '), {go:caseHash(c.id, 'overview'), l:'Open the case'}); } }
   /* open questions, oldest first */
   for(const c of cases){ const Q = DB.records.filter(r => r.caseId === c.id && r.type === 'lead' && !r.answer).sort((a, b) => (a.addedAt || 0) - (b.addedAt || 0)); if(!Q.length) continue;
     const age = Math.floor((now - (Q[0].addedAt || now)) / 864e5);
-    add(age > 7 ? 2 : 1, 'circle-help', `${c.code}: ${Q.length} open question${Q.length > 1 ? 's' : ''}`, `Oldest${age ? ' (' + age + ' day' + (age > 1 ? 's' : '') + ')' : ''}: ${Q[0].title}`, {go:caseHash(c.id, 'analysis'), l:'Answer them'}); }
+    add(age > 7 ? 2 : 1, 'circle-help', `${caseNm(c)}: ${Q.length} open question${Q.length > 1 ? 's' : ''}`, `Oldest${age ? ' (' + age + ' day' + (age > 1 ? 's' : '') + ')' : ''}: ${Q[0].title}`, {go:caseHash(c.id, 'analysis'), l:'Answer them'}); }
   /* cases gone quiet */
   for(const c of cases){ if(c.status !== 'active') continue; const last = Math.max(c.updated || 0, c.created || 0, ...DB.records.filter(r => r.caseId === c.id).map(r => r.addedAt || 0), ...DB.entries.filter(e => e.caseId === c.id).map(e => e.created || 0), ...(DB.notes || []).filter(n => n.caseId === c.id).map(n => n.updated || 0));
-    const days = Math.floor((now - last) / 864e5); if(days >= 7) add(1, 'hourglass', `${c.code} has been quiet for ${days} days`, c.name.split(' — ')[0] + ' is still marked active. Close it, or pick it back up.', {go:caseHash(c.id, 'overview'), l:'Open the case'}); }
+    const days = Math.floor((now - last) / 864e5); if(days >= 7) add(1, 'hourglass', `${caseNm(c)} has been quiet for ${days} days`, c.name.split(' — ')[0] + ' is still marked active. Close it, or pick it back up.', {go:caseHash(c.id, 'overview'), l:'Open the case'}); }
   return {items:out.sort((a, b) => b.lvl - a.lvl), demo:!own.length};
 }
 function viewToday(){

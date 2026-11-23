@@ -23,7 +23,7 @@ function sightBuckets(timed){
 function sightSection(id){
   const D = sightData(id); if(!D || !D.recs.length) return '';
   const B = sightBuckets(D.timed), max = B ? Math.max(...B.b) : 0, fmt = t => esc(E.fmtDate(t, tz()));
-  const code = cid => { const c = theCase(cid); return c ? esc(c.code) : '—'; };
+  const code = cid => { const c = theCase(cid); return c ? esc(caseNm(c)) : '—'; };
   const span = D.first && D.last && D.last.ts > D.first.ts ? E.fmtAgo(D.last.ts - D.first.ts).replace(/ ago$/, '') : '';
   return `<div class="isec sight"><h4>Seen over time <span class="t3">${D.recs.length} record${D.recs.length === 1 ? '' : 's'} · ${D.cases.length} case${D.cases.length === 1 ? '' : 's'}</span></h4>
     ${D.first ? `<dl class="kv sight-kv"><dt>First seen</dt><dd>${fmt(D.first.ts)} <span class="t3">in ${code(D.first.caseId)}</span></dd>${D.last !== D.first ? `<dt>Last seen</dt><dd>${fmt(D.last.ts)} <span class="t3">in ${code(D.last.caseId)}</span></dd>` : ''}${span ? `<dt>Over</dt><dd>${esc(span)}</dd>` : ''}</dl>` : '<p class="t3 sight-none">None of the records it is in has a time.</p>'}
@@ -36,7 +36,7 @@ function sightDlg(id){
   const D = sightData(id); if(!D) return; const {v} = entSplit(id);
   const L = D.timed.concat(D.recs.filter(r => !r.ts)).slice(0, SIGHT.LIST);
   openDlg(dhead('Every sighting of <span class="mono">' + esc(v.length > 50 ? v.slice(0, 48) + '…' : v) + '</span>') + `<div class="in"><p class="t2" style="margin:0 0 12px">${D.recs.length.toLocaleString()} record${D.recs.length === 1 ? '' : 's'} across ${D.cases.length} case${D.cases.length === 1 ? '' : 's'}, oldest first${D.untimed ? '; those without a time last' : ''}.</p>
-    <ol class="sight-list">${L.map(r => { const c = theCase(r.caseId); return `<li><button class="li" data-act="sightOpen" data-id="${r.id}"><span class="sight-t mono">${r.ts ? esc(E.fmtFull(r.ts, tz()).slice(0, 16)) : 'no time'}</span><span class="sight-c">${c ? esc(c.code) : ''}</span><b>${esc(r.title)}</b>${r.host ? `<small class="t3">${esc(r.host)}</small>` : ''}</button></li>`; }).join('')}</ol>
+    <ol class="sight-list">${L.map(r => { const c = theCase(r.caseId); return `<li><button class="li" data-act="sightOpen" data-id="${r.id}"><span class="sight-t mono">${r.ts ? esc(E.fmtFull(r.ts, tz()).slice(0, 16)) : 'no time'}</span><span class="sight-c">${c ? esc(caseNm(c)) : ''}</span><b>${esc(r.title)}</b>${r.host ? `<small class="t3">${esc(r.host)}</small>` : ''}</button></li>`; }).join('')}</ol>
     ${D.recs.length > L.length ? `<p class="t3">The first ${L.length} are shown.</p>` : ''}</div><footer><button class="btn" data-act="dclose">Close</button></footer>`, true);
 }
 const SIGHT_ACTS = {

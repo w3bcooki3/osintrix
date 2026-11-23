@@ -206,6 +206,9 @@ function parseHash(){
   if(p[0] === 'dorks') p[0] = 'queries';
   return {area:AREAS.includes(p[0]) && p[0] !== 'case' ? p[0] : 'home'};
 }
+/* how a case is called on screen: its name, up to the first “ — ” (“Op Lantern”). The TN-… code is kept as an
+   internal reference — exports, search and “in TN-2026-014” still know it — but people read names, not numbers. */
+const caseNm = (c, max = 48) => { if(typeof c === 'string') c = theCase(c); if(!c) return ''; const n = String(c.name || 'Untitled case').split(' — ')[0].trim() || String(c.name || 'Untitled case'); return n.length > max ? n.slice(0, max - 1).trimEnd() + '…' : n; };
 const caseHash = (id, tab) => '#/case/' + encodeURIComponent(id || DB.active) + '/' + (tab || SHELL_HOME);
 function go(h){ if(location.hash === h) onRoute(); else location.hash = h; }
 

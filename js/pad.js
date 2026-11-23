@@ -84,7 +84,7 @@ function padRefresh(){
 function padBulkPaint(){
   const el = $('padBulk'); if(!el) return; const n = (UI.padSel || new Set()).size;
   el.hidden = !n; if(!n) return;
-  el.innerHTML = `<b>${n} selected</b><span class="pad-bulk-sp"></span><button class="btn xs" data-act="padCopy">${ico('copy','sm')}Copy</button><button class="btn xs" data-act="padDefang">${ico('shield-alert','sm')}Defang</button>${DB.cases.length ? `<button class="btn xs" data-act="padToCase">${ico('list-plus','sm')}To ${esc((theCase() || DB.cases[0]).code)}</button>` : ''}<button class="iconbtn" data-act="padSelClear" aria-label="Clear selection">${ico('x','sm')}</button>`;
+  el.innerHTML = `<b>${n} selected</b><span class="pad-bulk-sp"></span><button class="btn xs" data-act="padCopy">${ico('copy','sm')}Copy</button><button class="btn xs" data-act="padDefang">${ico('shield-alert','sm')}Defang</button>${DB.cases.length ? `<button class="btn xs" data-act="padToCase">${ico('list-plus','sm')}To ${esc(caseNm(theCase() || DB.cases[0]))}</button>` : ''}<button class="iconbtn" data-act="padSelClear" aria-label="Clear selection">${ico('x','sm')}</button>`;
 }
 
 function bindPad(){
@@ -108,7 +108,7 @@ const PAD_ACTS = {
     const ents = (typeof extractRich === 'function' ? extractRich(text) : (E.extract ? E.extract(text) : [])).filter(e => !vals.length || vals.includes(e.v));
     const r = {id:uid('r'), caseId:cid, type:'note', title:'Scratchpad — ' + (vals.length ? vals.length + ' selected indicator' + (vals.length === 1 ? '' : 's') : 'notes'), body:text,
       tsRaw:'', tsZone:'', ts:null, source:'scratchpad', host:'', tags:['scratchpad'], ents, answer:'', addedBy:'You', addedAt:Date.now(), hash:'', pv:1, att:[]};
-    DB.records.push(r); mutate('scratchpad to ' + theCase(cid).code); hashRecords().then(renderAll);
-    toast('Sent to ' + theCase(cid).code + ' · ' + ents.length + ' indicator' + (ents.length === 1 ? '' : 's'), 'Open', () => { UI.sel = {kind:'rec', id:r.id}; UI.inspOpen = true; go(caseHash(cid, 'timeline')); });
+    DB.records.push(r); mutate('scratchpad to ' + caseNm(theCase(cid))); hashRecords().then(renderAll);
+    toast('Sent to ' + caseNm(theCase(cid)) + ' · ' + ents.length + ' indicator' + (ents.length === 1 ? '' : 's'), 'Open', () => { UI.sel = {kind:'rec', id:r.id}; UI.inspOpen = true; go(caseHash(cid, 'timeline')); });
   }
 };

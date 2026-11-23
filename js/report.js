@@ -95,7 +95,7 @@ function reportHTML(c, D, M){
   return M.S.map(s => `<h2>${esc(s.h)}${s.hidden ? ` <button class="btn xs ghost noprint" data-act="repRecAll">Show ${s.hidden} dropped</button>` : ''}</h2>${s.items.map(item).join('')}`).join('');
 }
 function reportMdText(c, D, M, tplName){
-  const ci = x => x && x.n ? ' [' + x.n + ']' : '', L = ['# ' + M.red(c.name), '', '_' + c.code + ' · ' + tplName + ' report · ' + tz() + (UI.redact ? ' · redacted' : '') + '_', ''];
+  const ci = x => x && x.n ? ' [' + x.n + ']' : '', L = ['# ' + M.red(c.name), '', '_' + tplName + ' report · ' + tz() + (UI.redact ? ' · redacted' : '') + '_', ''];
   for(const s of M.S){ L.push('## ' + s.h, '');
     for(const it of s.items){
       if(it.k === 'p') L.push((it.b ? '**' + it.b.trim() + '** ' : '') + it.t + ci(it.c), '');
@@ -116,7 +116,7 @@ function caseReport(c, D){
       <label class="chk swl"><span class="sw"><input type="checkbox" data-act="repRedact"${UI.redact ? ' checked' : ''}><span></span></span>Redact personal data</label>
       <span class="sp"></span><button class="btn primary" data-act="shareDlg">${ico('share-2','sm')}Share…</button><button class="btn" data-act="exportMd">${ico('download','sm')}Markdown</button><button class="btn" data-act="exportDocx">${ico('download','sm')}Word</button><button class="btn" data-act="printReport">${ico('file-text','sm')}Print / PDF</button><button class="btn" data-act="iocMenu">${ico('fingerprint','sm')}IOCs &amp; case data${ico('chevron-down','sm')}</button></div>
     ${UI.redact ? `<p class="note" style="margin:0 0 14px"><span class="ic">${ico('eye-off','sm')}</span><span>Emails, phone numbers, IP addresses, @handles and the names of Person entries are masked in this view, the Markdown and the PDF. Check it before sharing — free-text can still hold personal details.</span></p>` : ''}
-    <article class="doc"><h1>${esc(M.red(c.name))}</h1><p class="mono t3" style="font-size:13px">${esc(c.code)} · ${esc(REP_T.find(x => x[0] === tpl)[1])} report · generated from ${D.recs.length} records and ${D.entries.length} vault entries · ${esc(tz())}${UI.redact ? ' · redacted' : ''}</p>
+    <article class="doc"><h1>${esc(M.red(c.name))}</h1><p class="mono t3" style="font-size:13px">${esc(REP_T.find(x => x[0] === tpl)[1])} report · generated from ${D.recs.length} records and ${D.entries.length} vault entries · ${esc(tz())}${UI.redact ? ' · redacted' : ''}</p>
       ${reportHTML(c, D, M)}</article></div></div>`;
 }
 function reportMd(){ const c = theCase(), D = derive(), tpl = DB.prefs.repT || (c.id === 'c-lab' ? 'ctf' : 'full'); return reportMdText(c, D, reportModel(c, D, tpl, !!UI.redact), REP_T.find(x => x[0] === tpl)[1]); }

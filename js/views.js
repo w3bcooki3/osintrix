@@ -64,11 +64,11 @@ function viewHome(){
           ${fm.map(({f, hits}) => `<button class="li" data-act="selFeed" data-id="${f.id}" style="align-items:flex-start"><span class="tb sm" style="--c:var(--red)">${ico('rss')}</span>
             <div class="main2"><b style="white-space:normal">${esc(f.title)}</b><small>${esc(f.source)} · ${hits.length} match${hits.length > 1 ? 'es' : ''}</small></div></button>`).join('') || empty('rss', 'No matches', 'No feed item mentions an entity from your cases.')}</div></section>
         <section class="card"><header><h3>Seen in more than one case</h3></header><div class="body">
-          ${cross.map(e => `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${entPill(e.id)}<span class="t3" style="font-size:calc(13px * var(--ts,1))">${[...e.cases].map(id => theCase(id) && esc(theCase(id).code)).filter(Boolean).join(' · ')}</span></div>`).join('') || '<span class="t3">Nothing shared yet.</span>'}
+          ${cross.map(e => `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${entPill(e.id)}<span class="t3" style="font-size:calc(13px * var(--ts,1))">${[...e.cases].map(id => theCase(id) && esc(caseNm(theCase(id)))).filter(Boolean).join(' · ')}</span></div>`).join('') || '<span class="t3">Nothing shared yet.</span>'}
           <p class="heur">An exact match on the normalised value. A lead, not an attribution.</p></div></section>
         ${(DB.notes || []).some(n => n.pinned) ? `<section class="card"><header><h3>Pinned notes</h3><a class="btn sm ghost" href="#/notes">All notes ${ico('chevron-right','sm')}</a></header><div class="body"><div class="board mini">${DB.notes.filter(n => n.pinned).slice(0, 3).map(n => noteCard(n)).join('')}</div></div></section>` : ''}
         <section class="card"><header><h3>Open questions</h3><span class="t3">${openQ.length}</span></header><div class="body flush">
-          ${openQ.slice(0, 5).map(r => `<button class="li" data-act="selRec" data-id="${r.id}"><span class="t3">${ico('circle-dot','sm')}</span><div class="main2"><b style="font-weight:520">${esc(r.title)}</b></div><span class="end mono">${theCase(r.caseId) ? esc(theCase(r.caseId).code) : ''}</span></button>`).join('')}</div></section>
+          ${openQ.slice(0, 5).map(r => `<button class="li" data-act="selRec" data-id="${r.id}"><span class="t3">${ico('circle-dot','sm')}</span><div class="main2"><b style="font-weight:520">${esc(r.title)}</b></div><span class="end mono">${theCase(r.caseId) ? esc(caseNm(theCase(r.caseId))) : ''}</span></button>`).join('')}</div></section>
       </div></div>
   </div></div>`;
 }
@@ -126,7 +126,7 @@ function viewCases(){
       `<button class="btn" data-act="importCase">${ico('upload','sm')}Import case</button><button class="btn primary" data-act="newCase">${ico('plus','sm')}New case</button>`)}
     <div class="cs2-bar">
       <div class="seg" role="group" aria-label="Show cases">${[['all','All'],['active','Active'],['review','In review'],['closed','Archived']].map(([k, l]) => `<button data-act="cf" data-v="${k}" aria-pressed="${f === k}">${l} <span class="segn">${counts[k] || 0}</span></button>`).join('')}</div>
-      <div class="cs2-q">${ico('search','sm')}<label class="sr" for="cs2Q">Find a case</label><input id="cs2Q" type="search" placeholder="Find a case — name, code, scope…" value="${esc(UI.cq || '')}" autocomplete="off" spellcheck="false"></div>
+      <div class="cs2-q">${ico('search','sm')}<label class="sr" for="cs2Q">Find a case</label><input id="cs2Q" type="search" placeholder="Find a case — name, scope, owner…" value="${esc(UI.cq || '')}" autocomplete="off" spellcheck="false"></div>
       <span class="cs2-sp"></span>
       <label class="cs2-sort">${ico('arrow-down-up','sm')}<span class="sr">Sort cases by</span><select id="cs2Sort" class="inp">${Object.entries(CASE_SORT).map(([k, l]) => `<option value="${k}"${so === k ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
       <div class="seg cs2-view" role="group" aria-label="Layout"><button data-act="casesView" data-v="board" aria-pressed="${v === 'board'}" title="Board cards" aria-label="Board cards">${ico('layout-grid','sm')}<span class="bl">Board</span></button><button data-act="casesView" data-v="ledger" aria-pressed="${v === 'ledger'}" title="List" aria-label="List">${ico('list','sm')}<span class="bl">List</span></button></div>
@@ -150,7 +150,7 @@ function caseCard(c){
     <div class="cs2-map">${map}
       <div class="cs2-ov"><span>${ico('git-branch','sm')}${n} ${n === 1 ? 'entry' : 'entries'}</span>${F.mal ? `<span class="r">${ico('shield-alert','sm')}${F.mal} malicious</span>` : ''}</div>
       <span class="cs2-st">${statusTag(c.status)}</span></div>
-    <div class="cs2-b"><div class="cs2-code">${caseSq(c)}<span class="mono">${esc(c.code)}</span><span class="cs2-sp"></span>${caseActs(c)}</div>
+    <div class="cs2-b"><div class="cs2-code">${caseSq(c)}<span class="cs2-sp"></span>${caseActs(c)}</div>
       <h3>${esc(c.name)}</h3>
       <p class="${c.scope ? '' : 'none'}">${esc(c.scope || 'No scope written yet.')}</p>
       ${F.ind.length ? `<div class="cs2-ind" aria-label="Top entries">${F.ind.map(x => `<span class="${x.m ? 'm' : ''}" title="${esc(x.v)}">${x.m ? '<i></i>' : ''}${esc(x.v)}</span>`).join('')}</div>` : ''}
@@ -161,7 +161,7 @@ function caseCard(c){
 function caseLedger(L){
   const row = c => { const F = caseFacts(c), pct = F.leads ? Math.round(F.done / F.leads * 100) : 0;
     return `<div class="cs2-r${c.status === 'closed' ? ' archived' : ''}" role="row" style="--cc:${esc(c.color)}"><a class="case-hit" href="${caseHash(c.id)}" aria-label="Open ${esc(c.name)}"></a>
-      <div class="cs2-n" role="cell">${caseSq(c)}<div><b>${esc(c.name)}</b><small><span class="mono">${esc(c.code)}</span>${c.scope ? ' · ' + esc(c.scope) : ' · <i>No scope written yet</i>'}</small></div></div>
+      <div class="cs2-n" role="cell">${caseSq(c)}<div><b>${esc(c.name)}</b><small>${c.scope ? esc(c.scope) : '<i>No scope written yet</i>'}</small></div></div>
       <div role="cell">${statusTag(c.status)}</div>
       <div class="cs2-lq" role="cell">${F.leads ? `<span>${F.done} of ${F.leads} answered</span><span class="b"><i style="width:${pct}%"></i></span>` : '<span class="none">No questions</span>'}</div>
       <div class="num" role="cell">${F.D.entries.length}</div><div class="num" role="cell">${F.D.recs.length}</div><div class="num${F.mal ? ' r' : ''}" role="cell">${F.mal}</div>
@@ -181,7 +181,7 @@ function viewCase(tab){
   const c = theCase(), D = derive();
   const counts = {vault:D.entries.length, entities:caseEntList(c.id).length, timeline:D.recs.filter(r => r.ts).length, questions:D.recs.filter(r => r.type === 'lead' && !r.answer).length || null, media:D.recs.reduce((n, r) => n + (r.att ? r.att.length : 0) + (r.big ? 1 : 0), 0) || null};
   const body = {map:caseMapView, media:caseMedia, overview:caseOverview, vault:caseVault, entities:caseEntities, timeline:caseTimeline, graph:caseGraph, questions:caseQuestions, infra:caseInfra, report:caseReport}[tab] || caseOverview;
-  return `<div class="chead${tab === 'graph' ? ' g' : ''}" style="--cc:${esc(c.color)}"><div class="crumb"><a href="#/cases">Cases</a>${ico('chevron-right','sm')}<span>${esc(c.code)}</span></div>
+  return `<div class="chead${tab === 'graph' ? ' g' : ''}" style="--cc:${esc(c.color)}"><div class="crumb"><a href="#/cases">Cases</a>${ico('chevron-right','sm')}<span>${esc(caseNm(c))}</span></div>
     <div class="row1"><span class="cicon" style="--cc:${esc(c.color)}">${ico(c.icon)}</span>
       <div style="flex:1;min-width:0"><h1>${esc(c.name)}</h1><div class="meta">${statusTag(c.status)}<span>${ico('calendar','sm')}Opened ${esc(E.fmtDate(c.created, tz()))}</span><span>${ico('user','sm')}${esc(c.owner)}</span></div></div>
       <div class="acts"><button class="iconbtn" data-act="caseMenu" data-id="${c.id}" aria-label="More for this case" title="Snapshots, export, archive…">${ico('ellipsis','sm')}</button><button class="btn" data-act="editCase" aria-label="Edit case">${ico('pencil','sm')}<span class="bl">Edit</span></button><button class="btn" data-act="addEntry">${ico('plus','sm')}<span class="bl">Add entry</span><span class="bm">Entry</span></button><button class="btn primary" data-act="capture">${ico('plus','sm')}Capture</button></div></div>
@@ -258,7 +258,7 @@ function entryCard(e){
   const t = TYPES[e.type], v = entryVerdict(e), X = entryCtx(e), mono = MONO_TYPES.has(e.type);
   const seen = X.recs.length ? `${X.recs.length} record${X.recs.length > 1 ? 's' : ''}${X.first ? ' · ' + shortDay(X.first) + (X.last && shortDay(X.last) !== shortDay(X.first) ? '–' + shortDay(X.last) : '') : ''}` : '';
   return `<div class="ecard ec2${v === 'malicious' ? ' bad' : v === 'suspicious' ? ' sus' : ''}" data-id="${e.id}" aria-current="${!!(UI.sel && UI.sel.id === e.id)}"><button class="gcard-hit" data-act="selEntry" data-id="${e.id}" aria-label="${esc(t.label + ': ' + primary(e))}"></button>
-    ${typeof vbPickBtn === 'function' ? vbPickBtn(e) : ''}<div class="h">${X.pic ? `<span class="ec-pic"><img data-pid="${esc(X.pic.id)}" data-pk="${/^video/.test(X.pic.type) ? 'video' : 'image'}" alt=""></span>` : tbadge(e.type)}<div class="tt"><div class="kind">${esc(t.label)}${X.other.length ? ` <span class="ec-also" title="Also in ${esc(X.other.map(c => c.code).join(', '))}">${ico('git-compare-arrows','sm')}${X.other.length === 1 ? esc(X.other[0].code) : X.other.length + ' cases'}</span>` : ''}</div>
+    ${typeof vbPickBtn === 'function' ? vbPickBtn(e) : ''}<div class="h">${X.pic ? `<span class="ec-pic"><img data-pid="${esc(X.pic.id)}" data-pk="${/^video/.test(X.pic.type) ? 'video' : 'image'}" alt=""></span>` : tbadge(e.type)}<div class="tt"><div class="kind">${esc(t.label)}${X.other.length ? ` <span class="ec-also" title="Also in ${esc(X.other.map(c => c.name).join(', '))}">${ico('git-compare-arrows','sm')}${X.other.length === 1 ? esc(caseNm(X.other[0])) : X.other.length + ' cases'}</span>` : ''}</div>
       <div class="val${mono ? ' mono' : ''}" title="${esc(primary(e))}">${esc(primary(e))}</div></div>
       ${X.watched ? `<span class="ec-w" title="Watched — you hear when it shows up again">${ico('eye','sm')}</span>` : ''}<span class="star${e.starred ? ' on' : ''}" data-act="star" data-id="${e.id}" role="button" tabindex="0" aria-label="${e.starred ? 'Unstar' : 'Star'}">${ico('star','sm')}</span></div>
     ${X.facts.length ? `<dl>${X.facts.map(([n, l]) => `<dt>${esc(l)}</dt><dd title="${esc(e.fields[n])}">${esc(e.fields[n])}</dd>`).join('')}</dl>` : ''}
@@ -282,7 +282,7 @@ function entryRows(list, pick){
   return `<div class="card ev-list" style="overflow:auto"><table class="tbl vl-t"><thead><tr>${pick ? '<th class="c-pk"><span class="sr">Select</span></th>' : ''}<th class="c-st"><span class="sr">Star</span></th>${th('value', 'Entry')}${th('type', 'Type', 'hide-m')}<th class="hide-m">Details</th>${th('verdict', 'Verdict')}${th('prio', 'Priority', 'hide-m')}${th('recs', 'Records', 'n')}${th('last', 'Last seen', 'hide-m')}${th('links', 'Links', 'n hide-m')}</tr></thead><tbody>
     ${L.map(e => { const X = entryCtx(e), v = entryVerdict(e), t = TYPES[e.type];
       return `<tr data-act="selEntry" data-id="${e.id}" tabindex="0" aria-current="${!!(UI.sel && UI.sel.id === e.id)}">${pick ? `<td class="c-pk">${vbPickBtn(e)}</td>` : ''}<td class="c-st"><span class="star${e.starred ? ' on' : ''}" data-act="star" data-id="${e.id}" role="button" tabindex="0" aria-label="${e.starred ? 'Unstar' : 'Star'}">${ico('star','sm')}</span></td>
-        <td><div class="vl-v">${tbadge(e.type)}<span class="${MONO_TYPES.has(e.type) ? 'mono' : ''}" title="${esc(primary(e))}">${esc(primary(e))}</span>${(f => f ? `<span class="vflag" title="${esc(f.why)}">${ico('shield-alert','sm')}${esc(f.t)}</span>` : '')(typeof ipfEntryFlag === 'function' ? ipfEntryFlag(e) : null)}${X.watched ? `<span class="ec-w" title="Watched">${ico('eye','sm')}</span>` : ''}${X.other.length ? `<span class="ec-also">${ico('git-compare-arrows','sm')}${esc(X.other.map(c => c.code).join(', '))}</span>` : ''}</div></td>
+        <td><div class="vl-v">${tbadge(e.type)}<span class="${MONO_TYPES.has(e.type) ? 'mono' : ''}" title="${esc(primary(e))}">${esc(primary(e))}</span>${(f => f ? `<span class="vflag" title="${esc(f.why)}">${ico('shield-alert','sm')}${esc(f.t)}</span>` : '')(typeof ipfEntryFlag === 'function' ? ipfEntryFlag(e) : null)}${X.watched ? `<span class="ec-w" title="Watched">${ico('eye','sm')}</span>` : ''}${X.other.length ? `<span class="ec-also">${ico('git-compare-arrows','sm')}${esc(X.other.map(c => caseNm(c)).join(', '))}</span>` : ''}</div></td>
         <td class="hide-m t2">${esc(t.label)}</td><td class="hide-m t2 vl-d">${esc(X.facts.map(([n]) => e.fields[n]).join(' · '))}</td><td>${v ? vdLabel(v) : '<span class="t3">—</span>'}</td><td class="hide-m">${prioLabel(e.priority)}</td>
         <td class="n">${X.recs.length || '<span class="t3">0</span>'}</td><td class="hide-m t2 mono">${X.last ? esc(E.fmtFull(X.last, tz()).slice(5, 16)) : '<span class="t3">—</span>'}</td><td class="n hide-m">${X.links.length || '<span class="t3">0</span>'}</td></tr>`; }).join('')}</tbody></table></div>`;
 }

@@ -259,7 +259,7 @@ function ctiCveDlg(cve){
     <h4 class="ti-h4">In the news <span class="t3">${arts.length}</span></h4>
     ${arts.length ? `<ul class="ti-arts">${arts.slice(0, 8).map(f => `<li><button class="linkbtn" data-act="ctiOpenFeed" data-id="${f.id}">${esc(f.title)}</button><small>${esc(f.source)} · ${esc(iAgo(f.ts))}</small></li>`).join('')}</ul>` : '<p class="t3">No story you have mentions it.</p>'}
     <p class="ti-links"><a href="https://nvd.nist.gov/vuln/detail/${encodeURIComponent(cve)}" target="_blank" rel="noopener noreferrer">${ico('external-link','sm')}NVD</a><a href="https://www.cve.org/CVERecord?id=${encodeURIComponent(cve)}" target="_blank" rel="noopener noreferrer">${ico('external-link','sm')}CVE.org</a>${k ? `<a href="https://www.cisa.gov/known-exploited-vulnerabilities-catalog?search_api_fulltext=${encodeURIComponent(cve)}" target="_blank" rel="noopener noreferrer">${ico('external-link','sm')}CISA KEV</a>` : ''}${(s.refs || []).map(u => E.safeUrl(String(u))).filter(Boolean).slice(0, 3).map(u => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${ico('external-link','sm')}${esc(hostOf(u))}</a>`).join('')}</p>
-    </div><footer><button class="btn" data-act="ient" data-v="cve:${esc(cve)}">${ico('newspaper','sm')}Show stories</button><span class="sp"></span><button class="btn primary" data-act="ctiCveToCase" data-v="${esc(cve)}">${ico('plus','sm')}Add to ${esc(theCase().code)}</button></footer>`);
+    </div><footer><button class="btn" data-act="ient" data-v="cve:${esc(cve)}">${ico('newspaper','sm')}Show stories</button><span class="sp"></span><button class="btn primary" data-act="ctiCveToCase" data-v="${esc(cve)}">${ico('plus','sm')}Add to ${esc(caseNm(theCase()))}</button></footer>`);
 }
 
 /* ---------- Indicators ---------- */
@@ -293,7 +293,7 @@ function ctiIocsView(){
         <span role="cell">${tlpTag(x.tlp)}</span><span role="cell" class="n">${x.conf == null ? '<span class="t3">—</span>' : x.conf}</span>
         <span role="cell" class="t2">${d(x.last)}</span><span role="cell" class="t2">${x.exp ? (iocLive(x) ? d(x.exp) : '<span class="ti-x">Expired</span>') : '<span class="t3">Never</span>'}</span>
         <span role="cell" class="t3 ti-sr" title="${esc(x.srcs.join(', '))}">${esc(x.srcs[0] || '')}${x.srcs.length > 1 ? ' +' + (x.srcs.length - 1) : ''}</span>
-        <span role="cell" class="ti-ra"><button class="iconbtn" data-act="ctiIocAdd" data-id="${x.id}" aria-label="Add to case" title="Add to ${esc((theCase() || {code:'a case'}).code)}">${ico('plus','sm')}</button><button class="iconbtn" data-act="ctiIocDel" data-id="${x.id}" aria-label="Delete ${esc(x.v)}" title="Delete">${ico('trash-2','sm')}</button></span></div>`})), {role:'rowgroup'})}
+        <span role="cell" class="ti-ra"><button class="iconbtn" data-act="ctiIocAdd" data-id="${x.id}" aria-label="Add to case" title="Add to ${esc((caseNm(theCase()) || 'a case'))}">${ico('plus','sm')}</button><button class="iconbtn" data-act="ctiIocDel" data-id="${x.id}" aria-label="Delete ${esc(x.v)}" title="Delete">${ico('trash-2','sm')}</button></span></div>`})), {role:'rowgroup'})}
 </div>`
       : empty('fingerprint', all.length ? 'Nothing matches' : 'No indicators yet', all.length ? 'Try another filter.' : 'Import a STIX 2.1 bundle, a MISP event, a CSV or a plain list — or switch on an indicator feed in Sources. Everything is checked against your cases.',
         `<button class="btn primary" data-act="ctiImport">${ico('upload','sm')}Import indicators</button><button class="btn" data-act="feedSources" data-v="ioc">${ico('rss','sm')}Indicator feeds</button>`)}
@@ -321,7 +321,7 @@ async function ctiDoImport(text, name, opts){
 function ctiExportDlg(){
   const L = ctiIocList();
   openDlg(dhead('Export indicators') + `<div class="in">
-    <div class="field"><label for="ctiExWhat">What</label><select id="ctiExWhat"><option value="list">Indicators shown now (${L.length.toLocaleString()})</option><option value="all">Every live indicator (${CTI.iocs.filter(iocLive).length.toLocaleString()})</option>${DB.cases.map(c => `<option value="case:${c.id}">Case ${esc(c.code)} — ${esc(c.name)}</option>`).join('')}</select></div>
+    <div class="field"><label for="ctiExWhat">What</label><select id="ctiExWhat"><option value="list">Indicators shown now (${L.length.toLocaleString()})</option><option value="all">Every live indicator (${CTI.iocs.filter(iocLive).length.toLocaleString()})</option>${DB.cases.map(c => `<option value="case:${c.id}">Case: ${esc(c.name)}</option>`).join('')}</select></div>
     <div class="frow"><div class="field"><label for="ctiExFmt">Format</label><select id="ctiExFmt"><option value="stix">STIX 2.1 bundle (JSON)</option><option value="misp">MISP event (JSON)</option><option value="csv">CSV</option></select></div>
       <div class="field"><label for="ctiExTlp">Marking</label><select id="ctiExTlp">${TLP.map(t => `<option value="${t}"${t === 'amber' ? ' selected' : ''}>TLP:${t.toUpperCase()}</option>`).join('')}</select></div></div>
     <p class="t3 small">Each indicator keeps its own TLP when it has one; the marking applies to the rest and to the report. Share only with people the TLP allows.</p>
@@ -329,7 +329,7 @@ function ctiExportDlg(){
 }
 function ctiExportGo(){
   const what = $('ctiExWhat').value, fmt = $('ctiExFmt').value, tlp = $('ctiExTlp').value; let items, title;
-  if(/^case:/.test(what)){ const c = theCase(what.slice(5)); items = ctiCaseItems(c.id); title = c.code + ' — ' + c.name; }
+  if(/^case:/.test(what)){ const c = theCase(what.slice(5)); items = ctiCaseItems(c.id); title = c.name; }
   else { items = what === 'all' ? CTI.iocs.filter(iocLive) : ctiIocList(); title = 'OSINTrix indicators ' + new Date().toISOString().slice(0, 10); }
   if(!items.length) return toast('Nothing to export');
   const base = slug(title) || 'indicators';
@@ -498,11 +498,11 @@ const CTI_ACTS = {
   ctiReadAll:() => { const S = ctiFeedList(); S.forEach(st => st.items.forEach(f => f.read = true)); mutate('marked stories read'); renderMain(); },
   ctiStoryMenu:(id, v, t) => { const r = t.getBoundingClientRect(), f = DB.feed.find(x => x.id === id), L = ctiStoryOf(id), u = E.safeUrl(f.link);
     showMenu(r.right - 240, r.bottom + 4, [...(u ? [{label:'Read the original', icon:'external-link', fn:() => window.open(u, '_blank', 'noopener,noreferrer')}] : []),
-      {label:'Add to ' + theCase().code, icon:'plus', fn:() => clickAct('feedToCase', id)}, {label:'Mark actioned', icon:'check-check', fn:() => { L.forEach(x => { x.st = 'actioned'; x.read = true; }); mutate('actioned a story'); renderMain(); }},
+      {label:'Add to ' + caseNm(theCase()), icon:'plus', fn:() => clickAct('feedToCase', id)}, {label:'Mark actioned', icon:'check-check', fn:() => { L.forEach(x => { x.st = 'actioned'; x.read = true; }); mutate('actioned a story'); renderMain(); }},
       {label:L.every(x => x.read) ? 'Mark unread' : 'Mark read', icon:'mail', fn:() => { const r2 = !L.every(x => x.read); L.forEach(x => x.read = r2); mutate('read state'); renderMain(); }},
       ...(L.length > 1 ? [{sep:true}, ...L.map(x => ({label:x.source + ': ' + x.title, icon:'newspaper', fn:() => select('feed', x.id)}))] : [])]); },
   ctiOpenFeed:id => { closeDlg(); UI.itab = 'feed'; select('feed', id); },
-  ctiCveToCase:(id, v) => { ctiAddEntry('cve', v, kevOf(v) ? 'CISA KEV: ' + kevOf(v).name : ''); mutate('added ' + v); closeDlg(); toast(v + ' added to ' + theCase().code); },
+  ctiCveToCase:(id, v) => { ctiAddEntry('cve', v, kevOf(v) ? 'CISA KEV: ' + kevOf(v).name : ''); mutate('added ' + v); closeDlg(); toast(v + ' added to ' + caseNm(theCase())); },
   ctiEpssOne:async (id, v) => { try{ await ctiEpss([v]); save(); ctiCveDlg(v); }catch(e){ ctiSrcErr('epss', e); toast(e.message); } },
   ctiNvdOne:async (id, v, t) => { if(t) t.disabled = true; try{ await ctiNvd(v); save(); ctiCveDlg(v); }catch(e){ ctiSrcErr('nvd', e); toast(e.message); if(t) t.disabled = false; } },
   ctiEpssShown:async (id, v, t) => { const R = ctiVulnRows().slice(0, UI.vlim || 100).filter(r => !(r.s.epssAt > Date.now() - 864e5)).map(r => r.c); if(!R.length) return toast('Scores are already fresh');
@@ -516,8 +516,8 @@ const CTI_ACTS = {
   ctiIocMore:(id, v, t) => { const r = t.getBoundingClientRect(), L = ctiIocList(), exp = CTI.iocs.filter(x => !iocLive(x)).length;
     showMenu(r.right - 260, r.bottom + 4, [{label:'Purge ' + exp + ' expired', icon:'timer-off', disabled:!exp, fn:async () => { const n = ctiPurgeExpired(); await ctiSaveIocs(); renderMain(); toast(n + ' expired indicator' + (n === 1 ? '' : 's') + ' removed'); }},
       {label:'Delete the ' + L.length.toLocaleString() + ' shown', icon:'trash-2', disabled:!L.length, fn:() => confirmDlg('Delete ' + L.length.toLocaleString() + ' indicators?', 'They are removed from the indicator store in this browser. Your cases are not changed.', 'Delete', async () => { const ids = new Set(L.map(x => x.id)); CTI.iocs = CTI.iocs.filter(x => !ids.has(x.id)); ctiIocIndex(); await ctiSaveIocs(); renderMain(); toast('Deleted'); })},
-      {label:'Add the shown to ' + theCase().code, icon:'plus', disabled:!L.length || L.length > 500, fn:() => { L.slice(0, 500).forEach(x => ctiAddEntry(x.k, x.v, [x.threat, ...x.tags].filter(Boolean).slice(0, 3).join(', '))); mutate('added indicators'); toast(Math.min(500, L.length) + ' added to ' + theCase().code); }}]); },
-  ctiIocAdd:id => { const x = CTI.iocs.find(i => i.id === id); if(!x) return; ctiAddEntry(x.k, x.v, [x.threat, ...x.tags].filter(Boolean).slice(0, 3).join(', ') || x.srcs[0]); mutate('added ' + x.v); toast(x.v + ' added to ' + theCase().code); },
+      {label:'Add the shown to ' + caseNm(theCase()), icon:'plus', disabled:!L.length || L.length > 500, fn:() => { L.slice(0, 500).forEach(x => ctiAddEntry(x.k, x.v, [x.threat, ...x.tags].filter(Boolean).slice(0, 3).join(', '))); mutate('added indicators'); toast(Math.min(500, L.length) + ' added to ' + caseNm(theCase())); }}]); },
+  ctiIocAdd:id => { const x = CTI.iocs.find(i => i.id === id); if(!x) return; ctiAddEntry(x.k, x.v, [x.threat, ...x.tags].filter(Boolean).slice(0, 3).join(', ') || x.srcs[0]); mutate('added ' + x.v); toast(x.v + ' added to ' + caseNm(theCase())); },
   ctiIocDel:async id => { const i = CTI.iocs.findIndex(x => x.id === id); if(i < 0) return; const [x] = CTI.iocs.splice(i, 1); ctiIocIndex(); await ctiSaveIocs(); renderMain();
     toast('Deleted ' + x.v, 'Undo', async () => { CTI.iocs.push(x); ctiIocIndex(); await ctiSaveIocs(); renderMain(); }); },
   ctiIocCase:id => { const x = CTI.iocs.find(i => i.id === id); if(x) select('ent', x.k + ':' + x.v); },

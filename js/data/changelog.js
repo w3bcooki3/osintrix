@@ -4,6 +4,70 @@
    Each change has a type: "added" | "changed" | "fixed" | "removed". */
 const CHANGELOG_DATA = [
   {
+    "version": "1.59",
+    "name": "Cases go by their names; a cleaner decoder and story view",
+    "date": "2026-11-23",
+    "summary": "Everywhere a case was shown as a number like TN-2026-014, it now shows its name.",
+    "changes": [
+      {
+        "type": "changed",
+        "text": "Cases are called by their names on screen — chips, breadcrumbs, lists, menus, messages, “also in” and “seen in” notes, Ctrl K, file names of snapshots and share packages. The TN-… number is kept as an internal reference: it still finds the case in Ctrl K (case:TN-2026-014) and in questions (“in TN-2026-014”), and exports carry it for other tools. To delete a case, type its name."
+      },
+      {
+        "type": "added",
+        "text": "Ctrl K: case: suggests cases by name (case:op-lantern), and the filter chip says the case’s name."
+      },
+      {
+        "type": "changed",
+        "text": "Decoder: one row instead of three — Auto-decode, then a menu each for Decode, Encode & transform and Analyse. The menu holding the operation you chose shows its name."
+      },
+      {
+        "type": "changed",
+        "text": "A news story reads like an article: the summary in paragraphs with no scroll box (a long one opens with “Read the rest”), source, date and severity on one line, the triage buttons in one row."
+      }
+    ]
+  },
+  {
+    "version": "1.58",
+    "name": "Follow the money",
+    "date": "2026-11-23",
+    "summary": "A Bitcoin or Ethereum wallet’s transactions — fetched with your say-so or imported from a file — read into who paid it, whom it paid, which wallets are probably the same owner and whether any is sanctioned, then brought into the case as linked vault entries and timeline events.",
+    "changes": [
+      {
+        "type": "added",
+        "text": "Money trail, in a wallet’s details: balance, received, sent (and fees), tokens, first and last activity, the largest counterparties with what each paid or was paid, wallets spent together with it (probably the same owner — CoinJoins left out and flagged), and labels on everything. Open the trail for every counterparty, every transaction and the same-owner list."
+      },
+      {
+        "type": "added",
+        "text": "Fetched from mempool.space (Bitcoin) or Blockscout (Ethereum, with its public name tags, ENS names and scam flags), every page of it. The first fetch asks: only the wallet address is sent, and only to that source. Both are also lookups in Settings → Lookups."
+      },
+      {
+        "type": "added",
+        "text": "Or imported, fully offline, from explorer JSON (Blockstream, mempool.space, blockchain.com, BlockCypher, Etherscan), an Etherscan transactions or token-transfers export, or any CSV with from, to and amount columns (the trail’s own export reads back). Failed transactions move nothing; rows that cannot be read are counted, not guessed."
+      },
+      {
+        "type": "added",
+        "text": "Sanctions: download the OFAC list of crypto addresses (Bitcoin, Ethereum, USDT, USDC, TRON) once, on request; every wallet and counterparty is then checked here, offline. Direct exposure to a sanctioned wallet is flagged."
+      },
+      {
+        "type": "added",
+        "text": "Into the case: pick counterparties (or same-owner wallets) and add them to the vault, linked “paid” with the amount, count and dates — they appear in the graph. Add every payment to the timeline as its own event, once. Label any wallet (exchange, mixer, victim, suspect…) and the label shows wherever it appears. Export the trail as CSV."
+      },
+      {
+        "type": "added",
+        "text": "One with Analysis → Money: whatever is fetched or imported is kept as evidence in the open case (with its SHA-256), so the case’s money flows, owner groups and patterns include it. Every explorer format Money reads imports into the trail too, and Money now also reads Blockscout."
+      },
+      {
+        "type": "added",
+        "text": "Legacy Bitcoin addresses (starting 1 or 3) now have their Base58Check checksum verified too."
+      },
+      {
+        "type": "fixed",
+        "text": "Dialogs are named by their title for screen readers."
+      }
+    ]
+  },
+  {
     "version": "1.57",
     "name": "Every indicator, read like an analyst would",
     "date": "2026-11-23",

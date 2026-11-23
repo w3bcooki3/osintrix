@@ -69,7 +69,7 @@ function fileTriage(r){
     if(feed && iocLive(feed)){ add(45, 'In your threat feeds' + (feed.threat ? ': ' + feed.threat : '')); break; }
     if(lh && /malicious|suspicious/.test(lh.band)){ add(lh.band === 'malicious' ? 45 : 20, 'Live lookups scored it ' + lh.score + ' (' + lh.band + ')'); break; }
     if(lh && lh.band === 'benign'){ add(-25, 'Live lookups found it benign'); break; } }
-  const others = DB.records.filter(x => x.source === 'forensics-kit' && (x.body || '').includes(r.sha256)).map(x => (theCase(x.caseId) || {}).code).filter(Boolean);
+  const others = DB.records.filter(x => x.source === 'forensics-kit' && (x.body || '').includes(r.sha256)).map(x => caseNm(x.caseId)).filter(Boolean);
   if(others.length) add(0, 'Seen before in ' + [...new Set(others)].join(', '), 'lo');
   /* YARA, when it has been run */
   const yh = r.yara ? r.yara.filter(x => x.match) : []; if(yh.length) add(Math.min(40, 20 + yh.length * 5), 'YARA: ' + yh.slice(0, 3).map(x => x.rule).join(', '));

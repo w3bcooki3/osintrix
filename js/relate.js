@@ -190,7 +190,7 @@ function paintBuild(){
 async function buildGo(){
   const c = theCase(), P = BUILD.plan; c.graphOpts = BUILD.opts; c.autoGraph = BUILD.auto;
   if(!P.newKeys.length && !P.newRels.length){ closeDlg(); mutate('graph settings'); return toast(c.autoGraph ? 'New captures will be added to the graph' : 'Saved'); }
-  await snapshot('Before building the graph of ' + c.code);
+  await snapshot('Before building the graph of ' + caseNm(c));
   const res = applyPlan(c.id, P, 'build'); closeDlg(); mutate('built graph: ' + res.made.length + ' entities, ' + res.links.length + ' relationships'); UI.graph.views = {}; renderAll();
   toast(`${res.made.length} entities and ${res.links.length} relationships added`, 'Undo', () => { const s = new Set(res.made.map(e => e.id)), sl = new Set(res.links.map(l => l.id)); DB.entries = DB.entries.filter(e => !s.has(e.id)); DB.links = DB.links.filter(l => !sl.has(l.id)); mutate('undid graph build'); renderAll(); });
 }

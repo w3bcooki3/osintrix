@@ -67,7 +67,7 @@ function idpBuild(rootId){
 }
 /* how sure a link is: a three-step meter and a word */
 const idpConf = c => `<span class="idp-cf c${c}" title="How sure this link is: ${IDP_CONF[c]}"><i></i><i></i><i></i><span>${IDP_CONF[c]}</span></span>`;
-const idpCase = cid => { const c = theCase(cid); return c ? `<a href="${caseHash(cid)}" class="idp-case" title="${esc(c.name)}">${esc(c.code)}</a>` : ''; };
+const idpCase = cid => { const c = theCase(cid); return c ? `<a href="${caseHash(cid)}" class="idp-case" title="${esc(c.name)}">${esc(caseNm(c))}</a>` : ''; };
 const IDP_GROUPS = [['Contact', ['email', 'phone', 'messaging']], ['Accounts', ['username', 'social', 'forum', 'link', 'domain']], ['Money', ['crypto', 'transaction']], ['Devices and places', ['device', 'ip', 'location', 'breach', 'file']]];
 /* per identifier: how much evidence names it, and when it was last seen */
 function idpSeen(x){ const ge = globalEnts().get(x.k); if(!ge) return {n:0, last:null, first:null}; const R = ge.recs.filter(r => r.type !== 'lead'), ts = R.map(r => r.ts).filter(Boolean).sort((a, b) => a - b); return {n:R.length, first:ts[0] || null, last:ts[ts.length - 1] || null}; }
@@ -77,7 +77,7 @@ function idpGaps(P){
   for(const c of P.conflicts) G.push(['warn', `${c.what} differs between cases (${c.vals.map(v => v.v).join(' / ')}). Find a document that settles it, or treat them as two people.`]);
   if(!P.facts.dob.length) G.push(['', 'No date of birth recorded.']);
   if(!has('email') && !has('phone')) G.push(['', 'No email address or phone number — the identifiers that tie accounts to one person most firmly.']);
-  for(const o of P.people.slice(1)) if(!o.why.strong) G.push(['warn', `${primary(o.e) || 'The person'} in ${(theCase(o.e.caseId) || {}).code} is joined only by a username. Confirm with a second identifier before treating them as the same person.`]);
+  for(const o of P.people.slice(1)) if(!o.why.strong) G.push(['warn', `${primary(o.e) || 'The person'} in ${caseNm(o.e.caseId)} is joined only by a username. Confirm with a second identifier before treating them as the same person.`]);
   for(const x of P.ids) if(x.conf === 1) G.push(['', `${primary(x.e)} is only a possible link (${x.link && x.link.label ? x.link.label + ', ' : ''}two steps away). Confirm it directly.`]);
   if(!P.media.length) G.push(['', 'No photo linked.']);
   for(const h of P.hrs) if(h.flat) G.push(['warn', `${h.who} posts at all hours — it may be automated or shared.`]);
@@ -108,7 +108,7 @@ function idpMap(P){
   let svg = pos.map(([x, y], i) => `<line x1="0" y1="0" x2="${x}" y2="${y}" class="idp-ml"${dash(ids[i].conf)}></line>`).join('');
   svg += outer.map(({o, i, x, y}) => `<line x1="${pos[i][0]}" y1="${pos[i][1]}" x2="${x}" y2="${y}" class="idp-ml"${dash(o.conf)}></line>`).join('');
   svg += pos.map(([x, y], i) => `<g class="idp-mn"><circle cx="${x}" cy="${y}" r="5"></circle><text x="${x}" y="${y > 0 ? y + 18 : y - 10}" text-anchor="middle">${esc(short(primary(ids[i].e)))}</text></g>`).join('');
-  svg += outer.map(({o, x, y}) => { const t = (primary(o.e) || 'Person') + ' · ' + ((theCase(o.e.caseId) || {}).code || ''), w = Math.min(220, 16 + t.length * 7); return `<g class="idp-mo"><rect x="${x - w / 2}" y="${y - 13}" width="${w}" height="26" rx="13"></rect><text x="${x}" y="${y + 4}" text-anchor="middle">${esc(short(t))}</text></g>`; }).join('');
+  svg += outer.map(({o, x, y}) => { const t = (primary(o.e) || 'Person') + ' · ' + caseNm(o.e.caseId), w = Math.min(220, 16 + t.length * 7); return `<g class="idp-mo"><rect x="${x - w / 2}" y="${y - 13}" width="${w}" height="26" rx="13"></rect><text x="${x}" y="${y + 4}" text-anchor="middle">${esc(short(t))}</text></g>`; }).join('');
   svg += `<g class="idp-mc"><circle cx="0" cy="0" r="22"></circle><text x="0" y="4.5" text-anchor="middle">${esc((primary(P.root) || '?').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase())}</text></g>`;
   return `<figure class="idp-map"><svg viewBox="${x0} ${y0} ${x1 - x0} ${y1 - y0}" role="img" aria-label="How the identifiers connect to ${esc(primary(P.root))}">${svg}</svg>
     <figcaption class="t3 small"><span class="idp-lg"><i class="s"></i>confirmed</span><span class="idp-lg"><i class="d"></i>likely</span><span class="idp-lg"><i class="o"></i>possible</span><span>· people in other cases on the outside</span></figcaption></figure>`;
@@ -119,7 +119,7 @@ function idpCard(P){
   const role = P.facts.role[0] ? P.facts.role[0].v : '', strongN = P.ids.filter(x => x.conf === 3).length;
   const extra = x => { const h = primary(x.e).replace(/^@/, '').replace(/^https?:\/\/[^/]+\/(@|u\/|user\/)?/, '').replace(/\/.*$/, '').toLowerCase(), a = P.acc.find(z => z.h.toLowerCase() === h), hr = P.hrs.find(z => z.who.replace(/^@|^u\//, '').toLowerCase() === h);
     return [a ? 'made ' + ftWhen(a.created) : '', hr ? (hr.flat ? 'posts at all hours' : 'posts from UTC' + hr.offs.map(hrOff).join('/')) : ''].filter(Boolean).join(' · '); };
-  const fact = (what, L) => `<div class="idp-kf${bad.has(what) ? ' warn' : ''}"><dt>${esc(what)}</dt><dd>${L.length ? L.map(x => `<span>${esc(x.v)}${P.cases.length > 1 ? ` <span class="t3">${esc(x.cases.map(c => (theCase(c) || {}).code).join(', '))}</span>` : ''}</span>`).join('') : '<span class="t3">Not known</span>'}${bad.has(what) ? `<em>${ico('triangle-alert','sm')}Cases disagree</em>` : ''}</dd></div>`;
+  const fact = (what, L) => `<div class="idp-kf${bad.has(what) ? ' warn' : ''}"><dt>${esc(what)}</dt><dd>${L.length ? L.map(x => `<span>${esc(x.v)}${P.cases.length > 1 ? ` <span class="t3">${esc(x.cases.map(c => caseNm(c)).join(', '))}</span>` : ''}</span>`).join('') : '<span class="t3">Not known</span>'}${bad.has(what) ? `<em>${ico('triangle-alert','sm')}Cases disagree</em>` : ''}</dd></div>`;
   const gaps = idpGaps(P);
   return `<article class="idp" aria-label="Identity profile of ${esc(name)}">
     <header class="idp-hd"><div class="idp-av" aria-hidden="true">${esc(ini || '?')}</div>
@@ -154,7 +154,7 @@ function idpAll(){ const done = new Set(), out = [];
 function idpListDlg(){
   const L = idpAll();
   openDlg(dhead('Identity profiles') + `<div class="in"><p class="t2 small" style="margin:0 0 12px">Every person and organisation in your vault, one card each — joined across cases when they share an identifier.</p>
-    ${L.length ? `<ul class="idp-list">${L.map(P => `<li><button class="li" data-act="idpOpen" data-id="${esc(P.root.id)}">${tbadge(P.root.type, 'sm')}<div class="main2"><b>${esc(primary(P.root) || 'Unnamed')}</b><small>${P.cases.map(c => esc((theCase(c) || {}).code || '')).join(', ')} · ${P.ids.length} identifier${P.ids.length === 1 ? '' : 's'}${P.people.length > 1 ? ' · the same person in ' + (P.people.length - 1) + ' other case' + (P.people.length > 2 ? 's' : '') : ''}${P.conflicts.length ? ' · cases disagree' : ''}</small></div></button></li>`).join('')}</ul>` : empty('users', 'No people in the vault yet', 'Add a Person entry and link their handles, emails, phones and wallets to it.')}</div>
+    ${L.length ? `<ul class="idp-list">${L.map(P => `<li><button class="li" data-act="idpOpen" data-id="${esc(P.root.id)}">${tbadge(P.root.type, 'sm')}<div class="main2"><b>${esc(primary(P.root) || 'Unnamed')}</b><small>${P.cases.map(c => esc(caseNm(c))).join(', ')} · ${P.ids.length} identifier${P.ids.length === 1 ? '' : 's'}${P.people.length > 1 ? ' · the same person in ' + (P.people.length - 1) + ' other case' + (P.people.length > 2 ? 's' : '') : ''}${P.conflicts.length ? ' · cases disagree' : ''}</small></div></button></li>`).join('')}</ul>` : empty('users', 'No people in the vault yet', 'Add a Person entry and link their handles, emails, phones and wallets to it.')}</div>
     <footer><button class="btn" data-act="dclose">Close</button></footer>`); $('dlg').classList.add('xwide');
 }
 const IDP_ACTS = {

@@ -73,7 +73,7 @@ function nlqParse(q){
     { const cn = Object.keys(NLQ_COUNTRY).sort((a, b) => b.length - a.length).find(n => s.startsWith('in ' + n) && /^(\W|$)/.test(s.slice(3 + n.length)) || s.startsWith('from ' + n) && /^(\W|$)/.test(s.slice(5 + n.length)));
       if(cn){ F.country = NLQ_COUNTRY[cn]; chip('in ' + cn.replace(/\b\w/g, c => c.toUpperCase()), 'country'); s = s.slice(s.indexOf(cn) + cn.length); continue; } }
     if((m = /^(?:in |case )?(\S+)/.exec(s))){ const w = m[1], c = DB.cases.find(c => c.code.toLowerCase() === w || (w.length >= 4 && /^(in|case) /.test(m[0]) && c.name.toLowerCase().split(/\W+/).includes(w)));
-      if(c){ F.caseId = c.id; chip('in ' + c.code, 'case'); s = s.slice(m[0].length); continue; } }
+      if(c){ F.caseId = c.id; chip('in ' + caseNm(c), 'case'); s = s.slice(m[0].length); continue; } }
     if((m = /^(riskiest|most dangerous|worst|top)\b/.exec(s))){ F.sort = 'risk'; chip('riskiest first', 'sort'); s = s.slice(m[0].length); continue; }
     if((m = /^(most seen|most common|most mentioned|busiest)\b/.exec(s))){ F.sort = 'seen'; chip('most seen first', 'sort'); s = s.slice(m[0].length); continue; }
     if((m = /^(newest|latest|most recent|recent)\b/.exec(s))){ F.sort = 'new'; chip('newest first', 'sort'); s = s.slice(m[0].length); continue; }

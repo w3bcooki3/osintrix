@@ -3,141 +3,142 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' file: 'wasm-unsafe-eval'; style-src 'self' file: 'unsafe-inline'; font-src 'self' file: data:; img-src 'self' data: blob:; media-src 'self' blob:; connect-src https://api.rss2json.com https://raw.githubusercontent.com https://api.first.org https://cveawg.mitre.org https://internetdb.shodan.io https://api.shodan.io https://dns.google https://rdap.org https://rdap.arin.net https://rdap.db.ripe.net https://rdap.apnic.net https://rdap.afrinic.net https://rdap.lacnic.net https://rdap.verisign.com https://tld-rdap.verisign.com https://rdap.identitydigital.services https://pubapi.registry.google https://rdap.registry.cloud https://rdap.nixiregistry.in https://rdap.publicinterestregistry.org https://rdap.radix.host https://rdap.gmoregistry.net https://rdap.zdnsgtld.com https://rdap.nominet.uk https://rdap.centralnic.com https://ipinfo.io https://stat.ripe.net https://onionoo.torproject.org https://api.certspotter.com https://api.hackertarget.com https://archive.org https://otx.alienvault.com https://haveibeenpwned.com https://*.workers.dev; form-action 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' file: 'wasm-unsafe-eval'; style-src 'self' file: 'unsafe-inline'; font-src 'self' file: data:; img-src 'self' data: blob:; media-src 'self' blob:; connect-src https://api.rss2json.com https://raw.githubusercontent.com https://api.first.org https://cveawg.mitre.org https://internetdb.shodan.io https://api.shodan.io https://dns.google https://rdap.org https://rdap.arin.net https://rdap.db.ripe.net https://rdap.apnic.net https://rdap.afrinic.net https://rdap.lacnic.net https://rdap.verisign.com https://tld-rdap.verisign.com https://rdap.identitydigital.services https://pubapi.registry.google https://rdap.registry.cloud https://rdap.nixiregistry.in https://rdap.publicinterestregistry.org https://rdap.radix.host https://rdap.gmoregistry.net https://rdap.zdnsgtld.com https://rdap.nominet.uk https://rdap.centralnic.com https://ipinfo.io https://stat.ripe.net https://onionoo.torproject.org https://mempool.space https://eth.blockscout.com https://api.certspotter.com https://api.hackertarget.com https://archive.org https://otx.alienvault.com https://haveibeenpwned.com https://*.workers.dev; form-action 'none'; base-uri 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#0b1020">
 <title>OSINTrix</title>
 <link rel="icon" id="fav" href="data:,">
-<link rel="stylesheet" href="css/fonts.css?v=1.57-6b722f46">
-<link rel="stylesheet" href="css/app.css?v=1.57-2bcbbb57">
-<link rel="stylesheet" href="css/theme.css?v=1.57-c7d9472f">
-<link rel="stylesheet" href="css/design.css?v=1.57-c0d5d653">
+<link rel="stylesheet" href="css/fonts.css?v=1.59-6b722f46">
+<link rel="stylesheet" href="css/app.css?v=1.59-2bcbbb57">
+<link rel="stylesheet" href="css/theme.css?v=1.59-c7d9472f">
+<link rel="stylesheet" href="css/design.css?v=1.59-1d15a5ec">
 <!-- preload:start -->
-<link rel="preload" as="script" href="js/lazy.js?v=1.57-dc1aced0">
-<link rel="preload" as="script" href="js/textin.js?v=1.57-25c20484">
-<link rel="preload" as="script" href="js/limits.js?v=1.57-00cc2dd4">
-<link rel="preload" as="script" href="js/vendor/js-yaml.min.js?v=1.57-45dc3dd0">
-<link rel="preload" as="script" href="js/data/tools.js?v=1.57-8fffec7b">
-<link rel="preload" as="script" href="js/data/query-templates.js?v=1.57-d96de4aa">
-<link rel="preload" as="script" href="js/data/detection-rules.js?v=1.57-b4a16c10">
-<link rel="preload" as="script" href="js/data/reference.js?v=1.57-232bff13">
-<link rel="preload" as="script" href="js/data/ctf-cheats.js?v=1.57-a94afc1e">
-<link rel="preload" as="script" href="js/data/cloudguide.js?v=1.57-f4e2ee0a">
-<link rel="preload" as="script" href="js/data/cert-guide.js?v=1.57-4398ad03">
-<link rel="preload" as="script" href="js/data/changelog.js?v=1.57-3887b5e0">
-<link rel="preload" as="script" href="js/data/attack.js?v=1.57-c1562fb4">
-<link rel="preload" as="script" href="js/icons.js?v=1.57-5abd540b">
-<link rel="preload" as="script" href="js/engine.js?v=1.57-efdd9802">
-<link rel="preload" as="script" href="js/brand.js?v=1.57-42e5721a">
-<link rel="preload" as="script" href="js/model.js?v=1.57-2ee86688">
-<link rel="preload" as="script" href="js/demo.js?v=1.57-d81efcbb">
-<link rel="preload" as="script" href="js/core.js?v=1.57-91dd2bcb">
-<link rel="preload" as="script" href="js/recent.js?v=1.57-760d9ab8">
-<link rel="preload" as="script" href="js/validate.js?v=1.57-481647ce">
-<link rel="preload" as="script" href="js/layouts.js?v=1.57-82c05eda">
-<link rel="preload" as="script" href="js/views.js?v=1.57-62b228d6">
-<link rel="preload" as="script" href="js/vault2.js?v=1.57-e773f461">
-<link rel="preload" as="script" href="js/vimport.js?v=1.57-be78daef">
-<link rel="preload" as="script" href="js/snapcase.js?v=1.57-aa25a1f1">
-<link rel="preload" as="script" href="js/savedv.js?v=1.57-95c50a46">
-<link rel="preload" as="script" href="js/mentions.js?v=1.57-108404c4">
-<link rel="preload" as="script" href="js/sightings.js?v=1.57-f8b4e1a4">
-<link rel="preload" as="script" href="js/iprofile.js?v=1.57-c7f0b057">
-<link rel="preload" as="script" href="js/keys.js?v=1.57-fac1865b">
-<link rel="preload" as="script" href="js/graph.js?v=1.57-c0422bf7">
-<link rel="preload" as="script" href="js/graphview.js?v=1.57-7db8537c">
-<link rel="preload" as="script" href="js/areas.js?v=1.57-766a7930">
-<link rel="preload" as="script" href="js/insp.js?v=1.57-a8459d56">
-<link rel="preload" as="script" href="js/cti.js?v=1.57-3792c593">
-<link rel="preload" as="script" href="js/intel.js?v=1.57-87be7aa8">
-<link rel="preload" as="script" href="js/lookups.js?v=1.57-a8852adb">
-<link rel="preload" as="script" href="js/verdict.js?v=1.57-b8ccb240">
-<link rel="preload" as="script" href="js/investigate.js?v=1.57-91febe6a">
-<link rel="preload" as="script" href="js/copilot.js?v=1.57-c63ab18e">
-<link rel="preload" as="script" href="js/graphiq.js?v=1.57-82531632">
-<link rel="preload" as="script" href="js/nlq.js?v=1.57-556b5b3a">
-<link rel="preload" as="script" href="js/repwriter.js?v=1.57-a5691d65">
-<link rel="preload" as="script" href="js/osint.js?v=1.57-a39db509">
-<link rel="preload" as="script" href="js/checklist.js?v=1.57-7d86951b">
-<link rel="preload" as="script" href="js/detiq.js?v=1.57-8accc6ef">
-<link rel="preload" as="script" href="js/triage.js?v=1.57-b48624cc">
-<link rel="preload" as="script" href="js/share.js?v=1.57-7d3e015a">
-<link rel="preload" as="script" href="js/setup.js?v=1.57-215cd8c0">
-<link rel="preload" as="script" href="js/vlist.js?v=1.57-b357021a">
-<link rel="preload" as="script" href="js/queries.js?v=1.57-57c58329">
-<link rel="preload" as="script" href="js/qbuild.js?v=1.57-4e62a10c">
-<link rel="preload" as="script" href="js/detections.js?v=1.57-870c9880">
-<link rel="preload" as="script" href="js/notes.js?v=1.57-37f20a32">
-<link rel="preload" as="script" href="js/playbooks.js?v=1.57-1098b072">
-<link rel="preload" as="script" href="js/mask.js?v=1.57-8bde180c">
-<link rel="preload" as="script" href="js/extras.js?v=1.57-bc2e0bf0">
-<link rel="preload" as="script" href="js/lab.js?v=1.57-30d8c98b">
-<link rel="preload" as="script" href="js/ctf.js?v=1.57-a0fdd8e1">
-<link rel="preload" as="script" href="js/kit.js?v=1.57-30801b09">
-<link rel="preload" as="script" href="js/parse.js?v=1.57-15518b9f">
-<link rel="preload" as="script" href="js/search.js?v=1.57-8722e3e7">
-<link rel="preload" as="script" href="js/evtx.js?v=1.57-4993a790">
-<link rel="preload" as="script" href="js/safety.js?v=1.57-deb0866d">
-<link rel="preload" as="script" href="js/integrity.js?v=1.57-c332aa31">
-<link rel="preload" as="script" href="js/tl.js?v=1.57-1da49f4f">
-<link rel="preload" as="script" href="js/report.js?v=1.57-e4c120e2">
-<link rel="preload" as="script" href="js/caseents.js?v=1.57-5576b2d8">
-<link rel="preload" as="script" href="js/relate.js?v=1.57-00452cbc">
-<link rel="preload" as="script" href="js/watch.js?v=1.57-94b854ce">
-<link rel="preload" as="script" href="js/map.js?v=1.57-cb0a6099">
-<link rel="preload" as="script" href="js/webpage.js?v=1.57-90026d66">
-<link rel="preload" as="script" href="js/media.js?v=1.57-7db6eda2">
-<link rel="preload" as="script" href="js/tlx.js?v=1.57-c2675c04">
-<link rel="preload" as="script" href="js/tlx2.js?v=1.57-cb2dad96">
-<link rel="preload" as="script" href="js/picx.js?v=1.57-4a0a1911">
-<link rel="preload" as="script" href="js/activity.js?v=1.57-7438453f">
-<link rel="preload" as="script" href="js/auto.js?v=1.57-cb17a519">
-<link rel="preload" as="script" href="js/tour.js?v=1.57-8dbbf2d6">
-<link rel="preload" as="script" href="js/detlab.js?v=1.57-8e61fc50">
-<link rel="preload" as="script" href="js/rulever.js?v=1.57-bab684ef">
-<link rel="preload" as="script" href="js/rulepack.js?v=1.57-3cb44b16">
-<link rel="preload" as="script" href="js/hunts.js?v=1.57-35cf277d">
-<link rel="preload" as="script" href="js/evnote.js?v=1.57-127a26a3">
-<link rel="preload" as="script" href="js/endpoint.js?v=1.57-c4886a1f">
-<link rel="preload" as="script" href="js/meta.js?v=1.57-40dfe377">
-<link rel="preload" as="script" href="js/oldoffice.js?v=1.57-18f81939">
-<link rel="preload" as="script" href="js/rxengine.js?v=1.57-641afc4b">
-<link rel="preload" as="script" href="js/rxlib.js?v=1.57-e416b847">
-<link rel="preload" as="script" href="js/rxbig.js?v=1.57-9335fc49">
-<link rel="preload" as="script" href="js/regexb.js?v=1.57-0333c8cf">
-<link rel="preload" as="script" href="js/geoloc.js?v=1.57-c6d2c256">
-<link rel="preload" as="script" href="js/infra.js?v=1.57-82d1e06d">
-<link rel="preload" as="script" href="js/sources.js?v=1.57-96e11d79">
-<link rel="preload" as="script" href="js/phone.js?v=1.57-6ec6eeff">
-<link rel="preload" as="script" href="js/wallet.js?v=1.57-8e6a63b8">
-<link rel="preload" as="script" href="js/footprint.js?v=1.57-c193c308">
-<link rel="preload" as="script" href="js/hours.js?v=1.57-3f8fb74b">
-<link rel="preload" as="script" href="js/changes.js?v=1.57-048b6413">
-<link rel="preload" as="script" href="js/identity.js?v=1.57-795f7202">
-<link rel="preload" as="script" href="js/chain.js?v=1.57-9d2efc8a">
-<link rel="preload" as="script" href="js/caserules.js?v=1.57-510f59b7">
-<link rel="preload" as="script" href="js/today.js?v=1.57-ab34fca5">
-<link rel="preload" as="script" href="js/dupes.js?v=1.57-71c5f741">
-<link rel="preload" as="script" href="js/vdecay.js?v=1.57-bfca184e">
-<link rel="preload" as="script" href="js/links.js?v=1.57-61b0383d">
-<link rel="preload" as="script" href="js/security.js?v=1.57-bf5337c7">
-<link rel="preload" as="script" href="js/cloudscan.js?v=1.57-c32baedc">
-<link rel="preload" as="script" href="js/cloudlogs.js?v=1.57-1cc3239b">
-<link rel="preload" as="script" href="js/cloud.js?v=1.57-22a425cf">
-<link rel="preload" as="script" href="js/whatsnew.js?v=1.57-16300cd3">
-<link rel="preload" as="script" href="js/pad.js?v=1.57-76b424fe">
-<link rel="preload" as="script" href="js/notebook.js?v=1.57-1138f041">
-<link rel="preload" as="script" href="js/nbexport.js?v=1.57-8b6265ff">
-<link rel="preload" as="script" href="js/storage.js?v=1.57-2d540953">
-<link rel="preload" as="script" href="js/fbackup.js?v=1.57-54b3d4db">
-<link rel="preload" as="script" href="js/x509.js?v=1.57-0b97c484">
-<link rel="preload" as="script" href="js/certs.js?v=1.57-16bfc0f0">
-<link rel="preload" as="script" href="js/imgx.js?v=1.57-37da06c7">
-<link rel="preload" as="script" href="js/ach.js?v=1.57-ee81d8ef">
-<link rel="preload" as="script" href="js/pcap.js?v=1.57-4458a5b0">
-<link rel="preload" as="script" href="js/sqlite.js?v=1.57-1f0a62c8">
-<link rel="preload" as="script" href="js/valmenu.js?v=1.57-b7dee91d">
-<link rel="preload" as="script" href="js/app.js?v=1.57-a3ed9e3f">
+<link rel="preload" as="script" href="js/lazy.js?v=1.59-dc1aced0">
+<link rel="preload" as="script" href="js/textin.js?v=1.59-25c20484">
+<link rel="preload" as="script" href="js/limits.js?v=1.59-00cc2dd4">
+<link rel="preload" as="script" href="js/vendor/js-yaml.min.js?v=1.59-45dc3dd0">
+<link rel="preload" as="script" href="js/data/tools.js?v=1.59-8fffec7b">
+<link rel="preload" as="script" href="js/data/query-templates.js?v=1.59-d96de4aa">
+<link rel="preload" as="script" href="js/data/detection-rules.js?v=1.59-b4a16c10">
+<link rel="preload" as="script" href="js/data/reference.js?v=1.59-232bff13">
+<link rel="preload" as="script" href="js/data/ctf-cheats.js?v=1.59-a94afc1e">
+<link rel="preload" as="script" href="js/data/cloudguide.js?v=1.59-f4e2ee0a">
+<link rel="preload" as="script" href="js/data/cert-guide.js?v=1.59-4398ad03">
+<link rel="preload" as="script" href="js/data/changelog.js?v=1.59-144f8987">
+<link rel="preload" as="script" href="js/data/attack.js?v=1.59-c1562fb4">
+<link rel="preload" as="script" href="js/icons.js?v=1.59-5abd540b">
+<link rel="preload" as="script" href="js/engine.js?v=1.59-efdd9802">
+<link rel="preload" as="script" href="js/brand.js?v=1.59-65ed98c3">
+<link rel="preload" as="script" href="js/model.js?v=1.59-2ee86688">
+<link rel="preload" as="script" href="js/demo.js?v=1.59-d81efcbb">
+<link rel="preload" as="script" href="js/core.js?v=1.59-3ff5a9f7">
+<link rel="preload" as="script" href="js/recent.js?v=1.59-760d9ab8">
+<link rel="preload" as="script" href="js/validate.js?v=1.59-481647ce">
+<link rel="preload" as="script" href="js/layouts.js?v=1.59-82c05eda">
+<link rel="preload" as="script" href="js/views.js?v=1.59-90311d99">
+<link rel="preload" as="script" href="js/vault2.js?v=1.59-69644956">
+<link rel="preload" as="script" href="js/vimport.js?v=1.59-57ac9464">
+<link rel="preload" as="script" href="js/snapcase.js?v=1.59-0e8dbeb4">
+<link rel="preload" as="script" href="js/savedv.js?v=1.59-95c50a46">
+<link rel="preload" as="script" href="js/mentions.js?v=1.59-108404c4">
+<link rel="preload" as="script" href="js/sightings.js?v=1.59-07677802">
+<link rel="preload" as="script" href="js/iprofile.js?v=1.59-a498d5e3">
+<link rel="preload" as="script" href="js/trail.js?v=1.59-4b274eb8">
+<link rel="preload" as="script" href="js/keys.js?v=1.59-fac1865b">
+<link rel="preload" as="script" href="js/graph.js?v=1.59-c0422bf7">
+<link rel="preload" as="script" href="js/graphview.js?v=1.59-7db8537c">
+<link rel="preload" as="script" href="js/areas.js?v=1.59-410e1617">
+<link rel="preload" as="script" href="js/insp.js?v=1.59-1f5ee965">
+<link rel="preload" as="script" href="js/cti.js?v=1.59-3792c593">
+<link rel="preload" as="script" href="js/intel.js?v=1.59-594340ee">
+<link rel="preload" as="script" href="js/lookups.js?v=1.59-41e0de86">
+<link rel="preload" as="script" href="js/verdict.js?v=1.59-b8ccb240">
+<link rel="preload" as="script" href="js/investigate.js?v=1.59-61806a93">
+<link rel="preload" as="script" href="js/copilot.js?v=1.59-b02cc75e">
+<link rel="preload" as="script" href="js/graphiq.js?v=1.59-82531632">
+<link rel="preload" as="script" href="js/nlq.js?v=1.59-e5f95f96">
+<link rel="preload" as="script" href="js/repwriter.js?v=1.59-746763e6">
+<link rel="preload" as="script" href="js/osint.js?v=1.59-64ddf098">
+<link rel="preload" as="script" href="js/checklist.js?v=1.59-9e83319a">
+<link rel="preload" as="script" href="js/detiq.js?v=1.59-69f04a1f">
+<link rel="preload" as="script" href="js/triage.js?v=1.59-ef00f55a">
+<link rel="preload" as="script" href="js/share.js?v=1.59-4baa7d43">
+<link rel="preload" as="script" href="js/setup.js?v=1.59-215cd8c0">
+<link rel="preload" as="script" href="js/vlist.js?v=1.59-b357021a">
+<link rel="preload" as="script" href="js/queries.js?v=1.59-bc8b7bda">
+<link rel="preload" as="script" href="js/qbuild.js?v=1.59-4e62a10c">
+<link rel="preload" as="script" href="js/detections.js?v=1.59-94b6a0bb">
+<link rel="preload" as="script" href="js/notes.js?v=1.59-ee9504f0">
+<link rel="preload" as="script" href="js/playbooks.js?v=1.59-3b0c63d5">
+<link rel="preload" as="script" href="js/mask.js?v=1.59-8bde180c">
+<link rel="preload" as="script" href="js/extras.js?v=1.59-a685f8cb">
+<link rel="preload" as="script" href="js/lab.js?v=1.59-5c47b678">
+<link rel="preload" as="script" href="js/ctf.js?v=1.59-b0cbbf46">
+<link rel="preload" as="script" href="js/kit.js?v=1.59-30801b09">
+<link rel="preload" as="script" href="js/parse.js?v=1.59-15518b9f">
+<link rel="preload" as="script" href="js/search.js?v=1.59-e8f214a2">
+<link rel="preload" as="script" href="js/evtx.js?v=1.59-4993a790">
+<link rel="preload" as="script" href="js/safety.js?v=1.59-afe15fc4">
+<link rel="preload" as="script" href="js/integrity.js?v=1.59-0224916c">
+<link rel="preload" as="script" href="js/tl.js?v=1.59-1da49f4f">
+<link rel="preload" as="script" href="js/report.js?v=1.59-e183c3c9">
+<link rel="preload" as="script" href="js/caseents.js?v=1.59-a8985f5b">
+<link rel="preload" as="script" href="js/relate.js?v=1.59-58d9fe38">
+<link rel="preload" as="script" href="js/watch.js?v=1.59-d11e8d0d">
+<link rel="preload" as="script" href="js/map.js?v=1.59-d7d1ab08">
+<link rel="preload" as="script" href="js/webpage.js?v=1.59-90026d66">
+<link rel="preload" as="script" href="js/media.js?v=1.59-7db6eda2">
+<link rel="preload" as="script" href="js/tlx.js?v=1.59-c2675c04">
+<link rel="preload" as="script" href="js/tlx2.js?v=1.59-cb2dad96">
+<link rel="preload" as="script" href="js/picx.js?v=1.59-2d164ad7">
+<link rel="preload" as="script" href="js/activity.js?v=1.59-e422ef29">
+<link rel="preload" as="script" href="js/auto.js?v=1.59-1ac6d916">
+<link rel="preload" as="script" href="js/tour.js?v=1.59-8dbbf2d6">
+<link rel="preload" as="script" href="js/detlab.js?v=1.59-244428c8">
+<link rel="preload" as="script" href="js/rulever.js?v=1.59-bab684ef">
+<link rel="preload" as="script" href="js/rulepack.js?v=1.59-3cb44b16">
+<link rel="preload" as="script" href="js/hunts.js?v=1.59-633cf9f9">
+<link rel="preload" as="script" href="js/evnote.js?v=1.59-127a26a3">
+<link rel="preload" as="script" href="js/endpoint.js?v=1.59-c4886a1f">
+<link rel="preload" as="script" href="js/meta.js?v=1.59-40dfe377">
+<link rel="preload" as="script" href="js/oldoffice.js?v=1.59-18f81939">
+<link rel="preload" as="script" href="js/rxengine.js?v=1.59-641afc4b">
+<link rel="preload" as="script" href="js/rxlib.js?v=1.59-e416b847">
+<link rel="preload" as="script" href="js/rxbig.js?v=1.59-9335fc49">
+<link rel="preload" as="script" href="js/regexb.js?v=1.59-b8033bfa">
+<link rel="preload" as="script" href="js/geoloc.js?v=1.59-c6d2c256">
+<link rel="preload" as="script" href="js/infra.js?v=1.59-82d1e06d">
+<link rel="preload" as="script" href="js/sources.js?v=1.59-96e11d79">
+<link rel="preload" as="script" href="js/phone.js?v=1.59-75bc4704">
+<link rel="preload" as="script" href="js/wallet.js?v=1.59-096410e8">
+<link rel="preload" as="script" href="js/footprint.js?v=1.59-c193c308">
+<link rel="preload" as="script" href="js/hours.js?v=1.59-3f8fb74b">
+<link rel="preload" as="script" href="js/changes.js?v=1.59-048b6413">
+<link rel="preload" as="script" href="js/identity.js?v=1.59-db5bf42e">
+<link rel="preload" as="script" href="js/chain.js?v=1.59-9d2efc8a">
+<link rel="preload" as="script" href="js/caserules.js?v=1.59-510f59b7">
+<link rel="preload" as="script" href="js/today.js?v=1.59-585d812e">
+<link rel="preload" as="script" href="js/dupes.js?v=1.59-71c5f741">
+<link rel="preload" as="script" href="js/vdecay.js?v=1.59-bfca184e">
+<link rel="preload" as="script" href="js/links.js?v=1.59-553e3cb1">
+<link rel="preload" as="script" href="js/security.js?v=1.59-64d74601">
+<link rel="preload" as="script" href="js/cloudscan.js?v=1.59-c32baedc">
+<link rel="preload" as="script" href="js/cloudlogs.js?v=1.59-1cc3239b">
+<link rel="preload" as="script" href="js/cloud.js?v=1.59-38b48729">
+<link rel="preload" as="script" href="js/whatsnew.js?v=1.59-16300cd3">
+<link rel="preload" as="script" href="js/pad.js?v=1.59-e32228da">
+<link rel="preload" as="script" href="js/notebook.js?v=1.59-1138f041">
+<link rel="preload" as="script" href="js/nbexport.js?v=1.59-8b6265ff">
+<link rel="preload" as="script" href="js/storage.js?v=1.59-2d540953">
+<link rel="preload" as="script" href="js/fbackup.js?v=1.59-54b3d4db">
+<link rel="preload" as="script" href="js/x509.js?v=1.59-0b97c484">
+<link rel="preload" as="script" href="js/certs.js?v=1.59-88e7845f">
+<link rel="preload" as="script" href="js/imgx.js?v=1.59-1b67f5a9">
+<link rel="preload" as="script" href="js/ach.js?v=1.59-ee81d8ef">
+<link rel="preload" as="script" href="js/pcap.js?v=1.59-e5ebd345">
+<link rel="preload" as="script" href="js/sqlite.js?v=1.59-6fe98a76">
+<link rel="preload" as="script" href="js/valmenu.js?v=1.59-b7dee91d">
+<link rel="preload" as="script" href="js/app.js?v=1.59-44aba199">
 <!-- preload:end -->
 </head>
 <body>
@@ -169,144 +170,145 @@
 <div class="scrim" id="scrim" hidden><div class="dlg" id="dlg" role="dialog" aria-modal="true"></div></div>
 <div class="welcome" id="welcome" hidden role="dialog" aria-modal="true" aria-labelledby="wTitle"></div>
 <div class="toast" id="toast" role="status" hidden><span id="toastMsg"></span><button id="toastBtn" hidden></button></div>
-<link rel="prefetch" as="script" href="js/vendor/cytoscape.min.js?v=1.57-83e8c54a" data-lazy>
-<link rel="x-on-demand" href="js/vendor/jsqr.min.js?v=1.57-41fdad3e" data-lazy>
-<link rel="x-on-demand" href="js/vendor/oui-vendors.js?v=1.57-c0e66aaa" data-lazy>
-<link rel="x-on-demand" href="js/vendor/enrich-data.js?v=1.57-3c974ff3" data-lazy>
-<link rel="x-on-demand" href="js/vendor/libphonenumber-max.js?v=1.57-49963114" data-lazy>
-<link rel="x-on-demand" href="js/vendor/world-map.js?v=1.57-417768fe" data-lazy>
-<link rel="x-on-demand" href="js/data/sample-osint.js?v=1.57-a8480d68" data-lazy>
-<script src="js/lazy.js?v=1.57-dc1aced0"></script>
-<script src="js/textin.js?v=1.57-25c20484"></script>
-<script src="js/limits.js?v=1.57-00cc2dd4"></script>
-<script src="js/vendor/js-yaml.min.js?v=1.57-45dc3dd0"></script>
-<script src="js/data/tools.js?v=1.57-8fffec7b"></script>
-<script src="js/data/query-templates.js?v=1.57-d96de4aa"></script>
-<script src="js/data/detection-rules.js?v=1.57-b4a16c10"></script>
-<link rel="prefetch" as="script" href="js/data/detections-pack.js?v=1.57-fbe0bb54" data-lazy>
-<link rel="prefetch" as="script" href="js/data/playbooks-pack.js?v=1.57-47498e78" data-lazy>
-<script src="js/data/reference.js?v=1.57-232bff13"></script>
-<link rel="prefetch" as="script" href="js/data/reference-pack.js?v=1.57-4c093c4b" data-lazy>
-<script src="js/data/ctf-cheats.js?v=1.57-a94afc1e"></script>
-<script src="js/data/cloudguide.js?v=1.57-f4e2ee0a"></script>
-<link rel="prefetch" as="script" href="js/data/cloudguide-pack.js?v=1.57-7f7b86e0" data-lazy>
-<link rel="prefetch" as="script" href="js/data/notebook-demo.js?v=1.57-d0996dc4" data-lazy>
-<script src="js/data/cert-guide.js?v=1.57-4398ad03"></script>
-<link rel="prefetch" as="script" href="js/data/cert-samples.js?v=1.57-0299cc85" data-lazy>
-<script src="js/data/changelog.js?v=1.57-3887b5e0"></script>
-<script src="js/data/attack.js?v=1.57-c1562fb4"></script>
-<link rel="prefetch" as="script" href="js/data/kev-snapshot.js?v=1.57-00aad734" data-lazy>
-<script src="js/icons.js?v=1.57-5abd540b"></script>
-<script src="js/engine.js?v=1.57-efdd9802"></script>
-<script src="js/brand.js?v=1.57-42e5721a"></script>
-<script src="js/model.js?v=1.57-2ee86688"></script>
-<script src="js/demo.js?v=1.57-d81efcbb"></script>
-<script src="js/core.js?v=1.57-91dd2bcb"></script>
-<script src="js/recent.js?v=1.57-760d9ab8"></script>
-<script src="js/validate.js?v=1.57-481647ce"></script>
-<script src="js/layouts.js?v=1.57-82c05eda"></script>
-<script src="js/views.js?v=1.57-62b228d6"></script>
-<script src="js/vault2.js?v=1.57-e773f461"></script>
-<script src="js/vimport.js?v=1.57-be78daef"></script>
-<script src="js/snapcase.js?v=1.57-aa25a1f1"></script>
-<script src="js/savedv.js?v=1.57-95c50a46"></script>
-<script src="js/mentions.js?v=1.57-108404c4"></script>
-<script src="js/sightings.js?v=1.57-f8b4e1a4"></script>
-<script src="js/iprofile.js?v=1.57-c7f0b057"></script>
-<script src="js/keys.js?v=1.57-fac1865b"></script>
-<script src="js/graph.js?v=1.57-c0422bf7"></script>
-<script src="js/graphview.js?v=1.57-7db8537c"></script>
-<script src="js/areas.js?v=1.57-766a7930"></script>
-<script src="js/insp.js?v=1.57-a8459d56"></script>
-<script src="js/cti.js?v=1.57-3792c593"></script>
-<script src="js/intel.js?v=1.57-87be7aa8"></script>
-<script src="js/lookups.js?v=1.57-a8852adb"></script>
-<script src="js/verdict.js?v=1.57-b8ccb240"></script>
-<script src="js/investigate.js?v=1.57-91febe6a"></script>
-<script src="js/copilot.js?v=1.57-c63ab18e"></script>
-<script src="js/graphiq.js?v=1.57-82531632"></script>
-<script src="js/nlq.js?v=1.57-556b5b3a"></script>
-<script src="js/repwriter.js?v=1.57-a5691d65"></script>
-<script src="js/osint.js?v=1.57-a39db509"></script>
-<script src="js/checklist.js?v=1.57-7d86951b"></script>
-<script src="js/detiq.js?v=1.57-8accc6ef"></script>
-<script src="js/triage.js?v=1.57-b48624cc"></script>
-<script src="js/share.js?v=1.57-7d3e015a"></script>
-<script src="js/setup.js?v=1.57-215cd8c0"></script>
-<script src="js/vlist.js?v=1.57-b357021a"></script>
-<script src="js/queries.js?v=1.57-57c58329"></script>
-<script src="js/qbuild.js?v=1.57-4e62a10c"></script>
-<script src="js/detections.js?v=1.57-870c9880"></script>
-<script src="js/notes.js?v=1.57-37f20a32"></script>
-<script src="js/playbooks.js?v=1.57-1098b072"></script>
-<script src="js/mask.js?v=1.57-8bde180c"></script>
-<script src="js/extras.js?v=1.57-bc2e0bf0"></script>
-<script src="js/lab.js?v=1.57-30d8c98b"></script>
-<script src="js/ctf.js?v=1.57-a0fdd8e1"></script>
-<script src="js/kit.js?v=1.57-30801b09"></script>
-<script src="js/parse.js?v=1.57-15518b9f"></script>
-<script src="js/search.js?v=1.57-8722e3e7"></script>
-<script src="js/evtx.js?v=1.57-4993a790"></script>
-<script src="js/safety.js?v=1.57-deb0866d"></script>
-<script src="js/integrity.js?v=1.57-c332aa31"></script>
-<script src="js/tl.js?v=1.57-1da49f4f"></script>
-<script src="js/report.js?v=1.57-e4c120e2"></script>
-<script src="js/caseents.js?v=1.57-5576b2d8"></script>
-<script src="js/relate.js?v=1.57-00452cbc"></script>
-<script src="js/watch.js?v=1.57-94b854ce"></script>
-<script src="js/map.js?v=1.57-cb0a6099"></script>
-<script src="js/webpage.js?v=1.57-90026d66"></script>
-<script src="js/media.js?v=1.57-7db6eda2"></script>
-<script src="js/tlx.js?v=1.57-c2675c04"></script>
-<script src="js/tlx2.js?v=1.57-cb2dad96"></script>
-<script src="js/picx.js?v=1.57-4a0a1911"></script>
-<script src="js/activity.js?v=1.57-7438453f"></script>
-<script src="js/auto.js?v=1.57-cb17a519"></script>
-<script src="js/tour.js?v=1.57-8dbbf2d6"></script>
-<script src="js/detlab.js?v=1.57-8e61fc50"></script>
-<script src="js/rulever.js?v=1.57-bab684ef"></script>
-<script src="js/rulepack.js?v=1.57-3cb44b16"></script>
-<script src="js/hunts.js?v=1.57-35cf277d"></script>
-<script src="js/evnote.js?v=1.57-127a26a3"></script>
-<script src="js/endpoint.js?v=1.57-c4886a1f"></script>
-<script src="js/meta.js?v=1.57-40dfe377"></script>
-<script src="js/oldoffice.js?v=1.57-18f81939"></script>
-<script src="js/rxengine.js?v=1.57-641afc4b"></script>
-<script src="js/rxlib.js?v=1.57-e416b847"></script>
-<script src="js/rxbig.js?v=1.57-9335fc49"></script>
-<script src="js/regexb.js?v=1.57-0333c8cf"></script>
-<script src="js/geoloc.js?v=1.57-c6d2c256"></script>
-<script src="js/infra.js?v=1.57-82d1e06d"></script>
-<script src="js/sources.js?v=1.57-96e11d79"></script>
-<script src="js/phone.js?v=1.57-6ec6eeff"></script>
-<script src="js/wallet.js?v=1.57-8e6a63b8"></script>
-<script src="js/footprint.js?v=1.57-c193c308"></script>
-<script src="js/hours.js?v=1.57-3f8fb74b"></script>
-<script src="js/changes.js?v=1.57-048b6413"></script>
-<script src="js/identity.js?v=1.57-795f7202"></script>
-<script src="js/chain.js?v=1.57-9d2efc8a"></script>
-<script src="js/caserules.js?v=1.57-510f59b7"></script>
-<script src="js/today.js?v=1.57-ab34fca5"></script>
-<script src="js/dupes.js?v=1.57-71c5f741"></script>
-<script src="js/vdecay.js?v=1.57-bfca184e"></script>
-<script src="js/links.js?v=1.57-61b0383d"></script>
-<script src="js/security.js?v=1.57-bf5337c7"></script>
-<script src="js/cloudscan.js?v=1.57-c32baedc"></script>
-<script src="js/cloudlogs.js?v=1.57-1cc3239b"></script>
-<script src="js/cloud.js?v=1.57-22a425cf"></script>
-<script src="js/whatsnew.js?v=1.57-16300cd3"></script>
-<script src="js/pad.js?v=1.57-76b424fe"></script>
-<script src="js/notebook.js?v=1.57-1138f041"></script>
-<script src="js/nbexport.js?v=1.57-8b6265ff"></script>
-<script src="js/storage.js?v=1.57-2d540953"></script>
-<script src="js/fbackup.js?v=1.57-54b3d4db"></script>
-<script src="js/x509.js?v=1.57-0b97c484"></script>
-<script src="js/certs.js?v=1.57-16bfc0f0"></script>
-<script src="js/imgx.js?v=1.57-37da06c7"></script>
-<script src="js/ach.js?v=1.57-ee81d8ef"></script>
-<script src="js/pcap.js?v=1.57-4458a5b0"></script>
-<script src="js/sqlite.js?v=1.57-1f0a62c8"></script>
-<script src="js/valmenu.js?v=1.57-b7dee91d"></script>
-<script src="js/app.js?v=1.57-a3ed9e3f"></script>
+<link rel="prefetch" as="script" href="js/vendor/cytoscape.min.js?v=1.59-83e8c54a" data-lazy>
+<link rel="x-on-demand" href="js/vendor/jsqr.min.js?v=1.59-41fdad3e" data-lazy>
+<link rel="x-on-demand" href="js/vendor/oui-vendors.js?v=1.59-c0e66aaa" data-lazy>
+<link rel="x-on-demand" href="js/vendor/enrich-data.js?v=1.59-3c974ff3" data-lazy>
+<link rel="x-on-demand" href="js/vendor/libphonenumber-max.js?v=1.59-49963114" data-lazy>
+<link rel="x-on-demand" href="js/vendor/world-map.js?v=1.59-417768fe" data-lazy>
+<link rel="x-on-demand" href="js/data/sample-osint.js?v=1.59-a8480d68" data-lazy>
+<script src="js/lazy.js?v=1.59-dc1aced0"></script>
+<script src="js/textin.js?v=1.59-25c20484"></script>
+<script src="js/limits.js?v=1.59-00cc2dd4"></script>
+<script src="js/vendor/js-yaml.min.js?v=1.59-45dc3dd0"></script>
+<script src="js/data/tools.js?v=1.59-8fffec7b"></script>
+<script src="js/data/query-templates.js?v=1.59-d96de4aa"></script>
+<script src="js/data/detection-rules.js?v=1.59-b4a16c10"></script>
+<link rel="prefetch" as="script" href="js/data/detections-pack.js?v=1.59-fbe0bb54" data-lazy>
+<link rel="prefetch" as="script" href="js/data/playbooks-pack.js?v=1.59-47498e78" data-lazy>
+<script src="js/data/reference.js?v=1.59-232bff13"></script>
+<link rel="prefetch" as="script" href="js/data/reference-pack.js?v=1.59-4c093c4b" data-lazy>
+<script src="js/data/ctf-cheats.js?v=1.59-a94afc1e"></script>
+<script src="js/data/cloudguide.js?v=1.59-f4e2ee0a"></script>
+<link rel="prefetch" as="script" href="js/data/cloudguide-pack.js?v=1.59-7f7b86e0" data-lazy>
+<link rel="prefetch" as="script" href="js/data/notebook-demo.js?v=1.59-d0996dc4" data-lazy>
+<script src="js/data/cert-guide.js?v=1.59-4398ad03"></script>
+<link rel="prefetch" as="script" href="js/data/cert-samples.js?v=1.59-0299cc85" data-lazy>
+<script src="js/data/changelog.js?v=1.59-144f8987"></script>
+<script src="js/data/attack.js?v=1.59-c1562fb4"></script>
+<link rel="prefetch" as="script" href="js/data/kev-snapshot.js?v=1.59-00aad734" data-lazy>
+<script src="js/icons.js?v=1.59-5abd540b"></script>
+<script src="js/engine.js?v=1.59-efdd9802"></script>
+<script src="js/brand.js?v=1.59-65ed98c3"></script>
+<script src="js/model.js?v=1.59-2ee86688"></script>
+<script src="js/demo.js?v=1.59-d81efcbb"></script>
+<script src="js/core.js?v=1.59-3ff5a9f7"></script>
+<script src="js/recent.js?v=1.59-760d9ab8"></script>
+<script src="js/validate.js?v=1.59-481647ce"></script>
+<script src="js/layouts.js?v=1.59-82c05eda"></script>
+<script src="js/views.js?v=1.59-90311d99"></script>
+<script src="js/vault2.js?v=1.59-69644956"></script>
+<script src="js/vimport.js?v=1.59-57ac9464"></script>
+<script src="js/snapcase.js?v=1.59-0e8dbeb4"></script>
+<script src="js/savedv.js?v=1.59-95c50a46"></script>
+<script src="js/mentions.js?v=1.59-108404c4"></script>
+<script src="js/sightings.js?v=1.59-07677802"></script>
+<script src="js/iprofile.js?v=1.59-a498d5e3"></script>
+<script src="js/trail.js?v=1.59-4b274eb8"></script>
+<script src="js/keys.js?v=1.59-fac1865b"></script>
+<script src="js/graph.js?v=1.59-c0422bf7"></script>
+<script src="js/graphview.js?v=1.59-7db8537c"></script>
+<script src="js/areas.js?v=1.59-410e1617"></script>
+<script src="js/insp.js?v=1.59-1f5ee965"></script>
+<script src="js/cti.js?v=1.59-3792c593"></script>
+<script src="js/intel.js?v=1.59-594340ee"></script>
+<script src="js/lookups.js?v=1.59-41e0de86"></script>
+<script src="js/verdict.js?v=1.59-b8ccb240"></script>
+<script src="js/investigate.js?v=1.59-61806a93"></script>
+<script src="js/copilot.js?v=1.59-b02cc75e"></script>
+<script src="js/graphiq.js?v=1.59-82531632"></script>
+<script src="js/nlq.js?v=1.59-e5f95f96"></script>
+<script src="js/repwriter.js?v=1.59-746763e6"></script>
+<script src="js/osint.js?v=1.59-64ddf098"></script>
+<script src="js/checklist.js?v=1.59-9e83319a"></script>
+<script src="js/detiq.js?v=1.59-69f04a1f"></script>
+<script src="js/triage.js?v=1.59-ef00f55a"></script>
+<script src="js/share.js?v=1.59-4baa7d43"></script>
+<script src="js/setup.js?v=1.59-215cd8c0"></script>
+<script src="js/vlist.js?v=1.59-b357021a"></script>
+<script src="js/queries.js?v=1.59-bc8b7bda"></script>
+<script src="js/qbuild.js?v=1.59-4e62a10c"></script>
+<script src="js/detections.js?v=1.59-94b6a0bb"></script>
+<script src="js/notes.js?v=1.59-ee9504f0"></script>
+<script src="js/playbooks.js?v=1.59-3b0c63d5"></script>
+<script src="js/mask.js?v=1.59-8bde180c"></script>
+<script src="js/extras.js?v=1.59-a685f8cb"></script>
+<script src="js/lab.js?v=1.59-5c47b678"></script>
+<script src="js/ctf.js?v=1.59-b0cbbf46"></script>
+<script src="js/kit.js?v=1.59-30801b09"></script>
+<script src="js/parse.js?v=1.59-15518b9f"></script>
+<script src="js/search.js?v=1.59-e8f214a2"></script>
+<script src="js/evtx.js?v=1.59-4993a790"></script>
+<script src="js/safety.js?v=1.59-afe15fc4"></script>
+<script src="js/integrity.js?v=1.59-0224916c"></script>
+<script src="js/tl.js?v=1.59-1da49f4f"></script>
+<script src="js/report.js?v=1.59-e183c3c9"></script>
+<script src="js/caseents.js?v=1.59-a8985f5b"></script>
+<script src="js/relate.js?v=1.59-58d9fe38"></script>
+<script src="js/watch.js?v=1.59-d11e8d0d"></script>
+<script src="js/map.js?v=1.59-d7d1ab08"></script>
+<script src="js/webpage.js?v=1.59-90026d66"></script>
+<script src="js/media.js?v=1.59-7db6eda2"></script>
+<script src="js/tlx.js?v=1.59-c2675c04"></script>
+<script src="js/tlx2.js?v=1.59-cb2dad96"></script>
+<script src="js/picx.js?v=1.59-2d164ad7"></script>
+<script src="js/activity.js?v=1.59-e422ef29"></script>
+<script src="js/auto.js?v=1.59-1ac6d916"></script>
+<script src="js/tour.js?v=1.59-8dbbf2d6"></script>
+<script src="js/detlab.js?v=1.59-244428c8"></script>
+<script src="js/rulever.js?v=1.59-bab684ef"></script>
+<script src="js/rulepack.js?v=1.59-3cb44b16"></script>
+<script src="js/hunts.js?v=1.59-633cf9f9"></script>
+<script src="js/evnote.js?v=1.59-127a26a3"></script>
+<script src="js/endpoint.js?v=1.59-c4886a1f"></script>
+<script src="js/meta.js?v=1.59-40dfe377"></script>
+<script src="js/oldoffice.js?v=1.59-18f81939"></script>
+<script src="js/rxengine.js?v=1.59-641afc4b"></script>
+<script src="js/rxlib.js?v=1.59-e416b847"></script>
+<script src="js/rxbig.js?v=1.59-9335fc49"></script>
+<script src="js/regexb.js?v=1.59-b8033bfa"></script>
+<script src="js/geoloc.js?v=1.59-c6d2c256"></script>
+<script src="js/infra.js?v=1.59-82d1e06d"></script>
+<script src="js/sources.js?v=1.59-96e11d79"></script>
+<script src="js/phone.js?v=1.59-75bc4704"></script>
+<script src="js/wallet.js?v=1.59-096410e8"></script>
+<script src="js/footprint.js?v=1.59-c193c308"></script>
+<script src="js/hours.js?v=1.59-3f8fb74b"></script>
+<script src="js/changes.js?v=1.59-048b6413"></script>
+<script src="js/identity.js?v=1.59-db5bf42e"></script>
+<script src="js/chain.js?v=1.59-9d2efc8a"></script>
+<script src="js/caserules.js?v=1.59-510f59b7"></script>
+<script src="js/today.js?v=1.59-585d812e"></script>
+<script src="js/dupes.js?v=1.59-71c5f741"></script>
+<script src="js/vdecay.js?v=1.59-bfca184e"></script>
+<script src="js/links.js?v=1.59-553e3cb1"></script>
+<script src="js/security.js?v=1.59-64d74601"></script>
+<script src="js/cloudscan.js?v=1.59-c32baedc"></script>
+<script src="js/cloudlogs.js?v=1.59-1cc3239b"></script>
+<script src="js/cloud.js?v=1.59-38b48729"></script>
+<script src="js/whatsnew.js?v=1.59-16300cd3"></script>
+<script src="js/pad.js?v=1.59-e32228da"></script>
+<script src="js/notebook.js?v=1.59-1138f041"></script>
+<script src="js/nbexport.js?v=1.59-8b6265ff"></script>
+<script src="js/storage.js?v=1.59-2d540953"></script>
+<script src="js/fbackup.js?v=1.59-54b3d4db"></script>
+<script src="js/x509.js?v=1.59-0b97c484"></script>
+<script src="js/certs.js?v=1.59-88e7845f"></script>
+<script src="js/imgx.js?v=1.59-1b67f5a9"></script>
+<script src="js/ach.js?v=1.59-ee81d8ef"></script>
+<script src="js/pcap.js?v=1.59-e5ebd345"></script>
+<script src="js/sqlite.js?v=1.59-6fe98a76"></script>
+<script src="js/valmenu.js?v=1.59-b7dee91d"></script>
+<script src="js/app.js?v=1.59-44aba199"></script>
 </body>
 </html>

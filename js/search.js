@@ -29,7 +29,7 @@ function srchIndex(){
     ['#/reference','Reference','book-open'],['#/playbooks','Playbooks','list-checks'],['#/help','Help','circle-help'],['#/settings','Settings','settings']];
   for(const [h, l, i] of nav) add('action', {id:'go' + h, title:'Go to ' + l, sub:'Page', icon:i, text:l + ' page open go', run:() => go(h), w:2});
   const c0 = theCase();
-  if(c0) for(const [k, l, i] of CASE_TABS) add('action', {id:'tab' + k, title:c0.code + ' · ' + l, sub:'Tab in ' + c0.name.split(' — ')[0], icon:i, text:l + ' ' + c0.name + ' ' + c0.code, run:() => go(caseHash(c0.id, k)), w:1});
+  if(c0) for(const [k, l, i] of CASE_TABS) add('action', {id:'tab' + k, title:caseNm(c0) + ' · ' + l, sub:'Tab in ' + c0.name.split(' — ')[0], icon:i, text:l + ' ' + c0.name + ' ' + c0.code, run:() => go(caseHash(c0.id, k)), w:1});
   const acts = [['Capture evidence','plus','capture paste log new record', () => openCapture()], ['Add a vault entry','layers','new entry add person domain ip', () => entryDlg()], ['New case','folder-plus','create case', () => caseDlg()],
     ['New note','sticky-note','note todo', () => go('#/notes')], ['New CTF challenge','flag','ctf challenge add', () => { go('#/ctf'); setTimeout(() => clickAct('ctfNew'), 50); }],
     ['Inspect a file','file-search','file forensics exif hash strings', () => { UI.labTab = 'file'; go('#/lab'); }], ['Convert a timestamp','clock-3','epoch unix filetime webkit time', () => { UI.labTab = 'time'; go('#/lab'); }],
@@ -41,16 +41,16 @@ function srchIndex(){
   if(c0) acts.push(['Save a snapshot of this case to your computer','history','snapshot save backup version point in time case file', () => sncSaveDlg()], ['Compare this case with a snapshot','git-compare','snapshot compare diff changes roll back restore case', () => sncLoad()]);
   if(DB.sample) acts.push(['Remove sample data','trash-2','sample demo delete remove', () => clickAct('removeSample')]);
   /* saved views open from here too */
-  if(typeof svList === 'function') for(const v of svList()){ const c = v.caseId ? theCase(v.caseId) : null; add('action', {id:'sv' + v.id, title:v.name, sub:SV_KIND[v.kind][0] + (c ? ' · ' + c.code : '') + ' · ' + svDescribe(v), icon:SV_KIND[v.kind][1], text:v.name + ' view saved ' + SV_KIND[v.kind][0] + ' ' + svDescribe(v), run:() => svOpen(v.id), w:4}); }
+  if(typeof svList === 'function') for(const v of svList()){ const c = v.caseId ? theCase(v.caseId) : null; add('action', {id:'sv' + v.id, title:v.name, sub:SV_KIND[v.kind][0] + (c ? ' · ' + caseNm(c) : '') + ' · ' + svDescribe(v), icon:SV_KIND[v.kind][1], text:v.name + ' view saved ' + SV_KIND[v.kind][0] + ' ' + svDescribe(v), run:() => svOpen(v.id), w:4}); }
   for(const [t, i, x, fn] of acts) add('action', {id:'a' + t, title:t, sub:'Action', icon:i, text:t + ' ' + x, run:fn, w:3});
-  for(const c of DB.cases) add('case', {id:c.id, title:c.name, sub:c.code + ' · ' + ({active:'Active', review:'In review', closed:'Archived'}[c.status] || c.status), icon:c.icon, color:c.color, text:c.name + ' ' + c.code + ' ' + (c.scope || ''), body:c.scope, caseId:c.id, w:6});
+  for(const c of DB.cases) add('case', {id:c.id, title:c.name, sub:({active:'Active', review:'In review', closed:'Archived'}[c.status] || c.status), icon:c.icon, color:c.color, text:c.name + ' ' + c.code + ' ' + (c.scope || ''), body:c.scope, caseId:c.id, w:6});
   for(const e of DB.entries){ const t = TYPES[e.type]; if(!t) continue; const c = theCase(e.caseId);
-    add('entry', {id:e.id, title:primary(e), sub:t.label + (c ? ' · ' + c.code : ''), icon:t.icon, tcolor:t.color, text:Object.values(e.fields).join(' ') + ' ' + e.tags.join(' ') + ' ' + (e.notes || '') + ' ' + t.label, body:e.notes || Object.entries(e.fields).map(([k, v]) => k + ': ' + v).join(' · '), caseId:e.caseId, mono:MONO_TYPES.has(e.type), w:5,
+    add('entry', {id:e.id, title:primary(e), sub:t.label + (c ? ' · ' + caseNm(c) : ''), icon:t.icon, tcolor:t.color, text:Object.values(e.fields).join(' ') + ' ' + e.tags.join(' ') + ' ' + (e.notes || '') + ' ' + t.label, body:e.notes || Object.entries(e.fields).map(([k, v]) => k + ': ' + v).join(' · '), caseId:e.caseId, mono:MONO_TYPES.has(e.type), w:5,
       vd:entryVerdict(e) || '', ty:[e.type, t.label.toLowerCase()], tags:e.tags, star:!!e.starred, watch:!!(entryKey(e) && isWatched(entryKey(e)))}); }
   for(const r of DB.records){ const c = theCase(r.caseId);
-    add('record', {id:r.id, title:r.title, sub:typeLabel(r.type) + (c ? ' · ' + c.code : '') + (r.host ? ' · ' + r.host : '') + (r.ts ? ' · ' + E.fmtDate(r.ts, tz()) : ''), icon:(EVTYPE[r.type] || EVTYPE.note)[0], text:r.title + ' ' + r.body + ' ' + r.host + ' ' + r.source + ' ' + (r.tags || []).join(' ') + ' ' + (r.answer || ''), body:r.answer ? r.answer : r.body, caseId:r.caseId, w:4, ty:[r.type, typeLabel(r.type).toLowerCase()], tags:r.tags || [], open:r.type === 'lead' && !r.answer}); }
+    add('record', {id:r.id, title:r.title, sub:typeLabel(r.type) + (c ? ' · ' + caseNm(c) : '') + (r.host ? ' · ' + r.host : '') + (r.ts ? ' · ' + E.fmtDate(r.ts, tz()) : ''), icon:(EVTYPE[r.type] || EVTYPE.note)[0], text:r.title + ' ' + r.body + ' ' + r.host + ' ' + r.source + ' ' + (r.tags || []).join(' ') + ' ' + (r.answer || ''), body:r.answer ? r.answer : r.body, caseId:r.caseId, w:4, ty:[r.type, typeLabel(r.type).toLowerCase()], tags:r.tags || [], open:r.type === 'lead' && !r.answer}); }
   for(const [id, g] of globalEnts()) add('ent', {id, title:g.v, sub:(E.LABEL[g.k] || g.k) + ' · ' + g.recs.length + ' record' + (g.recs.length === 1 ? '' : 's') + ' · ' + g.cases.size + ' case' + (g.cases.size === 1 ? '' : 's') + (verdictOf(id) ? ' · ' + verdictOf(id) : ''), icon:'fingerprint', text:g.v + ' ' + (E.LABEL[g.k] || g.k), mono:true, w:5, vd:verdictOf(id) || '', ty:[g.k, (E.LABEL[g.k] || g.k).toLowerCase()], watch:isWatched(id)});
-  for(const n of DB.notes || []){ const c = n.caseId ? theCase(n.caseId) : null; add('note', {id:n.id, title:noteLabel(n), sub:'Note' + (c ? ' · ' + c.code : ' · General'), icon:'sticky-note', text:n.text, body:n.text, w:3}); }
+  for(const n of DB.notes || []){ const c = n.caseId ? theCase(n.caseId) : null; add('note', {id:n.id, title:noteLabel(n), sub:'Note' + (c ? ' · ' + caseNm(c) : ' · General'), icon:'sticky-note', text:n.text, body:n.text, w:3}); }
   for(const t of DB.tools) add('tool', {id:t.id, title:t.name, sub:hostOf(t.url) + ' · ' + toolSub(t), icon:'wrench', text:t.name + ' ' + t.desc + ' ' + t.tags.join(' ') + ' ' + hostOf(t.url) + ' ' + toolSub(t), body:t.desc, w:3, tags:t.tags || []});
   for(const x of DB.queries || []) add('query', {id:x.id, title:x.name, sub:qcat(x.cat)[0] + ' · ' + x.engines.map(e => ENGINES[e] ? ENGINES[e][0] : e).join(', '), icon:'scan-search', text:x.name + ' ' + x.desc + ' ' + x.query + ' ' + x.tags.join(' '), body:x.query, codeBody:true, w:2, tags:x.tags || []});
   for(const r of DB.rules || []) add('rule', {id:r.id, title:r.title, sub:RTYPE[r.type][0] + ' · ' + sevOf(r.severity)[0] + (r.technique ? ' · ' + r.technique : ''), icon:RTYPE[r.type][1], text:r.title + ' ' + r.desc + ' ' + r.technique + ' ' + r.tags.join(' ') + ' ' + r.code, body:r.desc, w:2, tags:r.tags || []});
@@ -92,7 +92,7 @@ function srchScore(it, P){
   if(srHasF(P.f) && !srPass(it, P.f)) return 0;
   const title = it.title.toLowerCase(), text = (it.title + ' ' + it.sub + ' ' + it.text).toLowerCase();
   for(const n of P.neg) if(text.includes(n)) return 0;
-  if(P.caseCode){ const c = it.caseId ? theCase(it.caseId) : null; if(!c || !(c.code.toLowerCase().includes(P.caseCode) || c.name.toLowerCase().includes(P.caseCode))) return 0; }
+  if(P.caseCode){ const c = it.caseId ? theCase(it.caseId) : null; if(!c || !(c.code.toLowerCase().includes(P.caseCode) || c.name.toLowerCase().includes(P.caseCode) || slug(c.name).includes(P.caseCode))) return 0; }
   if(!P.terms.length) return P.caseCode || P.scope || srHasF(P.f) ? it.w : 0;
   let s = 0;
   for(const t of P.terms){
@@ -117,7 +117,7 @@ function srchRun(){
   const ioc = q && !P.tl.length ? E.extract(q).find(e => e.v.toLowerCase() === refang(q).toLowerCase() || e.v.toLowerCase() === q.toLowerCase()) : null;
   if(ioc) special.push({kind:'ioc', id:'ioc', title:ioc.v, sub:'Indicator · ' + (E.LABEL[ioc.k] || ioc.k), icon:'crosshair', mono:true, k:ioc.k, v:ioc.v});
   const tlOwn = P.tl.some(x => !SR_F.test(x));   /* host:, source:, after: … only mean something on a timeline */
-  if(tlOwn || (q && UI.route.area === 'case' && UI.route.tab === 'timeline')) special.push({kind:'tl', id:'tl', title:'Filter the ' + theCase().code + ' timeline', sub:(P.tl.concat(P.terms)).join(' ') || q, icon:'filter', q});
+  if(tlOwn || (q && UI.route.area === 'case' && UI.route.tab === 'timeline')) special.push({kind:'tl', id:'tl', title:'Filter the ' + caseNm(theCase()) + ' timeline', sub:(P.tl.concat(P.terms)).join(' ') || q, icon:'filter', q});
   let groups;
   if(scope === 'all'){ const order = ['action','case','entry','ent','record','note','chal','tool','query','rule','playbook','feed'];
     groups = order.map(k => ({k, items:all.filter(x => x.it.kind === k).slice(0, k === 'action' ? 4 : 5).map(x => x.it), total:counts[k] || 0})).filter(g => g.items.length);
@@ -139,7 +139,7 @@ function srHints(q){
   const OPS = [['case:', 'Only one case', 'folder-open'], ['in:', 'Only one kind of thing', 'layers'], ['verdict:', 'Malicious, suspicious, benign or none', 'shield'], ['type:', 'IP, domain, email, hash, person…', 'shapes'], ['tag:', 'Things with a tag', 'tag'], ['is:', 'Starred, watched, open questions, solved', 'star']];
   if(!colon){ if(op.length >= 2) for(const [o, sub, i] of OPS) if(o.startsWith(op) && o !== op + ':') hint(o, o, sub, i); return H.slice(0, 4); }
   const add = (v, sub, i) => { if(!val || v.toLowerCase().startsWith(val) || v.toLowerCase().includes(val)) if(v.toLowerCase() !== val) hint(op + ':' + v + ' ', op + ':' + v, sub, i); };
-  if(op === 'case') for(const c of DB.cases) add(c.code, c.name, 'folder-open');
+  if(op === 'case') for(const c of DB.cases) add(slug(caseNm(c)), c.name, 'folder-open');
   else if(op === 'in') for(const [k, l, i] of SCOPES.slice(1)) add(Object.keys(SCOPE_ALIAS).find(a => SCOPE_ALIAS[a] === k && a.endsWith('s')) || k, l, i);
   else if(op === 'verdict') for(const v of SR_VD) add(v, v === 'none' ? 'Not judged yet' : 'Entries and indicators judged ' + v, 'shield');
   else if(op === 'is') for(const [k, l] of Object.entries(SR_IS)) add(k, l, 'star');
@@ -157,7 +157,7 @@ function srFilterLine(P){
   const F = P.f, chips = [];
   if(F.vd) chips.push(['verdict:' + F.vd, F.vd === 'none' ? 'no verdict' : F.vd]);
   for(const t of F.type) chips.push(['type:' + t, 'type ' + t]); for(const t of F.tag) chips.push(['tag:' + t, '#' + t]); for(const k of F.is) chips.push(['is:' + k, SR_IS[k].toLowerCase()]);
-  if(P.caseCode) chips.push(['case:' + P.caseCode, 'in ' + P.caseCode.toUpperCase()]);
+  if(P.caseCode) chips.push(['case:' + P.caseCode, 'in ' + ((c => c ? caseNm(c) : P.caseCode)(DB.cases.find(c => c.code.toLowerCase() === P.caseCode || slug(c.name).includes(P.caseCode) || c.name.toLowerCase().includes(P.caseCode))))]);
   if(!chips.length) return '';
   return `<div class="sr-fl" role="group" aria-label="Filters in force"><span>${ico('filter','sm')}Only</span>${chips.map(([tok, l]) => `<button class="sr-fc" data-act="srDropF" data-v="${esc(tok)}" aria-label="Remove the filter ${esc(l)}" title="Remove">${esc(l)}${ico('x','sm')}</button>`).join('')}</div>`;
 }
@@ -177,14 +177,14 @@ function srchPaint(){
       const c = it.caseId ? theCase(it.caseId) : null;
       h += `<button class="sr-it" data-sr="${i}" id="sro${i}" aria-selected="${i === S.at}" role="option" tabindex="-1"><span class="sr-ic"${it.color ? ` style="--c:${esc(it.color)}"` : it.tcolor ? ` style="--c:var(${it.tcolor})"` : ''}>${ico(it.icon || 'search','sm')}</span>
         <span class="sr-tx"><b class="${it.mono ? 'mono' : ''}">${hl(it.title, terms)}</b><small>${esc(it.sub)}</small>${terms.length && it.body && !it.title.toLowerCase().includes(terms[0]) ? `<em class="${it.codeBody ? 'mono' : ''}">${snippet(it.body, terms)}</em>` : ''}</span>
-        ${c && R.scope !== 'case' ? `<span class="sr-case" style="--cc:${esc(c.color)}">${esc(c.code)}</span>` : ''}<span class="sr-go">${ico('arrow-right','sm')}</span></button>`; }
+        ${c && R.scope !== 'case' ? `<span class="sr-case" style="--cc:${esc(c.color)}">${esc(caseNm(c))}</span>` : ''}<span class="sr-go">${ico('arrow-right','sm')}</span></button>`; }
     h += '</div>';
   }
-  if(!S.flat.length) h = `<div class="sr-empty" role="group" aria-label="No results">${ico('search')}<b>Nothing found for “${esc(S.q)}”</b><span>Try fewer words, another scope, or check the spelling. Tip: <code>in:tools</code>, <code>case:TN-2026-014</code>, <code>"exact phrase"</code>, <code>-exclude</code>.</span></div>`;
+  if(!S.flat.length) h = `<div class="sr-empty" role="group" aria-label="No results">${ico('search')}<b>Nothing found for “${esc(S.q)}”</b><span>Try fewer words, another scope, or check the spelling. Tip: <code>in:tools</code>, <code>case:op-lantern</code>, <code>"exact phrase"</code>, <code>-exclude</code>.</span></div>`;
   if(!S.q.trim() && S.scope === 'all'){ const rec = (DB.prefs.recentQ || []).slice(0, 8);
     h = (rec.length ? `<div role="group" aria-label="Recent searches"><div class="sr-g"><span>Recent searches</span><button data-act="srClearRecent">Clear</button></div><div class="sr-recent">${rec.map(r => `<span class="sr-rq"><button data-act="srRecent" data-v="${esc(r)}">${ico('clock','sm')}${esc(r)}</button><button class="sr-rqx" data-act="srForget" data-v="${esc(r)}" aria-label="Forget the search ${esc(r)}" title="Forget">${ico('x','sm')}</button></span>`).join('')}</div></div>` : '')
       + `<div class="sr-tips" role="group" aria-label="Tips"><div><b>Search everything</b><span>Cases, vault, evidence, indicators, notes, tools, queries, rules, playbooks, CTF and news.</span></div>
-        <div><code>malicious IPs last week</code><code>domains registered this month</code><code>what talks to 203.0.113.47</code><code>unchecked hashes</code><code>in:tools shodan</code><code>case:TN-2026-014 dns</code><code>"lamp loader"</code><code>beacon -firewall</code><code>type:ip verdict:malicious</code><code>tag:phishing</code><code>is:watched</code><code>host:DC01</code><code>203.0.113.47</code></div></div>` + h; }
+        <div><code>malicious IPs last week</code><code>domains registered this month</code><code>what talks to 203.0.113.47</code><code>unchecked hashes</code><code>in:tools shodan</code><code>case:op-lantern dns</code><code>"lamp loader"</code><code>beacon -firewall</code><code>type:ip verdict:malicious</code><code>tag:phishing</code><code>is:watched</code><code>host:DC01</code><code>203.0.113.47</code></div></div>` + h; }
   const fl = $('srFl'); if(fl){ const x = S.q.trim() ? srFilterLine(R.P) : ''; fl.innerHTML = x; fl.hidden = !x; }
   const sv = $('srSave'); if(sv) sv.hidden = !S.q.trim();
   $('srList').innerHTML = h; srchPreview(); srAria();
@@ -209,7 +209,7 @@ function srActs(it){
   else if(it.kind === 'record'){ const r = recById(it.id); if(!r) return A;
     add('Copy the text', 'copy', () => copyText(r.body || r.title), true); if(r.body && typeof maskCopy === 'function') add('Copy masked', 'eye-off', () => maskCopy(r.body), true);
     add('Show on the timeline', 'clock', () => { DB.active = r.caseId; UI.sel = {kind:'rec', id:r.id}; UI.inspOpen = true; go(caseHash(r.caseId, 'timeline')); }); }
-  else if(it.kind === 'case'){ for(const [k, l, i] of [['vault', 'Vault', 'layers'], ['timeline', 'Timeline', 'clock'], ['graph', 'Board', 'waypoints'], ['questions', 'Open questions', 'circle-help']]) add('Open its ' + l.toLowerCase(), i, () => go(caseHash(it.id, k))); add('Make it the active case', 'crosshair', () => { DB.active = it.id; save(); renderAll(); toast('Active case: ' + theCase(it.id).code); }, true); }
+  else if(it.kind === 'case'){ for(const [k, l, i] of [['vault', 'Vault', 'layers'], ['timeline', 'Timeline', 'clock'], ['graph', 'Board', 'waypoints'], ['questions', 'Open questions', 'circle-help']]) add('Open its ' + l.toLowerCase(), i, () => go(caseHash(it.id, k))); add('Make it the active case', 'crosshair', () => { DB.active = it.id; save(); renderAll(); toast('Active case: ' + caseNm(theCase(it.id))); }, true); }
   else if(it.kind === 'query'){ const x = DB.queries.find(z => z.id === it.id); if(x) add('Copy the query', 'copy', () => copyText(x.query), true); }
   else if(it.kind === 'tool'){ add('Show in the Toolbox', 'wrench', () => { const t = DB.tools.find(x => x.id === it.id); UI.tq = t.name; UI.tcat = 'all'; go('#/toolbox'); }); }
   else if(it.kind === 'chal'){ const c = DB.ctf.chals.find(z => z.id === it.id); if(c && c.flag) add('Copy the flag', 'copy', () => copyText(c.flag), true); }
@@ -228,7 +228,7 @@ function srchPreview(){
   const row = (k, v, mono) => v ? `<div class="sp-kv"><span>${esc(k)}</span><b class="${mono ? 'mono' : ''}">${hl(String(v), terms)}</b></div>` : '';
   if(it.kind === 'ioc' || it.kind === 'ent'){ const id = it.kind === 'ioc' ? it.k + ':' + it.v : it.id, g = globalEnts().get(id), {k, v} = entSplit(id), m = E.meaning(k, v);
     b = `${m ? `<p>${esc(m.t)}</p>` : ''}${row('Verdict', verdictOf(id) || 'Not judged')}${row('Seen in', g ? g.recs.length + ' records · ' + g.cases.size + ' cases' : 'Not in any case yet')}
-      ${g ? `<div class="sp-list">${g.recs.slice(0, 6).map(r => `<span>${esc(r.title)} <i>${esc((theCase(r.caseId) || {}).code || '')}</i></span>`).join('')}</div>` : ''}${pivotSection(k, v)}`; }
+      ${g ? `<div class="sp-list">${g.recs.slice(0, 6).map(r => `<span>${esc(r.title)} <i>${esc(caseNm(r.caseId) || '')}</i></span>`).join('')}</div>` : ''}${pivotSection(k, v)}`; }
   else if(it.kind === 'entry'){ const e = entryById(it.id); b = Object.entries(e.fields).map(([kk, vv]) => row((TYPES[e.type].fields.find(f => f[0] === kk) || [kk, kk])[1], vv, MONO_TYPES.has(e.type) && kk === TYPES[e.type].fields[0][0])).join('') + (e.tags.length ? row('Tags', e.tags.join(', ')) : '') + (e.notes ? `<p>${hl(e.notes, terms)}</p>` : '') + (entryKey(e) ? pivotSection(entSplit(entryKey(e)).k, entSplit(entryKey(e)).v) : ''); }
   else if(it.kind === 'record'){ const r = recById(it.id); b = `${row('When', r.ts ? E.fmtFull(r.ts, tz()) : '')}${row('Host', r.host)}${row('Source', r.source)}${r.answer ? row('Answer', r.answer) : ''}<pre class="sp-pre">${hl(r.body || '', terms)}</pre>`; }
   else if(it.kind === 'case'){ const c = theCase(it.id), D = derive(c.id); b = `<p>${hl(c.scope || 'No scope written yet.', terms)}</p>${row('Entries', D.entries.length)}${row('Records', D.recs.length)}${row('Open questions', D.recs.filter(r => r.type === 'lead' && !r.answer).length)}`; }
@@ -240,7 +240,7 @@ function srchPreview(){
   else if(it.kind === 'note'){ b = `<pre class="sp-pre">${hl(it.body, terms)}</pre>`; }
   else if(it.kind === 'page'){ b = `<pre class="sp-pre">${hl(it.body.slice(0, 1600), terms)}</pre>`; }
   else if(it.kind === 'feed'){ b = `<p>${hl(it.body, terms)}</p>`; }
-  else if(it.kind === 'hint'){ b = `<p>${esc(it.sub)}.</p><p class="t3">Press <kbd>Enter</kbd> or <kbd>Tab</kbd> to use it. Filters combine: <span class="mono">type:ip verdict:malicious case:TN-2026-014</span>.</p>`; }
+  else if(it.kind === 'hint'){ b = `<p>${esc(it.sub)}.</p><p class="t3">Press <kbd>Enter</kbd> or <kbd>Tab</kbd> to use it. Filters combine: <span class="mono">type:ip verdict:malicious case:op-lantern</span>.</p>`; }
   else if(it.kind === 'tl'){ b = `<p>Shows only the records in <b>${esc(theCase().name)}</b> that match. Filters you can combine:</p><div class="sp-list">${['host:DC01','verdict:malicious','type:finding','tag:c2','after:2026-09-14','before:2026-09-15','ent:203.0.113.47','source:sysmon'].map(x => `<span class="mono">${x}</span>`).join('')}</div>`; }
   else b = `<p>${esc(it.sub)}</p>`;
   el.innerHTML = `<div class="sp-h"><span class="sr-ic"${it.color ? ` style="--c:${esc(it.color)}"` : ''}>${ico(it.icon || 'search','sm')}</span><div><h3 class="${it.mono ? 'mono' : ''}">${hl(it.title, terms)}</h3><small>${esc(it.sub)}</small></div></div><div class="sp-b">${S.acts.length ? `<div class="sp-acts" role="group" aria-label="Actions">${S.acts.map((a, n) => `<button class="sp-a" data-act="srAct" data-v="${n}">${ico(a.i,'sm')}<span>${esc(a.l)}</span><kbd>Alt ${n + 1}</kbd></button>`).join('')}</div>` : ''}${b}</div>

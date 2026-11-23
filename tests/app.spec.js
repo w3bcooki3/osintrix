@@ -1254,7 +1254,7 @@ test('smart search: plain questions become filters shown as chips, run over ever
   expect(await page.evaluate(() => { const t = nlqTime('last 3 days', 1e12); return [t[1] - t[0], t[2]]; })).toEqual([3 * 864e5, 'last 3 days']);
   // the search box
   await page.keyboard.press('Control+k'); await page.fill('#srQ', 'malicious domains in TN-2026-014');
-  await expect(page.locator('.sr-nl')).toContainText('in TN-2026-014'); await expect(page.locator('.sr-nl')).toContainText('2 matches');
+  await expect(page.locator('.sr-nl')).toContainText('in Op Lantern'); await expect(page.locator('.sr-nl')).toContainText('2 matches');
   await page.keyboard.press('Enter'); await expect(page).toHaveURL(/#\/entities/);
   await page.keyboard.press('Control+k'); await page.fill('#srQ', 'lamp loader'); await expect(page.locator('.sr-nl')).toHaveCount(0); await expect(page.locator('#srList')).toContainText('Lamp loader');
   noErrors(errors);
@@ -1463,7 +1463,7 @@ test('share package: one ZIP with a read-only page (no scripts, its own CSP), ST
   await page.click('[data-act=shareDlg]'); await expect(page.locator('#dlg')).toContainText('Traffic Light Protocol');
   await page.click('[data-act=shTlp][data-v=green]');
   const [dl] = await Promise.all([page.waitForEvent('download'), page.click('[data-act=shGo]')]);
-  expect(dl.suggestedFilename()).toMatch(/^TN-2026-014-.*-green\.zip$/);
+  expect(dl.suggestedFilename()).toMatch(/^op-lantern-green\.zip$/);
   const out = require('child_process').execFileSync('python3', ['-I', '-c', `
 import zipfile, hashlib, json, sys
 z = zipfile.ZipFile(sys.argv[1]); names = z.namelist(); r = {'names': names}
@@ -1934,7 +1934,7 @@ test('a new rule opens its editor from any Detections view; vault cards and the 
   const card = page.locator('.ec2[data-id=v-sender]');
   await expect(card).toHaveClass(/bad/); await expect(card.locator('.ec-sig')).toContainText('Malicious'); await expect(card.locator('.ec-sig')).toContainText('1 record');
   await expect(card.locator('.ec-sig')).toContainText('links:'); await expect(card.locator('.ec-w')).toBeVisible();
-  await expect(page.locator('.ec2:has-text("203.0.113.47") .ec-also')).toContainText('TN-2026-011');   // also in another case
+  await expect(page.locator('.ec2:has-text("203.0.113.47") .ec-also')).toContainText('Customer portal');   // also in another case
   await expect(page.locator('.ec2 dd:text-is("—")')).toHaveCount(0);   // empty fields are not shown
   await page.click('[data-act=vLay][data-v=list]');
   await expect(page.locator('.vl-t tbody tr')).toHaveCount(await page.evaluate(() => DB.entries.filter(e => e.caseId === 'c-lantern').length));

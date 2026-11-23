@@ -243,6 +243,7 @@ function normStored(d){
     if(r.hours != null && !(isObj(r.hours) && Array.isArray(r.hours.t) && Array.isArray(r.hours.who))) delete r.hours; if(r.cred != null && !/^[1-6]$/.test(String(r.cred))) delete r.cred; }
   for(const k of ['cases', 'records', 'entries', 'notes', 'tools', 'queries', 'rules', 'playbooks']) if(d[k]) d[k] = d[k].filter(x => typeof x.id === 'string' && x.id);
   if(d.views !== undefined) d.views = typeof svClean === 'function' ? svClean(d.views) : Array.isArray(d.views) ? d.views : [];
+  if(d.chain !== undefined){ const c = typeof chClean === 'function' ? chClean(d.chain) : undefined; if(c) d.chain = c; else delete d.chain; }
   /* a built search keeps its rows: a short list of {k, v} strings, or nothing */
   if(d.queries) for(const q of d.queries) if(q.b !== undefined){ if(!Array.isArray(q.b)) delete q.b; else { q.b = q.b.filter(r => r && typeof r === 'object' && typeof r.k === 'string' && typeof r.v === 'string' && (typeof QB_KINDS === 'undefined' || QB_KINDS[r.k])).slice(0, 30).map(r => ({k:r.k, v:r.v.slice(0, 500)})); if(!q.b.length) delete q.b; } }
   if(d.links) d.links = d.links.filter(l => typeof l.a === 'string' && typeof l.b === 'string');
