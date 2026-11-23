@@ -3455,3 +3455,19 @@ button.rsum-i:hover{background:var(--hover);color:var(--text)}
 .ds .keys-r{display:grid;grid-template-columns:minmax(96px,auto) 1fr;gap:12px;align-items:baseline;padding:5px 0;font-size:calc(13.5px * var(--ts,1));border-bottom:1px solid var(--border-soft)}
 .ds .keys-r:last-child{border-bottom:0}
 .ds .keys-k{white-space:nowrap}
+/* indicator profile */
+.ds .ipf-f{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--border-soft);width:100%;text-align:left;background:none}
+.ds .ipf-f:first-of-type{border-top:0}
+.ds .ipf-f b{display:block;font-weight:560;font-size:calc(13.5px * var(--ts,1));color:var(--text);overflow-wrap:anywhere}
+.ds .ipf-f small{display:block;color:var(--text-2);font-size:calc(12.5px * var(--ts,1));line-height:1.5;margin-top:2px;overflow-wrap:anywhere}
+.ds .ipf-i{flex:none;display:grid;place-items:center;width:24px;height:24px;border-radius:6px;background:var(--surface-2,var(--border-soft));color:var(--text-3)}
+.ds .ipf-f.bad .ipf-i{background:var(--red-soft);color:var(--red)}
+.ds .ipf-f.warn .ipf-i{background:var(--amber-soft);color:var(--amber)}
+.ds button.ipf-f:hover b{text-decoration:underline}
+.ds .ipf-kv{margin-top:10px}
+.ds .ipf-m{font-weight:500;color:var(--text-2);margin-left:4px}
+.ds .ipf-n{margin:8px 0 0}
+.ds .vflag{display:inline-flex;align-items:center;gap:4px;font-size:calc(11.5px * var(--ts,1));font-weight:560;color:var(--red);border:1px solid var(--red-line);border-radius:5px;padding:0 6px;white-space:nowrap}
+.ds .ec-sig li.pf{color:var(--red);font-weight:560}.ds .ec-sig li.pf svg{color:inherit}
+.ds .vl-v .vflag{margin-left:2px;max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.ds .vflag svg{flex:none}

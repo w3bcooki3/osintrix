@@ -33,6 +33,7 @@ function inspEntry(e){
     <div class="wrap" style="margin-top:14px"><button class="btn sm" data-act="editEntry" data-id="${e.id}">${ico('pencil','sm')}Edit</button>${k ? `<button class="btn sm${isWatched(k) ? ' on' : ''}" data-act="watch" data-id="${esc(k)}">${ico(isWatched(k) ? 'eye-off' : 'eye','sm')}${isWatched(k) ? 'Unwatch' : 'Watch'}</button>` : ''}<button class="btn sm" data-act="linkFrom" data-id="${e.id}">${ico('git-branch','sm')}Connect</button>
       <a class="btn sm" href="${caseHash(e.caseId,'graph')}" data-act="showInGraph" data-id="${e.id}">${ico('waypoints','sm')}Graph</a><button class="btn sm danger" data-act="delEntry" data-id="${e.id}" aria-label="Delete">${ico('trash-2','sm')}</button></div>
     ${(e.type === 'person' || e.type === 'alias' || e.type === 'organization') && typeof idpBuild === 'function' ? (P => `<div class="isec"><button class="btn sm" data-act="idpOpen" data-id="${e.id}">${ico('users','sm')}Identity profile</button> <span class="t3 small">${P ? P.ids.length + ' identifier' + (P.ids.length === 1 ? '' : 's') + (P.people.length > 1 ? ' · also in ' + (P.people.length - 1) + ' other case' + (P.people.length > 2 ? 's' : '') : '') + (P.conflicts.length ? ' · cases disagree' : '') : ''}</span></div>`)(idpBuild(e.id)) : ''}
+    ${k && typeof ipfSection === 'function' ? ipfSection(entSplit(k).k, entSplit(k).v) : ''}
     ${typeof entryMedia === 'function' ? entryMedia(e) : ''}
     ${e.type === 'phone' && typeof phoneSection === 'function' ? phoneSection(primary(e)) : ''}
     ${pivotSection(k ? entSplit(k).k : e.type, k ? entSplit(k).v : primary(e))}
@@ -72,6 +73,7 @@ function inspRecord(r){
     ${typeof cxInRecord === 'function' ? (x => x ? `<div class="isec"><h4>Decoded</h4>${x}</div>` : '')(cxInRecord(r)) : ''}${typeof metaHtml === 'function' && (r.att || []).length ? `<div class="isec"><h4>What the file says about itself</h4>${(r.att || []).slice(0, 6).map(a => ((r.att || []).length > 1 ? `<div class="t3 small mono">${esc(a.name)}</div>` : '') + metaHtml(a, r.id)).join('')}</div>` : ''}${typeof srcRecSection === 'function' ? srcRecSection(r) : ''}${typeof geoSection === 'function' ? geoSection(r) : ''}${typeof picSameSection === 'function' ? picSameSection(r) : ''}${typeof decodedHtml === 'function' ? (x => x ? `<div class="isec"><h4>Command line, decoded</h4>${x}</div>` : '')(decodedHtml(r)) : ''}
     ${r.body ? `<div class="isec"><h4 class="ih-acts">Captured text<span class="sp"></span><button class="btn xs ghost" data-act="recCopyBody" data-id="${r.id}">${ico('copy','sm')}Copy</button><button class="btn xs ghost" data-act="recCopyMasked" data-id="${r.id}" title="Copy with IPs, domains, emails, user and host names replaced by placeholders — safe to paste into an online tool or show someone">${ico('eye-off','sm')}Copy masked</button></h4><pre class="rawbox">${esc(r.body)}</pre></div>` : ''}
     ${r.body ? fieldsSection(r) : ''}
+    ${typeof ipfRecSection === 'function' ? ipfRecSection(r) : ''}
     ${obs.length ? `<div class="isec"><h4>Observations <span class="t3">heuristic</span></h4>${obs.map(o => `<div class="note amber obs"><span class="ic">${ico('triangle-alert','sm')}</span><div><b>${esc(o.tag[0].toUpperCase() + o.tag.slice(1))}</b> — ${esc(o.t)}</div></div>`).join('')}</div>` : ''}
     <div class="isec"><h4>Entities found <span class="t3">${r.ents.length}</span></h4><div class="wrap">${r.ents.map(e => { const id = entKey(e), en = D.byKey.get(id); return en ? entryPill(en) : entPill(id); }).join('') || '<span class="t3">None.</span>'}</div></div>
     ${aroundHTML(r)}
@@ -84,6 +86,7 @@ function inspEnt(id){
     ${m ? `<div style="font-size:calc(13px * var(--ts,1));margin-top:3px;color:${m.hot ? 'var(--amber)' : 'var(--text-3)'}">${esc(m.t)}</div>` : ''}<div class="cxts">${ctxChips(k, v)}</div></div></div>
     <div class="wrap" style="margin-top:14px"><button class="btn sm${isWatched(id) ? ' on' : ''}" data-act="watch" data-id="${esc(id)}">${ico(isWatched(id) ? 'eye-off' : 'eye','sm')}${isWatched(id) ? 'Unwatch' : 'Watch'}</button></div>
     ${canVault && !derive().byKey.has(id) ? `<button class="btn primary sm" data-act="promote" data-id="${esc(id)}" style="margin-top:14px">${ico('plus','sm')}Add to ${esc(theCase().code)} vault</button>` : ''}
+    ${typeof ipfSection === 'function' ? ipfSection(k, v) : ''}
     ${typeof lkInspSection === 'function' ? lkInspSection(k, v) : ''}
     ${k === 'phone' && typeof phoneSection === 'function' ? phoneSection(v) : ''}
     ${pivotSection(k, v)}

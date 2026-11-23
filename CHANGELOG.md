@@ -2,6 +2,17 @@
 
 All notable changes to OSINTrix, newest first. The format is based on [Keep a Changelog](https://keepachangelog.com); this file is generated from `js/data/changelog.js` by `tools/changelog.py`.
 
+## [1.57] — Every indicator, read like an analyst would (2026-11-23)
+
+_An indicator’s details now say what it is and what about it should worry you — look-alikes, hosting, link tricks, broken wallets, leaked secrets — worked out from the value alone, with nothing looked up._
+
+### Added
+- Profile, in an indicator’s details and a vault entry’s: look-alikes of about 125 commonly imitated brands and of every domain you marked benign — other alphabets (аррӏе.com, shown decoded from xn--), digits for letters (paypa1), rn for m, one letter off, brand plus words (micros0ft-online), a brand used as a subdomain (paypal.com.verify.top). Each says which letter stands in and why it matters; real brand domains and words that merely contain a brand stay quiet.
+- Profile also reads where a domain lives — dynamic DNS, tunnels (ngrok, trycloudflare), free hosting (with the user’s own name as what to judge, not the platform), shorteners, paste and file sharing, exfiltration endpoints — and flags machine-generated names. URLs: text before @, hosts written as numbers or bare IPs, redirect parameters and where they go, an email address carried in the link (also in base64), payload downloads, phishing words.
+- Profile for addresses, hashes and wallets: public resolvers and cloud metadata addresses as noise or SSRF targets, IPv4 inside IPv6 (mapped, 6to4, Teredo) and the MAC address inside EUI-64; empty-file and EICAR hashes, placeholders; Bitcoin address type and a real bech32/bech32m checksum that catches a mistyped wallet; burn addresses; for email, the same inbox behind dots and +tags.
+- Worth a second look, in a record’s details: the look-alikes in it, links made for one person, and secrets that should not be there — Telegram bot tokens and Discord webhooks phishing kits use, AWS, GitHub, GitLab, Slack, Google, Stripe, OpenAI, Anthropic, npm, SendGrid and Azure keys, private keys, passwords in links, and JWTs read out (issuer, subject, expiry, unsigned). Secrets are only ever shown masked.
+- Vault: a card or row whose indicator is a look-alike says so, and Show → Look-alikes and other warnings lists every such entry.
+
 ## [1.56] — Case snapshots, saved views, @ links in notes, and a guard on space (2026-11-22)
 
 _Save a case to a file and compare or roll back to it later, name the views you come back to, link notes to entries with @, and never let an import fill the browser._

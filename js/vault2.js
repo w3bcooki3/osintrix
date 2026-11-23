@@ -7,7 +7,7 @@
    delete them at once. Every bulk change can be undone.
    ========================================================================== */
 const VB_LIM = {cards:150, list:400};
-const VB_ONLY = [['', 'Show everything'], ['nolinks', 'Not linked to anything'], ['other', 'Also in other cases'], ['watched', 'Watched'], ['open', 'With open questions'], ['norecs', 'Not seen in any record'], ['notes', 'With notes']];
+const VB_ONLY = [['', 'Show everything'], ['nolinks', 'Not linked to anything'], ['other', 'Also in other cases'], ['watched', 'Watched'], ['open', 'With open questions'], ['norecs', 'Not seen in any record'], ['notes', 'With notes'], ['flagged', 'Look-alikes and other warnings']];
 const VB_SORT = [['prio', 'Priority'], ['new', 'Newest first'], ['old', 'Oldest first'], ['recs', 'Most records'], ['last', 'Last seen'], ['value', 'Value A–Z'], ['type', 'Type']];
 const VB_VD = [['', 'Any verdict'], ['malicious', 'Malicious'], ['suspicious', 'Suspicious'], ['none', 'No verdict'], ['benign', 'Benign']];
 /* the filters belong to one case; switching case starts clean */
@@ -18,7 +18,7 @@ function vbFilter(list, F){
     if(F.vd){ const v = entryVerdict(e); if(F.vd === 'none' ? v && v !== 'unknown' : v !== F.vd) return false; }
     if(F.only){ const X = entryCtx(e);
       if(F.only === 'nolinks' && X.links.length) return false; if(F.only === 'other' && !X.other.length) return false; if(F.only === 'watched' && !X.watched) return false;
-      if(F.only === 'open' && !X.open) return false; if(F.only === 'norecs' && X.recs.length) return false; if(F.only === 'notes' && !(e.notes || '').trim()) return false; }
+      if(F.only === 'open' && !X.open) return false; if(F.only === 'norecs' && X.recs.length) return false; if(F.only === 'notes' && !(e.notes || '').trim()) return false; if(F.only === 'flagged' && !(typeof ipfEntryFlag === 'function' && ipfEntryFlag(e, true))) return false; }
     return true; });
 }
 function vbSort(list, how){
