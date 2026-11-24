@@ -195,7 +195,9 @@ function nbMarkdown(body, imgName){
   const doc = nbDoc(body);
   const inl = n => { let o = ''; for(const c of n.childNodes){ if(c.nodeType === 3){ o += mdEsc(c.data.replace(/\s+/g, ' ')); continue; } if(c.nodeType !== 1) continue; const T = c.tagName, x = inl(c);
       if(T === 'BR') o += '  \n'; else if(T === 'B' || T === 'STRONG') o += x.trim() ? `**${x}**` : x; else if(T === 'I' || T === 'EM') o += x.trim() ? `*${x}*` : x; else if(T === 'S') o += `~~${x}~~`;
-      else if(T === 'MARK') o += `==${x}==`; else if(T === 'CODE') o += '`' + c.textContent.replace(/`/g, 'ˋ') + '`'; else if(T === 'A'){ const u = nbSafeUrl(c.getAttribute('href')); o += u ? `[${x}](${u.replace(/\)/g, '%29')})` : x; }
+      else if(T === 'MARK') o += `==${x}==`; else if(T === 'CODE') o += '`' + c.textContent.replace(/`/g, 'ˋ') + '`'; else if(T === 'A' && c.hasAttribute('data-wl') && typeof nbwTarget === 'function'){ const T2 = nbwTarget(c.getAttribute('data-wl')), al = c.hasAttribute('data-a');
+        o += T2.k === 'page' || T2.k === 'new' ? '[[' + (T2.k === 'page' ? T2.title : T2.id) + (al && c.textContent.trim() !== T2.title ? '|' + c.textContent.trim() : '') + ']]' : x; }
+      else if(T === 'A'){ const u = nbSafeUrl(c.getAttribute('href')); o += u ? `[${x}](${u.replace(/\)/g, '%29')})` : x; }
       else if(T === 'IMG'){ const f = imgName(c); o += f ? `![${mdEsc(c.getAttribute('alt') || '')}](${f})` : ''; } else o += x; }
     return o; };
   const lst = (ul, ind) => [...ul.children].filter(l => l.tagName === 'LI').map((li, i) => { const sub = [...li.children].filter(c => c.tagName === 'UL' || c.tagName === 'OL'), cl = li.cloneNode(true); cl.querySelectorAll(':scope > ul, :scope > ol').forEach(x => x.remove());

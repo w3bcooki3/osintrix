@@ -229,7 +229,9 @@ async function metaRead(b, name, type){
   if(/picture/.test(fmt) && !F.some(f => f.g === 'Device' || f.g === 'When')) st.flags.push({t:'No camera or date — stripped, a screenshot, or saved from a website or app', tone:''});
   for(const f of st.flags) F.unshift({g:'Stands out', k:'', v:f.t, tone:f.tone});
   F.sort((a, b) => MT_GROUPS.indexOf(a.g) - MT_GROUPS.indexOf(b.g));
-  return {fmt, fields:F.slice(0, 160), gps:st.gps, taken:st.taken ?? st.vidTime ?? null, tz:st.taken != null ? st.tz || 'explicit' : 'explicit', people:[...new Set(people)].slice(0, 12), software:soft.slice(0, 12), flags:st.flags, at:Date.now()};
+  let gen = null; if(/picture/.test(fmt) && typeof aiGenRead === 'function'){ try{ gen = await aiGenRead(b); }catch(e){} }
+  if(gen && !st.flags.some(f => /AI-generated/.test(f.t))){ const t = 'Marked as AI-generated: ' + (gen.tool || gen.c2pa || 'IPTC digital source'); st.flags.push({t, tone:'red'}); F.unshift({g:'Stands out', k:'', v:t, tone:'red'}); }
+  return {gen, fmt, fields:F.slice(0, 160), gps:st.gps, taken:st.taken ?? st.vidTime ?? null, tz:st.taken != null ? st.tz || 'explicit' : 'explicit', people:[...new Set(people)].slice(0, 12), software:soft.slice(0, 12), flags:st.flags, at:Date.now()};
 }
 /* a file too big to hold in memory: video keeps its metadata in the 'moov' box (start or end), so read every box but the media data */
 async function metaReadFile(f){
@@ -244,7 +246,7 @@ async function metaReadFile(f){
   return metaRead(new Uint8Array(await f.slice(0, 16 * 1048576).arrayBuffer()), f.name, f.type);
 }
 /* the compact copy kept with a stored file */
-const metaKeep = M => M && (M.fields.length || M.gps) ? {fmt:M.fmt, fields:M.fields.slice(0, 120), gps:M.gps ? {lat:M.gps.lat, lon:M.gps.lon, alt:M.gps.alt ?? null, dir:M.gps.dir ?? null, src:M.gps.src || ''} : null, taken:M.taken, tz:M.tz || 'explicit', people:M.people, software:M.software, flags:M.flags.map(f => ({t:f.t, tone:f.tone})), at:M.at} : {fmt:M ? M.fmt : '', fields:[], none:true, at:Date.now()};
+const metaKeep = M => M && (M.fields.length || M.gps) ? {gen:M.gen || null, fmt:M.fmt, fields:M.fields.slice(0, 120), gps:M.gps ? {lat:M.gps.lat, lon:M.gps.lon, alt:M.gps.alt ?? null, dir:M.gps.dir ?? null, src:M.gps.src || ''} : null, taken:M.taken, tz:M.tz || 'explicit', people:M.people, software:M.software, flags:M.flags.map(f => ({t:f.t, tone:f.tone})), at:M.at} : {fmt:M ? M.fmt : '', fields:[], none:true, at:Date.now()};
 /* lines for the evidence text: searchable, and what they name becomes entities */
 function metaLines(M){ if(!M || !M.fields || !M.fields.length) return ''; const L = [];
   for(const f of M.fields){ if(f.g === 'Stands out') continue; if(/Edit history|Generation settings|Generator workflow|Document ID|Content ID|Image ID/.test(f.k)) continue; L.push(`${f.k}: ${f.v.replace(/\s+/g, ' ').slice(0, 200)}`); if(L.length >= 40) break; }

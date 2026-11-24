@@ -50,7 +50,12 @@ function nbInfo(p){
   cards.forEach(k => k.key = p.id + ':' + nbHash(k.q.toLowerCase()));
   const heads = [...body.querySelectorAll('h2,h3')].map(h => ({lvl:+h.tagName[1], t:h.textContent.trim()})).filter(h => h.t);
   const imgs = [...body.querySelectorAll('img[data-m]')].map(i => i.getAttribute('data-m'));
-  const r = {u:p.updated, h:p.html, text:lines.join('\n'), cards, heads, imgs}; NB_CACHE.set(p.id, r); return r;
+  const blk = a => { const b = a.closest('p,li,h2,h3,h4,td,th,blockquote,figcaption'); if(!b) return a.textContent.trim().slice(0, 220); const c = b.cloneNode(true);
+    c.querySelectorAll('a[data-wl^="page:"]:not([data-a])').forEach(x => { const q = nbPage(x.getAttribute('data-wl').slice(5)); if(q) x.textContent = q.title || 'Untitled'; });   // links show the page's title now
+    return c.textContent.replace(/\s+/g, ' ').trim().slice(0, 220); };
+  const wl = [...body.querySelectorAll('a[data-wl]')].map(a => ({v:a.getAttribute('data-wl'), t:a.textContent.trim(), ctx:blk(a)}));
+  for(const l of lines) for(const m of l.matchAll(/\[\[([^\[\]\n|]{1,120})(?:\|[^\[\]\n]{1,120})?\]\]/g)) wl.push({v:'new:' + m[1].trim(), t:m[1].trim(), ctx:l.slice(0, 220)});   // [[Title]] still written as text
+  const r = {u:p.updated, h:p.html, text:lines.join('\n'), cards, heads, imgs, wl}; NB_CACHE.set(p.id, r); return r;
 }
 /* ---------- spaced review (SM-2 style) ---------- */
 const NB_DAY = 864e5;
@@ -82,7 +87,8 @@ function nbClean(html, opts = {}){
   const style = n => (n.getAttribute && n.getAttribute('style') || '').toLowerCase();
   const node = (n, d) => {
     if(d > 40) return '';
-    if(n.nodeType === 3) return esc(n.data.replace(/\u00a0/g, ' ')).replace(/ {2}/g, ' &nbsp;');
+    if(n.nodeType === 3){ if(opts.src && n.data.includes('[[') && typeof nbwLit === 'function' && !(n.parentNode && n.parentNode.closest && n.parentNode.closest('a,code'))) return nbwLit(n.data);
+      return esc(n.data.replace(/\u00a0/g, ' ')).replace(/ {2}/g, ' &nbsp;'); }
     if(n.nodeType !== 1 || NB_DROP.has(n.tagName)) return '';
     const T = n.tagName, st = style(n);
     if(T === 'PRE'){ const t = (() => { const x = n.cloneNode(true); x.querySelectorAll('br').forEach(b => b.replaceWith('\n')); return x.textContent; })(); return `<pre>${esc(t.replace(/\n$/, '')) || '<br>'}</pre>`; }
@@ -94,6 +100,7 @@ function nbClean(html, opts = {}){
       if(!m){ const u = nbSafeUrl(src); return u ? `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">[image] ${esc(n.getAttribute('alt') || hostOf(u))}</a>` : ''; }
       const alt = esc(n.getAttribute('alt') || '').slice(0, 300), url = opts.src ? nbInline(M[m]) || NB_DATA.get(m) || (opts.src !== 'data' && NB_URLS.get(m)) : null;
       return `<img data-m="${m}" alt="${alt}"${opts.src ? (url ? ` src="${esc(url)}"` : ` data-nbm="${m}"`) : ''}>`; }
+    if(T === 'A' && n.hasAttribute('data-wl')){ const w = typeof nbwParse === 'function' && nbwParse(n.getAttribute('data-wl')), t = n.textContent; return w ? nbwAnchor(w, t, n.hasAttribute('data-a'), !!opts.src) : esc(t); }
     if(T === 'A'){ const u = nbSafeUrl(n.getAttribute('href')); return u ? `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${kids(n, d + 1)}</a>` : kids(n, d + 1); }
     if(T === 'B' && /font-weight:\s*(normal|400)/.test(st)) return kids(n, d + 1);   // Google Docs wraps pastes in <b style="font-weight:normal">
     if(T === 'SPAN' || T === 'FONT'){ let s = kids(n, d + 1); if(!s) return '';
@@ -175,6 +182,7 @@ const nbRoomFor = bytes => stoRoom(bytes);
 function viewNotebook(){
   ensureNB(); nbCommit();   // never redraw over keystrokes that are still waiting to be saved
   if(!nbGC.done){ nbGC.done = true; if(nbGC()) save(); nbFlushMedia(); }
+  if(UI.nbView === 'graph' && typeof nbwGraphView === 'function') return nbwGraphView();
   const p = UI.nbView === 'page' && nbPage(UI.nbPage);
   return p ? nbEditorView(p) : nbLibraryView();
 }
@@ -196,7 +204,7 @@ function nbLibraryView(){
         <div class="nbk-bar" aria-hidden="true"><i style="width:${s.cards ? Math.max(2, s.pct) : 0}%"></i></div><div class="nbk-ed">${ico('clock','sm')}Edited ${nbAgo(s.edited)}</div></div></div>`; };
   return `<div class="scroll"><div class="page wide nbl">
     <div class="nbl-h"><div><h1>Notebook</h1><p>What you learn from courses, labs and reading — with screenshots, links and code — ready to export to Word, Google Docs, OneNote or Markdown.</p></div>
-      <div class="nbl-a"><button class="btn" data-act="nbImport">${ico('upload','sm')}Import</button><button class="btn" data-act="nbExport" data-v="all"${N.pages.length ? '' : ' disabled'}>${ico('download','sm')}Export</button><button class="btn primary" data-act="nbBookNew">${ico('plus','sm')}New notebook</button></div></div>
+      <div class="nbl-a"><button class="btn" data-act="nbwGraph"${N.pages.length ? '' : ' disabled'}>${ico('waypoints','sm')}Graph</button><button class="btn" data-act="nbImport">${ico('upload','sm')}Import</button><button class="btn" data-act="nbExport" data-v="all"${N.pages.length ? '' : ' disabled'}>${ico('download','sm')}Export</button><button class="btn primary" data-act="nbBookNew">${ico('plus','sm')}New notebook</button></div></div>
     <div class="nbl-g"><div class="nbl-l">
       <div class="nbl-quick" id="nbQuick" tabindex="0" role="button" aria-label="Quick capture: paste a screenshot, link or text to start a page">${ico('image')}<span><b>Paste a screenshot, link or text here</b> to start a new page with it. Drop files too. Inside a page, Ctrl V works anywhere.</span></div>
       ${books.length ? `<div class="nbl-books">${books.map(card).join('')}<button class="nbk-new" data-act="nbBookNew">${ico('plus')}New notebook</button></div>`
@@ -252,7 +260,7 @@ function nbEditorView(p){
   const tb = (cmd, icon, label, txt) => `<button type="button" class="nbtb" data-nbcmd="${cmd}" aria-label="${label}" title="${label}">${icon ? ico(icon,'sm') : ''}${txt || ''}</button>`;
   return `<div class="nb3${UI.nbSide === false ? ' noside' : ''}${UI.nbTreeOpen ? ' treeopen' : ''}" id="nb3">
     <aside class="nb3-tree" aria-label="Notebooks">
-      <div class="nbt-h"><button class="nbt-back" data-act="nbLib" title="All notebooks">${ico('arrow-left','sm')}<span>All notebooks</span></button><span class="sp"></span><button class="iconbtn" data-act="nbNewMenu" aria-label="New…" title="New page, section or notebook">${ico('plus','sm')}</button></div>
+      <div class="nbt-h"><button class="nbt-back" data-act="nbLib" title="All notebooks">${ico('arrow-left','sm')}<span>All notebooks</span></button><span class="sp"></span><button class="iconbtn" data-act="nbwGraph" aria-label="Graph of pages" title="Graph of pages and links">${ico('waypoints','sm')}</button><button class="iconbtn" data-act="nbNewMenu" aria-label="New…" title="New page, section or notebook">${ico('plus','sm')}</button></div>
       <div class="nbt-q">${ico('search','sm')}<label class="sr" for="nbq">Search notes</label><input id="nbq" type="search" placeholder="Search notes, code, captions…" value="${esc(UI.nbq || '')}" autocomplete="off"></div>
       <div class="nbt-body" id="nbTree">${nbTreeHtml()}</div>
       <button class="nbt-imp" data-act="nbImport">${ico('upload','sm')}Import Markdown, HTML or Word</button>
@@ -275,7 +283,7 @@ function nbEditorView(p){
         <label class="sr" for="nbTitle">Page title</label><input id="nbTitle" class="nbtitle" value="${esc(p.title === 'Untitled' ? '' : p.title)}" placeholder="Untitled" autocomplete="off" maxlength="200">
         <div class="nbmeta" id="nbMeta">${nbMetaHtml(p)}</div>
         ${TABS.writer ? '' : `<p class="nb-ro">${ico('lock','sm')}This workspace is open in another tab, so this page is read-only here.</p>`}
-        <div id="nbEd" class="nbed" contenteditable="${TABS.writer ? 'true' : 'false'}" spellcheck="true" role="textbox" aria-multiline="true" aria-label="Page text" data-ph="Write, or paste a screenshot, link or code…">${nbWithSrc(p.html)}</div>
+        <div id="nbEd" class="nbed" contenteditable="${TABS.writer ? 'true' : 'false'}" spellcheck="true" role="textbox" aria-multiline="true" aria-label="Page text" data-ph="Write, or paste a screenshot, link or code… Type [[ to link a page, case or indicator.">${nbWithSrc(p.html)}</div>
         <div class="nbed-end" data-act="nbEdEnd" aria-hidden="true"></div>
       </div></div>
       <input type="file" id="nbImgIn" accept="image/*" multiple hidden><input type="file" id="nbAttIn" multiple hidden>
@@ -294,6 +302,7 @@ function nbSideHtml(p){
   const I = nbInfo(p), links = nbLinked(p), files = [...new Set(I.imgs)].map(nbM).filter(Boolean).concat((p.att || []).map(nbM).filter(Boolean));
   const due = I.cards.filter(k => nbIsDue(k.key)).length;
   return `<section><h4>${ico('list','sm')}On this page</h4>${I.heads.length ? `<nav class="nbs-ol">${I.heads.map((h, i) => `<button class="${h.lvl === 3 ? 's' : ''}" data-act="nbGoHead" data-v="${i}">${esc(h.t)}</button>`).join('')}</nav>` : '<p class="nbs-e">Headings you add show up here.</p>'}</section>
+    ${typeof nbwSideHtml === 'function' ? nbwSideHtml(p) : ''}
     <section><h4>${ico('sparkles','sm')}Flashcards${I.cards.length ? `<span class="nbs-n">${I.cards.length}</span>` : ''}</h4>
       ${I.cards.length ? I.cards.slice(0, 6).map(k => `<div class="nbs-qa"><b>${esc(k.q)}</b><span>${esc(k.a)}</span></div>`).join('') + (I.cards.length > 6 ? `<p class="nbs-e">+${I.cards.length - 6} more</p>` : '') + `<button class="btn sm nbs-rv" data-act="nbRevPage">${ico('play','sm')}Review ${I.cards.length === 1 ? 'it' : 'these ' + I.cards.length}${due ? ` · ${due} due` : ''}</button>`
         : '<p class="nbs-e">Type <b>Q:</b> and a question, then <b>A:</b> and the answer on the next line — or select text and press Flashcard.</p>'}</section>
@@ -412,10 +421,10 @@ const nbCardHtml = (u, t) => `<div class="nb-link" contenteditable="false"><a hr
 function bindNotebook(){
   const ed = $('nbEd');
   const q = $('nbq'); if(q){ let t; q.oninput = () => { clearTimeout(t); t = setTimeout(() => { UI.nbq = q.value; const tr = $('nbTree'); if(tr) tr.innerHTML = nbTreeHtml(); }, 140); }; }
-  if(!ed){ nbBindLibrary(); return; }
+  if(!ed){ if(typeof nbwClose === 'function') nbwClose(); if($('nbGraph')) return nbwGraphBind(); nbBindLibrary(); return; }
   const p = nbPage(UI.nbPage); ed.dataset.page = p.id;
   try{ document.execCommand('defaultParagraphSeparator', false, 'p'); }catch(e){}
-  ed.addEventListener('input', nbDirty);
+  ed.addEventListener('input', nbDirty); if(typeof nbwBind === 'function') nbwBind(ed);
   ed.addEventListener('blur', () => { nbSaveRange(); });
   document.onselectionchange = () => { const s = getSelection(); if(!ed.isConnected){ document.onselectionchange = null; return; } if(!s.rangeCount || !ed.contains(s.anchorNode)) return;
     nbRange = s.getRangeAt(0).cloneRange(); const b = nbBlockOf(s.anchorNode), sel = $('nbBlock'); if(sel){ const tg = b ? (nbUp(s.anchorNode, 'BLOCKQUOTE') ? 'blockquote' : b.tagName.toLowerCase()) : 'p'; sel.value = ['h2', 'h3', 'blockquote'].includes(tg) ? tg : 'p'; }

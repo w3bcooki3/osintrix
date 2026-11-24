@@ -4,6 +4,206 @@
    Each change has a type: "added" | "changed" | "fixed" | "removed". */
 const CHANGELOG_DATA = [
   {
+    "version": "1.75",
+    "name": "Design pass across every screen",
+    "date": "2026-11-24",
+    "summary": "A screen-by-screen check of the desktop app in light and dark: pages no longer scroll as a whole, a stray bold no longer spreads across a case overview, wide tables scroll instead of cutting columns off, and several pages get clearer starting points.",
+    "changes": [
+      {
+        "type": "fixed",
+        "text": "Pages could scroll as a whole, carrying the top bar away, because hidden screen-reader labels stretched the page. They are now pinned in place."
+      },
+      {
+        "type": "fixed",
+        "text": "An unclosed bold tag in the case overview's connections card, the wallet view and hunts made everything after it bold."
+      },
+      {
+        "type": "fixed",
+        "text": "Case overview: the connections card now sits after the stats and case progress instead of between them, and vault entries that match an indicator are no longer listed twice."
+      },
+      {
+        "type": "fixed",
+        "text": "The case Entities table, Watchlist and area tables scroll sideways when narrow instead of cutting off columns; long entity values wrap instead of widening the table."
+      },
+      {
+        "type": "fixed",
+        "text": "Detections IDE no longer shows a tall empty gap above the editor (a class name it shared with the regex builder)."
+      },
+      {
+        "type": "fixed",
+        "text": "Times like “last 3 d ago ago” in the Toolbox details, backup status, reference sources and saved regex patterns now read once."
+      },
+      {
+        "type": "fixed",
+        "text": "The log parser's one-line summary no longer starts a wrapped row with a stray separator."
+      },
+      {
+        "type": "changed",
+        "text": "Forensics kit → Identity offers example values to try, and Look-alikes offers the open case's domains as one-click starting points."
+      },
+      {
+        "type": "changed",
+        "text": "The Regex builder title matches every other page; the Settings buttons have room under the tagline; Toolbox rows show nothing instead of a bare dash for tools never opened; news items you wrote no longer carry a coloured edge."
+      }
+    ]
+  },
+  {
+    "version": "1.74",
+    "name": "Clean before sending, AI generator traces, scam playbooks",
+    "date": "2026-11-24",
+    "summary": "Forensics kit → Clean before sending takes your camera, location, name, company and folders out of photos and documents and proves it by reading the copy back; pictures made with AI now show the prompt, model, LoRAs and seed the generator left inside; a VIN decoder; and six new playbooks for sextortion, romance and investment scams, deepfakes and voice clones, SIM swaps, missing people and people being doxxed.",
+    "changes": [
+      {
+        "type": "added",
+        "text": "Forensics kit → Clean before sending: drop the photos and documents you are about to send. JPEG, PNG and WebP lose EXIF, GPS, XMP, IPTC, comments, Content Credentials and data hidden after the picture, while every pixel stays byte for byte the same and a turned photo keeps its turn. PDFs lose their properties, XMP packet and file IDs in place, so the document is unchanged. Word, Excel and PowerPoint files lose author, last editor, company, manager, template, editing time, custom properties, the preview thumbnail, editing-session IDs and folder paths, and comment and change authors become “Author”."
+      },
+      {
+        "type": "added",
+        "text": "Clean before sending reads each clean copy back with the same metadata reader and shows what is left, gives its SHA-256, and says what it cannot fix: tracked deletions, comments, hidden sheets, white text, speaker notes, earlier PDF versions. Clean copies can get plain names (photo-1.jpg). Videos, HEIC and other formats are refused with what to use instead. The OPSEC panel on the Tradecraft page links to it."
+      },
+      {
+        "type": "added",
+        "text": "AI generation, in the File inspector and Image tools: the prompt, negative prompt, model and model hash, VAE, LoRAs, seed, sampler, steps and size written by AUTOMATIC1111, Forge, ComfyUI (from the workflow graph), Fooocus, InvokeAI and NovelAI — in PNG text or a JPEG's EXIF comment — the Midjourney prompt, version, account and Job ID, the IPTC “made by a trained algorithm” mark and the generator named in Content Credentials. Models and LoRAs link to Civitai, by hash where the file gives one; a LoRA named after a person is called out."
+      },
+      {
+        "type": "added",
+        "text": "Forensics kit → Time & IDs reads a VIN: maker, country, the check digit (with what it should be when it is wrong), the model year, the plant code and the serial, with links to the NHTSA decoder and the NICB stolen-vehicle check."
+      },
+      {
+        "type": "added",
+        "text": "Playbooks: Sextortion (victim safety, Take It Down, StopNCII, tracing the payment demand — and never copying the images into the case), Romance and investment scam (pig butchering), Deepfake, AI image and voice-clone check, SIM swap and phone-number takeover, Missing person, and Protect someone who is being harassed or doxxed."
+      }
+    ]
+  },
+  {
+    "version": "1.73",
+    "name": "Web captures and browser profiles",
+    "date": "2026-11-24",
+    "summary": "The File inspector reads web captures — HAR recordings, WARC and WACZ web archives and saved MHTML pages — and a new Browser profile tool reads a whole Chrome, Edge, Brave, Firefox or Safari profile into one timeline, including what only its -wal files held.",
+    "changes": [
+      {
+        "type": "added",
+        "text": "File inspector → web captures: a HAR (developer tools → Network → export), a WARC or WARC.GZ, a WACZ (ArchiveWeb.page, Browsertrix) or an MHTML (Save page as → single file) shows the redirect chain the visit went through — 3xx answers, Refresh headers, meta refresh and script redirects — with each server's IP."
+      },
+      {
+        "type": "added",
+        "text": "Web captures: what the page sent and where — form posts, JSON and query strings — with passwords, card numbers, codes and bot tokens masked. Logins and card details sent to another site, Telegram bot and Discord webhook drops, form relays and Google Apps Script endpoints are called out."
+      },
+      {
+        "type": "added",
+        "text": "Web captures: every site contacted, marked as the page itself, analytics, captcha, CDN, free hosting, IP and location lookups (the checks kits use to hide from researchers) or drops, with request counts, IPs and server software; the cookies set; files the page handed out, each opened in the inspector with one click."
+      },
+      {
+        "type": "added",
+        "text": "Web captures: the landing page's Shodan page hash and the favicon's hash, analytics and ad IDs, form targets and Telegram handles, with the Shodan, FOFA, urlscan and PublicWWW queries to find sibling sites. A form that asks for a wallet recovery phrase or sends to another site is flagged."
+      },
+      {
+        "type": "added",
+        "text": "Forensics kit → Browser profile: drop a profile folder, a ZIP of it or some of its files. The signed-in account and sync address, every visit, search and text typed in the address bar, downloads with the full chain of addresses they came from and whether they were opened, saved-login sites with user names, form entries, saved names, addresses and cards, bookmarks, extensions and the sites that set cookies — on one timeline you can filter, with the hours of the day the browser was used."
+      },
+      {
+        "type": "added",
+        "text": "Browser profile: a -wal file next to a database is replayed, and the tool says what only the -wal held (for example 3 visits, 1 download and 1 search) — the newest activity, which tools that open only the main file miss."
+      },
+      {
+        "type": "added",
+        "text": "Browser profile: what stands out — searches about wiping or hiding traces, file-sharing and paste sites, private or throwaway mail, programs and archives downloaded, extensions loaded outside the store or able to read every site, and history that starts long after the profile was made."
+      },
+      {
+        "type": "added",
+        "text": "Browser profile: save it to the case as one record with its indicators (accounts, e-mails, phones, download sources), send every event to the case timeline, or download the timeline as CSV. Passwords, cookie values and card numbers stay encrypted and are never read; codes typed into forms are masked."
+      },
+      {
+        "type": "changed",
+        "text": "Playbooks: brand phishing now records the visit as a HAR or web archive and reads it back; browser and phone artefacts start with the Browser profile tool."
+      },
+      {
+        "type": "fixed",
+        "text": "Notebook graph: the zoom-out button and the “create page” suggestion had no icon."
+      }
+    ]
+  },
+  {
+    "version": "1.72",
+    "name": "Linked notebook and note reminders",
+    "date": "2026-11-24",
+    "summary": "The Notebook now links like Obsidian: type [[ to link another page, a case, evidence, an indicator, a note, a detection or a playbook, see which pages link back, turn plain mentions into links, and look at all your pages as a graph. Notes take a date, a time and a reminder when you create them.",
+    "changes": [
+      {
+        "type": "added",
+        "text": "Notebook: type [[ in a page to link another page. A list of matching pages comes up as you type; Enter or Tab picks one. Typing [[Title]] in full links it straight away, and [[Title|other words]] shows other words."
+      },
+      {
+        "type": "added",
+        "text": "Notebook: a link to a page that does not exist yet is shown dashed and creates the page when clicked. Links are kept by page, so renaming a page keeps every link and shows the new title."
+      },
+      {
+        "type": "added",
+        "text": "Notebook: the same [[ list links cases, evidence, indicators, vault entries, notes, detections and playbooks. [[case:, [[ioc:, [[note:, [[rule: and [[playbook: narrow it, and an IP, domain, hash or URL typed after [[ links even before any case has it. Clicking one opens it where it lives; an indicator no case has yet opens a lookup."
+      },
+      {
+        "type": "added",
+        "text": "Notebook side panel: “Linked from” lists the pages that link to this one with the line each link sits in, “Mentioned in” lists pages that name this page without linking it, with a Link button that makes the mention a link, and “Links on this page” lists where this page points."
+      },
+      {
+        "type": "added",
+        "text": "Notebook side panel: indicators written on a page that are already in one of your cases are listed, and open in Entities."
+      },
+      {
+        "type": "added",
+        "text": "Notebook graph: every page as a dot and every link as a line, by notebook, with or without the cases, evidence and indicators pages link to. Hover a page to see its neighbours, click to open it, drag to move around, scroll or use the buttons to zoom. Open it from the Graph button in the library or the page list."
+      },
+      {
+        "type": "added",
+        "text": "Notebook: Markdown export writes page links as [[Title]], and imported Markdown with [[Title]] or [[Title|alias]] links up to the pages with those titles, so notes move to and from Obsidian."
+      },
+      {
+        "type": "added",
+        "text": "Notes: the quick-add form takes a due date, a time and a Remind me switch, so a new note no longer has to be opened again to get a date. The edit window has the time and the switch too."
+      },
+      {
+        "type": "added",
+        "text": "Notes: at the due time a reminder shows in the app and, if you allow it, as a system notification. A reminder missed while the app was closed shows when you come back, saying when it was due."
+      },
+      {
+        "type": "changed",
+        "text": "Notes and Today: a note with a time is overdue from that time instead of from the end of the day, and its card and the Today list show the time with a bell when a reminder is set."
+      }
+    ]
+  },
+  {
+    "version": "1.71",
+    "name": "Documents and delivery files",
+    "date": "2026-11-24",
+    "summary": "The File inspector now takes documents and delivery files apart: earlier PDF versions with the text a later save removed, tracked changes and hidden text in Office files, e-mail and Outlook messages with their attachments, and ISO, OneNote and RAR files with what is inside.",
+    "changes": [
+      {"type": "changed", "text": "Threat Intel → Investigate: the sources that answered get the width, sources that are off are one compact list with what each would add, and lists such as name servers show one name per line instead of breaking inside a name."},
+      {"type": "added", "text": "Threat Intel → Investigate: a Clear button empties the current investigation; pressing Investigate on the indicator already shown asks the sources again instead of only showing the saved answers."},
+      {"type": "fixed", "text": "Threat Intel: a story panel opened on one tab now closes when you switch tab, so it no longer lingers over Overview and swallowing the next clicks — one click opens a story."},
+      {"type": "fixed", "text": "Threat Intel → Sources: the dialog fits the window with one scroll — the tabs and Done stay in view instead of a second scrollbar inside a dialog cut off at the bottom."},
+      {
+        "type": "added",
+        "text": "PDF: every earlier version kept by incremental saves opens on its own, with the lines that were in an earlier version but not the last one — text removed or “redacted” by editing; embedded files (each opens on its own), JavaScript, form fields, fonts and signatures."
+      },
+      {
+        "type": "added",
+        "text": "Word, Excel, PowerPoint: tracked deletions and insertions with who and when, hidden and white or tiny text, comments, the people list with the account behind each commenter, custom properties, editing sessions, hidden and very hidden sheets, hidden named ranges, linked workbooks on file shares, speaker notes, hidden slides, and pictures inside (each opens with its own metadata)."
+      },
+      {
+        "type": "added",
+        "text": "E-mail (.eml) and Outlook (.msg) messages: sender, reply-to and bounce address, failed SPF/DKIM/DMARC, links that show one address and go to another, the public IPs on the route, risky attachment types, and every attachment decoded to inspect on its own; the headers open in the Email headers tool."
+      },
+      {
+        "type": "added",
+        "text": "Delivery files: ISO and IMG disk images (volume, the program that made them and its time zone, hidden files, each file opens on its own), OneNote notebooks (embedded scripts and HTA files), and RAR 4 and 5 archives (entries, encrypted files or names, the system they were packed on)."
+      },
+      {
+        "type": "fixed",
+        "text": "A link followed by a pipe in a command line (iwr http://…/p.ps1|iex) no longer takes the pipe into the address."
+      }
+    ]
+  },
+  {
     "version": "1.70",
     "name": "Forensics kit, advanced",
     "date": "2026-11-24",

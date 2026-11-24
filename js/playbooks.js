@@ -94,7 +94,8 @@ const PB_SEED = [
     ['Send the events to the case timeline and mark verdicts', 'Lookups, requests and connections become evidence.']]},
   {id:'pb-browser', name:'Browser and phone artefacts', cat:'ir', icon:'database', desc:'What a person visited, searched, downloaded and wrote — from SQLite files.', steps:[
     ['Collect the database files (and their -wal files) from a copy, not the live profile', 'History, Cookies, Login Data, places.sqlite, sms.db, msgstore.db.'],
-    ['Open each in the SQLite viewer and record its SHA-256', 'Forensics kit → SQLite. The original is never changed.'],
+    ['Read the whole browser profile at once', 'Forensics kit → Browser profile takes the profile folder or a ZIP of it: one timeline, the signed-in account, downloads with their source, saved-login sites, extensions — and what only the -wal file held.'],
+    ['Open other databases in the SQLite viewer and record their SHA-256', 'Forensics kit → SQLite. The original is never changed.'],
     ['Review visited pages and searches around the time of interest', 'Dates are converted for you; check the time zone.'],
     ['Review downloads: file names, source URLs, referrers', 'Match them to files on disk.'],
     ['List saved-login sites and usernames (passwords stay encrypted)', 'They show accounts the person holds.'],

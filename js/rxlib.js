@@ -5,7 +5,7 @@
    the rest of the workspace (encrypted when the workspace is).
    ========================================================================== */
 const RXL_MAX = {items:300, name:80, tags:10, tag:24, text:100000, tests:200, versions:20};
-const rxlAgo = at => { const t = E.fmtAgo(Date.now() - at); return /now/i.test(t) ? t : t + ' ago'; };
+const rxlAgo = at => E.fmtAgo(Math.max(0, Date.now() - at));
 const rxlList = () => (DB.rxlib = Array.isArray(DB.rxlib) ? DB.rxlib : []);
 /* what is kept of the builder: enough to open it again exactly as it was */
 function rxlSnap(){ const S = RX(), C = rxCurrent();

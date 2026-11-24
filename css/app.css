@@ -57,7 +57,7 @@ a:hover{text-decoration:underline}
 :focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:6px}
 h1,h2,h3,h4{margin:0;font-weight:650;letter-spacing:-.011em;color:var(--text)}
 .mono{font-family:var(--mono);font-size:.92em;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
-.sr{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.sr{position:absolute!important;top:0;left:0;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .t2{color:var(--text-2)} .t3{color:var(--text-3)}
 .label{font-size:var(--fs-sm);font-weight:560;color:var(--text-2)}
 .caps{font-size:var(--fs-xs);font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3)}
@@ -1899,7 +1899,9 @@ html.modal, html.modal body{overflow:hidden}
 .pline{display:flex;flex-wrap:wrap;align-items:center;gap:6px 0;font-size:calc(13px * var(--ts,1));color:var(--text-2);padding:8px 10px;border-radius:10px;background:var(--surface-2);margin:6px 0 10px}
 .pline .mono{font-size:calc(12.5px * var(--ts,1));color:var(--text)}
 .pline .pfx{color:var(--text-3)}
-.pline .psep{width:1px;height:12px;background:var(--border);margin:0 10px;display:inline-block}
+/* separators sit on each part's left edge; the first part of every wrapped row has its edge clipped, so no row starts with a stray bar */
+.pline .pl-w{display:flex;flex-wrap:wrap;align-items:center;row-gap:6px;overflow:hidden;margin-left:-10px;width:calc(100% + 10px)}
+.pline .pb{border-left:1px solid var(--border);margin-left:-1px;padding:0 10px;line-height:1.35}
 .pline b{color:var(--amber);font-weight:650;margin-left:4px}
 .ftab{width:100%;border-collapse:collapse;font-size:calc(12.5px * var(--ts,1))}
 .ftab th{text-align:left;font-weight:500;color:var(--text-3);padding:4px 10px 4px 0;vertical-align:top;white-space:nowrap;width:1%;font-family:var(--mono);font-size:calc(12px * var(--ts,1))}

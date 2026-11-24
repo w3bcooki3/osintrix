@@ -36,7 +36,7 @@ function cfbOpen(b){
   const read = e => { if(!e || e.type !== 2) return null; const size = Math.min(e.size, 64 * 1048576);
     if(size < cutoff){ const L = chain(e.start, mfat, Math.ceil(size / MS) + 2), out = new Uint8Array(size); let at = 0; for(const s of L){ const o = s * MS, n = Math.min(MS, size - at); if(n <= 0 || o + n > mini.length) break; out.set(mini.subarray(o, o + n), at); at += n; } return out.subarray(0, at); }
     return readBig(e.start, size); };
-  return {entries:D.filter(Boolean), find:n => D.find(e => e && e.name === n) || null, read};
+  return {entries:D.filter(Boolean), all:D, find:n => D.find(e => e && e.name === n) || null, read};
 }
 /* a property set stream (SummaryInformation and friends) → {id: value} of its first section */
 function cfbProps(s){

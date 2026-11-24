@@ -459,6 +459,7 @@ function sourcesDlg(tab){
       <div class="srcs">${DB.intel.sources.filter(s => { const m = ctiSrc(s.id); return m && m.kind === 'ioc'; }).map(s => dataRow(s.id)).join('')}</div>
 `}
     </div><footer>${t === 'news' ? `<button class="btn ghost" data-act="srcReset" style="margin-right:auto">Restore defaults</button>` : '<span class="sp"></span>'}<button class="btn primary" data-act="dclose">Done</button></footer>`);
+  $('dlg').classList.add('ti-srcdlg');   /* one scroll: the tabs and Done stay in view, the list scrolls between them */
 }
 
 /* ---------- binding inputs, and the actions ---------- */
@@ -485,7 +486,9 @@ function ctiAddEntry(k, v, label){
 /* triage from a list or from the story panel: the panel shows the new state too */
 const ctiInspAgain = () => { if(UI.inspOpen && UI.sel && UI.sel.kind === 'feed') renderInsp(); };
 const CTI_ACTS = {
-  itab:(id, v, t) => { UI.itab = v; if(t && t.dataset.x === 'hits') UI.ohits = true; UI.sel = null; renderMain(); const s = document.querySelector('#main .scroll'); if(s) s.scrollTop = 0; },
+  itab:(id, v, t) => { UI.itab = v; if(t && t.dataset.x === 'hits') UI.ohits = true;
+    /* a story panel belongs to the tab it was opened from: close it, so it neither lingers over the new tab nor swallows the next click */
+    if(UI.sel && UI.sel.kind === 'feed'){ UI.inspOpen = false; $('inspBtn').classList.remove('on'); } UI.sel = null; renderInsp(); renderMain(); const s = document.querySelector('#main .scroll'); if(s) s.scrollTop = 0; },
   itri:(id, v) => { UI.itri = v; UI.ilim = 0; renderMain(); }, istack:() => { UI.istack = !UI.istack; renderMain(); }, ient:(id, v) => { UI.ient = v; UI.itab = 'feed'; UI.itri = v ? 'all' : UI.itri; closeDlg(); renderMain(); },
   ilim:() => { UI.ilim = (UI.ilim || 60) + 60; renderMain(); }, vlim:() => { UI.vlim = (UI.vlim || 100) + 100; renderMain(); }, olim:() => { UI.olim = (UI.olim || 200) + 200; renderMain(); },
   vmode:(id, v) => { UI.vmode = v; UI.vlim = 0; UI.vsort = null; renderMain(); }, vkev:() => { UI.vkev = !UI.vkev; renderMain(); }, vransom:() => { UI.vransom = !UI.vransom; renderMain(); },

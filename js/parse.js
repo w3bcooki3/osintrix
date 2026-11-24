@@ -181,7 +181,7 @@ function parsedLine(P){
   if(n.method || n.url) bits.push(`<span class="mono">${esc([n.method, n.url].filter(Boolean).join(' ').slice(0, 80))}</span>${n.status ? ` <b>${esc(n.status)}</b>` : ''}`);
   for(const k of ['proto','app','action','user','process','event.id','rule']) if(n[k] && !(k === 'app' && bits.length > 3)) bits.push(`<span class="pfx">${esc({proto:'', app:'', action:'', user:'user ', process:'', 'event.id':'event ', rule:'rule '}[k])}</span>${esc(k === 'process' ? n[k].split(/[\\/]/).pop() : n[k])}`);
   if(n['bytes.out'] || n['bytes.in']) bits.push(`${b(n['bytes.out'] || 0)} out · ${b(n['bytes.in'] || 0)} in`);
-  return bits.map(x => `<span class="pb">${x}</span>`).join('<i class="psep"></i>');
+  return bits.length ? `<span class="pl-w">${bits.map(x => `<span class="pb">${x}</span>`).join('')}</span>` : '';
 }
 function fieldsSection(r){
   const P = recParsed(r); if(!P || (/Label: value/.test(P.format) && Object.keys(P.norm).length < 2)) return '';

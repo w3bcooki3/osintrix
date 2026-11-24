@@ -29,7 +29,7 @@ function tRow(t){
     ${tPick(t)}<div class="tr2-n">${tmono(t, 32)}<div><b>${esc(t.name)}</b><small>${esc(hostOf(t.url))}</small></div></div>
     <p class="tr2-d">${esc(t.desc || '')}</p>
     <span class="tr2-c"><i class="cdot" style="background:${catCol(t.cat)}"></i>${esc(toolSub(t))}</span>
-    <span class="tr2-u" title="Last opened">${tAgo(t)}</span>
+    <span class="tr2-u" title="Last opened">${t.last ? tAgo(t) : ''}</span>
     <span class="tr2-a">${t.tpl ? `<button class="tb-ic run" data-act="toolRun" data-id="${t.id}" aria-label="Look something up with ${esc(t.name)}" title="Look up a value">${ico('play','sm')}</button>` : ''}${tStar(t)}${tGo(t)}</span></div>`;
 }
 function tCard(t){
@@ -67,7 +67,7 @@ function tDetail(t){
     ${t.tpl ? `<form class="tdet-q" data-form="toolRun" data-id="${t.id}"><label class="ix" for="tdV">Look up with ${esc(t.name)}</label><div class="r"><input id="tdV" class="inp mono" placeholder="Value — IP, domain, email, hash…" autocomplete="off"><button class="btn">Go</button></div><code>${esc(t.tpl)}</code></form>` : ''}
     <dl class="tdet-kv"><dt>Category</dt><dd class="blk"><i class="cdot" style="background:${catCol(t.cat)}"></i>${esc((TOOL_CATS[t.cat] || {name:t.cat}).name)} · ${esc(toolSub(t))}</dd>
       ${t.tags.length ? `<dt>Tags</dt><dd>${t.tags.map(g => `<button class="tag" data-act="toolTag" data-v="${esc(g)}">${esc(g)}</button>`).join('')}</dd>` : ''}
-      <dt>Opened</dt><dd>${t.uses ? `${t.uses} time${t.uses > 1 ? 's' : ''}${t.last ? ' · last ' + tAgo(t) + ' ago' : ''}` : 'Not yet'}</dd>
+      <dt>Opened</dt><dd>${t.uses ? `${t.uses} time${t.uses > 1 ? 's' : ''}${t.last ? ' · last ' + tAgo(t) : ''}` : 'Not yet'}</dd>
       <dt>Added</dt><dd>${t.added ? esc(new Date(t.added).toISOString().slice(0, 10)) : '—'}${t.seed ? ' · pre-added' : ' · by you'}</dd></dl>
     <div class="tdet-f"><button class="btn sm${t.starred ? ' on' : ''}" data-act="toolStar" data-id="${t.id}">${ico('star','sm')}${t.starred ? 'Favourite' : 'Add to favourites'}</button><button class="btn sm${t.pinned ? ' on' : ''}" data-act="toolPin" data-id="${t.id}">${ico('pin','sm')}${t.pinned ? 'In quick launch' : 'Quick launch'}</button><span class="sp"></span><button class="btn sm tdel" data-act="toolDelAsk" data-id="${t.id}">${ico('trash-2','sm')}Delete</button></div></aside>`;
 }
@@ -124,7 +124,7 @@ function viewEntities(){
     <div class="ph"><div><h1>Entities</h1><div class="sub">Every indicator across every case, whether you added it to a vault or it was extracted from evidence. Each case also has its own Entities tab.</div></div></div>
     <div class="toolbar"><div class="search-in">${ico('search')}<label class="sr" for="entq">Search entities</label><input id="entq" class="inp" placeholder="Search values…" value="${esc(UI.entq || '')}"></div><label class="sr" for="entCase">Case</label><select id="entCase" class="gsel bord"><option value="">All cases</option>${DB.cases.map(c => `<option value="${c.id}"${ec === c.id ? ' selected' : ''}>${esc(c.name.split(' — ')[0])}</option>`).join('')}</select><div class="seg">${[['','All ' + g.length],['malicious','Malicious'],['cross','In 2+ cases']].map(([v, l]) => `<button data-act="entKind" data-v="${v}" aria-pressed="${(UI.entKind || '') === v}">${l}</button>`).join('')}</div><span style="flex:1"></span><span class="t3">${list.length} shown</span><button class="btn" data-act="entExport">${ico('download','sm')}Export CSV</button></div>
     ${typeof psSection === 'function' && !eq && !ec && !UI.entKind ? psSection() : ''}
-    <section class="card" style="overflow:hidden"><table class="tbl cardify"><thead><tr><th>Entity</th><th>Verdict</th><th style="text-align:right">Records</th><th class="hide-m">Cases</th><th>What it is</th></tr></thead><tbody>
+    <section class="card" style="overflow-x:auto"><table class="tbl cardify"><thead><tr><th>Entity</th><th>Verdict</th><th style="text-align:right">Records</th><th class="hide-m">Cases</th><th>What it is</th></tr></thead><tbody>
     ${list.slice(0, 150).map(e => { const m = E.meaning(e.k, e.v);
       return `<tr data-act="selEnt" data-id="${esc(e.id)}"><td><div style="display:flex;gap:10px;align-items:center;min-width:0">${kindBadge(e.k,'sm')}<div style="min-width:0"><div class="v">${esc(e.v)}</div><div class="t3" style="font-size:calc(12.5px * var(--ts,1))">${esc(E.LABEL[e.k] || e.k)}</div></div></div></td>
         <td>${vdLabel(verdictOf(e.id)) || '<span class="t3">—</span>'}</td><td class="n">${e.recs.length}</td><td class="hide-m"><div class="wrap" style="gap:4px">${[...e.cases].filter(theCase).slice(0, 3).map(cid => { const o = theCase(cid); return `<a class="ce-case" href="${caseHash(cid, 'entities')}" style="--cc:${esc(o.color)}" title="${esc(o.name)}">${esc(caseNm(o))}</a>`; }).join('')}${e.cases.size > 3 ? `<span class="t3">+${e.cases.size - 3}</span>` : ''}</div></td><td class="t2 hide-m" style="font-size:calc(13.5px * var(--ts,1))">${m ? esc(m.t) : '—'}</td></tr>`; }).join('')}
@@ -250,7 +250,7 @@ function viewSettings(){
   return `<div class="scroll"><div class="page"><div class="ph"><div><h1>Settings</h1><div class="sub">Stored in this browser only.</div></div></div>
     <section class="card" style="margin-bottom:18px"><div class="body" style="padding:22px"><div class="about">${logoMark(64)}<div style="flex:1;min-width:220px"><h2>${wordmark().replace('wordmark','wordmark big')}</h2>
       <div class="t2" style="margin-top:4px">${esc(BRAND.tagline)} · <span class="mono">${esc(BRAND.version)}</span></div>
-      <div class="wrap" style="align-items:center"><button class="btn" data-act="showWelcome">${ico('eye','sm')}Show welcome</button><button class="btn" data-act="setupOpen">${ico('sparkles','sm')}Run setup</button></div></div>
+      <div class="wrap" style="align-items:center;margin-top:14px"><button class="btn" data-act="showWelcome">${ico('eye','sm')}Show welcome</button><button class="btn" data-act="setupOpen">${ico('sparkles','sm')}Run setup</button></div></div>
       <p class="t3" style="margin:16px 0 0;font-size:calc(13px * var(--ts,1))">A private, browser-only OSINT workspace. Geist, Geist Mono, Inter and JetBrains Mono (OFL 1.1) · Lucide icons (ISC) · Cytoscape.js (MIT) · jsQR (Apache-2.0) · IEEE OUI list via oui-data (BSD-2) — all bundled, nothing loads from the network. <a href="#/help">Help &amp; FAQ</a></p></div></section>
     <div class="grid cols-2" style="align-items:start">
       <section class="card"><header><h3>Appearance</h3></header><div class="body">
@@ -319,7 +319,7 @@ function viewHelp(){
       <section class="hx2-sec hx2-dir"><header><h2>Browse by area</h2></header><div class="hx2-cols">${dir.map(([g, xs]) => `<div><span class="ix">${g}</span>${xs.map(([h, n, d]) => h[0] === '#' && h[1] !== '/' ? `<button class="hs-i" data-act="helpGo" data-v="${h.slice(1)}"><b>${n}</b><small>${d}</small></button>` : `<a class="hs-i" href="${h}"><b>${n}</b><small>${d}</small></a>`).join('')}</div>`).join('')}</div></section>
       <section class="hx2-sec hx2-strip" id="hx-data"><div class="hx2-data">
           <span class="ix">Your data · this browser</span>
-          <div class="hx2-dn"><b class="mono">${mb} MB</b><span>of ${cap}</span><span class="hx2-st${stale ? ' warn' : ''}"><i></i>${last ? 'Last backup ' + esc(E.fmtAgo(Date.now() - last)) + ' ago' : 'Never backed up'}</span></div>
+          <div class="hx2-dn"><b class="mono">${mb} MB</b><span>of ${cap}</span><span class="hx2-st${stale ? ' warn' : ''}"><i></i>${last ? 'Last backup ' + esc(E.fmtAgo(Date.now() - last)) : 'Never backed up'}</span></div>
           <span class="bar"><i style="width:${Math.max(pct, 1)}%"></i></span>
           <p>${where}</p>
           <div class="hx2-b"><button class="btn primary sm" data-act="exportAll">${ico('download','sm')}Back up everything</button><button class="btn sm" data-act="importAll">${ico('upload','sm')}Restore a backup</button><span class="sp"></span><button class="btn sm ghost hx2-rs" data-act="helpReset">${ico('triangle-alert','sm')}Reset…</button></div></div>

@@ -1,0 +1,38 @@
+/* Vehicle identification numbers (ISO 3779 / 49 CFR 565), offline: the region and country from the first characters,
+   the maker from the world manufacturer identifier, the check digit (required in North America, optional elsewhere),
+   the model year code, the plant code and the serial. Shown in Forensics kit → Time & IDs when a VIN is pasted. */
+const VIN_WMI = {'1FA':'Ford (USA)', '1FT':'Ford trucks (USA)', '1FM':'Ford SUVs (USA)', '1G1':'Chevrolet (USA)', '1GC':'Chevrolet trucks (USA)', '1GT':'GMC (USA)', '1G6':'Cadillac (USA)', '1HG':'Honda (USA)', '1N4':'Nissan (USA)',
+  '1C4':'Chrysler / Jeep / Dodge (USA)', '1C6':'Ram (USA)', '1J4':'Jeep (USA)', '2HG':'Honda (Canada)', '2T1':'Toyota (Canada)', '3VW':'Volkswagen (Mexico)', '3FA':'Ford (Mexico)', '4T1':'Toyota (USA)', '5YJ':'Tesla (USA)',
+  '7SA':'Tesla (USA)', '5UX':'BMW SUVs (USA)', '5N1':'Nissan SUVs (USA)', 'JHM':'Honda (Japan)', 'JTD':'Toyota (Japan)', 'JT2':'Toyota (Japan)', 'JN1':'Nissan (Japan)', 'JM1':'Mazda (Japan)', 'JF1':'Subaru (Japan)',
+  'JA3':'Mitsubishi (Japan)', 'JA4':'Mitsubishi (Japan)', 'JS2':'Suzuki (Japan)', 'KMH':'Hyundai (Korea)', 'KNA':'Kia (Korea)', 'LRW':'Tesla (China)', 'LSV':'SAIC Volkswagen (China)', 'LFV':'FAW-Volkswagen (China)',
+  'LVS':'Changan Ford (China)', 'LBV':'BMW Brilliance (China)', 'LE4':'Beijing Benz (China)', 'MAL':'Hyundai (India)', 'MA1':'Mahindra (India)', 'MAT':'Tata Motors (India)', 'MR0':'Toyota (Thailand)', 'NMT':'Toyota (Turkey)',
+  'SAL':'Land Rover (UK)', 'SAJ':'Jaguar (UK)', 'SCC':'Lotus (UK)', 'SCF':'Aston Martin (UK)', 'SB1':'Toyota (UK)', 'TMB':'Škoda (Czech Republic)', 'TMA':'Hyundai (Czech Republic)', 'TRU':'Audi (Hungary)',
+  'U5Y':'Kia (Slovakia)', 'VF1':'Renault (France)', 'VF3':'Peugeot (France)', 'VF7':'Citroën (France)', 'VNK':'Toyota (France)', 'VSS':'SEAT (Spain)', 'WBA':'BMW (Germany)', 'WBS':'BMW M (Germany)',
+  'WDB':'Mercedes-Benz (Germany)', 'WDD':'Mercedes-Benz (Germany)', 'W1K':'Mercedes-Benz (Germany)', 'WP0':'Porsche (Germany)', 'WP1':'Porsche SUVs (Germany)', 'WVW':'Volkswagen (Germany)', 'WV1':'Volkswagen Commercial (Germany)',
+  'WV2':'Volkswagen Commercial (Germany)', 'WAU':'Audi (Germany)', 'WF0':'Ford (Germany)', 'W0L':'Opel (Germany)', 'YV1':'Volvo (Sweden)', 'YS3':'Saab (Sweden)', 'ZFA':'Fiat (Italy)', 'ZAR':'Alfa Romeo (Italy)',
+  'ZFF':'Ferrari (Italy)', 'ZHW':'Lamborghini (Italy)', 'ZAM':'Maserati (Italy)', '9BW':'Volkswagen (Brazil)'};
+const VIN_REGION = [[/^[1457]/, 'United States'], [/^2/, 'Canada'], [/^3[A-W]/, 'Mexico'], [/^J/, 'Japan'], [/^K[L-R]/, 'South Korea'], [/^L/, 'China'], [/^M[A-E]/, 'India'], [/^M[L-R]/, 'Thailand'], [/^N[M-T]/, 'Turkey'],
+  [/^S[A-M]/, 'United Kingdom'], [/^T[A-H]/, 'Switzerland'], [/^T[J-P]/, 'Czech Republic'], [/^T[R-V]/, 'Hungary'], [/^U[5-7]/, 'Slovakia'], [/^V[A-E]/, 'Austria'], [/^V[F-R]/, 'France'], [/^V[S-W]/, 'Spain'],
+  [/^W/, 'Germany'], [/^X[3-90]/, 'Russia'], [/^Y[A-E]/, 'Belgium'], [/^Y[F-K]/, 'Finland'], [/^Y[S-W]/, 'Sweden'], [/^Z[A-R]/, 'Italy'], [/^6[A-W]/, 'Australia'], [/^9[A-E]/, 'Brazil']];
+const VIN_YEAR = 'ABCDEFGHJKLMNPRSTVWXY123456789';
+function vinDecode(input){
+  const v = String(input || '').trim().toUpperCase().replace(/[\s-]/g, ''); if(!/^[A-HJ-NPR-Z0-9]{17}$/.test(v) || !/[A-Z]/.test(v) || !/\d/.test(v)) return null;
+  const tr = c => /\d/.test(c) ? +c : 'A1B2C3D4E5F6G7H8J1K2L3M4N5P7R9S2T3U4V5W6X7Y8Z9'.match(new RegExp(c + '(\\d)'))[1] * 1, W = [8, 7, 6, 5, 4, 3, 2, 10, 0, 9, 8, 7, 6, 5, 4, 3, 2];
+  const sum = [...v].reduce((s, c, i) => s + tr(c) * W[i], 0), want = sum % 11 === 10 ? 'X' : String(sum % 11), ok = v[8] === want;
+  const region = (VIN_REGION.find(([re]) => re.test(v)) || [, ''])[1], na = /^(United States|Canada|Mexico)$/.test(region), wmi = v.slice(0, 3), maker = VIN_WMI[wmi] || '';
+  const yi = VIN_YEAR.indexOf(v[9]); let years = [];
+  if(yi >= 0){ const y0 = 1980 + yi; years = /\d/.test(v[6]) ? [y0] : /[A-Z]/.test(v[6]) && na ? [y0 + 30] : [y0, y0 + 30].filter(y => y <= new Date().getFullYear() + 1); }
+  if(na && !years.length && yi >= 0) years = [1980 + yi];
+  return {vin:v, wmi, maker, region, na, check:{ok, want, got:v[8]}, years, vds:v.slice(3, 8), plant:v[10], serial:v.slice(11), smallMaker:v[2] === '9'};
+}
+function vinCard(input){
+  const V = vinDecode(input); if(!V) return '';
+  const row = (k, v, mono) => v ? `<div class="kv"><span>${esc(k)}</span>${mono ? `<code>${esc(v)}</code>` : `<b>${esc(v)}</b>`}</div>` : '';
+  const chk = V.check.ok ? 'Correct' : V.na ? `Wrong — position 9 should be ${V.check.want}, not ${V.check.got}. A North American VIN with a wrong check digit is mistyped or forged.` : `Does not match (${V.check.want} expected) — most makers outside North America do not use a check digit, so this proves nothing here.`;
+  return `<div class="idrows vin" id="vinOut"><h4>${ico('car','sm')} Vehicle identification number</h4>
+    ${row('Maker', V.maker || (V.smallMaker ? 'A small maker (fewer than 1,000 vehicles a year) — the full maker code is in positions 12–14' : 'Not in the offline list — look up the first three characters (' + V.wmi + ')'))}${row('Built in', V.region)}
+    ${row('Check digit', chk)}${row('Model year', V.years.length ? V.years.join(' or ') + (V.years.length > 1 ? ' — the year code repeats every 30 years; the vehicle itself tells which' : '') + (V.na ? '' : ' (if the maker uses the year code — not required outside North America)') : '')}
+    ${row('Vehicle descriptor (model, body, engine)', V.vds, true)}${row('Plant code', V.plant, true)}${row('Serial', V.serial, true)}
+    <div class="pivots" style="margin-top:8px"><a href="https://vpic.nhtsa.dot.gov/decoder/Decoder?VIN=${encodeURIComponent(V.vin)}" target="_blank" rel="noopener noreferrer">NHTSA decoder${ico('arrow-up-right','sm')}</a><a href="https://www.nicb.org/vincheck" target="_blank" rel="noopener noreferrer">NICB stolen check (US)${ico('arrow-up-right','sm')}</a><a href="https://www.google.com/search?q=%22${encodeURIComponent(V.vin)}%22" target="_blank" rel="noopener noreferrer">The VIN on the web (listings, auctions, photos)${ico('arrow-up-right','sm')}</a></div>
+    <p class="t3" style="font-size:calc(12px * var(--ts,1));margin:8px 0 0">A VIN in a listing photo, an auction record or an insurance document ties one vehicle across them. Cloned VINs copy a real car's number — a correct check digit does not prove the car is that car.</p></div>`;
+}

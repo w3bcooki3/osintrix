@@ -1,0 +1,35 @@
+{
+   "roots": {
+      "bookmark_bar": {
+         "children": [
+            {
+               "date_added": "13383699240000000",
+               "name": "VeraCrypt - Downloads",
+               "type": "url",
+               "url": "https://www.veracrypt.fr/en/Downloads.html"
+            },
+            {
+               "children": [
+                  {
+                     "date_added": "13380282000000000",
+                     "name": "HR Portal",
+                     "type": "url",
+                     "url": "https://intranet.acme.example/hr/"
+                  }
+               ],
+               "name": "Work",
+               "type": "folder",
+               "date_added": "13380282000000000"
+            }
+         ],
+         "name": "Bookmarks bar",
+         "type": "folder"
+      },
+      "other": {
+         "children": [],
+         "name": "Other bookmarks",
+         "type": "folder"
+      }
+   },
+   "version": 1
+}

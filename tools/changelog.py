@@ -16,9 +16,17 @@ src = (root / 'js' / 'data' / 'changelog.js').read_text(encoding='utf-8')
 
 # pull the JSON array that follows "const CHANGELOG_DATA ="
 start = src.index('[')
-depth, i = 0, start
+depth, i, instr, bs = 0, start, False, False
 for i in range(start, len(src)):
-    if src[i] == '[':
+    c = src[i]
+    if instr:                       # brackets inside strings (e.g. "[[Title]]") do not count
+        if bs: bs = False
+        elif c == '\\': bs = True
+        elif c == '"': instr = False
+        continue
+    if c == '"':
+        instr = True
+    elif src[i] == '[':
         depth += 1
     elif src[i] == ']':
         depth -= 1

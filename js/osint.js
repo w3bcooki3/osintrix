@@ -70,6 +70,11 @@ function twRisk(x, orig){
   if(orig && orig.ips && x.ips.some(ip => orig.ips.includes(ip))){ s -= 25; why.push('same servers as the original — likely owned by the same company'); }
   return {s:Math.max(0, Math.min(100, s)), why};
 }
+/* domains in the open case, offered as one-click starting points */
+function twCaseChips(){
+  let ds = []; try { const c = theCase(); if(c) ds = [...derive(c.id).ents.values()].filter(x => x.k === 'domain').sort((a, b) => b.recs.length - a.recs.length).map(x => x.v).slice(0, 6); } catch(e){ ds = []; }
+  return ds.length ? `<div class="wrap" style="margin-top:12px;align-items:center"><span class="t3" style="font-size:calc(12.5px * var(--ts,1))">From ${esc(caseNm(theCase()))}:</span>${ds.map(d => `<button class="chip mono" data-act="twTry" data-v="${esc(d)}">${esc(d)}</button>`).join('')}</div>` : '';
+}
 function labTwist(){
   const T = UI.tw || {}, L = T.list || [], done = L.filter(x => x.done).length, reg = L.filter(x => x.exists).map(x => Object.assign(x, {r:twRisk(x, T.orig)})).sort((a, b) => b.r.s - a.r.s);
   const dnsOn = typeof lkProv === 'function' && lkOn(lkProv('dns')), rdOn = typeof lkProv === 'function' && lkOn(lkProv('rdap'));
@@ -79,7 +84,7 @@ function labTwist(){
       <button class="btn primary" type="submit">${ico('sparkles','sm')}Generate</button>
       ${L.length ? `<button class="btn" type="button" data-act="twCheck" ${dnsOn ? '' : 'disabled'}>${ico('radar','sm')}${T.running ? 'Checking ' + done + ' of ' + L.length + '…' : done ? 'Check again' : 'Check which exist'}</button>${T.running ? `<button class="btn ghost" type="button" data-act="twStop">Stop</button>` : ''}` : ''}</form>
     ${L.length && !dnsOn ? `<div class="ti-relay">${ico('wifi-off','sm')}<span>Checking sends each candidate name to Google DNS (<span class="mono">dns.google</span>). Switch on the DNS source to allow it${rdOn ? '' : ' — and RDAP to see how new each one is'}.</span><button class="btn sm" data-act="twDnsOn">Allow Google DNS${rdOn ? '' : ' and RDAP'}</button></div>` : ''}
-    ${L.length ? `<p class="t3" style="margin:4px 0 12px">${L.length} candidates — ${kinds.slice(0, 8).map(([k, n]) => esc(TW_NAME[k] || k) + ' ' + n).join(' · ')}</p>` : '<p class="t3">Enter a domain you want to protect — or one from a case — to see how it could be imitated.</p>'}
+    ${L.length ? `<p class="t3" style="margin:4px 0 12px">${L.length} candidates — ${kinds.slice(0, 8).map(([k, n]) => esc(TW_NAME[k] || k) + ' ' + n).join(' · ')}</p>` : `<p class="t3">Enter a domain you want to protect — or one from a case — to see how it could be imitated.</p>${twCaseChips()}`}
     ${(W => { const ks = Object.keys(W).sort((a, b) => W[b].at - W[a].at); if(!ks.length) return ''; const cur = W[T.d];
       return `<div class="tw-watch">${cur && !done ? `<p class="small" style="margin:0 0 6px">${ico('eye','sm')} Checked before on ${esc(new Date(cur.at).toISOString().slice(0, 10))} — ${cur.list.length} existed. <b>Check which exist</b> again and new ones are marked.</p>` : T.since && done && !T.running ? `<p class="small" style="margin:0 0 6px">${ico('eye','sm')} Compared with the check on ${esc(new Date(T.since).toISOString().slice(0, 10))}: <b>${L.filter(x => x.isNew).length} new</b>.</p>` : ''}
         <div class="wrap"><span class="t3 small">Watched:</span>${ks.slice(0, 12).map(k => `<button class="chip" data-act="twWatch" data-v="${esc(k)}" aria-pressed="${k === T.d}">${esc(k)} <span class="t3">${esc(new Date(W[k].at).toISOString().slice(5, 10))}</span></button>`).join('')}</div></div>`; })(DB.prefs.twSeen && typeof DB.prefs.twSeen === 'object' ? DB.prefs.twSeen : {})}
@@ -163,7 +168,7 @@ function labIdent(){
       <div class="wrap" style="margin-top:10px"><button class="btn sm primary" data-act="idAdd" data-v="${esc(P.e164)}">${ico('plus','sm')}Add to ${esc(caseNm(theCase()))}</button>${casePick()}</div>` : `<p class="t3">${esc(P ? P.note : 'Not a phone number.')}</p>`; }
   return `<div class="labgrid one wide"><section class="card"><header><h3>${ico('fingerprint','sm')} Identity pivots</h3><span class="t3">a username, an email address or a phone number</span></header><div class="body">
     <form class="lk-q" data-form="idGo"><div class="search-in">${ico('at-sign')}<label class="sr" for="idQ">Username, email or phone</label><input id="idQ" class="inp mono" value="${esc(q)}" placeholder="n1ghtlamp · someone@example.com · +44 20 7946 0000" autocomplete="off" spellcheck="false"></div><button class="btn primary" type="submit">${ico('search','sm')}Pivot</button></form>
-    ${body || '<p class="t3">Nothing is sent anywhere until you open a link or look up mail servers.</p>'}</div></section></div>`;
+    ${body || `<p class="t3">Nothing is sent anywhere until you open a link or look up mail servers.</p><div class="wrap" style="margin-top:12px;align-items:center"><span class="t3" style="font-size:calc(12.5px * var(--ts,1))">Try:</span>${[['n1ghtlamp','A username'],['j.doe@proton.me','An email address'],['+44 20 7946 0000','A UK phone number']].map(([v, l]) => `<button class="chip" data-act="idTry" data-v="${esc(v)}">${esc(l)}</button>`).join('')}</div>`}</div></section></div>`;
 }
 
 /* ---------- pivot plan: what to do next for one indicator ---------- */

@@ -361,7 +361,7 @@ function fxMetaCard(M){
   const F = M.fields, flags = F.filter(f => f.g === 'Stands out'), open = !!UI.fxMetaAll, groups = MT_GROUPS.filter(g => g !== 'Stands out').map(g => [g, F.filter(f => f.g === g)]).filter(x => x[1].length);
   const shown = open ? groups : groups.map(([g, L]) => [g, L.slice(0, g === 'Software' || g === 'When' ? 4 : 3)]), total = F.length - flags.length, vis = shown.reduce((s, x) => s + x[1].length, 0);
   const G = M.gps;
-  return `<section class="card fx-meta"><header><h3>${ico('scan-search','sm')} Metadata</h3><span class="t3">${esc(M.fmt || '')} · ${total} fact${total === 1 ? '' : 's'}</span></header><div class="body">
+  return (M.gen && typeof aiGenCard === 'function' ? aiGenCard(M.gen) : '') + `<section class="card fx-meta"><header><h3>${ico('scan-search','sm')} Metadata</h3><span class="t3">${esc(M.fmt || '')} · ${total} fact${total === 1 ? '' : 's'}</span></header><div class="body">
     ${flags.length ? `<div class="wrap fx-flags">${flags.map(f => fxChip(f.v, f.tone)).join('')}</div>` : ''}
     ${G ? `<div class="gpsbox"><div>${ico('map-pin','sm')}<b>${G.lat}, ${G.lon}</b>${G.alt != null ? `<span class="t3"> · ${G.alt} m</span>` : ''}${G.dir != null ? `<span class="t3"> · facing ${G.dir}° ${fxDir(G.dir)}</span>` : ''}</div><div class="pivots">${geoLinks(G.lat, G.lon).map(([n, u]) => fxLink(n, u)).join('')}</div></div>` : ''}
     ${shown.map(([g, L]) => `<h5 class="fx-g">${esc(g)}</h5>${L.map(f => `<div class="kv fx-kv"><span>${esc(f.k)}</span><b>${esc(f.v.length > 400 && !open ? f.v.slice(0, 400) + '…' : f.v)}</b><button class="iconbtn sm" data-act="flagCopy" data-v="${esc(f.v)}" aria-label="Copy ${esc(f.k)}">${ico('copy','sm')}</button></div>`).join('')}`).join('')}
@@ -735,7 +735,7 @@ function fxStealer(items, mine){
 const slMask = p => !p ? '' : UI.slShow ? p : p.length <= 2 ? '••' : p.slice(0, 2) + '•'.repeat(Math.min(10, p.length - 2)) + ` (${p.length})`;
 function labSteal(){
   const S = UI.fxSteal, mine = UI.slMine || '';
-  const form = `<div class="sl-mine"><label for="slMine" class="ix">Your domains</label><input id="slMine" class="inp" placeholder="corp.example, corp-mail.example — accounts and sessions on these are marked" value="${esc(mine)}"></div>`;
+  const form = `<div class="sl-mine"><label for="slMine" class="ix">Your domains <span class="t3">— their logins and sessions are marked</span></label><input id="slMine" class="inp" placeholder="corp.example, corp-mail.example" title="Logins and sessions on these domains are marked as yours" value="${esc(mine)}"></div>`;
   if(!S) return `${form}<label class="drop" id="slDrop" tabindex="0"><input type="file" id="slIn" class="sr" multiple accept=".zip,.txt">${ico('key-round')}<b>Drop a stealer log — the ZIP, or the files from one victim's folder</b>
     <span>RedLine, Lumma, Vidar, Raccoon, StealC and their clones: the infected machine (user, computer name, HWID, IP, country, build tag), every saved login it gave up, and the cookies that let someone sign in without a password. Passwords stay masked until you ask.</span>
     <span class="drop-feat"><i>Machine profile</i><i>Build tag</i><i>Saved logins</i><i>Your domains</i><i>SSO &amp; VPN</i><i>Live session cookies</i><i>Wallets</i><i>Telegram &amp; Discord</i></span></label>

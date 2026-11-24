@@ -40,16 +40,18 @@ function lkStatus(p, r, pending){
   const s = (r.sig || []).reduce((a, x) => x.t === 'mal' ? 'mal' : a === 'mal' ? a : x.t === 'sus' ? 'sus' : a || x.t, '');
   return `<span class="lk-st ${s || (r.none ? 'none' : 'ok')}">${s === 'mal' ? 'Bad' : s === 'sus' ? 'Suspicious' : s === 'ben' ? 'Good' : r.none ? 'No record' : 'Answered'} · ${esc(iAgo(r.at))}</span>`;
 }
+/* a value that is a list of host names or addresses: one per line, each kept whole */
+const lkVal = v => { const s = String(v ?? ''), parts = s.split(/,\s+/); return parts.length > 1 && parts.every(x => /^[\w.:*-]+(?:\s\(\w+\))?$/.test(x)) ? parts.map(x => `<span class="lk-li">${esc(x)}</span>`).join('') : esc(s); };
 function lkCard(p, r, pending){
   const facts = r && r.ok ? r.facts : [];
   return `<section class="lk-card${r && r.ok && (r.sig || []).some(s => s.t === 'mal') ? ' mal' : ''}"><header><b>${esc(p.name)}</b>${lkStatus(p, r, pending)}${r && r.link ? `<a class="iconbtn" href="${esc(r.link)}" target="_blank" rel="noopener noreferrer" aria-label="Open on ${esc(p.name)}" title="Open on ${esc(hostOf(r.link))}">${ico('external-link','sm')}</a>` : ''}</header>
-    ${facts.length ? `<dl>${facts.map(([l, v]) => `<dt>${esc(l)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>` : r && r.ok && r.none ? '' : !r && lkSettings().on[p.id] && lkRoute(p) ? '' : `<p class="t3">${esc(p.about)}</p>`}</section>`;
+    ${facts.length ? `<dl>${facts.map(([l, v]) => `<dt>${esc(l)}</dt><dd>${lkVal(v)}</dd>`).join('')}</dl>` : r && r.ok && r.none ? '' : !r && lkSettings().on[p.id] && lkRoute(p) ? '' : `<p class="t3">${esc(p.about)}</p>`}</section>`;
 }
 function ctiLookView(){
   const S = lkSettings(), onN = LK_PROVIDERS.filter(lkOn).length, relay = lkRelay();
   const form = `<form class="lk-q" data-form="ctiLook"><div class="search-in">${ico('scan-search')}<label class="sr" for="lkQ">Indicator to investigate</label><input id="lkQ" class="inp mono" placeholder="IP, domain, URL, file hash, CVE or ASN" value="${esc(UI.look ? UI.look.v : '')}" autocomplete="off" spellcheck="false"></div>
     <button class="btn primary" type="submit">${ico('radar','sm')}Investigate</button><button class="btn" type="button" data-act="lookCase">${ico('list-checks','sm')}Investigate ${esc(caseNm(theCase()))}</button>
-    <button class="iconbtn" type="button" data-act="feedSources" data-v="look" aria-label="Lookup sources" title="Lookup sources">${ico('settings','sm')}</button></form>
+    ${UI.look || LKV.bulk ? `<button class="btn ghost" type="button" data-act="lookClear">${ico('x','sm')}Clear</button>` : ''}<button class="iconbtn" type="button" data-act="feedSources" data-v="look" aria-label="Lookup sources" title="Lookup sources">${ico('settings','sm')}</button></form>
     ${onN ? `<p class="lk-note">${ico('globe','sm')}${onN} source${onN > 1 ? 's' : ''} on${relay ? ' · relay ' + esc(hostOf(relay.url)) : ' · no relay — VirusTotal, AbuseIPDB, GreyNoise, urlscan and abuse.ch need one'}. Only the indicator you investigate is sent, and only to those sources.</p>`
       : `<div class="ti-relay">${ico('wifi-off','sm')}<span>No lookup source is switched on. Each one is off until you choose it — the indicator is sent to that service when you investigate.</span><button class="btn sm primary" data-act="lkFreeOn">${ico('wifi','sm')}Turn on the free sources</button><button class="btn sm" data-act="feedSources" data-v="look">Choose…</button></div>`}`;
   if(LKV.bulk) return form + lkBulkView();
@@ -72,12 +74,14 @@ function ctiLookView(){
         <section class="card lk-why"><h3>Why</h3>${V.reasons.length ? `<ul>${V.reasons.slice(0, 12).map(e => `<li class="${e.t}"><i aria-hidden="true"></i><span>${esc(e.why)}</span><small>${esc(e.src)}</small></li>`).join('')}</ul>`
           : `<p class="t3">${busy ? 'Waiting for answers…' : V.answered.length ? 'No source has anything against it, or for it.' : 'Nothing asked yet.'}</p>`}
           ${V.failed.length ? `<p class="t3 small">${esc(V.failed.join(', '))} did not answer.</p>` : ''}</section>
-        ${pivots.length ? `<section class="card lk-piv"><h3>What it is</h3><dl>${pivots.map(([l, x]) => `<dt>${esc(l)}</dt><dd>${esc(x)}</dd>`).join('')}</dl></section>` : ''}
+        ${pivots.length ? `<section class="card lk-piv"><h3>What it is</h3><dl>${pivots.map(([l, x]) => `<dt>${esc(l)}</dt><dd>${lkVal(x)}</dd>`).join('')}</dl></section>` : ''}
         ${rel.length ? `<section class="card lk-rel"><h3>Leads to <span class="t3">${rel.length}</span>${rel.length > 1 ? `<button class="btn sm ghost" data-act="lookRelAll">${ico('plus','sm')}Add all to ${esc(caseNm(theCase()))}</button>` : ''}</h3>
           <ul>${rel.slice(0, 40).map((x, i) => `<li>${kindBadge(x.k, 'sm')}<span class="mono">${esc(x.v)}</span><small>${esc(x.rel.join(', '))}</small><button class="iconbtn" data-act="lookRel" data-v="${i}" aria-label="Investigate ${esc(x.v)}" title="Investigate">${ico('radar','sm')}</button><button class="iconbtn" data-act="lookRelAdd" data-v="${i}" aria-label="Add ${esc(x.v)} to the case" title="Add to ${esc(caseNm(theCase()))}">${ico('plus','sm')}</button></li>`).join('')}</ul>
           ${rel.length > 40 ? `<p class="t3 small">${rel.length - 40} more not shown.</p>` : ''}</section>` : ''}
       </div>
-      <div class="lk-cards">${P.slice().sort((a, b) => order(a) - order(b)).map(p => lkCard(p, LKV.res[p.id], LKV.pending.has(p.id))).join('')}</div>
+      <div class="lk-cards">${(used => used.map(p => lkCard(p, LKV.res[p.id], LKV.pending.has(p.id))).join(''))(P.filter(p => lkOn(p) || LKV.res[p.id] || LKV.pending.has(p.id)).sort((a, b) => order(a) - order(b)))}
+        ${(off => off.length ? `<section class="lk-off"><header><b>Not switched on</b><span class="t3">${off.length} more source${off.length === 1 ? '' : 's'} could answer for this ${esc((E.LABEL[k] || k).toLowerCase())}</span><button class="btn xs" type="button" data-act="feedSources" data-v="look">${ico('settings','sm')}Choose sources</button></header>
+          <ul>${off.map(p => `<li><b>${esc(p.name)}</b><span class="t3">${esc(p.about)}</span>${p.via !== 'direct' && !lkRelay() && !(lkSettings().keys[p.id]) ? '<span class="lk-need">needs a key or relay</span>' : ''}</li>`).join('')}</ul></section>` : '')(P.filter(p => !(lkOn(p) || LKV.res[p.id] || LKV.pending.has(p.id))))}</div>
     </div></div>`;
 }
 function lkHistView(){
@@ -162,6 +166,7 @@ const LK_ACTS = {
   lookBulkClose:() => { if(LKV.bulk) LKV.bulk.stop = true; LKV.bulk = null; renderMain(); },
   lookOpen:id => { const {k, v} = entSplit(id); const B = LKV.bulk, it = B && B.items.find(x => x.key === id); LKV.bulk = null; if(it && it.res){ UI.look = {k, v}; LKV.key = id; LKV.res = {...it.res}; LKV.pending = new Set(); renderMain(); } else lookGo(k, v); },
   lookAgain:() => UI.look && lookGo(UI.look.k, UI.look.v, true),
+  lookClear:() => { if(LKV.bulk) LKV.bulk.stop = true; UI.look = null; LKV.key = ''; LKV.res = {}; LKV.pending = new Set(); LKV.bulk = null; renderMain(); const q = $('lkQ'); if(q){ q.value = ''; q.focus(); } },
   lookEnt:id => { const {k, v} = entSplit(id); lookGo(k, v); },
   lookHist:(id, v) => { const h = (DB.intel.lookHist || [])[+v]; if(h) lookGo(h.k, h.v); },
   lookHistDel:(id, v) => { DB.intel.lookHist.splice(+v, 1); mutate('removed an investigation from history'); renderMain(); },

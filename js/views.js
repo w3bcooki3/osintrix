@@ -200,16 +200,16 @@ function caseOverview(c, D){
   const key = D.entries.filter(e => e.starred || e.priority === 'critical').slice(0, 6);
   const beacon = [...D.ents.values()].map(e => ({e, b:E.beaconOf(e.recs.map(r => r.ts))})).find(x => x.b && x.b.regular && x.e.k === 'hostport');
   return `<div class="scroll"><div class="page">
-    ${typeof activityCard === 'function' ? activityCard(c) : ''}
-    ${typeof linksCard === 'function' ? linksCard(c) : ''}
     ${c.scope ? `<p style="margin:0 0 20px;max-width:880px;color:var(--text-2);font-size:calc(15.5px * var(--ts,1));line-height:1.65">${esc(c.scope)}</p>` : ''}
-    ${typeof cpCard === 'function' ? cpCard(c) : ''}
-    <div class="stats">
+    ${typeof activityCard === 'function' ? activityCard(c) : ''}
+    <div class="stats" style="margin-bottom:18px">
       ${stat('layers','var(--accent)', D.entries.length, 'Vault entries', byGroup.slice(0, 2).map(([g, n]) => n + ' ' + GROUPS.find(x => x[0] === g)[1].toLowerCase()).join(' · '), caseHash(c.id,'vault'))}
       ${stat('clock','var(--amber)', D.recs.length, 'Evidence records', D.recs.filter(r => r.ts).length + ' on the timeline', caseHash(c.id,'timeline'))}
       ${stat('shield-alert','var(--red)', D.entries.filter(e => entryVerdict(e) === 'malicious').length, 'Malicious', 'judged in this case', caseHash(c.id,'vault'))}
       ${stat('list-checks','var(--green)', done + '/' + leads.length, 'Questions answered', leads.length - done + ' still open', caseHash(c.id,'questions'))}
     </div>
+    ${typeof cpCard === 'function' ? cpCard(c) : ''}
+    ${(l => l ? `<div style="margin-top:18px">${l}</div>` : '')(typeof linksCard === 'function' ? linksCard(c) : '')}
     <div class="grid cols-main" style="margin-top:18px">
       <div class="stack">
         <a class="card mapcard" href="${caseHash(c.id,'graph')}"><header><h3>Case map</h3><span class="t3">${D.entries.length} entries · ${D.links.length} relationships</span><span class="btn sm ghost" style="margin-left:auto">Open graph ${ico('chevron-right','sm')}</span></header><div class="body">${caseMap(c.id, 720, 260)}</div></a>

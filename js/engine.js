@@ -154,7 +154,7 @@ const PATTERNS = [
   ['sid',/\bS-1-(?:\d{1,10}-){1,14}\d{1,10}\b/g],
   ['social',/\b(?:https?:\/\/)?(?:www\.|m\.|mobile\.|old\.)?(?:twitter\.com|x\.com|instagram\.com|facebook\.com|fb\.com|tiktok\.com|github\.com|gitlab\.com|t\.me|telegram\.me|reddit\.com|linkedin\.com|youtube\.com|threads\.net|pinterest\.com|medium\.com|twitch\.tv|vk\.com|keybase\.io|bsky\.app|snapchat\.com|soundcloud\.com|steamcommunity\.com|hackerone\.com|patreon\.com|onlyfans\.com)\/[^\s"'<>()\[\]]+/gi],
   /* a URL may hold balanced brackets (Wikipedia pages: /wiki/Foo_(bar)) and an IPv6 host in square brackets; an ellipsis ends it */
-  ['url',/\bhttps?:\/\/(?:\[[0-9a-f:.]+\](?::\d{1,5})?(?:\/(?:[^\s"'<>()\[\]…]|\([^\s"'<>()\[\]…]*\))*)?|(?:[^\s"'<>()\[\]…]|\([^\s"'<>()\[\]…]*\))+)/gi],
+  ['url',/\bhttps?:\/\/(?:\[[0-9a-f:.]+\](?::\d{1,5})?(?:\/(?:[^\s"'<>()\[\]…|`]|\([^\s"'<>()\[\]…|`]*\))*)?|(?:[^\s"'<>()\[\]…|`]|\([^\s"'<>()\[\]…|`]*\))+)/gi],
   ['mac',/\b(?:[0-9a-f]{2}[:-]){5}[0-9a-f]{2}\b|\b(?:[0-9a-f]{4}\.){2}[0-9a-f]{4}\b/gi],
   ['ipv6',/(?<![\w:.])(?:[0-9a-f]{1,4}:(?::?[0-9a-f]{1,4}){0,7}::?|::)(?:[0-9a-f]{1,4}(?::[0-9a-f]{1,4}){0,7})?(?![\w:.])/gi],
   ['phone',/(?:\btel:|(?:\b(?:phone|tel|mobile|cell|whats\s?app|call|fax|contact)\b[^\d+\n]{0,12}))?\+\d{1,3}[\s.-]?\(?\d{1,4}\)?(?:[\s.-]?\d{2,5}){1,4}\b|\b(?:phone|tel|mobile|cell|whats\s?app|call(?: me)?|fax)\b[^\d\n]{0,12}\(?\d{2,5}\)?(?:[\s.-]?\d{2,5}){1,4}\b/gi],
