@@ -1415,7 +1415,7 @@ test('generators: real-world names (accents, apostrophes, particles, double-barr
   for(const w of [1024, 1280, 1440]){ await page.setViewportSize({ width: w, height: 800 }); await page.evaluate(() => { UI.labTab = 'gen'; go('#/lab'); });
     const rows = await page.evaluate(() => new Set([...document.querySelectorAll('.lt-cat')].map(b => Math.round(b.getBoundingClientRect().top))).size);
     expect(rows, 'width ' + w).toBe(1); await expect(page.locator('.lt-c.on .lt-cur')).toHaveText('Generators'); }
-  expect(await page.locator('.lt-pop [data-act=labTab]').count()).toBe(13);
+  expect(await page.locator('.lt-pop [data-act=labTab]').count()).toBe(17);
   await page.click('.lt-cat[data-v="0"]'); await expect(page.locator('.lt-pop').first()).toBeVisible(); await page.click('.lt-pop [data-v=pcap]');
   await expect(page.locator('.lt-c.on .lt-cur')).toHaveText('PCAP'); await expect(page.locator('.lt-pop').first()).toBeHidden();
   await page.click('.lt-cat[data-v="2"]'); await page.keyboard.press('Escape'); await expect(page.locator('.lt-pop').nth(2)).toBeHidden();

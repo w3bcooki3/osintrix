@@ -65,6 +65,8 @@ function twRisk(x, orig){
   if(x.created && Date.now() - x.created < 90 * 864e5){ s += 30; why.push('registered ' + Math.floor((Date.now() - x.created) / 864e5) + ' days ago'); }
   if(x.parked){ s -= 20; why.push('parked'); }
   if(/homoglyph|idn|bitsquat/.test(x.kind)){ s += 10; why.push('hard to spot'); }
+  if(x.certFirst && Date.now() - x.certFirst < 30 * 864e5){ s += 20; why.push('certificate issued ' + Math.max(0, Math.floor((Date.now() - x.certFirst) / 864e5)) + ' days ago'); }
+  if(x.isNew){ s += 10; why.push('new since the last check'); }
   if(orig && orig.ips && x.ips.some(ip => orig.ips.includes(ip))){ s -= 25; why.push('same servers as the original — likely owned by the same company'); }
   return {s:Math.max(0, Math.min(100, s)), why};
 }
@@ -78,11 +80,14 @@ function labTwist(){
       ${L.length ? `<button class="btn" type="button" data-act="twCheck" ${dnsOn ? '' : 'disabled'}>${ico('radar','sm')}${T.running ? 'Checking ' + done + ' of ' + L.length + '…' : done ? 'Check again' : 'Check which exist'}</button>${T.running ? `<button class="btn ghost" type="button" data-act="twStop">Stop</button>` : ''}` : ''}</form>
     ${L.length && !dnsOn ? `<div class="ti-relay">${ico('wifi-off','sm')}<span>Checking sends each candidate name to Google DNS (<span class="mono">dns.google</span>). Switch on the DNS source to allow it${rdOn ? '' : ' — and RDAP to see how new each one is'}.</span><button class="btn sm" data-act="twDnsOn">Allow Google DNS${rdOn ? '' : ' and RDAP'}</button></div>` : ''}
     ${L.length ? `<p class="t3" style="margin:4px 0 12px">${L.length} candidates — ${kinds.slice(0, 8).map(([k, n]) => esc(TW_NAME[k] || k) + ' ' + n).join(' · ')}</p>` : '<p class="t3">Enter a domain you want to protect — or one from a case — to see how it could be imitated.</p>'}
+    ${(W => { const ks = Object.keys(W).sort((a, b) => W[b].at - W[a].at); if(!ks.length) return ''; const cur = W[T.d];
+      return `<div class="tw-watch">${cur && !done ? `<p class="small" style="margin:0 0 6px">${ico('eye','sm')} Checked before on ${esc(new Date(cur.at).toISOString().slice(0, 10))} — ${cur.list.length} existed. <b>Check which exist</b> again and new ones are marked.</p>` : T.since && done && !T.running ? `<p class="small" style="margin:0 0 6px">${ico('eye','sm')} Compared with the check on ${esc(new Date(T.since).toISOString().slice(0, 10))}: <b>${L.filter(x => x.isNew).length} new</b>.</p>` : ''}
+        <div class="wrap"><span class="t3 small">Watched:</span>${ks.slice(0, 12).map(k => `<button class="chip" data-act="twWatch" data-v="${esc(k)}" aria-pressed="${k === T.d}">${esc(k)} <span class="t3">${esc(new Date(W[k].at).toISOString().slice(5, 10))}</span></button>`).join('')}</div></div>`; })(DB.prefs.twSeen && typeof DB.prefs.twSeen === 'object' ? DB.prefs.twSeen : {})}
     ${T.running || done ? `<div class="lk-prog" role="progressbar" aria-label="Checking look-alikes" aria-valuenow="${Math.round(done / Math.max(1, L.length) * 100)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${Math.round(done / Math.max(1, L.length) * 100)}%"></i></div>` : ''}
     ${reg.length ? `<div class="wrap" style="margin:12px 0 8px"><b>${reg.length} exist</b><span class="t3">${reg.filter(x => x.mx.length).length} can receive mail · ${reg.filter(x => x.created && Date.now() - x.created < 90 * 864e5).length} registered in the last 90 days</span><span class="sp"></span>
         <button class="btn sm" data-act="twAdd">${ico('plus','sm')}Add the risky ones to ${esc(caseNm(theCase()))}</button>${casePick()}<button class="btn sm ghost" data-act="twCsv">${ico('download','sm')}CSV</button></div>
       <table class="tbl tw-tbl"><thead><tr><th>Domain</th><th>How</th><th class="n">Risk</th><th class="hide-m">Why</th><th class="hide-m">Address · mail</th><th></th></tr></thead><tbody>
-        ${reg.slice(0, 150).map(x => `<tr><td><span class="mono">${esc(x.show)}</span>${x.show !== x.d ? `<br><small class="mono t3">${esc(x.d)}</small>` : ''}</td><td class="t2">${esc(TW_NAME[x.kind] || x.kind)}</td><td class="n"><b style="color:${x.r.s >= 70 ? 'var(--red)' : x.r.s >= 45 ? 'var(--amber)' : 'var(--text-2)'}">${x.r.s}</b></td>
+        ${reg.slice(0, 150).map(x => `<tr><td>${x.isNew ? '<span class="chip sq red">new</span> ' : ''}<span class="mono">${esc(x.show)}</span>${x.show !== x.d ? `<br><small class="mono t3">${esc(x.d)}</small>` : ''}${x.certs ? `<br><small class="t3">${x.certs} certificate${x.certs > 1 ? 's' : ''}${x.certFirst ? ', latest ' + new Date(x.certFirst).toISOString().slice(0, 10) : ''}</small>` : ''}</td><td class="t2">${esc(TW_NAME[x.kind] || x.kind)}</td><td class="n"><b style="color:${x.r.s >= 70 ? 'var(--red)' : x.r.s >= 45 ? 'var(--amber)' : 'var(--text-2)'}">${x.r.s}</b></td>
           <td class="hide-m t2">${esc(x.r.why.join(', '))}</td><td class="hide-m mono t3">${esc((x.ips[0] || '—') + (x.mx.length ? ' · MX ' + x.mx[0] : ''))}</td><td><button class="iconbtn" data-act="twLook" data-v="${esc(x.d)}" aria-label="Investigate ${esc(x.d)}" title="Investigate">${ico('radar','sm')}</button></td></tr>`).join('')}</tbody></table>`
       : done && !T.running ? `<p class="t2">${ico('check','sm')} None of the ${done} candidates exist${L.some(x => x.err) ? ' (' + L.filter(x => x.err).length + ' could not be checked)' : ''}.</p>` : ''}
     </div></section></div>`;
@@ -91,8 +96,18 @@ async function twRun(){
   const T = UI.tw; if(!T || !T.list) return; T.list.forEach(x => { x.done = false; }); T.running = true; T.sig = {stop:false}; renderMain();
   const S = twSplit(T.d); try{ const j = JSON.parse((await lkFetch('https://dns.google/resolve?name=' + encodeURIComponent(S.full) + '&type=A', {timeout:10000})).text); T.orig = {ips:(j.Answer || []).filter(y => y.type === 1).map(y => y.data)}; }catch(e){ T.orig = {ips:[]}; }
   let t = 0; await twCheck(T.list, () => { if(Date.now() - t > 400){ t = Date.now(); if(UI.labTab === 'twist') renderMain(); } }, T.sig);
+  /* certificates for the ones that exist (CertSpotter, if on): a fresh certificate means a site is being set up */
+  const csP = typeof lkProv === 'function' && lkProv('cs');
+  if(csP && lkOn(csP)) for(const x of T.list.filter(y => y.exists && !y.parked).sort((a, b) => twRisk(b, T.orig).s - twRisk(a, T.orig).s).slice(0, 12)){ if(T.sig.stop) break;
+    try{ const sp = csP.req('domain', x.d, lkSettings().keys.cs || ''), w = lkWire(csP, sp); await lkPace('cs'); const L = JSON.parse((await lkFetch(w.url.replace('include_subdomains=true', 'include_subdomains=false'), {headers:w.headers, noRedirect:w.noRedirect, timeout:20000})).text);
+      if(Array.isArray(L)){ x.certs = L.length; const t = L.map(c => Date.parse(c.not_before || '')).filter(isFinite); x.certFirst = t.length ? Math.max(...t) : 0; } }catch(e){ if(e.code === 429) break; }
+    if(UI.labTab === 'twist') renderMain(); }
+  /* the watch: what exists now that did not at the last check of this domain */
+  const W = DB.prefs.twSeen = DB.prefs.twSeen && typeof DB.prefs.twSeen === 'object' ? DB.prefs.twSeen : {}, prev = W[T.d], now = T.list.filter(x => x.exists).map(x => x.d);
+  if(prev){ const old = new Set(prev.list); for(const x of T.list) x.isNew = x.exists && !old.has(x.d); T.since = prev.at; } else T.since = 0;
+  W[T.d] = {at:Date.now(), list:now}; const ks = Object.keys(W); if(ks.length > 50) delete W[ks.sort((a, b) => W[a].at - W[b].at)[0]]; save();
   T.running = false; if(UI.labTab === 'twist') renderMain();
-  const n = T.list.filter(x => x.exists).length; toast(n ? n + ' look-alike' + (n > 1 ? 's' : '') + ' of ' + T.d + ' exist' : 'No look-alikes of ' + T.d + ' exist');
+  const n = T.list.filter(x => x.exists).length, nn = T.list.filter(x => x.isNew).length; if(nn) return toast(nn + ' new look-alike' + (nn > 1 ? 's' : '') + ' of ' + T.d + ' since ' + new Date(T.since).toISOString().slice(0, 10)); toast(n ? n + ' look-alike' + (n > 1 ? 's' : '') + ' of ' + T.d + ' exist' : 'No look-alikes of ' + T.d + ' exist');
 }
 
 /* ---------- identity pivots ---------- */
@@ -170,6 +185,7 @@ function pivotPlan(k, v){
 }
 const OS_ACTS = {
   twCheck:() => twRun(), twStop:() => { if(UI.tw && UI.tw.sig) UI.tw.sig.stop = true; },
+  twWatch:(id, v) => { if(UI.tw && UI.tw.sig) UI.tw.sig.stop = true; UI.tw = {d:v, list:twGen(v)}; renderMain(); },
   twDnsOn:() => { const S = lkSettings(); S.on.dns = true; S.on.rdap = true; mutate('turned on Google DNS and RDAP lookups'); renderMain(); },
   twLook:(id, v) => lookGo('domain', v),
   twAdd:() => { const L = (UI.tw.list || []).filter(x => x.exists && twRisk(x, UI.tw.orig).s >= 45); let n = 0; L.forEach(x => { if(ctiAddEntry('domain', x.d, 'Look-alike of ' + UI.tw.d + ' (' + (TW_NAME[x.kind] || x.kind) + '): ' + twRisk(x, UI.tw.orig).why.join(', '))) n++; }); mutate('added look-alike domains'); toast(n ? n + ' added to ' + caseNm(theCase()) : 'They are already in ' + caseNm(theCase())); },

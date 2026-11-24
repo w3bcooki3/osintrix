@@ -137,15 +137,15 @@ function ctfWriteups(){
 }
 
 /* ---------- forensics kit ---------- */
-const LAB_TABS = [['file','File inspector','file-search'], ['logs','Log parser','scan-text'], ['pcap','PCAP','network'], ['sqlite','SQLite','database'], ['image','Image','image'], ['email','Email headers','mail'], ['time','Time & IDs','clock-3'], ['hash','Hashes','fingerprint'], ['geo','Coordinates','compass'], ['net','Network','network'], ['gen','Generators','users'], ['twist','Look-alikes','copy'], ['ident','Identity','user']];
+const LAB_TABS = [['file','File inspector','file-search'], ['logs','Log parser','scan-text'], ['pcap','PCAP','network'], ['sqlite','SQLite','database'], ['image','Image','image'], ['email','Email headers','mail'], ['time','Time & IDs','clock-3'], ['hash','Hashes','fingerprint'], ['geo','Coordinates','compass'], ['net','Network','network'], ['gen','Generators','users'], ['twist','Look-alikes','copy'], ['ident','Identity','user'], ['fav','Favicon & page hash','scan-search'], ['kit','Phishing kit','skull'], ['steal','Stealer log','key-round'], ['corp','Company footprint','building-2']];
 /* the tools in three groups, all visible at any width (the bar wraps instead of hiding tools off to the side) */
-const LAB_GROUPS = [['Analyse files', ['file', 'logs', 'pcap', 'sqlite', 'image']], ['Decode', ['email', 'time', 'hash']], ['Investigate', ['geo', 'net', 'gen', 'twist', 'ident']]];
+const LAB_GROUPS = [['Analyse files', ['file', 'image', 'kit', 'steal', 'logs', 'pcap', 'sqlite']], ['Decode', ['email', 'time', 'hash']], ['Investigate', ['corp', 'fav', 'geo', 'net', 'gen', 'twist', 'ident']]];
 /* one line: a button per group showing the tool in use; its tools drop down under it */
 document.addEventListener('click', ev => { if(UI.ltOpen == null || ev.target.closest('.lt-c')) return; UI.ltOpen = null; document.querySelectorAll('.lt-pop').forEach(x => x.hidden = true); document.querySelectorAll('.lt-cat').forEach(b => b.setAttribute('aria-expanded', 'false')); });
 document.addEventListener('keydown', ev => { if(ev.key === 'Escape' && UI.ltOpen != null){ const b = document.querySelector(`.lt-cat[data-v="${UI.ltOpen}"]`); UI.ltOpen = null; document.querySelectorAll('.lt-pop').forEach(x => x.hidden = true); if(b){ b.setAttribute('aria-expanded', 'false'); b.focus(); } } });
 function viewLab(){
   const t = LAB_TABS.some(x => x[0] === UI.labTab) ? UI.labTab : 'file';
-  const body = {file:labFile, logs:labParse, pcap:labPcap, sqlite:labSql, image:labImage, email:labEmail, time:labTime, hash:labHash, geo:labGeo, net:labNet, gen:labGen, twist:labTwist, ident:labIdent}[t]();
+  const body = {file:labFile, logs:labParse, pcap:labPcap, sqlite:labSql, image:labImage, email:labEmail, time:labTime, hash:labHash, geo:labGeo, net:labNet, gen:labGen, twist:labTwist, ident:labIdent, fav:() => typeof labFav === 'function' ? labFav() : '', kit:() => typeof labKit === 'function' ? labKit() : '', steal:() => typeof labSteal === 'function' ? labSteal() : '', corp:() => typeof labFoot === 'function' ? labFoot() : ''}[t]();
   return `<div class="scroll"><div class="page wide">
     ${libHead('Forensics kit', 'Inspect files and images, read email headers, decode timestamps and IDs, identify hashes, find look-alike domains and pivot on identities. Files never leave your browser; online checks use only the sources you switched on.', '', '')}
     <div class="mpick"><label for="labSel" class="ix">Tool</label><select id="labSel" class="gsel bord">${LAB_TABS.map(([k, l]) => `<option value="${k}"${t === k ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
@@ -254,11 +254,23 @@ async function analyseFile(file){
   let iocs = E.extract((txt + '\n' + trTxt).slice(0, 600000)); if(!textFile) iocs = iocs.filter(fileIocOK);
   if(zip && zip.external) iocs = iocs.concat(E.extract(zip.external.map(x => x[1]).join('\n')));
   if(pdf) iocs = iocs.concat(E.extract(pdf.uris.join('\n')));
+  /* the deeper reads (js/forensic.js): every metadata format, how a picture was written, shortcuts, build fingerprints, who packed an archive */
+  const fx = typeof fxJpeg === 'function', meta = typeof metaRead === 'function' ? await metaRead(buf, file.name, file.type).catch(() => null) : null;
+  const jpg = fx && t.ext === 'jpg' ? fxJpeg(buf) : null, thumbB = jpg ? fxExifThumb(buf) : null, lnk = fx && t.ext === 'lnk' ? fxLnk(buf) : null;
+  const pem = fx && pe ? fxPeMore(buf) : null, elfm = fx && elf ? fxElfMore(buf) : null, zipx = fx && t.ext === 'zip' ? fxZip(buf) : null;
+  if(pem) pem.imphash = fxImphash(pe.imports);
+  let thumb = null; if(thumbB) thumb = await fxThumbCompare(thumbB, new Blob([buf], {type:'image/jpeg'})).catch(() => null);
+  if(lnk) iocs = iocs.concat(E.extract([lnk.target, lnk.args, lnk.workdir, lnk.share, lnk.machine].filter(Boolean).join('\n')));
+  let sig = null; if(pe && typeof X5 !== 'undefined'){ try{ const P = X5.pe(buf), sd = P && P.sigs && P.sigs[0], sg = sd && sd.signers[0];
+    if(sd){ await X5.peCheck(P, buf); const who = sg && sg.cert ? (sg.cert.subject.map.O || sg.cert.subject.map.CN || [sg.cert.title])[0] : 'an unknown signer'; sig = sd.fileOk === false ? {ok:false, t:`Signed by ${who}, but the file was changed after signing — the signature no longer covers it.`} : {ok:true, t:`Signed by ${who}${sd.fileOk ? ' — the file matches its signature' : ''}. Open it in Certificates for the whole chain.`}; }
+    else sig = {ok:false, t:'Not signed (no Authenticode signature).'}; }catch(e){} }
+  const nameHint = fx ? fxNameHint(file.name) : null, sun = fx && meta && meta.gps ? fxSunFacts(meta.gps.lat, meta.gps.lon, fxUtcMoment(meta), meta.gps.dir) : null;
+  const strKinds = fx ? fxStrKinds(st) : {};
   const seen = new Set(); iocs = iocs.filter(e => { const k = e.k + ':' + e.v; if(seen.has(k)) return false; seen.add(k); return true; });
   return {name:file.name, size:file.size, lastModified:file.lastModified, type:t, ext, file, bytes:buf,
     mismatch:t.ext && ext && !(t.ext === ext || (t.ext === 'jpg' && /jpe?g/.test(ext)) || (t.ext === 'zip' && /docx|xlsx|pptx|docm|xlsm|pptm|apk|jar|odt|ods|epub|vsix|nupkg|ipa/.test(ext)) || (t.ext === 'tif' && /tiff?/.test(ext)) || (t.ext === 'riff' && /wav|avi|webp/.test(ext)) || (t.ext === 'doc' && /xls|ppt|msi|msg|dot/.test(ext)) || (t.ext === 'exe' && /dll|sys|scr|ocx|cpl|efi/.test(ext)) || (t.ext === 'elf' && /so|ko|o|bin|out/.test(ext)) || t.ext === 'txt' || (t.ext === 'mp4' && /m4a|mov|m4v/.test(ext))),
     md5:buf.length <= 200e6 ? md5(buf) : '', sha1:s1, sha256:s256, entropy:entropy(buf), exif:exif(buf), png:pngInfo(buf), trailing:tr, trailPreview:trTxt.slice(0, 400),
-    c2pa:/c2pa\./.test(txt) ? ((txt.match(/claim_generator[^\n]{0,80}/) || [''])[0].replace(/[^\x20-\x7e]/g, ' ') || 'present') : '',     carve:carve(buf).filter(([o]) => o > 0), strings:st, good:good.length, iocs, flags:findFlags(txt + '\n' + trTxt), head:buf.slice(0, 256), zip, pdf, pe, elf, noise:noise.length > 0};
+    c2pa:/c2pa\./.test(txt) ? ((txt.match(/claim_generator[^\n]{0,80}/) || [''])[0].replace(/[^\x20-\x7e]/g, ' ') || 'present') : '',     carve:t.ext === 'zip' ? [] : carve(buf).filter(([o]) => o > 0), strings:st, meta, jpg, thumb, lnk, pem, elfm, zipx, sig, nameHint, sun, strKinds, good:good.length, iocs, flags:findFlags(txt + '\n' + trTxt), head:buf.slice(0, 256), zip, pdf, pe, elf, noise:noise.length > 0};
 }
 const fmtBytes = n => { n = +n || 0; const t = (v, d) => String(+v.toFixed(d)); return n < 1024 ? n + ' B' : n < 1048576 ? t(n / 1024, 1) + ' KB' : n < 1073741824 ? t(n / 1048576, 2) + ' MB' : t(n / 1073741824, 2) + ' GB'; };
 function hexdump(b){ const L = []; for(let o = 0; o < b.length; o += 16){ const row = b.slice(o, o + 16); L.push(o.toString(16).padStart(8, '0') + '  ' + [...row].map(x => x.toString(16).padStart(2, '0')).join(' ').padEnd(48) + '  ' + [...row].map(x => x >= 32 && x < 127 ? String.fromCharCode(x) : '.').join('')); } return L.join('\n'); }
@@ -272,7 +284,7 @@ function fileStructure(r){
       ${z.ole.length ? `<p class="t3" style="font-size:calc(12.5px * var(--ts,1));margin:10px 0 0">Embedded objects: ${esc(z.ole.slice(0, 8).join(', '))}</p>` : ''}</div></section>`; }
     h += `<section class="card"><header><h3>${ico('box','sm')} Archive contents</h3><span class="t3">${z.files.length} files${z.encrypted ? ' · password-protected' : ''}</span></header>
       ${z.comment ? `<div class="body" style="padding-bottom:0">${kvr('Comment', z.comment, true)}</div>` : ''}
-      <div class="ziplist">${z.files.slice(0, 300).map(f => `<div><span class="mono">${esc(f.name)}</span>${f.enc ? `<span class="pill" style="--c:var(--amber)">${ico('lock','sm')}encrypted</span>` : ''}<span class="t3">${fmtBytes(f.size)}</span><span class="t3 hide-m">${isFinite(f.date) ? new Date(f.date).toISOString().slice(0, 16).replace('T', ' ') : ''}</span></div>`).join('')}</div></section>`; }
+      <div class="ziplist">${z.files.slice(0, 300).map(f => `<div><span class="mono">${esc(f.name)}</span>${f.enc ? `<span class="pill" style="--c:var(--amber)">${ico('lock','sm')}encrypted</span>` : ''}<span class="t3">${fmtBytes(f.size)}</span><span class="t3 hide-m">${isFinite(f.date) ? new Date(f.date).toISOString().slice(0, 16).replace('T', ' ') : ''}</span>${!f.enc && f.size && !/\/$/.test(f.name) && (f.method === 0 || f.method === 8) ? `<button class="btn xs ghost" data-act="fxZipOpen" data-v="${esc(f.name)}" aria-label="Inspect ${esc(f.name)}">${ico('file-search','sm')}Inspect</button>` : ''}</div>`).join('')}</div></section>`; }
   if(r.pdf){ const p = r.pdf, risky = ['/JS','/JavaScript','/OpenAction','/AA','/Launch','/EmbeddedFile','/XFA'].filter(k => p.keys[k]);
     h += `<section class="card"><header><h3>${ico('file-text','sm')} PDF structure</h3><span class="t3">PDF ${esc(p.version)}${p.updates ? ' · ' + p.updates + ' incremental update' + (p.updates > 1 ? 's' : '') : ''}</span></header><div class="body">
       ${Object.entries(p.info).map(([k, v]) => kvr(k, v)).join('')}
@@ -304,13 +316,13 @@ function labFile(){
     <span class="drop-feat"><i>Magic bytes</i><i>MD5 · SHA-1 · SHA-256</i><i>EXIF & GPS</i><i>Office & PDF metadata</i><i>Macros & active content</i><i>ZIP listing</i><i>PE / ELF headers</i><i>YARA scan</i><i>Appended data</i><i>Flag finder</i></span></label><div class="drop-hist"><button class="btn sm ghost" data-act="rcShow" data-v="labFile">${ico('history','sm')}History<span class="crt-cnt">${recentN('labFile')}</span></button><span class="t3 small">Files you open are kept in this browser (up to 50 MB each) so a refresh does not lose them.</span></div>`;
   if(r.busy) return `<div class="card" style="padding:40px;text-align:center">${ico('refresh-cw','sm spin')} Reading ${esc(r.name)}…</div>`;
   const eh = r.entropy, ehl = eh > 7.5 ? ['Very high — compressed or encrypted','var(--red)'] : eh > 6 ? ['High — packed or compressed data likely','var(--amber)'] : ['Normal','var(--green)'];
-  const q = (UI.strq || '').toLowerCase(), showAll = !!UI.strAll, st = r.strings.filter(s => (showAll || s[3]) && (!q || s[1].toLowerCase().includes(q))).slice(0, 500);
+  const q = (UI.strq || '').toLowerCase(), showAll = !!UI.strAll, sk = UI.fxStrK || '', st = r.strings.filter(s => (showAll || s[3] || (sk && s[4] && s[4].includes(sk))) && (!q || s[1].toLowerCase().includes(q)) && (!sk || (s[4] && s[4].includes(sk)))).slice(0, 500);
   const hashRow = (l, v) => v ? `<div class="kv"><span>${l}</span><code>${esc(v)}</code><button class="iconbtn" data-act="flagCopy" data-v="${esc(v)}" aria-label="Copy ${l}">${ico('copy','sm')}</button></div>` : '';
   const G = r.exif && r.exif.GPS, isImg = /^(png|jpg|gif|bmp|riff)$/.test(r.type.ext);
   return `${flagBox(r.flags)}${typeof triageCard === 'function' ? triageCard(r) : ''}
   <div class="fi-grid">
     <div class="fi-side">
-    <section class="card fi-sum"><header><span class="fi-ic">${ico('file-digit')}</span><div style="min-width:0;flex:1"><h3>${esc(r.name)}</h3><p class="t3">${fmtBytes(r.size)} · modified ${esc(new Date(r.lastModified).toISOString().slice(0, 16).replace('T', ' '))} UTC</p></div>
+    <section class="card fi-sum"><header><span class="fi-ic">${ico('file-digit')}</span><div style="min-width:0;flex:1"><h3>${esc(r.name)}</h3><p class="t3">${fmtBytes(r.size)} · modified ${esc(new Date(r.lastModified).toISOString().slice(0, 16).replace('T', ' '))} UTC${r.parent ? ' · taken out of ' + esc(r.parent) : ''}</p></div>
       <button class="btn sm ghost" data-act="rcShow" data-v="labFile">${ico('history','sm')}History<span class="crt-cnt">${recentN('labFile')}</span></button><button class="btn sm" data-act="labClear">${ico('x','sm')}Another file</button></header>
       <div class="body">
         <div class="kv"><span>Detected type</span><b>${esc(r.type.name)}</b></div>
@@ -324,8 +336,10 @@ function labFile(){
     ${yaraPanel(r)}
     </div>
     <div class="fi-side">
+      ${typeof fxPicCard === 'function' && (isImg || r.nameHint || r.sun) ? fxPicCard({jpg:r.jpg, png:r.png, thumb:r.thumb}, r.nameHint, r.sun) : ''}
+      ${r.lnk ? fxLnkCard(r.lnk) : ''}${r.pem ? fxPeCard(r.pem, r.pe, r.sig) : ''}${r.elfm ? fxElfCard(r.elfm) : ''}${r.zipx ? fxZipCard(r.zipx) : ''}
       ${fileStructure(r)}
-      ${r.exif ? `<section class="card"><header><h3>${ico('image','sm')} EXIF metadata</h3></header><div class="body">${Object.entries(r.exif).filter(([k]) => k !== 'GPS').map(([k, v]) => `<div class="kv"><span>${esc(k)}</span><b>${esc(Array.isArray(v) ? v.join(', ') : v)}</b></div>`).join('')}
+      ${typeof fxMetaCard === 'function' && r.meta && (r.meta.fields.length || /picture/.test(r.meta.fmt || '')) ? fxMetaCard(r.meta) : r.exif ? `<section class="card"><header><h3>${ico('image','sm')} EXIF metadata</h3></header><div class="body">${Object.entries(r.exif).filter(([k]) => k !== 'GPS').map(([k, v]) => `<div class="kv"><span>${esc(k)}</span><b>${esc(Array.isArray(v) ? v.join(', ') : v)}</b></div>`).join('')}
         ${G ? `<div class="gpsbox"><div>${ico('map-pin','sm')}<b>${G.lat}, ${G.lon}</b>${G.alt != null ? `<span class="t3"> · ${G.alt} m</span>` : ''}</div><div class="pivots">${geoLinks(G.lat, G.lon).map(([n, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(n)}${ico('arrow-up-right','sm')}</a>`).join('')}</div></div>` : '<p class="t3" style="margin:8px 0 0;font-size:calc(13px * var(--ts,1))">No GPS tags.</p>'}</div></section>` : ''}
       ${r.c2pa ? `<section class="card"><header><h3>${ico('shield-check','sm')} Content Credentials (C2PA)</h3></header><div class="body"><p style="margin:0 0 8px;font-size:calc(13.5px * var(--ts,1))">This file carries a signed provenance manifest — who or what created or edited it. Readable parts appear in the strings below (look for <span class="mono">claim_generator</span>, <span class="mono">softwareAgent</span>).</p><div class="pivots"><a href="https://contentcredentials.org/verify" target="_blank" rel="noopener noreferrer">Verify on contentcredentials.org${ico('arrow-up-right','sm')}</a></div></div></section>` : ''}
       ${r.png ? `<section class="card"><header><h3>${ico('image','sm')} PNG structure</h3></header><div class="body"><div class="kv"><span>Size</span><b>${r.png.w} × ${r.png.h}</b></div><div class="kv"><span>Chunks</span><code style="white-space:normal">${esc([...new Set(r.png.chunks)].join(' '))}</code></div>
@@ -339,9 +353,10 @@ function labFile(){
   <div class="fi-grid2">
     <section class="card"><header><h3>Strings</h3><span class="t3">${r.good} readable${r.strings.length !== r.good ? ' · ' + r.strings.length + ' total' : ''}</span><span style="flex:1"></span>
       <label class="chk"><input type="checkbox" data-act="strAll" ${showAll ? 'checked' : ''}> Include noise</label><div class="search-in" style="max-width:220px">${ico('search')}<label class="sr" for="strq">Filter strings</label><input id="strq" class="inp" placeholder="Filter…" value="${esc(UI.strq || '')}"></div></header>
-      <pre class="strs">${st.map(([o, s, u, g]) => `<span class="o">${o.toString(16).padStart(8, '0')}</span>${u ? '<span class="u">U</span>' : ' '} ${g ? '' : '<span class="nz">'}${esc(s.length > 300 ? s.slice(0, 300) + '…' : s)}${g ? '' : '</span>'}`).join('\n') || (showAll ? 'No strings match.' : 'No readable strings. Tick “Include noise” to see every printable run.')}</pre></section>
-    <section class="card"><header><h3>First 256 bytes</h3></header><pre class="hexd">${esc(hexdump(r.head))}</pre></section>
-  </div>`;
+      ${r.strKinds && Object.keys(r.strKinds).length ? `<div class="wrap fx-sk">${FX_SK.filter(([k]) => r.strKinds[k]).map(([k, l]) => `<button class="chip" data-act="fxStrK" data-v="${k}" aria-pressed="${sk === k}">${esc(l)}<span class="crt-cnt">${r.strKinds[k]}</span></button>`).join('')}</div>` : ''}
+      <pre class="strs">${st.map(([o, s, u, g, ks]) => `<span class="o">${o.toString(16).padStart(8, '0')}</span>${u ? '<span class="u">U</span>' : ' '} ${g ? '' : '<span class="nz">'}${esc(s.length > 300 ? s.slice(0, 300) + '…' : s)}${g ? '' : '</span>'}${ks && ks.includes('b64') && fxB64(s) ? ` <button class="lnk small" data-act="fxB64" data-v="${esc(s.slice(0, 20000))}">decode</button>` : ''}`).join('\n') || (sk ? 'No strings of this kind.' : showAll ? 'No strings match.' : 'No readable strings. Tick “Include noise” to see every printable run.')}</pre></section>
+    ${typeof fxHexCard === 'function' && r.bytes ? '' : `<section class="card"><header><h3>First 256 bytes</h3></header><pre class="hexd">${esc(hexdump(r.head))}</pre></section>`}
+  </div>${typeof fxHexCard === 'function' && r.bytes ? fxHexCard(r) : ''}`;
 }
 function bindLab(){
   const inp = $('labIn'), d = $('labDrop');
@@ -360,14 +375,18 @@ function bindLab(){
   deb('genName', v => { UI.genName = v; $('genOut').innerHTML = genOut(); }, 100); deb('genNicks', v => { UI.genNicks = v; $('genOut').innerHTML = genOut(); }, 100); deb('genQ', v => { UI.genQ = v; $('genOut').innerHTML = genOut(); }, 80); for(const [id, k] of [['genPers', 'genPers'], ['genAllP', 'genAllP']]){ const x = $(id); if(x) x.onchange = () => { UI[k] = x.checked; $('genOut').innerHTML = genOut(); }; } deb('genNums', v => { UI.genNums = v; $('genOut').innerHTML = genOut(); }, 100); deb('genDom', v => { UI.genDom = v; $('genOut').innerHTML = genOut(); }, 100);
   if(UI.macIn) macOut(UI.macIn);
   const sq = $('strq'); if(sq) sq.oninput = () => { UI.strq = sq.value; clearTimeout(bindLab.s); bindLab.s = setTimeout(() => { renderMain(); const x = $('strq'); if(x){ x.focus(); x.setSelectionRange(x.value.length, x.value.length); } }, 200); };
-  bindImage(); bindParse(); bindPcap(); bindSql();
+  const mv = $('fxMacV'), L0 = UI.labFile && UI.labFile.lnk; if(mv && L0 && L0.mac && typeof macVendor === 'function') macVendor(L0.mac).then(v => { if(!v || !$('fxMacV')) return; $('fxMacV').innerHTML = `<div class="kv"><span>Network card maker</span><b>${esc(v.vendor || (v.local ? 'locally assigned (randomised or virtual)' : 'not in the vendor list'))}</b>${/vmware|virtualbox|oracle|parallels|xensource|microsoft corp|qemu|red hat/i.test(v.vendor || '') ? '<span class="t3">a virtual machine — the builder works in a VM</span>' : ''}</div>`; }).catch(() => {});
+  const hg = $('fxHexGo'); if(hg) hg.onkeydown = e => { if(e.key !== 'Enter') return; const v = hg.value.trim(), n = /^0x/i.test(v) ? parseInt(v, 16) : /^[0-9a-f]*[a-f][0-9a-f]*$/i.test(v) ? parseInt(v, 16) : parseInt(v, 10); if(isFinite(n) && n >= 0){ UI.fxHexAt = n; UI.fxHexHit = null; renderMain(); } };
+  const hf = $('fxHexFind'); if(hf) hf.onkeydown = e => { if(e.key === 'Enter'){ e.preventDefault(); FX_ACTS.fxHexFind(); } };
+  bindImage(); bindParse(); bindPcap(); bindSql(); if(typeof bindFav === 'function') bindFav(); if(typeof bindKit === 'function') bindKit(); if(typeof bindSteal === 'function') bindSteal();
   if(typeof labRestore === 'function') labRestore();
   const tb = document.querySelector('.labtabs [aria-selected=true]'), nav = tb && tb.parentElement; if(nav && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = Math.max(0, tb.offsetLeft - nav.clientWidth / 2 + tb.offsetWidth / 2);
 }
 async function labLoad(f, keep = true){
   if(f.size > 200 * 1048576) return toast('That file is over 200 MB — too big to inspect in a browser tab');
   UI.labFile = {busy:true, name:f.name}; UI.strq = ''; renderMain();
-  try{ UI.labFile = await analyseFile(f); if(keep) recentKeepFile('labFile', f); }catch(e){ UI.labFile = null; toast('Could not read that file'); }
+  const parent = !keep && UI.fxParent ? UI.fxParent : ''; UI.fxParent = ''; UI.fxHexAt = 0; UI.fxHexHit = null; UI.fxHexMsg = ''; UI.fxStrK = '';
+  try{ UI.labFile = await analyseFile(f); UI.labFile.parent = parent; if(keep) recentKeepFile('labFile', f); }catch(e){ UI.labFile = null; toast('Could not read that file'); }
   renderMain();
 }
 function labSummary(r){
@@ -378,6 +397,13 @@ function labSummary(r){
     r.zip && r.zip.office ? 'Office: ' + Object.entries(r.zip.office).filter(([, v]) => v).map(([k, v]) => k + '=' + v).join('; ') : '', r.zip && r.zip.macros.length ? 'MACROS: ' + r.zip.macros.join(', ') : '', r.zip && r.zip.external.length ? 'External links: ' + r.zip.external.map(x => x[1]).join(' ') : '',
     r.zip ? 'Archive: ' + r.zip.files.length + ' files' + (r.zip.encrypted ? ' (encrypted)' : '') : '', r.pdf ? 'PDF: ' + Object.entries(r.pdf.info).map(([k, v]) => k + '=' + v).join('; ') + ' · ' + Object.entries(r.pdf.keys).filter(([, n]) => n).map(([k, n]) => k + ' ' + n).join(', ') : '',
     r.pe ? `PE: ${r.pe.kind}, ${r.pe.machine}, compiled ${r.pe.compiled}${r.pe.packers.length ? ', packed (' + r.pe.packers.join(', ') + ')' : ''}${r.pe.suspicious.length ? ', imports ' + r.pe.suspicious.join(' ') : ''}` : '',
+    r.meta && typeof metaLines === 'function' && metaLines(r.meta) ? '— Metadata —\n' + metaLines(r.meta) : '',
+    r.jpg ? `JPEG: ${r.jpg.stdTables ? 'standard tables' : 'custom tables'}, quality ~${r.jpg.quality}, ${r.jpg.subsampling || ''}${r.jpg.icc ? ', profile ' + r.jpg.icc.desc : ''}; segments ${r.jpg.segs.join(' ')}` : '', r.thumb ? 'Embedded thumbnail: ' + r.thumb.t : '', r.nameHint ? 'File name: ' + r.nameHint.what + (r.nameHint.when ? ' (' + r.nameHint.when + ')' : '') : '',
+    r.sun && r.sun.S ? `Sun at ${new Date(r.sun.t).toISOString()}: azimuth ${r.sun.S.az}°, elevation ${r.sun.S.el}°${r.sun.verdict ? ' — ' + r.sun.verdict.t : ''}` : '',
+    r.lnk ? `Shortcut target: ${r.lnk.target}${r.lnk.args ? ' ' + r.lnk.args.trim() : ''}\nMachine: ${r.lnk.machine || '?'} · MAC ${r.lnk.mac || '?'} · volume ${r.lnk.serial || '?'}${r.lnk.workdir ? ' · start in ' + r.lnk.workdir : ''}` : '',
+    r.pem ? [`Imphash: ${r.pem.imphash || '-'}`, r.pem.rich ? 'Rich header hash: ' + r.pem.rich.hash : '', ...r.pem.pdb.map(p => 'PDB: ' + p.path), ...Object.entries(r.pem.version).map(([k, v]) => k + ': ' + v), r.sig ? r.sig.t : ''].filter(Boolean).join('\n') : '',
+    r.elfm ? [r.elfm.needed.length ? 'Libraries: ' + r.elfm.needed.join(' ') : '', r.elfm.comment ? 'Compiler: ' + r.elfm.comment : '', r.elfm.go ? 'Go: ' + r.elfm.go + (r.elfm.goPath ? ' ' + r.elfm.goPath : '') : '', r.elfm.buildId ? 'Build ID: ' + r.elfm.buildId : ''].filter(Boolean).join('\n') : '',
+    r.zipx ? `Packed on ${r.zipx.os.join(', ')}${r.zipx.uids.length ? ', Unix user:group ' + r.zipx.uids.join(' ') : ''}${r.zipx.tz ? ', time zone ' + r.zipx.tz.txt : ''}` : '',
     r.yara && r.yara.some(x => x.match) ? 'YARA matches: ' + r.yara.filter(x => x.match).map(x => x.rule).join(', ') : '',
     r.flags.length ? 'Flags: ' + r.flags.join(' ') : '', r.iocs.length ? 'Indicators: ' + r.iocs.slice(0, 40).map(e => e.v).join(' ') : ''].filter(Boolean).join('\n');
 }
@@ -477,17 +503,24 @@ function labGeo(){
 function labImage(){
   const I = UI.img;
   if(!I) return `<label class="drop" id="imgDrop" tabindex="0"><input type="file" id="imgIn" accept="image/*" class="sr">${ico('image')}<b>Drop an image, or click to choose</b>
-    <span>Colour channels, bit planes, least-significant-bit extraction, QR codes and reverse image search — the usual steganography and geolocation checks.</span>
-    <span class="drop-feat"><i>R · G · B · Alpha</i><i>Bit planes 0–7</i><i>LSB text</i><i>QR / barcode</i><i>Invert</i><i>Error level (ELA)</i><i>Look-alikes</i><i>Reverse search</i></span></label><div class="drop-hist"><button class="btn sm ghost" data-act="rcShow" data-v="image">${ico('history','sm')}History<span class="crt-cnt">${recentN('image')}</span></button><span class="t3 small">Files you open are kept in this browser (up to 50 MB each) so a refresh does not lose them.</span></div>`;
+    <span>Verification and steganography: every metadata format, how the JPEG was written, the hidden thumbnail, where the sun was, noise, copied areas, colour channels, bit planes, LSB data and QR codes.</span>
+    <span class="drop-feat"><i>Metadata (EXIF · XMP · IPTC)</i><i>Encoder &amp; quality</i><i>Thumbnail check</i><i>Sun &amp; shadows</i><i>Error level</i><i>Noise</i><i>Copy-move</i><i>Levels</i><i>Bit planes · LSB</i><i>QR</i><i>Look-alikes</i></span></label><div class="drop-hist"><button class="btn sm ghost" data-act="rcShow" data-v="image">${ico('history','sm')}History<span class="crt-cnt">${recentN('image')}</span></button><span class="t3 small">Files you open are kept in this browser (up to 50 MB each) so a refresh does not lose them.</span></div>`;
   if(I.busy) return `<div class="card" style="padding:40px;text-align:center">${ico('refresh-cw','sm spin')} Loading image…</div>`;
+  const fxCards = typeof fxMetaCard === 'function' ? fxPicCard({jpg:I.jpg, png:I.png, thumb:I.thumb}, I.nameHint, I.sun) + fxMetaCard(I.meta) : '';
+  if(I.nodecode) return `<div class="imgwrap"><section class="card imgview"><header><h3>${esc(I.name)}</h3><span style="flex:1"></span><button class="btn sm" data-act="imgClear">${ico('x','sm')}Another image</button></header>
+      <div class="body"><div class="note amber" style="margin:0"><span class="ic">${ico('info','sm')}</span><div>This browser cannot draw ${esc((I.meta && I.meta.fmt || 'these').replace(/ picture$/, ''))} pictures, so the pixel views are not available. Everything read from the file itself is here. To use the pixel views, export it as JPEG or PNG (Photos → Export, or <span class="mono">sips -s format jpeg</span> on a Mac).</div></div></div></section>
+      <div class="fi-side">${fxCards}</div></div>`;
   const ch = UI.imgCh || 'rgb', bit = UI.imgBit === undefined ? 'all' : UI.imgBit, L = I.lsb || {};
   return `<div class="imgwrap">
     <section class="card imgview"><header><h3>${esc(I.name)}</h3><span class="t3">${I.w} × ${I.h}${I.scaled ? ' · previewed at 4096 px' : ''}</span><span style="flex:1"></span><button class="btn sm ghost" data-act="rcShow" data-v="image">${ico('history','sm')}History<span class="crt-cnt">${recentN('image')}</span></button><button class="btn sm" data-act="imgClear">${ico('x','sm')}Another image</button></header>
-      <div class="imgtools"><div class="seg">${[['rgb','Colour'],['r','Red'],['g','Green'],['b','Blue'],['a','Alpha'],['gray','Grey'],['inv','Invert'],['ela','Error level']].map(([k, l]) => `<button data-act="imgCh" data-v="${k}" aria-pressed="${ch === k}">${l}</button>`).join('')}</div>
-        ${ch !== 'rgb' && ch !== 'inv' && ch !== 'ela' ? `<div class="seg bits"><button data-act="imgBit" data-v="all" aria-pressed="${bit === 'all'}">All bits</button>${[7,6,5,4,3,2,1,0].map(b => `<button data-act="imgBit" data-v="${b}" aria-pressed="${bit === b}" title="Bit plane ${b}">${b}</button>`).join('')}</div>` : ''}</div>
+      <div class="imgtools"><div class="seg">${[['rgb','Colour'],['r','Red'],['g','Green'],['b','Blue'],['a','Alpha'],['gray','Grey'],['inv','Invert']].map(([k, l]) => `<button data-act="imgCh" data-v="${k}" aria-pressed="${ch === k}">${l}</button>`).join('')}</div>
+        <div class="seg">${[['ela','Error level'],['noise','Noise'],['lev','Levels'],['clone','Copy-move']].map(([k, l]) => `<button data-act="imgCh" data-v="${k}" aria-pressed="${ch === k}">${l}</button>`).join('')}</div>
+        <div class="seg zoom" aria-label="Zoom">${[['fit','Fit'],['1','1:1'],['2','2×'],['4','4×']].map(([k, l]) => `<button data-act="imgZoom" data-v="${k}" aria-pressed="${(UI.imgZoom || 'fit') === k}">${l}</button>`).join('')}</div>
+        ${!/^(rgb|inv|ela|noise|lev|clone)$/.test(ch) ? `<div class="seg bits"><button data-act="imgBit" data-v="all" aria-pressed="${bit === 'all'}">All bits</button>${[7,6,5,4,3,2,1,0].map(b => `<button data-act="imgBit" data-v="${b}" aria-pressed="${bit === b}" title="Bit plane ${b}">${b}</button>`).join('')}</div>` : ''}</div>
       <div class="imgcanvas"><canvas id="imgCv"></canvas></div>
-      <p class="t3" id="elaNote" style="font-size:calc(12.5px * var(--ts,1));margin:0;padding:10px 16px">${ch === 'ela' ? 'Computing error levels…' : 'Hidden data often shows up as noise or text in bit plane 0 of one channel — compare it with plane 7.'}</p></section>
+      <p class="t3" id="elaNote" style="font-size:calc(12.5px * var(--ts,1));margin:0;padding:10px 16px">${ch === 'ela' ? 'Computing error levels…' : ch === 'noise' ? 'The picture minus a smoothed copy of itself, brightened. Each camera leaves an even grain; an area pasted in from another picture, or smoothed by a tool, often has a different grain.' : ch === 'lev' ? 'Each colour stretched between its darkest and brightest 0.5 % — brings out detail in dark or washed-out areas (number plates, faces in shadow, text on signs).' : ch === 'clone' ? 'Looking for copied areas…' : 'Hidden data often shows up as noise or text in bit plane 0 of one channel — compare it with plane 7.'}</p></section>
     <div class="fi-side">
+      ${fxCards}${typeof fxHist === 'function' && I.data ? (h => `<section class="card"><header><h3>${ico('chart-column','sm')} Histogram</h3></header><div class="body">${fxHistSvg(h)}<p class="t3 small" style="margin:6px 0 0">${h.clipHi > .02 ? `${(h.clipHi * 100).toFixed(1)} % of pixels are pure white (blown out). ` : ''}${h.clipLo > .02 ? `${(h.clipLo * 100).toFixed(1)} % are pure black. ` : ''}${h.gaps > 20 ? `<b>${h.gaps} empty levels between used ones</b> — a comb-shaped histogram: the tones were stretched by an editor (levels or curves).` : 'No comb pattern — the tones were not stretched after capture.'}</p></div></section>`)(I.hist || (I.hist = fxHist(I.data))) : ''}
       ${imgxCard()}
       <section class="card"><header><h3>${ico('scan','sm')} QR / barcode</h3></header><div class="body">${I.qr ? `<pre class="rawbox">${esc(I.qr)}</pre><div class="wrap" style="margin-top:8px"><button class="btn sm" data-act="flagCopy" data-v="${esc(I.qr)}">${ico('copy','sm')}Copy</button><button class="btn sm" data-act="imgToDecoder" data-v="${esc(I.qr)}">${ico('binary','sm')}Open in Decoder</button></div>${flagBox(findFlags(I.qr))}` : '<p class="t3" style="margin:0;font-size:calc(13.5px * var(--ts,1))">No QR code found in this image. Try a bit plane or crop tighter.</p>'}</div></section>
       <section class="card"><header><h3>${ico('binary','sm')} LSB extraction</h3></header><div class="body">
@@ -501,14 +534,25 @@ function bindImage(){
   const inp = $('imgIn'), d = $('imgDrop');
   if(inp){ inp.onchange = () => { if(inp.files[0]) imgLoad(inp.files[0]); }; d.ondragover = e => { e.preventDefault(); d.classList.add('over'); }; d.ondragleave = () => d.classList.remove('over');
     d.ondrop = e => { e.preventDefault(); d.classList.remove('over'); const f = e.dataTransfer.files[0]; if(f) imgLoad(f); }; d.onkeydown = e => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); inp.click(); } }; }
-  const cv = $('imgCv'); if(cv && UI.img && UI.img.data){ if(UI.imgCh === 'ela') showEla(cv); else renderPlane(UI.img.data, UI.imgCh || 'rgb', UI.imgBit === undefined ? 'all' : UI.imgBit, cv); }
+  const cv = $('imgCv'), I = UI.img; if(cv && I && I.data){ const ch = UI.imgCh || 'rgb', put = img => { cv.width = img.width; cv.height = img.height; cv.getContext('2d').putImageData(img, 0, 0); if(typeof fxApplyZoom === 'function') fxApplyZoom(cv); }, note = h => { const n = $('elaNote'); if(n) n.innerHTML = h; };
+    if(ch === 'ela') showEla(cv).then(() => typeof fxApplyZoom === 'function' && fxApplyZoom(cv));
+    else if(ch === 'noise') put(I.noise || (I.noise = fxNoise(I.data)));
+    else if(ch === 'lev') put((I.lev || (I.lev = fxLevels(I.data))).img);
+    else if(ch === 'clone'){ setTimeout(() => { if(UI.img !== I) return; const R = I.clone || (I.clone = fxCloneScan(I.data)); put(fxCloneView(I.data, R));
+        note(R.found.length ? `<b style="color:var(--red)">${R.found.length} area${R.found.length > 1 ? 's' : ''} copied within the picture</b> — ${R.found.map(f => `${f.n} matching blocks moved by ${Math.abs(f.dx)} px ${f.dx >= 0 ? 'right' : 'left'}, ${Math.abs(f.dy)} px ${f.dy >= 0 ? 'down' : 'up'}`).join('; ')}. Boxes of one colour are the same patch. Repeating patterns (tiles, windows, fabric) can match too — look before you conclude.` : 'No copied areas found. Flat areas (sky, walls) are left out, and a patch that was resized or rotated is not found by this check.'); }, 30); }
+    else { renderPlane(I.data, ch, UI.imgBit === undefined ? 'all' : UI.imgBit, cv); if(typeof fxApplyZoom === 'function') fxApplyZoom(cv); } }
 }
 async function imgLoad(f, keep = true){
   if(f.size > 100 * 1048576) return toast('That image is over 100 MB — too big to open here');
   if(f.type && !/^image\//.test(f.type)) return toast('That is not an image');
   UI.img = {busy:true}; renderMain();
-  try{ await lazyNeed('qr'); const r = await loadImageData(f); UI.img = {name:f.name, w:r.w, h:r.h, scaled:r.scaled, data:r.data, qr:qrDecode(r.data)}; UI.imgCh = 'rgb'; UI.imgBit = 'all'; if(keep) recentKeepFile('image', f); }
-  catch(e){ UI.img = null; toast(e.message || 'Could not open that image'); }
+  /* what the file itself says, whether or not this browser can draw it */
+  let X = {name:f.name};
+  try{ const buf = new Uint8Array(await f.arrayBuffer()); if(typeof fxJpeg === 'function'){ const meta = typeof metaRead === 'function' ? await metaRead(buf, f.name, f.type).catch(() => null) : null, jpg = fxJpeg(buf), tb = jpg ? fxExifThumb(buf) : null;
+      X = {name:f.name, meta, jpg, png:pngInfo(buf), nameHint:fxNameHint(f.name), sun:meta && meta.gps ? fxSunFacts(meta.gps.lat, meta.gps.lon, fxUtcMoment(meta), meta.gps.dir) : null, thumb:tb ? await fxThumbCompare(tb, f).catch(() => null) : null}; } }catch(e){}
+  const heic = X.meta && /HEIC/.test(X.meta.fmt || '');
+  try{ if(heic) throw new Error('heic'); await lazyNeed('qr'); const r = await loadImageData(f); UI.img = Object.assign(X, {w:r.w, h:r.h, scaled:r.scaled, data:r.data, qr:qrDecode(r.data)}); UI.imgCh = 'rgb'; UI.imgBit = 'all'; if(keep) recentKeepFile('image', f); }
+  catch(e){ if(X.meta && X.meta.fmt){ UI.img = Object.assign(X, {nodecode:true}); if(keep) recentKeepFile('image', f); } else { UI.img = null; toast(e.message === 'heic' ? 'Could not open that image' : e.message || 'Could not open that image'); } }
   renderMain();
 }
 

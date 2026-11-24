@@ -4,6 +4,58 @@
    Each change has a type: "added" | "changed" | "fixed" | "removed". */
 const CHANGELOG_DATA = [
   {
+    "version": "1.70",
+    "name": "Forensics kit, advanced",
+    "date": "2026-11-24",
+    "summary": "The File inspector and Image tools read far deeper — every metadata format, how a JPEG was written, the hidden thumbnail, the sun, copied areas, shortcuts, build fingerprints, who packed an archive — and five new tools: phishing kits, stealer logs, favicon and page hashes, company footprint, and dates inside IDs.",
+    "changes": [
+      {
+        "type": "added",
+        "text": "File inspector: the full metadata reader (EXIF, XMP, IPTC, HEIC, PNG, WebP, MP4/MOV, MP3, PDF, Word/Excel old and new) with what stands out on top; picture forensics — JPEG quantisation tables (quality and whether a library, a camera or Photoshop wrote it), chroma sampling, segments, colour profile, Facebook and Photoshop markers, the EXIF thumbnail compared with the picture (cropped or replaced after capture), what the file name says (WhatsApp, Telegram, Pixel, screenshots…), and where the sun was at the GPS time and place."
+      },
+      {
+        "type": "added",
+        "text": "File inspector: Windows shortcuts (target, arguments, the NetBIOS name, MAC address and its maker, volume serial of the machine that made them); Windows programs — imphash, Rich header hash, PDB path and the developer's user name, version information, resource language, exports, overlay, TLS callbacks, writable-and-executable sections, signature, with VirusTotal and MalwareBazaar pivots; Linux programs — libraries, compiler, Go version and module, build IDs; ZIP archives — the OS, Unix user and group and the time zone of whoever packed it, and any file inside opens on its own."
+      },
+      {
+        "type": "added",
+        "text": "File inspector: strings sorted by kind (links, paths, registry, commands, keys and tokens, wallets, Base64 with a decode link, build traces) and a hex viewer over the whole file with paging, go-to-offset and find (text or hex)."
+      },
+      {
+        "type": "added",
+        "text": "Image tools: noise, levels and copy-move views (pasted patches found even after JPEG saving and resizing, with no false alarm on our 18 test photos), zoom to 1:1, 2× and 4×, a histogram that shows clipping and stretched tones, and the metadata and picture-forensics cards. HEIC pictures the browser cannot draw still show everything read from the file."
+      },
+      {
+        "type": "added",
+        "text": "Forensics kit → Phishing kit: drop a kit's ZIP or files — Telegram bot IDs and chat IDs, Discord webhooks, drop emails, SMTP accounts, log files and panels it sends victims to, the brand it imitates, the anti-bot and geo-filtering tricks, obfuscated code, author credits, and every YARA rule run over every file."
+      },
+      {
+        "type": "added",
+        "text": "Forensics kit → Stealer log: RedLine, Lumma, Vidar and similar logs read into infected machines (user, computer, HWID, IP, build tag, where it ran from) and their saved logins and session cookies, with your domains and sign-in or VPN hosts marked. Passwords stay masked and are never saved to the case."
+      },
+      {
+        "type": "added",
+        "text": "Forensics kit → Favicon & page hash: the Shodan favicon and html_hash values, MD5 and SHA-256 of a favicon or saved page, plus the Google Analytics, Tag Manager, AdSense, Meta pixel and Yandex Metrica IDs, forms, scripts and kit comments in it — each with the Shodan, FOFA, ZoomEye, Censys, urlscan or PublicWWW query ready to open."
+      },
+      {
+        "type": "added",
+        "text": "Forensics kit → Company footprint: mail provider and filtering, the SaaS a company verified, who may send mail as it (SPF, DKIM selectors), DMARC policy and reporters, Microsoft 365 and federation hints, CAA, and every host name in its certificates (CertSpotter) with the staging, admin and VPN ones flagged."
+      },
+      {
+        "type": "added",
+        "text": "Look-alikes remember each domain they checked: the next check marks the ones that are new, shows certificates issued to them (CertSpotter), and lists watched domains for a one-click re-check."
+      },
+      {
+        "type": "added",
+        "text": "Dates inside IDs: Bluesky post keys, Slack message links and Discord user links are dated in Time & IDs; a Discord account imported from a chat export shows when it was made and how long before its first message, and Infrastructure → Chats lists the accounts made just before they posted."
+      },
+      {
+        "type": "changed",
+        "text": "Playbooks for stealer logs, phishing kits, drainer sites and company footprints now point to the new tools."
+      }
+    ]
+  },
+  {
     "version": "1.69",
     "name": "More queries, rules and tricks",
     "date": "2026-11-23",

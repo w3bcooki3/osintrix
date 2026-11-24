@@ -363,13 +363,17 @@ function decodeIds(input){
   let s = String(input || '').trim(); if(!s) return [];
   const out = [], add = (l, ms, note) => { if(isFinite(ms) && ms > 1.1e12 - 5e11 && ms < 2.3e12) out.push([l, ms, note || '']); };
   const u = s.match(/(?:twitter|x)\.com\/[^/]+\/status(?:es)?\/(\d+)/i), dsc = s.match(/discord(?:app)?\.com\/channels\/\d+\/\d+\/(\d+)/i), tt = s.match(/tiktok\.com\/.*\/(?:video|photo)\/(\d+)/i),
-    ig = s.match(/instagram\.com\/(?:[\w.]+\/)?(?:p|reel|tv)\/([\w-]{6,})/i), li = s.match(/(?:activity|ugcPost|share)[:\-](\d{15,})/i), yt = s.match(/(?:youtu\.be\/|v=)([\w-]{11})/);
-  if(u){ s = u[1]; } if(dsc) s = dsc[1]; if(tt) s = tt[1]; if(li) s = li[1];
+    ig = s.match(/(?:instagram\.com\/(?:[\w.]+\/)?(?:p|reel|tv)|threads\.(?:net|com)\/@[\w.]+\/post)\/([\w-]{6,})/i), li = s.match(/(?:activity|ugcPost|share)[:\-](\d{15,})/i), yt = s.match(/(?:youtu\.be\/|v=)([\w-]{11})/);
+  const du = s.match(/discord(?:app)?\.com\/(?:users|channels)\/(\d{15,20})\/?$/i), bs = s.match(/(?:bsky\.app\/profile\/[^/]+\/post\/|app\.bsky\.feed\.post\/)([2-7a-z]{13})\b/i), sl = s.match(/slack\.com\/archives\/\w+\/p(\d{10})(\d{6})/i), tg = /\bt(?:elegram)?\.me\//i.test(s);
+  if(u){ s = u[1]; } if(dsc) s = dsc[1]; if(tt) s = tt[1]; if(li) s = li[1]; if(du) s = du[1];
+  if(bs){ const A = '234567abcdefghijklmnopqrstuvwxyz'; let n = 0n; for(const c of bs[1].toLowerCase()) n = n * 32n + BigInt(A.indexOf(c)); add('Bluesky post (record key ' + bs[1] + ')', Number((n >> 10n) / 1000n), 'from URL'); }
+  if(sl) add('Slack message', +sl[1] * 1000 + Math.floor(+sl[2] / 1000), 'from URL');
+  if(tg) out.push(['Telegram link', NaN, 'Telegram message numbers and user IDs carry no date — the time is only in the chat or the export']);
   if(ig){ let n = 0n; for(const c of ig[1].slice(0, 11)) n = n * 64n + BigInt(IG_ALPHA.indexOf(c)); add('Instagram post (shortcode ' + ig[1] + ')', Number(n >> 23n) + 1314220021721, 'from URL'); }
   if(yt) out.push(['YouTube video ' + yt[1], NaN, 'YouTube IDs are random — the upload date is only on the page']);
   if(/^\d{9,20}$/.test(s)){ const n = BigInt(s);
     add('X / Twitter post or user (snowflake)', Number(n >> 22n) + 1288834974657, u ? 'from URL' : '');
-    add('Discord message, user or server (snowflake)', Number(n >> 22n) + 1420070400000, dsc ? 'from URL' : '');
+    add(du ? 'Discord account or server (created)' : 'Discord message, user or server (snowflake)', Number(n >> 22n) + 1420070400000, dsc || du ? 'from URL' : '');
     add('TikTok video', Number(n >> 32n) * 1000, tt ? 'from URL' : '');
     add('Instagram media ID', Number(n >> 23n) + 1314220021721);
     add('Mastodon post', Number(n >> 16n));

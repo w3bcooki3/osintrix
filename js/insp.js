@@ -96,6 +96,7 @@ function inspEnt(id){
     ${typeof srcEntLine === 'function' ? srcEntLine(id) : ''}
     <div class="isec"><h4>Verdict <span class="t3">applies in every case</span></h4><div class="seg v">${[['malicious','Malicious'],['suspicious','Suspicious'],['benign','Benign'],['','Unknown']].map(([x, l]) => `<button data-act="entVerdict" data-id="${esc(id)}" data-v="${x}" aria-pressed="${vd === x}">${l}</button>`).join('')}</div>${typeof verdictAgeNote === 'function' ? verdictAgeNote(id) : ''}</div>
     ${typeof stashHits === 'function' ? (L => L.length ? `<div class="isec"><div class="note"><span class="ic">${ico('archive','sm')}</span><div><b>Also in ${L.length === 1 ? 'a case kept in a file' : L.length + ' cases kept in files'}:</b> ${L.map(c => `<a href="${caseHash(c.id)}">${esc(caseNm(c))}</a>`).join(', ')}</div></div></div>` : '')(stashHits(id)) : ''}
+    ${typeof idWhenHtml === 'function' ? idWhenHtml(k, v) : ''}
     ${typeof cnNamesHtml === 'function' ? cnNamesHtml(id) : ''}
     ${/^(handle|tgid|dcid)$/.test(k) && typeof stPickDlg === 'function' ? `<div class="isec"><button class="btn sm" data-act="stPick" data-id="${esc(id)}">${ico('pencil','sm')}Compare its writing with…</button></div>` : ''}
     ${typeof psOf === 'function' ? (P => P ? `<div class="isec"><div class="note"><span class="ic">${ico('users','sm')}</span><div><b>Part of a persona: ${esc(psName(P))}</b> — ${esc(psTieText(P, P.ties[0]))}. <button class="lnk" data-act="psOpen" data-id="${esc(P.id)}">See the evidence</button></div></div></div>` : '')(psOf(id)) : ''}

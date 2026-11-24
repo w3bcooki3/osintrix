@@ -340,16 +340,16 @@ const PB_PACK = [
 
   {id:"pb-phishkit-hunt", name:"Phishing kit & infrastructure hunting", cat:"threat", icon:"scan-search", level:"advanced", time:"2–4 h",
    desc:"Find phishing pages impersonating your brand, the kit behind them and the infrastructure that hosts them.", steps:[
-    ["Generate look-alike domains for your brand", "dnstwist for typos, homoglyphs and TLD swaps; check which are registered and resolve."],
+    ["Generate look-alike domains for your brand", "Forensics kit → Look-alikes (or dnstwist) for typos, homoglyphs and TLD swaps; check which are registered, resolve, receive mail and got a certificate recently."],
     ["Watch certificate transparency for brand keywords", "crt.sh searches (e.g. %yourbrand%) and certstream-based monitors catch new phishing sites when they get TLS."],
     ["Search urlscan.io for pages that look like yours", "Search by page title, your logo/favicon hash, domain keywords, or the hash of a known kit resource."],
     ["Analyse a live phishing page safely", "urlscan.io or a sandbox browser; note form POST targets, JavaScript exfil endpoints, Telegram bot API calls, anti-bot checks."],
     ["Look for exposed kit archives and open directories", "Kits are often left as .zip files in the web root. Download only into an isolated environment; never run them."],
-    ["Extract kit fingerprints", "Unique file names, comments, author handles, exfil emails or Telegram bot IDs, .htaccess block lists — these link campaigns."],
-    ["Pivot on kit fingerprints to find sibling sites", "urlscan.io hash and filename search, Shodan/Censys http.html_hash and favicon hash, shared hosting and registrar patterns."],
+    ["Extract kit fingerprints", "Forensics kit → Phishing kit reads the ZIP: unique file names, comments, author handles, exfil emails, Telegram bot IDs, .htaccess block lists and YARA hits — these link campaigns."],
+    ["Pivot on kit fingerprints to find sibling sites", "Forensics kit → Favicon & page hash gives the Shodan favicon and html_hash values and the analytics IDs, with the urlscan, Shodan, FOFA and PublicWWW queries ready; add shared hosting and registrar patterns."],
     ["Check reputation feeds for known reports", "PhishTank, OpenPhish, URLhaus, VirusTotal."],
     ["Record indicators and decide on action", "Blocklist internally, report for takedown (see Scam website takedown playbook), notify users if credentials were harvested."],
-    ["Set up continuing monitoring", "Saved urlscan searches, CT alerts and periodic dnstwist runs."]]},
+    ["Set up continuing monitoring", "Re-run Look-alikes for the brand — domains that appeared since the last check are marked new — plus saved urlscan searches and CT alerts."]]},
 
   {id:"pb-c2-pivot", name:"C2 infrastructure pivoting", cat:"threat", icon:"radar", level:"advanced", time:"2–6 h",
    desc:"Expand from one C2 indicator to the wider server cluster using certificates, TLS fingerprints and banners.", steps:[
@@ -690,7 +690,7 @@ const PB_PACK = [
    desc:"What a company runs in Microsoft 365, AWS, Azure, Google Cloud and SaaS, read from public metadata only — for due diligence, attack-surface reviews and phishing-risk work.", steps:[
     ["Set the scope in writing", "Outside-in only: DNS, public metadata, search engines and certificate logs. No sign-ins, no password resets, no listing of private resources. Write the domains in scope as the first note of the case."],
     ["Identity provider and tenant", "Cloud → Field guide → Cloud OSINT: getuserrealm and the OpenID metadata tell you Microsoft 365 or not, federated or not (and to what), and the tenant ID. The same tenant ID on two domains proves one owner."],
-    ["The SaaS stack from DNS", "TXT verification records, MX and SPF includes list the services the company signed up for. Each one is a place data lives and a pretext a phisher will use. Save the records as evidence."],
+    ["The SaaS stack from DNS", "Forensics kit → Company footprint reads TXT verification records, MX, SPF, DKIM selectors and DMARC: the services the company signed up for and who may send mail as it. Each one is a place data lives and a pretext a phisher will use. Save it to the case."],
     ["Every hostname from certificates", "Queries → crt.sh by domain and by organisation name. New subdomains, staging hosts and the date each appeared; feed them to Infrastructure."],
     ["Storage and apps by name", "Test company-name permutations against S3, Azure Blob and Google Cloud Storage names with DNS and HTTP status only. A 403 means it exists; a listing means it is public — record it, do not download personal data."],
     ["Exposed services", "Queries → Shodan and Censys by organisation and certificate name: Kubernetes, Docker, Elasticsearch, admin panels. Note the version and the date seen — not every banner is current."],
@@ -701,7 +701,7 @@ const PB_PACK = [
    desc:"Staff or customer credentials and session cookies turned up in stealer logs (RedLine, Lumma, Vidar and others). How to triage the logs, find the infected machine and close the accounts — not just reset passwords.", steps:[
     ["Get the files lawfully", "From your threat-intel provider, a law-enforcement notice or a public leak. Do not buy logs from criminal markets or Telegram shops — it funds them and may be illegal where you are."],
     ["Open them in the research environment only", "Logs are archives of a victim's machine. Unpack in an isolated VM; some archives carry malware. Hash every file you keep (Lab → Forensics kit)."],
-    ["Run the triage rules", "Detections → YARA: Info-Stealer Log Credential File and System Information File mark the passwords and machine-profile files; the token rules mark cloud and SaaS keys inside."],
+    ["Read the log", "Forensics kit → Stealer log, with your domains filled in: each infected machine (user, computer, HWID, IP, build tag), every saved login with yours marked, and the session cookies that still work. Passwords stay masked. Detections → YARA has rules for the same files."],
     ["List the company accounts", "Search the passwords file for the company domains and SSO hosts (Okta, Microsoft, Google). For each: user, URL, date of the log and whether a session cookie is there too."],
     ["Find the infected machine", "The system file gives the HWID, machine name, user, IP, country and infection date. Match the machine name and user to your asset inventory — a personal device signing into corporate apps is the usual answer."],
     ["Close sessions, not just passwords", "Stolen cookies survive a password change. Revoke sessions and refresh tokens for each account (Entra, Okta, Google), then reset the password and re-enrol MFA. Detections → Okta session roaming and Entra scripted-client rules show replay."],
@@ -720,7 +720,7 @@ const PB_PACK = [
   {id:"pb-drainer", name:"Crypto drainer or wallet-scam site", cat:"fraud", icon:"shield-alert", level:"advanced", time:"2–4 h",
    desc:"A fake mint, airdrop or wallet-connect page that tricks people into signing approvals that empty their wallets. From the page to the receiving wallets, the kit and the people running it.", steps:[
     ["Capture the page safely", "From the research environment, with no real wallet extension installed. Save the HTML and every script it loads (Capture → web page); never connect a wallet."],
-    ["Read the kit", "Detections → YARA: Wallet Drainer Kit Reporting to Telegram. Look in the scripts for the approval calls (setApprovalForAll, permit, increaseAllowance) and for the receiving addresses and the Telegram bot the kit reports to."],
+    ["Read the kit", "Forensics kit → Phishing kit unpacks a kit's ZIP: bots, drop emails, author credits and YARA hits. Detections → YARA: Wallet Drainer Kit Reporting to Telegram. Look in the scripts for the approval calls (setApprovalForAll, permit, increaseAllowance) and for the receiving addresses and the Telegram bot the kit reports to."],
     ["Follow the money", "Add the receiving wallets to the case; Money trail shows where the stolen funds went next. Drainer operators split proceeds with the kit developer — two outgoing streams are common."],
     ["Find sibling sites", "Queries → FOFA and PublicWWW by wallet address and by a unique script name; urlscan by the script's hash. Kits are rented, so siblings may be different operators — separate them by receiving wallet."],
     ["The bot is a lead, not a tool", "The bot ID (before the colon of the token) ties kits together. Do not call the Telegram API with the token — report it to Telegram and to the hosting provider."],
