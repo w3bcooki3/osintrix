@@ -7,7 +7,7 @@ const TOOL_FOR = {ip:['ip-analysis'], domain:['domain-investigation','dns-analys
 const ihead = (label, extra = '') => `<div class="ihead"><span class="caps">${label}</span>${extra}<button class="iconbtn" data-act="closeInsp" aria-label="Close">${ico('x')}</button></div>`;
 
 function renderInsp(){
-  const el = $('insp'); el.classList.toggle('closed', !UI.inspOpen); UI.shownSel = UI.sel;
+  const el = $('insp'); el.classList.toggle('closed', !UI.inspOpen); UI.shownSel = UI.sel; document.documentElement.toggleAttribute('data-insp', !!UI.inspOpen);
   if(!UI.inspOpen){ el.innerHTML = ''; return; }
   const s = UI.sel;
   try{
@@ -44,6 +44,7 @@ function inspEntry(e){
       <dt>Added</dt><dd>${esc(E.fmtFull(e.created, tz()).slice(0, 16))}</dd>${src ? `<dt>Source</dt><dd><button class="linkbtn" data-act="selRec" data-id="${src.id}">${esc(src.title)}</button></dd>` : ''}</dl>
       ${e.tags.length ? `<div class="wrap" style="margin-top:12px">${e.tags.map(x => `<span class="chip sq">#${esc(x)}</span>`).join('')}</div>` : ''}
       ${e.notes ? `<p style="margin:12px 0 0;color:var(--text-2);font-size:calc(14px * var(--ts,1));line-height:1.6">${esc(e.notes)}</p>` : ''}</div>
+    ${typeof stashHits === 'function' ? (L => L.length ? `<div class="isec"><div class="note"><span class="ic">${ico('archive','sm')}</span><div><b>Also in ${L.length === 1 ? 'a case kept in a file' : L.length + ' cases kept in files'}:</b> ${L.map(c => `<a href="${caseHash(c.id)}">${esc(caseNm(c))}</a>`).join(', ')}</div></div></div>` : '')(stashHits(k)) : ''}
     ${other.length ? `<div class="isec"><div class="note amber"><span class="ic">${ico('link-2','sm')}</span><div><b>Also in ${other.length} other case${other.length > 1 ? 's' : ''}:</b> ${other.map(x => `<a href="${caseHash(x)}">${esc(theCase(x).name)}</a>`).join(', ')}</div></div></div>` : ''}
     <div class="isec"><h4>Relationships <span class="t3">${links.length}</span></h4>
       ${links.map(l => { const out = l.a === e.id, o = entryById(out ? l.b : l.a); return o ? `<div class="rel"><div class="rt"><span class="dir" title="${out ? 'Outgoing' : 'Incoming'}">${ico(out ? 'arrow-up-right' : 'undo-2','sm')}</span><button class="lab" data-act="selLink" data-id="${l.id}">${out ? '' : '← '}${esc(l.label)}</button>${conf(l.conf)}</div>${entryPill(o)}</div>` : ''; }).join('') || '<span class="t3" style="font-size:calc(13.5px * var(--ts,1))">None yet — use Connect.</span>'}</div>
@@ -86,7 +87,7 @@ function inspEnt(id){
   return ihead('Indicator') + `<div class="ibody"><div style="display:flex;gap:14px;align-items:flex-start">${kindBadge(k,'lg')}<div style="min-width:0"><div class="t3" style="font-size:calc(13px * var(--ts,1))">${esc(E.LABEL[k] || k)} · extracted</div><h2 class="mono" style="font-size:calc(16px * var(--ts,1));font-weight:600;overflow-wrap:anywhere">${esc(v)}</h2>
     ${m ? `<div style="font-size:calc(13px * var(--ts,1));margin-top:3px;color:${m.hot ? 'var(--amber)' : 'var(--text-3)'}">${esc(m.t)}</div>` : ''}<div class="cxts">${ctxChips(k, v)}</div></div></div>
     <div class="wrap" style="margin-top:14px"><button class="btn sm${isWatched(id) ? ' on' : ''}" data-act="watch" data-id="${esc(id)}">${ico(isWatched(id) ? 'eye-off' : 'eye','sm')}${isWatched(id) ? 'Unwatch' : 'Watch'}</button></div>
-    ${canVault && !derive().byKey.has(id) ? `<button class="btn primary sm" data-act="promote" data-id="${esc(id)}" style="margin-top:14px">${ico('plus','sm')}Add to ${esc(caseNm(theCase()))} vault</button>` : ''}
+    ${canVault && !derive().byKey.has(id) ? `<button class="btn primary sm" data-act="promote" data-id="${esc(id)}" style="margin-top:14px">${ico('plus','sm')}Add to ${esc(caseNm(theCase()))} vault</button>${casePick()}` : ''}
     ${typeof ipfSection === 'function' ? ipfSection(k, v) : ''}
     ${typeof chSection === 'function' ? chSection(k, v) : ''}
     ${typeof lkInspSection === 'function' ? lkInspSection(k, v) : ''}
@@ -94,28 +95,15 @@ function inspEnt(id){
     ${pivotSection(k, v)}
     ${typeof srcEntLine === 'function' ? srcEntLine(id) : ''}
     <div class="isec"><h4>Verdict <span class="t3">applies in every case</span></h4><div class="seg v">${[['malicious','Malicious'],['suspicious','Suspicious'],['benign','Benign'],['','Unknown']].map(([x, l]) => `<button data-act="entVerdict" data-id="${esc(id)}" data-v="${x}" aria-pressed="${vd === x}">${l}</button>`).join('')}</div>${typeof verdictAgeNote === 'function' ? verdictAgeNote(id) : ''}</div>
+    ${typeof stashHits === 'function' ? (L => L.length ? `<div class="isec"><div class="note"><span class="ic">${ico('archive','sm')}</span><div><b>Also in ${L.length === 1 ? 'a case kept in a file' : L.length + ' cases kept in files'}:</b> ${L.map(c => `<a href="${caseHash(c.id)}">${esc(caseNm(c))}</a>`).join(', ')}</div></div></div>` : '')(stashHits(id)) : ''}
+    ${typeof cnNamesHtml === 'function' ? cnNamesHtml(id) : ''}
+    ${/^(handle|tgid|dcid)$/.test(k) && typeof stPickDlg === 'function' ? `<div class="isec"><button class="btn sm" data-act="stPick" data-id="${esc(id)}">${ico('pencil','sm')}Compare its writing with…</button></div>` : ''}
+    ${typeof psOf === 'function' ? (P => P ? `<div class="isec"><div class="note"><span class="ic">${ico('users','sm')}</span><div><b>Part of a persona: ${esc(psName(P))}</b> — ${esc(psTieText(P, P.ties[0]))}. <button class="lnk" data-act="psOpen" data-id="${esc(P.id)}">See the evidence</button></div></div></div>` : '')(psOf(id)) : ''}
     <div class="isec"><h4>Appears in <span class="t3">${recs.length} records · ${g ? g.cases.size : 0} cases</span></h4>${recs.slice(0, 10).map(r => `<button class="li" data-act="selRec" data-id="${r.id}" style="padding:8px 0"><div class="main2"><b style="font-weight:520;font-size:calc(14px * var(--ts,1))">${esc(r.title)}</b><small>${esc(caseNm(theCase(r.caseId)))}${r.ts ? ' · ' + esc(E.fmtFull(r.ts, tz()).slice(5, 16)) : ''}</small></div></button>`).join('')}</div>
     <div class="wrap" style="margin-top:16px"><button class="btn sm" data-act="pivot" data-id="${esc(id)}">${ico('filter','sm')}Filter timeline to this</button></div>
     ${typeof sightSection === 'function' ? sightSection(id) : ''}</div>`;
 }
-function inspFeed(f){
-  if(!f) return '';
-  if(!f.read){ f.read = true; save(); }
-  const g = globalEnts(), x = typeof ctiX === 'function' ? ctiX(f) : {iocs:E.extract(f.title + ' ' + f.body), cve:[], ttp:[], act:[], mal:[], ven:[]}, hits = x.iocs;
-  const others = typeof ctiStoryOf === 'function' ? ctiStoryOf(f.id).filter(o => o !== f) : [], t = f.st || 'new';
-  const sec = (title, html) => html ? `<div class="isec"><h4>${title}</h4><div class="wrap">${html}</div></div>` : '';
-  /* the summary as an article: paragraphs, no box, no scroll; a long one opens on request */
-  const paras = String(f.body || '').replace(/\r/g, '').split(/\n\s*\n|\n(?=[A-Z•\-–])/).map(x => x.replace(/\s+/g, ' ').trim()).filter(Boolean), P = paras.length > 1 ? paras : String(f.body || '').replace(/\s+/g, ' ').trim().split(/(?<=[.!?])\s+(?=[A-Z])/).reduce((a, x) => { const l = a[a.length - 1]; if(l && l.length < 320) a[a.length - 1] = l + ' ' + x; else a.push(x); return a; }, []);
-  let n = 0, cut = P.findIndex(x => (n += x.length) > 900); if(cut < 1 || P.length - cut < 1) cut = P.length;
-  const para = x => `<p>${esc(x)}</p>`, sev = f.sev && f.sev !== 'normal' ? String(f.sev) : '';
-  return ihead('Story') + `<div class="ibody"><h2>${esc(f.title)}</h2><div class="story-m"><span class="src">${esc(f.source)}</span><span>${esc(E.fmtDate(f.ts, tz()))}</span>${sev ? `<span class="story-sev ${esc(sev.toLowerCase())}">${esc(sev)}</span>` : ''}</div>
-    <div class="story-tri"><button class="btn sm${f.star ? ' on' : ''}" data-act="ctiStar" data-id="${f.id}" aria-pressed="${!!f.star}">${ico('star','sm')}${f.star ? 'Starred' : 'Star'}</button><button class="btn sm${t === 'relevant' ? ' on' : ''}" data-act="ctiTri" data-id="${f.id}" data-v="relevant" aria-pressed="${t === 'relevant'}">${ico('check','sm')}Relevant</button><button class="btn sm" data-act="ctiTri" data-id="${f.id}" data-v="${t === 'actioned' ? 'new' : 'actioned'}">${ico('check-check','sm')}${t === 'actioned' ? 'Actioned ✓' : 'Actioned'}</button><button class="btn sm" data-act="ctiTri" data-id="${f.id}" data-v="${t === 'dismissed' ? 'new' : 'dismissed'}">${ico(t === 'dismissed' ? 'undo-2' : 'x','sm')}${t === 'dismissed' ? 'Restore' : 'Dismiss'}</button></div>
-    <div class="story-b">${P.slice(0, cut).map(para).join('')}${cut < P.length ? `<details class="story-more"><summary>Read the rest of the summary</summary>${P.slice(cut).map(para).join('')}</details>` : ''}</div>
-    ${typeof cveChip === 'function' ? sec('Vulnerabilities', x.cve.map(cveChip).join('')) + sec('Actors &amp; malware', [...x.act, ...x.mal].map(actChip).join('')) + sec('ATT&amp;CK techniques', x.ttp.map(ttpChip).join('')) + sec('Vendors', x.ven.map(venChip).join('')) : ''}
-    ${hits.length ? `<div class="isec"><h4>Indicators</h4><div class="wrap">${hits.map(e => entPill(entKey(e))).join('')}</div>${hits.some(e => g.has(entKey(e))) ? '<p class="heur">Highlighted indicators already exist in your cases.</p>' : ''}</div>` : ''}
-    ${others.length ? `<div class="isec"><h4>Also reported by</h4>${others.map(o => `<button class="li" data-act="selFeed" data-id="${o.id}"><div class="main2"><b>${esc(o.source)}</b><span class="t3">${esc(o.title)}</span></div></button>`).join('')}</div>` : ''}
-    <div class="story-go"><button class="btn primary" data-act="feedToCase" data-id="${f.id}">${ico('plus','sm')}Add to ${esc(caseNm(theCase()))}</button>${E.safeUrl(f.link) ? `<a class="btn" href="${esc(E.safeUrl(f.link))}" target="_blank" rel="noopener noreferrer">Read original ${ico('external-link','sm')}</a>` : ''}</div></div>`;
-}
+/* the story panel (inspFeed) lives with the Threat Intel overview, in tiover.js */
 
 /* ---------- dialogs ---------- */
 let lastFocus = null;
@@ -310,3 +298,6 @@ function palette(){
     $('palL').onclick = ev => { const b = ev.target.closest('[data-pal]'); if(b){ const x = palList[+b.dataset.pal]; closeDlg(); x.fn(); } };
   });
 }
+/* save buttons and their case picker are joined after every draw of the panel and of dialogs */
+{ const ri = renderInsp; renderInsp = function(){ const r = ri.apply(this, arguments); if(typeof ctWrap === 'function') ctWrap($('insp')); return r; };
+  const od = openDlg; openDlg = function(){ const r = od.apply(this, arguments); if(typeof ctWrap === 'function') ctWrap($('dlg')); return r; }; }

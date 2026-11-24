@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Threat Intel — B · Triage desk</title>
+<link rel="stylesheet" href="../css/fonts.css">
+<script src="../js/icons.js"></script>
+<style>
+:root{--font:'Geist',system-ui,sans-serif;--mono:'Geist Mono',ui-monospace,monospace;
+  --bg:#f5f6f8;--side:#fff;--surface:#fff;--surface-2:#f8f9fb;--hover:#f2f4f7;--border:#dfe3ea;--soft:#eaedf2;
+  --text:#0f172a;--text-2:#475569;--text-3:#5b6678;--accent:#4f46e5;--accent-bg:#5b54f0;--accent-soft:#5b54f012;--accent-line:#c7c4fb;
+  --green:#047857;--green-soft:#04785712;--red:#c81e1e;--red-soft:#c81e1e10;--red-line:#f3c3c3;--amber:#a14b08;--amber-soft:#a14b0812;--amber-line:#f1d3b1;--blue:#2563eb;--sh:0 1px 2px #0f172a0a}
+[data-theme=dark]{--bg:#0b0f17;--side:#0d121c;--surface:#111723;--surface-2:#151c2a;--hover:#1a2232;--border:#2a3346;--soft:#1f2737;
+  --text:#e7ebf2;--text-2:#a9b3c4;--text-3:#8f9ab0;--accent:#a5a1ff;--accent-bg:#655cf7;--accent-soft:#6d64ff1f;--accent-line:#4b4690;
+  --green:#4ade80;--green-soft:#4ade8014;--red:#f87171;--red-soft:#f8717114;--red-line:#5c2a2a;--amber:#fbbf24;--amber-soft:#fbbf2414;--amber-line:#5a4416;--blue:#93c5fd;--sh:0 1px 2px #0006}
+*{box-sizing:border-box}
+body{margin:0;background:#dfe3ea;font:14.5px/1.5 var(--font);color:var(--text);padding:24px 0 40px}
+[data-theme=dark] body{background:#05070b}
+.i{width:16px;height:16px;stroke-width:1.8;flex:none}.i.sm{width:14px;height:14px}.i.xs{width:12px;height:12px}
+.bar{width:1440px;margin:0 auto 14px;display:flex;align-items:center;gap:12px;color:#334155;font-size:13.5px}
+[data-theme=dark] .bar{color:#a9b3c4}
+.bar b{font-size:15px}.bar .sp{flex:1}
+.bar button{height:32px;padding:0 12px;border-radius:8px;border:1px solid #c5cbd6;background:#fff;font:500 13px var(--font);cursor:pointer;display:inline-flex;align-items:center;gap:6px;color:#0f172a}
+.frame{width:1440px;height:900px;margin:0 auto;display:grid;grid-template-columns:64px 1fr;background:var(--bg);overflow:hidden;border-radius:10px;box-shadow:0 20px 60px -20px #0f172a55}
+.rail{background:var(--side);border-right:1px solid var(--soft);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:6px}
+.rail .logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#6d64ff,#a855f7);margin-bottom:12px}
+.rail b{width:40px;height:36px;border-radius:9px;display:grid;place-items:center;color:var(--text-3)}.rail b.on{background:var(--accent-soft);color:var(--accent)}
+.rail hr{width:32px;border:0;border-top:1px solid var(--soft);margin:6px 0}
+.main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.top{height:56px;flex:none;display:flex;align-items:center;gap:12px;padding:0 24px;border-bottom:1px solid var(--soft)}
+.search{width:560px;height:38px;border:1px solid var(--border);border-radius:11px;background:var(--surface);display:flex;align-items:center;gap:10px;padding:0 14px;color:var(--text-3);font-size:14px}
+.sp{flex:1}
+.btn{height:34px;padding:0 13px;border-radius:9px;border:1px solid var(--border);background:var(--surface);display:inline-flex;align-items:center;gap:7px;font:500 13.5px var(--font);color:var(--text);cursor:pointer;white-space:nowrap}
+.btn.pri{background:var(--accent-bg);border-color:var(--accent-bg);color:#fff}
+.btn.sm{height:28px;padding:0 10px;font-size:12.5px;border-radius:7px}
+.btn.ghost{border-color:transparent;background:none;color:var(--text-2)}
+.page{flex:1;overflow:auto;padding:22px 28px 28px}
+.ph{display:flex;align-items:flex-start;gap:12px;margin-bottom:18px}
+.ph h1{margin:0;font-size:26px;letter-spacing:-.02em}
+.ph p{margin:3px 0 0;color:var(--text-2);font-size:14px}
+.live{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--text-2);border:1px solid var(--border);border-radius:999px;padding:0 10px;height:28px;background:var(--surface)}
+.live i{width:7px;height:7px;border-radius:50%;background:var(--green)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--soft);margin-bottom:18px}
+.tabs span{padding:9px 12px;font-weight:500;color:var(--text-2);display:inline-flex;gap:7px;align-items:center;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs span.on{color:var(--text);border-color:var(--text)}
+.tabs em{font-style:normal;font:500 11.5px var(--mono);color:var(--text-3)}
+/* ---- triage desk ---- */
+.page{padding:0;display:grid;grid-template-columns:214px 400px 1fr;min-height:0;overflow:hidden}
+.q{border-right:1px solid var(--soft);background:var(--surface);padding:18px 12px;overflow:auto}
+.q h1{font-size:19px;margin:0 8px 2px;letter-spacing:-.01em}
+.q .sub{margin:0 8px 14px;font-size:12px;color:var(--text-3)}
+.q .cap{font:600 11px var(--font);letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);margin:16px 8px 6px}
+.qi{display:flex;align-items:center;gap:9px;height:34px;padding:0 10px;border-radius:8px;color:var(--text-2);font-size:13.5px;cursor:pointer}
+.qi:hover{background:var(--hover)}
+.qi.on{background:var(--accent-soft);color:var(--accent);font-weight:560}
+.qi em{margin-left:auto;font:500 11.5px var(--mono);font-style:normal;color:var(--text-3)}
+.qi.on em{color:var(--accent)}
+.qi .dot{width:8px;height:8px;border-radius:50%;flex:none}
+.list{border-right:1px solid var(--soft);display:flex;flex-direction:column;min-height:0;background:var(--surface-2)}
+.lh{padding:14px 16px 10px;border-bottom:1px solid var(--soft);background:var(--surface)}
+.lh .s{height:34px;border:1px solid var(--border);border-radius:9px;display:flex;align-items:center;gap:8px;padding:0 10px;color:var(--text-3);font-size:13px;background:var(--surface)}
+.lh .r{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12.5px;color:var(--text-3)}
+.lh .r .chip{height:24px;padding:0 9px;border:1px solid var(--border);border-radius:999px;display:inline-flex;align-items:center;gap:5px;color:var(--text-2);background:var(--surface)}
+.items{flex:1;overflow:auto}
+.dh{position:sticky;top:0;background:var(--surface-2);padding:8px 16px 6px;font:600 11.5px var(--font);color:var(--text-3);letter-spacing:.04em;text-transform:uppercase;border-bottom:1px solid var(--soft);z-index:1}
+.it{display:grid;grid-template-columns:18px 1fr;gap:10px;padding:11px 16px;border-bottom:1px solid var(--soft);cursor:pointer;background:var(--surface)}
+.it:hover{background:var(--hover)}
+.it.on{background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent-line)}
+.it .u{width:8px;height:8px;border-radius:50%;background:var(--accent);margin-top:7px}
+.it .u.seen{background:transparent;border:1.5px solid var(--border)}
+.it .t1{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text-3)}
+.it .t1 .sv{font:650 10.5px var(--font);letter-spacing:.03em;text-transform:uppercase;border-radius:4px;padding:1px 5px;border:1px solid var(--border);color:var(--text-2)}
+.it .t1 .sv.c{color:var(--red);border-color:var(--red-line)}.it .t1 .sv.h{color:var(--amber);border-color:var(--amber-line)}
+.it .t1 .ag{margin-left:auto}
+.it b{display:block;font-size:13.5px;font-weight:600;line-height:1.38;margin-top:3px}
+.it .tg{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.tg span{font:500 11px var(--mono);border:1px solid var(--soft);border-radius:4px;padding:0 5px;color:var(--text-2);background:var(--surface-2)}
+.tg span.hit{color:var(--accent);border-color:var(--accent-line);background:var(--accent-soft)}
+.tg span.why{font-family:var(--font);font-weight:560}
+.keys{border-top:1px solid var(--soft);padding:8px 14px;font-size:11.5px;color:var(--text-3);display:flex;gap:12px;flex-wrap:wrap;background:var(--surface)}
+.keys kbd{font:500 10.5px var(--mono);border:1px solid var(--border);border-bottom-width:2px;border-radius:4px;padding:0 4px;color:var(--text-2);background:var(--surface-2);margin-right:3px}
+.read{overflow:auto;padding:20px 24px 28px;background:var(--bg);min-width:0}
+.rbar{display:flex;align-items:center;gap:6px;margin-bottom:16px}
+.rbar .btn{height:30px;font-size:12.5px;padding:0 10px}
+.rbar .split{display:inline-flex}.rbar .split .btn:first-child{border-radius:9px 0 0 9px}.rbar .split .btn:last-child{border-radius:0 9px 9px 0;margin-left:-1px;padding:0 8px}
+.read h2{margin:0;font-size:22px;line-height:1.3;letter-spacing:-.015em;max-width:760px}
+.rm{display:flex;align-items:center;gap:10px;margin:8px 0 18px;font-size:13px;color:var(--text-3)}
+.rm b{color:var(--text-2);font-weight:600}
+.rm .sv{font:650 11px var(--font);text-transform:uppercase;letter-spacing:.03em;color:var(--red);border:1px solid var(--red-line);border-radius:5px;padding:1px 6px}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) 270px;gap:22px;align-items:start}
+.art p{margin:0 0 12px;font-size:14.5px;line-height:1.7;color:var(--text);max-width:68ch}
+.art p:first-child{font-size:15.5px}
+.wh{background:var(--surface);border:1px solid var(--soft);border-radius:12px;padding:12px 14px;margin:6px 0 16px}
+.wh h4{margin:0 0 8px;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3)}
+.wh div{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;padding:3px 0;color:var(--text-2)}
+.wh div b{color:var(--text)}
+.wh .i{margin-top:3px;color:var(--accent)}
+.box{background:var(--surface);border:1px solid var(--soft);border-radius:12px;margin-bottom:14px;overflow:hidden}
+.box>h4{margin:0;padding:11px 14px;font-size:13px;border-bottom:1px solid var(--soft);display:flex;align-items:center;gap:7px}
+.box>h4 .t3{margin-left:auto;font-weight:400;color:var(--text-3);font-size:12px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+td,th{padding:8px 14px;border-top:1px solid var(--soft);text-align:left;vertical-align:top}
+th{font-weight:500;color:var(--text-3);font-size:12px;border-top:0;background:var(--surface-2)}
+td.m{font-family:var(--mono);font-size:12.5px}
+td .hit{color:var(--accent);font-weight:560}
+td .act{color:var(--text-3)}
+.cve{padding:14px}
+.cve .top2{display:flex;align-items:baseline;gap:8px}
+.cve .id{font:600 15px var(--mono)}
+.cve .kev{margin-left:auto;font:650 10.5px var(--font);letter-spacing:.04em;text-transform:uppercase;color:var(--red);border:1px solid var(--red-line);border-radius:4px;padding:1px 6px}
+.cve .p{color:var(--text-2);font-size:12.5px;margin:2px 0 12px}
+.meters{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.meter{border:1px solid var(--soft);border-radius:9px;padding:8px 10px}
+.meter span{display:block;font-size:11.5px;color:var(--text-3)}
+.meter b{font:650 19px var(--mono)}
+.meter i{display:block;height:4px;border-radius:2px;background:var(--soft);margin-top:6px;overflow:hidden}.meter i u{display:block;height:100%;background:var(--red)}
+.kv2{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:12.5px;margin-top:12px}
+.kv2 span{color:var(--text-3)}
+.ttp{display:flex;flex-wrap:wrap;gap:6px;padding:12px 14px}
+.ttp span{font-size:12px;border:1px solid var(--soft);border-radius:6px;padding:3px 8px;color:var(--text-2)}
+.ttp span b{font-family:var(--mono);font-weight:600;margin-right:5px;color:var(--text)}
+.ttp span.cov{border-color:#a7dcc6}.ttp span.gap{border-color:var(--amber-line)}
+.ttp-n{padding:0 14px 12px;font-size:12px;color:var(--text-3)}
+.lbl{width:1440px;margin:12px auto 0;color:#475569;font-size:13px}
+[data-theme=dark] .lbl{color:#8f9ab0}
+</style>
+</head>
+<body>
+<div class="bar"><b>B · Triage desk</b><span>A mail client for intel: queues on the left, a dense list in the middle, the story and everything you can do with it on the right — all by keyboard.</span><span class="sp"></span><button onclick="document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark'">Light / dark</button></div>
+<div id="app"></div>
+<div class="lbl"><b>Idea:</b> built for clearing an inbox fast. Queues are saved filters with counts (cases, your stack, known exploited). The reading pane does the analyst’s work next to the story — why it is in your inbox, each indicator against your cases, the CVE’s CVSS/EPSS/KEV in one card, and which ATT&amp;CK techniques your detection rules already cover. J / K move, E actioned, X dismiss. Click a story in the list.</div>
+<script>
+const I = (n, c='') => `<svg class="i ${c}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">${LUCIDE[n]||''}</svg>`;
+const Q = [['mail','Inbox',11,1],['crosshair','Mentions my cases',2],['server','My stack',4],['shield-alert','Known exploited',5],['star','Starred',1],['check-check','Actioned',3],['x','Dismissed',0]];
+const SRC = [['Sample advisory digest',5,'#16a34a'],['Sample research notes',4,'#16a34a'],['Sample vendor watch',2,'#16a34a'],['Sample Intel Weekly',1,'#d97706'],['Sample CERT Bulletin',1,'#16a34a']];
+const IT = [
+ {d:'Today', l:[{sv:'c', s:'Advisory digest +1', ag:'2h', t:'PAN-OS GlobalProtect zero-day CVE-2024-3400 exploited in the wild', tg:[['In your stack','why'],['CVE-2024-3400'],['T1190']], u:1}]},
+ {d:'This week', l:[
+   {sv:'', s:'Intel Weekly', ag:'Mon', t:'“Lamp loader” builder sold on underground forum, C2 on port 4444', tg:[['Op Lantern','why hit'],['203.0.113.47','hit'],['update-lamp.test','hit']], u:1},
+   {sv:'', s:'CERT Bulletin', ag:'Sat', t:'Credential-stuffing wave against customer portals', tg:[['Customer portal','why hit'],['192.0.2.66','hit']], u:1},
+   {sv:'h', s:'Vendor Blog', ag:'Thu', t:'Patch Tuesday: CVE-2026-21001 in print spooler under active exploitation', tg:[['In your stack','why'],['CVE-2026-21001']], u:0}]},
+ {d:'Older', l:[
+   {sv:'c', s:'Research notes', ag:'Jan 10', t:'Ivanti Connect Secure zero-days CVE-2023-46805 and CVE-2024-21887 chained', tg:[['CVE-2023-46805'],['CVE-2024-21887']], u:1},
+   {sv:'c', s:'Vendor watch', ag:'Feb 9', t:'Fortinet FortiOS SSL VPN flaw CVE-2024-21762 potentially exploited', tg:[['In your stack','why'],['CVE-2024-21762']], u:1},
+   {sv:'c', s:'Advisory digest', ag:'Feb 7', t:'Volt Typhoon pre-positions in critical infrastructure networks', tg:[['T1078'],['T1003.003']], u:0},
+   {sv:'h', s:'Advisory digest', ag:'Nov 21', t:'LockBit 3.0 affiliates exploit Citrix Bleed (CVE-2023-4966)', tg:[['CVE-2023-4966'],['T1486']], u:1}]}];
+let SEL = 0;
+function draw(){
+  let k = -1;
+  document.getElementById('app').innerHTML = `<section class="frame"><nav class="rail"><div class="logo"></div>${['layout-dashboard','sun','sticky-note','notebook-pen'].map(i=>`<b>${I(i)}</b>`).join('')}<hr>${['folder-open','wrench','binary','shield-check'].map(i=>`<b>${I(i)}</b>`).join('')}<hr><b class="on">${I('rss')}</b><b>${I('eye')}</b></nav>
+  <div class="main"><div class="top"><div class="search">${I('search')}Search everything — cases, evidence, IOCs, tools, notes…</div><span class="sp"></span><span class="live"><i></i>Updated 7 min ago</span><button class="btn pri">${I('plus')}Capture</button></div>
+  <div class="page">
+    <aside class="q"><h1>Threat Intel</h1><p class="sub">12 stories · 5 sources · 2 feeds</p>
+      ${Q.map(([ic, l, n, on]) => `<div class="qi${on ? ' on' : ''}">${I(ic,'sm')}${l}<em>${n}</em></div>`).join('')}
+      <div class="cap">Saved views</div><div class="qi">${I('bookmark','sm')}Ransomware · my sector<em>3</em></div><div class="qi">${I('bookmark','sm')}Edge devices KEV<em>4</em></div>
+      <div class="cap">Sources</div>${SRC.map(([s, n, c]) => `<div class="qi"><span class="dot" style="background:${c}" title="${c === '#d97706' ? 'Slow to update' : 'Healthy'}"></span>${s.replace('Sample ', '')}<em>${n}</em></div>`).join('')}
+      <div class="qi" style="margin-top:6px">${I('settings','sm')}Manage sources</div></aside>
+    <section class="list"><div class="lh"><div class="s">${I('search','sm')}Filter — cve:2024 actor:lockbit source:cert</div><div class="r"><span class="chip">${I('square-check','sm')}Select</span><span class="chip">Newest first ${I('chevron-down','sm')}</span><span class="sp"></span>9 in Inbox</div></div>
+      <div class="items">${IT.map(g => `<div class="dh">${g.d}</div>${g.l.map(x => { k++; const i = k; return `<div class="it${SEL === i ? ' on' : ''}" onclick="SEL=${i};draw()"><span class="u${x.u ? '' : ' seen'}"></span><div><div class="t1">${x.sv ? `<span class="sv ${x.sv}">${x.sv === 'c' ? 'Critical' : 'High'}</span>` : ''}<span>${x.s}</span><span class="ag">${x.ag}</span></div><b>${x.t}</b><div class="tg">${x.tg.map(([v, c]) => `<span class="${c || ''}">${v}</span>`).join('')}</div></div></div>`; }).join('')}`).join('')}</div>
+      <div class="keys"><span><kbd>J</kbd><kbd>K</kbd>move</span><span><kbd>E</kbd>actioned</span><span><kbd>R</kbd>relevant</span><span><kbd>S</kbd>star</span><span><kbd>X</kbd>dismiss</span><span><kbd>A</kbd>add to case</span></div></section>
+    <article class="read">
+      <div class="rbar"><button class="btn" title="Star (S)">${I('star','sm')}</button><button class="btn">${I('check','sm')}Relevant</button><button class="btn">${I('check-check','sm')}Actioned</button><button class="btn" title="Dismiss (X)">${I('x','sm')}</button><span class="sp"></span><span class="split"><button class="btn pri">${I('plus','sm')}Add to Op Lantern</button><button class="btn pri">${I('chevron-down','sm')}</button></span><button class="btn" title="Read the original">${I('external-link','sm')}</button></div>
+      <h2>PAN-OS GlobalProtect zero-day CVE-2024-3400 exploited in the wild</h2>
+      <div class="rm"><span class="sv">Critical</span><b>Sample advisory digest</b><span>and 1 more source</span><span>·</span><span>Apr 12, 2024</span><span>·</span><span>Vulnerabilities</span></div>
+      <div class="cols"><div>
+        <div class="wh"><h4>Why it is in your inbox</h4><div>${I('server','sm')}<span><b>In your stack:</b> PAN-OS is on your stack list, with no note that it is patched.</span></div><div>${I('shield-alert','sm')}<span><b>Known exploited:</b> on CISA KEV since Apr 12 — due date Apr 19 has passed.</span></div><div>${I('layers','sm')}<span><b>2 sources</b> reported it; shown as one story.</span></div></div>
+        <div class="art"><p>Palo Alto Networks disclosed a critical command injection in the GlobalProtect feature of PAN-OS, exploited before a fix was available. Volexity tracked the activity as UTA0218: exploitation of the public-facing firewall, then a Python backdoor and lateral movement.</p><p>Hotfixes are out for affected versions. Devices with GlobalProtect gateway or portal enabled and device telemetry on are exposed. Look for unexpected files under the telemetry path and outbound connections from the firewall itself.</p></div>
+        <div class="box"><h4>${I('fingerprint','sm')}Indicators in the story<span class="t3">checked against 4 cases</span></h4><table><tr><th>Value</th><th>Kind</th><th>In your cases</th><th></th></tr>
+          <tr><td class="m">CVE-2024-3400</td><td>CVE</td><td class="act">—</td><td><span class="act">Watch</span></td></tr>
+          <tr><td class="m">T1190</td><td>Technique</td><td><span class="hit">Op Lantern</span></td><td><span class="act">Hunt</span></td></tr>
+          <tr><td class="m">UTA0218</td><td>Actor</td><td class="act">—</td><td><span class="act">Add</span></td></tr></table></div>
+      </div><div>
+        <div class="box cve"><div class="top2"><span class="id">CVE-2024-3400</span><span class="kev">KEV</span></div><div class="p">Palo Alto Networks · PAN-OS · OS command injection</div>
+          <div class="meters"><div class="meter"><span>CVSS 3.1</span><b>10.0</b><i><u style="width:100%"></u></i></div><div class="meter"><span>EPSS · 30 days</span><b>94%</b><i><u style="width:94%"></u></i></div></div>
+          <div class="kv2"><span>Added to KEV</span><b>2024-04-12</b><span>Due</span><b style="color:var(--red)">2024-04-19 · passed</b><span>Ransomware use</span><b>Unknown</b><span>Your stack</span><b>PAN-OS 10.2</b></div></div>
+        <div class="box"><h4>${I('crosshair','sm')}ATT&amp;CK in this story</h4><div class="ttp"><span class="cov"><b>T1190</b>Exploit public app</span><span class="gap"><b>T1059</b>Command interpreter</span><span class="gap"><b>T1505</b>Server component</span></div><div class="ttp-n">1 of 3 covered by your detection rules · <u>draft rules for the rest</u></div></div>
+      </div></div>
+    </article>
+  </div></div></section>`;
+}
+draw();
+</script>
+</body>
+</html>

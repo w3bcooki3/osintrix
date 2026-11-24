@@ -64,7 +64,7 @@ function ctiLookView(){
       <div class="lk-acts">
         <button class="btn sm" data-act="lookAgain">${ico('refresh-cw', busy ? 'sm spin' : 'sm')}Check again</button>
         ${/malicious|suspicious|benign/.test(V.band) && mine !== V.band ? `<button class="btn sm primary" data-act="lookVerdict" data-v="${V.band}">${ico('check','sm')}Mark ${esc(V.band)}</button>` : mine ? `<span class="t3 small">Your verdict: ${vdLabel(mine)}</span>` : ''}
-        ${KIND_TO_TYPE[k] || k === 'cve' ? `<button class="btn sm" data-act="lookAdd">${ico('plus','sm')}Add to ${esc(caseNm(theCase()))}</button>` : ''}
+        ${KIND_TO_TYPE[k] || k === 'cve' ? `<button class="btn sm" data-act="lookAdd">${ico('plus','sm')}Add to ${esc(caseNm(theCase()))}</button>${casePick()}` : ''}
         <button class="btn sm${isWatched(key) ? ' on' : ''}" data-act="watch" data-id="${esc(key)}">${ico(isWatched(key) ? 'eye-off' : 'eye','sm')}${isWatched(key) ? 'Unwatch' : 'Watch'}</button>
         <button class="btn sm ghost" data-act="lookNote">${ico('copy','sm')}Copy summary</button></div></section>
     <div class="lk-grid">

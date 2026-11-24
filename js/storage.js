@@ -30,7 +30,7 @@ async function stoGuard(bytes, what){
   if(await stoRoom(bytes)) return true;
   const free = Math.max(0, STO_QUOTA() - (STORE.usage || 0));
   openDlg(dhead('Not enough space in this browser') + `<div class="in"><p style="margin:0 0 10px">To ${esc(what)} needs about <b>${stoBytes(bytes * 1.5 + 5e6)}</b>, and this browser has <b>${stoBytes(free)}</b> left for OSINTrix. <b>Nothing was changed.</b></p>
-    <p class="t2" style="margin:0">Free space in Settings → Storage: empty the trash, remove restore points, or save finished cases as snapshot files on your computer and delete them here.</p></div>
+    <p class="t2" style="margin:0">Free space in Settings → Storage: empty the trash, remove restore points, or move archived cases to files on your computer (their cards stay).</p></div>
     <footer><button class="btn" data-act="dclose">Close</button><button class="btn primary" data-act="stoManage">Manage storage</button></footer>`);
   return false;
 }
@@ -80,6 +80,7 @@ function storageCard(){
       ${I.nbGoneN ? row(`Deleted notebook pictures, kept ${NB_KEEP_DAYS} days for undo`, stoBytes(I.nbGone), 'stoNbFree', 'Free now') : ''}
       ${row(`Restore points (${I.snapN} of ${SNAP_MAX})`, stoBytes(I.snaps), I.snapN > 2 ? 'stoSnapTrim' : '', 'Keep newest 2')}
       ${typeof recentAll === 'function' ? row(`Recent tool inputs (${recentAll().length}) — certificates, Lab files, cloud`, stoBytes(recentBytes()), recentAll().length ? 'rcShow' : '', 'Manage').replace('data-act="rcShow"', 'data-act="rcShow" data-v="*"') : ''}
+      ${typeof stashCandidates === 'function' ? (L => L.length ? row(`Archived cases you could move to files (${L.length})`, stoBytes(L.reduce((s, x) => s + x.s, 0)), 'stashPick', 'Choose') : '')(stashCandidates()) : ''}
       ${row(`Trash (${I.trashN} item${I.trashN === 1 ? '' : 's'})`, I.trashN ? 'auto-empties after 30 days' : '—', I.trashN ? 'trEmpty' : '', 'Empty')}
       ${I.orphans.length ? row(`Leftover files nothing uses (${I.orphans.length})`, '', 'stoOrphans', 'Remove') : ''}</div>` : '<p class="t3">Measuring…</p>'}
     <p class="t3 sto-n">${STORE.persisted ? 'Marked persistent: the browser will not clear this data to free disk space.' : 'Not marked persistent: under heavy disk pressure the browser may clear it.'}

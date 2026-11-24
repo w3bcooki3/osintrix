@@ -50,7 +50,8 @@ const PROTO_N = {1:'ICMP', 6:'TCP', 17:'UDP', 47:'GRE', 50:'ESP', 58:'ICMPv6'};
 /* ---------- helpers ---------- */
 function kvParse(s){
   const out = {}; let n = 0;
-  const re = /([A-Za-z_][\w.\-()]{0,48})=(?:"((?:[^"\\]|\\.)*)"|'([^']*)'|((?:(?![A-Za-z_][\w.\-()]{0,48}=)[^\s,;])+|))/g; let m;
+  /* a key starts where a word starts — tried mid-word too, a long run of letters made this quadratic */
+  const re = /(?<![\w.\-()])([A-Za-z_][\w.\-()]{0,48})=(?:"((?:[^"\\]|\\.)*)"|'([^']*)'|((?:(?![A-Za-z_][\w.\-()]{0,48}=)[^\s,;])+|))/g; let m;
   while((m = re.exec(s)) !== null){ const k = m[1], v = m[2] != null ? m[2] : m[3] != null ? m[3] : m[4]; if(!k || out[k] != null) continue; out[k] = v; n++; if(n > 200) break; }
   return n >= 2 ? out : null;
 }

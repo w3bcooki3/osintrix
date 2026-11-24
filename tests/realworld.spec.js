@@ -1207,6 +1207,11 @@ test('infrastructure pivots: WHOIS, RDAP, dig, crt.sh, Shodan, Censys and passiv
   await page.locator('.if-g', { hasText: 'k.voss.reg@mailbox.example' }).locator('[data-act=ifSub]', { hasText: I }).click();
   await expect(page.locator('.if-t tbody tr').first()).toContainText(I);
   expect(await page.locator('.if-t tbody tr').evaluateAll((rows, I) => rows.every(r => r.textContent.includes(I)), I)).toBe(true);
+  // the name also opens in the details panel, and the facts list is brought into view
+  expect(await page.evaluate(() => UI.sel && UI.sel.kind === 'ent' && UI.sel.id)).toBe('domain:' + I);
+  await expect(page.locator('#insp')).toContainText(I);
+  await expect.poll(() => page.evaluate(() => { const b = document.getElementById('ifAll').getBoundingClientRect(); return b.top >= 0 && b.top < innerHeight; })).toBe(true);
+  await page.locator('#insp [data-act=closeInsp]').click();
   await page.locator('.if-t tbody tr', { hasText: 'registrant email' }).locator('[data-act=tlxRec]').click();
   expect(await page.evaluate(() => [UI.tlMode, recById(UI.sel.id).title])).toEqual(['events', 'rdap-invoices.json']);
   noErrors(errors);
@@ -1440,7 +1445,7 @@ test('trash: always in the sidebar; deleting a rule, saved query, hunt, playbook
     clickAct('pbDelAsk', b.pb); await new Promise(r => setTimeout(r, 50)); dismiss(); }, before);
   const kinds = await page.evaluate(() => DB.trash.map(x => x.kind).sort());
   expect(kinds).toEqual(['auto', 'entry', 'hunt', 'note', 'playbook', 'query', 'record', 'rule', 'tool'].filter(k => k !== 'query' || before.query));
-  await page.reload();
+  await expect.poll(() => page.evaluate(() => { flush(); return isDirty(); }), { timeout: 15000 }).toBe(false); await page.reload();
   await expect.poll(() => page.evaluate(() => typeof DB !== 'undefined' && !!DB && !!document.querySelector('#sidenav .nv') && Array.isArray(DB.trash) ? DB.trash.length : -1), { timeout: 15000 }).toBe(kinds.length);   // the trash survives a refresh                               // the trash survives a refresh
   await page.evaluate(() => go('#/trash'));
   await expect(page.locator('.binrow')).toHaveCount(kinds.length);

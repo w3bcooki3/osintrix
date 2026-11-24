@@ -951,7 +951,7 @@ test('decompression bombs are stopped and download names are made safe', async (
 test('threat intel news: stories merge across sources, CVEs/actors/techniques are read, triage, stack alerts and CVE pages', async ({ page }) => {
   const errors = await open(page, '#/feeds'); const outside = [];
   page.on('request', r => { if (!/^(file|data|blob):/.test(r.url())) outside.push(r.url()); });
-  await page.click('[data-act=itri][data-v=all]');
+  await page.click('[data-act=itab][data-v=feed]'); await page.click('[data-act=itri][data-v=all]');
   const pan = page.locator('.ti-st:has-text("PAN-OS GlobalProtect zero-day")');
   await expect(pan.locator('.ti-more')).toHaveText('+1 source');                                         // two sources, one story
   await expect(pan.locator('.ti-chip.cve.kev')).toContainText('CVE-2024-3400');                          // known exploited
@@ -1172,7 +1172,7 @@ test('threat intel "For you": stories touching your cases, watchlist and stack c
     DB.feed = [mk('Quarterly gardening trends report', 1), mk('Gardening tools roundup', 2), mk('Gardening season opens', 3), mk('Ransomware gang hits hospital', 30), mk('Ransomware group leaks data', 31), mk('Ransomware actors use new loader', 40), mk('Infrastructure at 198.51.100.77 used by attackers', 50)];
     DB.watch = { 'ipv4:198.51.100.77': { at: now - 864e5 * 10 } };
     DB.feed.slice(0, 2).forEach(f => f.st = 'dismissed'); DB.feed[3].st = 'relevant'; DB.feed[4].st = 'relevant'; mutate('t');
-    UI.itri = 'all'; UI.isort = 'you'; const S = ctiFeedList();
+    UI.itab = 'feed'; UI.itri = 'all'; UI.isort = 'you'; const S = ctiFeedList();
     return { first: S[0].lead.title, why: S[0].rk.why, order: S.map(s => s.lead.title), learned: ctiModel().wt.get('ransomware') > 0 && ctiModel().wt.get('gardening') < 0 };
   });
   expect(r.first).toMatch(/198\.51\.100\.77/); expect(r.why.join(' ')).toMatch(/watched indicator/);
@@ -1661,6 +1661,8 @@ test('media: drop, paste or add pictures, videos and saved pages to a case; orig
   // pasted: the same picture again is stored once
   await page.evaluate(() => { const dt = new DataTransfer(); dt.items.add(new File([window.__png], 'image.png', { type: 'image/png' })); document.body.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); });
   await expect(page.locator('.md-c')).toHaveCount(3);
+  // the video's preview frame and size are read after it is stored — on a busy machine that can take a few seconds
+  await expect.poll(() => page.evaluate(async () => { const v = caseMediaItems('c-lantern').find(x => x.k === 'video'); return !!(v && v.a.w) && (await IDB.keys()).filter(k => /^file:.*\.p$/.test(k)).length; }), { timeout: 20000 }).toBe(2);
   const st = await page.evaluate(async () => { const I = caseMediaItems('c-lantern'), keys = (await IDB.keys()).filter(k => /^file:/.test(k));
     const v = I.find(x => x.k === 'video').a, im = I.find(x => x.a.name === 'photo.png').a;
     return { names: I.map(x => x.a.name).sort(), stored: keys.filter(k => !k.endsWith('.p')).length, prev: keys.filter(k => k.endsWith('.p')).length, vw: v.w, vdur: v.dur == null || v.dur > 0, iw: im.w, shot: I.some(x => /^screenshot-/.test(x.a.name)) }; });

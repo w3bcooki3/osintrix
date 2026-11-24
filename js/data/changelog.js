@@ -4,6 +4,326 @@
    Each change has a type: "added" | "changed" | "fixed" | "removed". */
 const CHANGELOG_DATA = [
   {
+    "version": "1.69",
+    "name": "More queries, rules and tricks",
+    "date": "2026-11-23",
+    "summary": "A bigger toolbox on the OSINT, cloud and detection sides: 72 investigation queries and five more search engines, 87 new detection rules, a cloud OSINT section in the field guide, four reference tables, two Tradecraft chapters and four playbooks.",
+    "changes": [
+      {
+        "type": "added",
+        "text": "Queries: 72 investigation queries — infrastructure pivots (favicon hash, JARM, SSH host key, certificates, page body and title, analytics IDs, reverse IP), threat hunting (Cobalt Strike, GoPhish, open directories, C2 panels), cloud exposure (buckets, Firebase, SharePoint, Docker, Kubernetes, Terraform state), leaks, Telegram, Discord and WhatsApp, people and handles, wallets and onions. They are added once to existing libraries; a query you delete stays deleted."
+      },
+      {
+        "type": "added",
+        "text": "Five more engines for queries: urlscan.io, crt.sh, PublicWWW, grep.app and Yandex — and three new categories: Infrastructure pivots, Threat hunting, and Telegram, Discord & chat."
+      },
+      {
+        "type": "added",
+        "text": "Detections: 72 Sigma rules — AWS (CloudTrail stopped, Bedrock LLMjacking, Roles Anywhere, public RDS snapshots, domain transfer), Entra and Azure, Exchange, Okta (session roaming, impersonation), Google Cloud, Google Workspace (domain-wide delegation), GitHub, Kubernetes, chat-platform and blockchain C2 in proxy and DNS logs, ClickFix, WebDAV and search-ms lures, cloud metadata theft on Linux, and macOS stealers."
+      },
+      {
+        "type": "added",
+        "text": "Detections: 15 YARA rules — Discord webhook and Telegram bot exfiltration, dead-drop resolvers, Chrome app-bound key theft, ClickFix pages, EtherHiding loaders, wallet drainers, Evilginx phishlets, cloud credential harvesters, leaked AWS keys, private keys and SaaS tokens, stealer-log files and phishing kits that report to Telegram."
+      },
+      {
+        "type": "added",
+        "text": "Cloud → Field guide → Cloud OSINT, outside in: Microsoft 365 tenant from a domain, the SaaS stack from DNS, AWS account ID from a key or bucket, public snapshots, Azure and Google Cloud names, which cloud an IP belongs to, the real server behind a CDN, and identity providers — each says what the owner can see of your lookup."
+      },
+      {
+        "type": "added",
+        "text": "Reference: platform IDs and the creation time inside them (Discord, X, LinkedIn, Instagram, TikTok, Mastodon, Bluesky, GitHub and more), cloud and SaaS key formats, Okta System Log events, and Google Workspace and GitHub audit events."
+      },
+      {
+        "type": "added",
+        "text": "Tradecraft: two chapters — Tricks that save hours (search engines, archives, identifiers, images, infrastructure history) and From findings to detections."
+      },
+      {
+        "type": "added",
+        "text": "Playbooks: company cloud footprint from outside, company accounts in info-stealer logs, adversary-in-the-middle phishing and session theft, and crypto drainer sites."
+      }
+    ]
+  },
+  {
+    "version": "1.68",
+    "name": "Chats & forwards, and names over time",
+    "date": "2026-11-23",
+    "summary": "The network behind the chats you import — where they forward from, posts pushed into several chats within minutes, the same words from different accounts, clusters — and every name a Telegram or Discord account went by.",
+    "changes": [
+      {
+        "type": "added",
+        "text": "Infrastructure → Chats: a forward map (sources → your chats, width by forwards), every source with its forwards, chats reached, first and last time and whether it appears in your other cases; coordinated pushes — one post in several chats, forwarded or copy-pasted, with how far apart and which chat had it first; texts sent word for word by different accounts; clusters of chats that share sources; and which chat tends to post first."
+      },
+      {
+        "type": "added",
+        "text": "Names over time: a Telegram or Discord account's panel lists every name and username it went by in your exports, in order, with when and where — and Infrastructure → Chats lists the accounts that changed name."
+      },
+      {
+        "type": "changed",
+        "text": "Chat exports keep each message's source, links and a fingerprint of its words (not a second copy of the text) for this analysis; the Telegram channel playbook points to it."
+      },
+      {
+        "type": "fixed",
+        "text": "On a busy or slow computer a video's size and preview could be skipped because the player took over 6 seconds to open it; it now waits up to 15."
+      },
+      {
+        "type": "changed",
+        "text": "Text that cannot hold an ENS name, a Telegram or Discord number, or a long hex value skips those checks — reading indicators out of large text is back to its earlier speed."
+      }
+    ]
+  },
+  {
+    "version": "1.67",
+    "name": "Chat exports, and playbooks for scammers and actors on chat platforms",
+    "date": "2026-11-23",
+    "summary": "Telegram and Discord exports become one record per author with their permanent account number; four playbooks and a Tradecraft chapter cover scammers, Discord, actors on chat platforms, and bots or webhooks found in malware.",
+    "changes": [
+      {
+        "type": "added",
+        "text": "Drop a Telegram Desktop export (result.json) or a DiscordChatExporter JSON into Capture: each author becomes a record with their messages and their permanent account number — Telegram user ID or Discord ID, which stay the same when names change — and the post times go to Active hours. Service messages are left out; channel posts are marked as the channel's."
+      },
+      {
+        "type": "added",
+        "text": "Telegram and Discord IDs are indicators. A Discord ID's profile shows when the account, server or channel was created (read from the ID itself) and flags ones made in the last 30 days."
+      },
+      {
+        "type": "added",
+        "text": "The same Telegram or Discord account in two cases ties them as a persona; names an author mentions in their messages are not taken for the author. Writing can be compared between chat authors."
+      },
+      {
+        "type": "added",
+        "text": "Playbooks: Scammer on Telegram, Discord or WhatsApp; Discord server and user investigation; Threat actor on chat platforms; Telegram bot or Discord webhook found in malware."
+      },
+      {
+        "type": "added",
+        "text": "Tradecraft → Telegram, Discord and other chats: what each platform reveals (permanent IDs, forwards, Fragment usernames, snowflake dates, invites and widgets, connected accounts), what it shows about you, and the lines not to cross — never using a bot token or webhook found in malware, never buying or downloading stolen data, never baiting without authority."
+      }
+    ]
+  },
+  {
+    "version": "1.66",
+    "name": "Solana trails from files, and writing compared",
+    "date": "2026-11-23",
+    "summary": "Solana wallets get a money trail from transfers you export from an explorer, and two names' writing can be compared as supporting evidence — ranked against every other writer in your evidence.",
+    "changes": [
+      {
+        "type": "added",
+        "text": "Solana in the money trail: import a wallet's transfers exported as CSV (e.g. from Solscan) — raw amounts are read with their decimals column, SOL and tokens are kept apart, wallets go into the vault with Solana as their currency. Nothing is fetched: the public Solana endpoint refuses browser requests and the alternatives need an account key, so the panel says so instead of offering a button that would fail."
+      },
+      {
+        "type": "added",
+        "text": "Writing compared (a handle's panel → Compare its writing with…, or Compare writing on a persona): letter patterns, the small words a writer leans on, and habits — punctuation, capitals, British or American spelling, dropped apostrophes, misspellings, shorthand — per 1,000 words, with the phrases both use."
+      },
+      {
+        "type": "added",
+        "text": "The result is ranked against every other writer in your evidence with 250+ words (“closer than 4 of 4 others”); with fewer than three others no ranking is given. Indicators are taken out first, too little text says nothing, and the dialog says plainly it is supporting evidence only."
+      }
+    ]
+  },
+  {
+    "version": "1.65",
+    "name": "OPSEC you can check, and a persona log",
+    "date": "2026-11-23",
+    "summary": "Tradecraft now shows what this browser tells every site, read locally, and keeps a log of which research persona looked at what. A 10,000-record case was timed screen by screen; the graph no longer rebuilds itself on every change.",
+    "changes": [
+      {
+        "type": "added",
+        "text": "What this browser tells every site (Tradecraft): time zone, languages, screen and window, platform, WebRTC — and whether it gives away a local address — and a canvas fingerprint, all read here with nothing sent. A language that does not fit the time zone, many languages, and WebRTC left on are called out; the public address is left to a leak test, as it cannot be seen from inside the page."
+      },
+      {
+        "type": "added",
+        "text": "The readiness check shows what the browser itself says next to the WebRTC and time-zone points."
+      },
+      {
+        "type": "added",
+        "text": "Your research personas (Tradecraft): each persona's name, platforms and where it connects from — never passwords — and a log of each use: case, platform, what was looked at. Warns when a persona touches three or more cases, is used ten or more times on one case in a week, or wakes after two months; a burned persona is kept as a record and cannot be logged again."
+      },
+      {
+        "type": "changed",
+        "text": "The case graph keeps its drawing when the page re-renders with the same data — a 2,000-node graph re-rendered in about 0.3 s instead of 1.6 s."
+      },
+      {
+        "type": "added",
+        "text": "A 10,000-record case is built in the tests and every case tab, the main pages, saving and moving it to a file must stay within a time limit."
+      }
+    ]
+  },
+  {
+    "version": "1.64",
+    "name": "Tradecraft, onion pages and personas",
+    "date": "2026-11-23",
+    "summary": "A field guide for investigating without being seen and for running an actor investigation; pages saved from Tor Browser read as dark-web pages; and personas found across cases from the identifiers operators keep.",
+    "changes": [
+      {
+        "type": "added",
+        "text": "Tradecraft (sidebar → Kit): your threat model, the research environment (VMs, Whonix, Tails, Qubes, VPN, Tor, residential egress, leak tests, browser hardening, handling subject files), research personas from building to retiring, starting an actor investigation, a pivot table (what to pivot on, where, and how much it says), finding the human behind infrastructure, and attribution you can defend. Searchable, works offline; points done in the app open where they are done."
+      },
+      {
+        "type": "added",
+        "text": "A readiness check before each session — VM, egress, leaks, accounts, time zone, files, logging, authorisation — kept in the workspace and cleared for a new session."
+      },
+      {
+        "type": "added",
+        "text": "Four playbooks to run on a case: Investigation environment & OPSEC, Research persona lifecycle, Actor investigation from one indicator, Finding the operator behind the infrastructure."
+      },
+      {
+        "type": "added",
+        "text": "Pages saved from Tor Browser are read as dark-web pages: the onion site from where its links point (Tor Browser records no address), the profile the page is about, the profiles it links, mirrors and other onions, signed messages, prices — titled “Onion page:” and tagged darkweb."
+      },
+      {
+        "type": "added",
+        "text": "Session and Tox messenger IDs are recognised (a Tox ID's checksum is checked); neither is taken for a file hash."
+      },
+      {
+        "type": "added",
+        "text": "Personas across your evidence (Entities): names that share a PGP key, wallet, email, phone or messenger ID, across cases, with what ties them and where. A username alone never ties names, and a page that names many people ties none. Make a profile in the open case in one step: a Person linked to every identifier, the PGP key with its names and emails."
+      },
+      {
+        "type": "added",
+        "text": "A new vault type, PGP key, with its fingerprint, the names and emails on it and when it was made."
+      }
+    ]
+  },
+  {
+    "version": "1.63",
+    "name": "Cases kept in files",
+    "date": "2026-11-23",
+    "summary": "An archived case can move out of the browser into one file on your computer — checked byte for byte before anything is removed — and come back whole from it. Plus a phone and tablet pass.",
+    "changes": [
+      {
+        "type": "added",
+        "text": "Move to a file (case menu, or Settings → Storage for archived cases, biggest first): the case is saved as one file — encrypted when the workspace is — then you pick the file back, it is compared byte for byte with what was saved, and only then are its entries, records, notes, links and attached files removed here."
+      },
+      {
+        "type": "added",
+        "text": "A case kept in a file keeps its card: name, scope, counts, size, the file's name and SHA-256. Its indicators are still matched — an indicator it shares says “Also in a case kept in a file”."
+      },
+      {
+        "type": "added",
+        "text": "Bring it back from its card by picking the same file: everything returns under the same ids, attached files included. A copy that has changed since is shown as such before it is brought back."
+      },
+      {
+        "type": "changed",
+        "text": "On a phone, a case's four actions (more, edit, entry, capture) sit on one row."
+      },
+      {
+        "type": "fixed",
+        "text": "Every page and case tab is checked to fit phone and tablet widths."
+      },
+      {
+        "type": "fixed",
+        "text": "Reading key=value logs with a very long field took about half a second per line; it now takes a few milliseconds."
+      }
+    ]
+  },
+  {
+    "version": "1.62",
+    "name": "Web3 and dark-web identifiers",
+    "date": "2026-11-23",
+    "summary": "ENS names, Solana addresses and signatures, Bitcoin and Ethereum transactions, Tor onion addresses and PGP keys are recognised, checked offline, and each leads somewhere.",
+    "changes": [
+      {
+        "type": "fixed",
+        "text": "A Bitcoin transaction ID is no longer taken for a SHA-256 file hash when it sits next to “tx”, “txid”, “transaction” or a block-explorer link; a hash found next to payment words offers to be read as a transaction."
+      },
+      {
+        "type": "added",
+        "text": "New indicators: ENS names (name.eth), Solana addresses and transaction signatures (checked as base58 keys of 32 and 64 bytes), Ethereum transaction hashes and Bitcoin transaction IDs."
+      },
+      {
+        "type": "added",
+        "text": "A Bitcoin or Ethereum transaction can be fetched on its own (mempool.space, eth.blockscout.com, asking first): when, block, status, fee, every input and output with amounts, tokens moved — and its wallets go into the case in one step. The answer is kept as evidence."
+      },
+      {
+        "type": "added",
+        "text": "An ENS name resolves to its Ethereum wallet through Blockscout, with the registration expiry (an expired name can be taken by anyone); the result is kept as evidence and the wallet can be added to the case."
+      },
+      {
+        "type": "added",
+        "text": "Tor onion addresses: version, checksum (a typo or made-up address fails it), v2 addresses called out as dead, other onions in your cases that start the same way (a vanity mirror or a phishing copy), and onions listed together in one text. Ahmia is the only pivot offered; nothing is looked up."
+      },
+      {
+        "type": "added",
+        "text": "PGP keys: a pasted public key block gives its fingerprint, creation date, algorithm, subkeys and every name and email on it — the emails become indicators. Fingerprints are also recognised written with spaces or after “fingerprint”; the same key in two cases ties them."
+      },
+      {
+        "type": "fixed",
+        "text": "A URL that contained a hash or a transaction ID was saved with blanks in place of it."
+      },
+      {
+        "type": "fixed",
+        "text": "An indicator's profile could miss evidence added since it was first shown."
+      }
+    ]
+  },
+  {
+    "version": "1.61",
+    "name": "Threat Intel overview",
+    "date": "2026-11-23",
+    "summary": "Threat Intel opens on an Overview that works out what stands out from your stories, cases, stack and rules, and stories open in a wider panel that says why each one matters to you.",
+    "changes": [
+      {
+        "type": "added",
+        "text": "Threat Intel → Overview, the first tab: four findings worked out from what is stored — products you run with known-exploited flaws in the news, news indicators already in your cases, how much of each named ATT&CK group your rules cover, and the technique in the news with the fewest rules."
+      },
+      {
+        "type": "added",
+        "text": "Overview boxes: actors and malware named in your stories (groups with a rule-coverage bar), the known-exploited CVEs with their CISA due date and whether you run the product, and the techniques named against how many of your rules are tagged with each."
+      },
+      {
+        "type": "added",
+        "text": "Overview stories table with filters (unread, in my cases, my stack, known exploited, critical), stories per month by category, your cases in the news, and the sources."
+      },
+      {
+        "type": "added",
+        "text": "“Start a rule for it” makes a Sigma rule with the technique's title, description and ATT&CK tag filled in; the detection logic is yours to write."
+      },
+      {
+        "type": "changed",
+        "text": "The story panel is wider and opens with a short slide; it puts “Why it matters to you” first (indicators in your cases, known-exploited CVEs and your stack, actor coverage, rules per technique), then the source's own summary, with Add to case and Read original kept at the bottom."
+      },
+      {
+        "type": "added",
+        "text": "Previous / next in the story panel, and J / K, step through the list you opened it from."
+      },
+      {
+        "type": "fixed",
+        "text": "Star, Relevant, Actioned and Dismiss in the story panel now show their new state straight away."
+      }
+    ]
+  },
+  {
+    "version": "1.60",
+    "name": "Fixes from a walk through the sample case",
+    "date": "2026-11-23",
+    "summary": "The timeline no longer goes blank when you scroll, the details panel stays inside itself, names in Infrastructure lead somewhere, and anything a tool saves can go to the case you choose.",
+    "changes": [
+      {
+        "type": "fixed",
+        "text": "Timeline: scrolling through days could leave the screen blank below a day heading. A heading stuck at the top was measured where it was stuck instead of where it sits, which threw off every row after it. Checked at four screen sizes and on a 20,000-event timeline."
+      },
+      {
+        "type": "fixed",
+        "text": "Details panel: long flags (a phone number in a drama range, an invalid number) wrapped instead of pushing the panel sideways. Every vault entry and indicator of the sample case is now checked for this."
+      },
+      {
+        "type": "fixed",
+        "text": "Board: the legend and zoom sit at the bottom when there is no time slider under them."
+      },
+      {
+        "type": "fixed",
+        "text": "Infrastructure → What they share: a name opens its details and narrows “All facts” to it, and the list is brought into view (it used to filter a list further down the page, out of sight)."
+      },
+      {
+        "type": "changed",
+        "text": "On a wide screen the open details card takes its own room: the page beside it narrows instead of hiding under it (hypotheses, sources and other case pages)."
+      },
+      {
+        "type": "added",
+        "text": "Every “Save to <case>” and “Add to <case>” button — decoder, certificates, lookups, email and log tools, SQLite, PCAP, checklists, the query library, stories — has a ▾ to pick the case. What you were working on stays on screen."
+      }
+    ]
+  },
+  {
     "version": "1.59",
     "name": "Cases go by their names; a cleaner decoder and story view",
     "date": "2026-11-23",

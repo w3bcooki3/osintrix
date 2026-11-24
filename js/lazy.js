@@ -16,6 +16,7 @@ const LZ = {
   kev:{f:'kev-snapshot.js', has:() => typeof KEV_SNAPSHOT !== 'undefined', then:() => { if(typeof CTI !== 'undefined' && !CTI.kevLive && typeof ctiKevIndex === 'function') ctiKevIndex(); }, shows:r => ['feeds','home','case','today'].includes(r.area)},
   pb:{f:'playbooks-pack.js', has:() => typeof PB_PACK !== 'undefined', then:() => { if(DB && typeof ensurePlaybooks === 'function') ensurePlaybooks(); }, shows:r => r.area === 'playbooks'},
   ref:{f:'reference-pack.js', has:() => typeof REFPACK !== 'undefined', then:() => { if(typeof REF_ALL !== 'undefined') REF_ALL = null; }, shows:r => r.area === 'reference'},
+  tc:{f:'tradecraft-pack.js', has:() => typeof TRADECRAFT !== 'undefined', shows:r => r.area === 'tradecraft'},
   cloud:{f:'cloudguide-pack.js', has:() => typeof CLOUDGUIDE_PACK !== 'undefined', then:() => { if(typeof CG_ALL !== 'undefined') CG_ALL = null; }, shows:r => r.area === 'cloud'},
   certs:{f:'cert-samples.js', has:() => typeof CERT_SAMPLES !== 'undefined', shows:r => r.area === 'certs'},
   nbdemo:{f:'notebook-demo.js', has:() => typeof NB_DEMO_SHOT !== 'undefined', shows:r => r.area === 'notebook'},

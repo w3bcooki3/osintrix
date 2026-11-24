@@ -9,28 +9,38 @@ const ENGINES = {
   shodan:['Shodan','https://www.shodan.io/search?query='], censys:['Censys','https://search.censys.io/search?resource=hosts&q='],
   github:['GitHub code','https://github.com/search?type=code&q='], zoomeye:['ZoomEye','https://www.zoomeye.hk/searchResult?q='],
   fofa:['FOFA','https://en.fofa.info/result?qbase64=', true], intelx:['Intelligence X','https://intelx.io/?s='],
+  urlscan:['urlscan.io','https://urlscan.io/search/#'], crtsh:['crt.sh','https://crt.sh/?q='], publicwww:['PublicWWW','https://publicwww.com/websites/'],
+  grepapp:['grep.app','https://grep.app/search?q='], yandex:['Yandex','https://yandex.com/search/?text='],
 };
 const QCATS = {osint:['OSINT','#8b5cf6'], people:['People','#8b5cf6'], social:['Social','#ec4899'], files:['Files & documents','#0ea5a4'], 'code & files':['Code','#0ea5a4'],
   databases:['Databases','#3b82f6'], cloud:['Cloud storage','#06b6d4'], vulnerabilities:['Vulnerabilities','#f59e0b'], iot:['IoT & devices','#f97316'], network:['Network','#3b82f6'],
   login:['Login panels','#e5484d'], web:['Web','#5468ff'], government:['Government','#64748b'], 'data leaks':['Data leaks','#e5484d'], crypto:['Crypto','#eab308'],
-  'dark-web':['Dark web','#6b7280'], 'remote-access':['Remote access','#f97316'], custom:['My queries','#5468ff']};
+  'dark-web':['Dark web','#6b7280'], 'remote-access':['Remote access','#f97316'], pivots:['Infrastructure pivots','#14b8a6'], 'threat-hunt':['Threat hunting','#e5484d'],
+  messaging:['Telegram, Discord & chat','#0ea5e9'], custom:['My queries','#5468ff']};
 const qcat = c => QCATS[c] || [c, '#5468ff'];
 const varsOf = q => [...new Set((String(q).match(/\{\{\s*([A-Z0-9_]+)\s*\}\}/gi) || []).map(v => v.replace(/[{}\s]/g, '').toUpperCase()))];
 /* which vault field fills which variable */
 const VAR_FILL = {DOMAIN_NAME:['domain','url','email'], COMPANY_DOMAIN:['domain','email'], TARGET_SITE:['domain','url'], EMAIL_DOMAIN:['email','domain'], FULL_NAME:['person'],
-  ENTITY_NAME:['person','organization','username','alias'], CVE_ID:['vulnerability'], USERNAME:['username','social'], IP:['ip'], EMAIL:['email']};
+  ENTITY_NAME:['person','organization','username','alias'], CVE_ID:['vulnerability'], USERNAME:['username','social','messaging'], IP:['ip'], EMAIL:['email'],
+  ORG_NAME:['organization'], BRAND:['organization'], WALLET:['crypto'], ONION:['domain','url'], PGP_FP:['pgpkey'], SHA256:['file','document','media'], INDICATOR:['ip','domain','url','file','email','crypto']};
 function fillFrom(v, e){
   if(!e) return ''; let val = primary(e);
   if(/DOMAIN|SITE/.test(v)){ if(e.type === 'email') val = val.split('@')[1] || val; if(e.type === 'url') val = hostOf(val) || val; }
   if(e.type === 'username') val = val.replace(/^@/, '');
   return val;
 }
+const qFromSeed = q => ({id:'q' + q.id, name:q.name, desc:q.description || '', query:q.query, cat:q.category || 'custom', engines:(q.engines || ['google']).filter(x => ENGINES[x]).concat(q.engines && q.engines.some(x => ENGINES[x]) ? [] : ['google']), tags:q.tags || [], starred:false, uses:0, custom:false});
 function ensureQueries(){
-  if(DB.queries) return;
-  const seen = new Set();
-  DB.queries = QUERY_SEED.filter(q => { const k = q.query.trim(); if(seen.has(k)) return false; seen.add(k); return true; })
-    .map(q => ({id:'q' + q.id, name:q.name, desc:q.description || '', query:q.query, cat:q.category || 'custom', engines:(q.engines || ['google']).filter(x => ENGINES[x]).concat(q.engines && q.engines.some(x => ENGINES[x]) ? [] : ['google']), tags:q.tags || [], starred:false, uses:0, custom:false}));
-  DB.queryLog = [];
+  if(!DB.queries){
+    const seen = new Set();
+    DB.queries = QUERY_SEED.filter(q => { const k = q.query.trim(); if(seen.has(k)) return false; seen.add(k); return true; }).map(qFromSeed);
+    DB.queryLog = []; DB.qSeeded = [];
+  }
+  /* the query pack: offered once — a query the analyst deleted is not brought back */
+  if(typeof QUERY_PACK === 'undefined') return;
+  if(!Array.isArray(DB.qSeeded)) DB.qSeeded = [];
+  const offered = new Set(DB.qSeeded), have = new Set(DB.queries.map(q => q.query.trim())), ids = new Set(DB.queries.map(q => q.id));
+  for(const q of QUERY_PACK){ if(offered.has(q.id)) continue; DB.qSeeded.push(q.id); if(have.has(q.query.trim()) || ids.has('q' + q.id)) continue; DB.queries.push(qFromSeed(q)); }
 }
 function engineUrl(eng, q){
   const e = ENGINES[eng] || ENGINES.google;
@@ -122,7 +132,7 @@ function queryPanel(x){
     <div class="qp-s"><h4><span class="stepn">${vs.length ? 3 : 2}</span>Search with</h4><div class="engs">${x.engines.map(eng).join('')}</div>
       ${others.length ? `<details class="more"><summary>Other engines</summary><div class="engs">${others.map(eng).join('')}</div></details>` : ''}</div>
     <div class="qp-go"><a class="btn primary big" id="qRunLink" target="_blank" rel="noopener noreferrer" data-act="qGo" data-id="${x.id}">${ico('external-link','sm')}<span id="qRunLabel">Search</span></a>
-      <button class="btn" data-act="qCopy">${ico('copy','sm')}Copy</button><label class="chk"><input type="checkbox" id="qLog" checked> Log to ${esc(caseNm(theCase()))}</label></div>
+      <button class="btn" data-act="qCopy">${ico('copy','sm')}Copy</button><label class="chk"><input type="checkbox" id="qLog" checked> Log to ${esc(caseNm(theCase()))}</label>${casePick()}</div>
     <p class="hint" id="qRunHint"></p>
     ${runs.length ? `<div class="qp-s"><h4>Recent searches</h4>${runs.map(l => `<div class="qrun"><span class="mono">${esc(l.q)}</span><small>${esc((ENGINES[l.engine] || [l.engine])[0])} · ${esc((caseNm(l.caseId) || 'deleted case'))} · ${esc(E.fmtAgo(Date.now() - l.at))}</small><button class="iconbtn qrun-x" data-act="qRunDel" data-v="${l.at}" aria-label="Forget this search" title="Forget">${ico('x','sm')}</button></div>`).join('')}</div>` : ''}
   </div>`;

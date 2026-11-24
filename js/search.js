@@ -19,7 +19,7 @@ const SR_F = /^(verdict|type|tag|is):(.+)$/i;
 const SR_VD = ['malicious', 'suspicious', 'benign', 'none'];
 const SR_IS = {starred:'Starred vault entries', watched:'On your watchlist', open:'Open questions', solved:'Solved CTF challenges'};
 /* short names for kinds of thing, as people type them */
-const SR_TYPE_ALIAS = {ip:['ipv4', 'ipv6', 'ip'], hash:['md5', 'sha1', 'sha256', 'sha512', 'hash', 'file'], wallet:['btc', 'eth', 'ltc', 'trx', 'doge', 'xmr', 'crypto'], user:['username', 'handle', 'social'], handle:['handle', 'username'], mail:['email'], cve:['cve', 'vulnerability'], phone:['phone'], url:['url'], domain:['domain'], person:['person'], org:['organization']};
+const SR_TYPE_ALIAS = {ip:['ipv4', 'ipv6', 'ip'], hash:['md5', 'sha1', 'sha256', 'sha512', 'hash', 'file'], wallet:['btc', 'eth', 'ltc', 'trx', 'doge', 'xmr', 'sol', 'ens', 'crypto'], tx:['btctx', 'ethtx', 'soltx'], pgp:['pgp'], key:['pgp'], txid:['btctx', 'ethtx', 'soltx'], user:['username', 'handle', 'social'], handle:['handle', 'username'], mail:['email'], cve:['cve', 'vulnerability'], phone:['phone'], url:['url'], domain:['domain'], person:['person'], org:['organization']};
 const srStripScope = q => q.replace(/(^|\s)(?:in|is):(\w+)(?=\s|$)/gi, (m, sp, w) => SCOPE_ALIAS[w.toLowerCase()] ? sp : m).replace(/\s{2,}/g, ' ');
 const S = {open:false, q:'', scope:'all', at:0, flat:[], index:null};
 function srchIndex(){

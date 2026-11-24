@@ -38,12 +38,12 @@ async function mediaProbe(blob, kind){
     if(kind === 'image'){ if(/svg/i.test(blob.type)) return out; const bm = await createImageBitmap(blob); out.w = bm.width; out.h = bm.height; out.prev = await drawSmall(bm, bm.width, bm.height); if(bm.close) bm.close(); }
     else if(kind === 'video' || kind === 'audio'){
       const u = URL.createObjectURL(blob), v = document.createElement(kind); v.muted = true; v.preload = 'metadata';
-      try{ v.src = u; await waitEv(v, 'loadedmetadata', 6000);
+      try{ v.src = u; await waitEv(v, 'loadedmetadata', 15000);   // a busy or slow machine can take a while to open even a short clip
         /* recordings from browsers and some phones leave the length out; seeking to the end makes the player work it out */
         if(!isFinite(v.duration)){ try{ v.currentTime = 1e7; await waitEv(v, 'durationchange', 4000); }catch(e){} try{ v.currentTime = 0; }catch(e){} }
         if(isFinite(v.duration) && v.duration > 0) out.dur = Math.round(v.duration * 10) / 10;
         if(kind === 'video' && v.videoWidth){ out.w = v.videoWidth; out.h = v.videoHeight;
-          try{ v.currentTime = Math.min(1, (out.dur || 0) / 10); await waitEv(v, 'seeked', 6000); out.prev = await drawSmall(v, v.videoWidth, v.videoHeight); }catch(e){} } }
+          try{ v.currentTime = Math.min(1, (out.dur || 0) / 10); await waitEv(v, 'seeked', 15000); out.prev = await drawSmall(v, v.videoWidth, v.videoHeight); }catch(e){} } }
       finally { v.removeAttribute('src'); try{ v.load(); }catch(e){} URL.revokeObjectURL(u); }
     }
   }catch(e){}

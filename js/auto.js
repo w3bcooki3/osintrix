@@ -14,7 +14,7 @@
            · ask a question · set a verdict · run a playbook (once per case)
    ========================================================================== */
 const AUTO = {busy:false, t:0};
-const AUTO_KINDS = [['ip', 'IP addresses', ['ipv4', 'ipv6']], ['domain', 'Domains', ['domain']], ['url', 'URLs', ['url']], ['hash', 'File hashes', ['md5', 'sha1', 'sha256', 'sha512']], ['email', 'Email addresses', ['email']], ['cve', 'CVEs', ['cve']], ['handle', 'Usernames and profiles', ['handle', 'social']], ['wallet', 'Crypto wallets', ['btc', 'eth', 'xmr', 'ltc', 'trx', 'doge']], ['phone', 'Phone numbers', ['phone']]];
+const AUTO_KINDS = [['ip', 'IP addresses', ['ipv4', 'ipv6']], ['domain', 'Domains', ['domain']], ['url', 'URLs', ['url']], ['hash', 'File hashes', ['md5', 'sha1', 'sha256', 'sha512']], ['email', 'Email addresses', ['email']], ['cve', 'CVEs', ['cve']], ['handle', 'Usernames and profiles', ['handle', 'social']], ['wallet', 'Crypto wallets', ['btc', 'eth', 'xmr', 'ltc', 'trx', 'doge', 'sol', 'ens']], ['tx', 'Crypto transactions', ['btctx', 'ethtx', 'soltx']], ['phone', 'Phone numbers', ['phone']]];
 const AUTO_DO = {store:'Check it against the indicator store', lookup:'Look it up with my switched-on sources', watch:'Watch it', vault:'Add it to the vault', question:'Ask a question', verdict:'Set a verdict', playbook:'Run a playbook on the case'};
 const AUTO_TPL = [
   {id:'t-store', name:'Check new indicators against the indicator store', when:{ev:'ind', kinds:['ip', 'domain', 'url', 'hash']}, then:[{a:'store'}], why:'Offline. Anything your feeds or imports already know about is marked suspicious and tagged with the threat.'},

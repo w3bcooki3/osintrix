@@ -191,7 +191,7 @@ function infraView(c){
   const head = `<div class="if-top"><p class="t2" style="margin:0">Paste what you got from WHOIS, RDAP, dig, passive DNS (VirusTotal, SecurityTrails, CIRCL, DNSDB or a CSV), crt.sh, Shodan or Censys. Each paste is kept as evidence; what the domains and addresses share is worked out here. Nothing is looked up.</p><button class="btn primary sm" data-act="ifPaste">${ico('plus','sm')}Paste results</button></div>`;
   if(!X.facts.length) return head + empty('network', 'No infrastructure results in this case yet', 'Paste WHOIS, DNS, certificate or scan results and the shared registrants, certificates, addresses and name servers show up here.');
   const lbl = {strong:['Strong', 'red'], medium:['Medium', 'amber'], weak:['Weak', ''], none:['Not a link', '']};
-  const sub = s => `<button class="lnk mono" data-act="ifSub" data-v="${esc(s.v)}">${esc(s.v)}</button>`;
+  const sub = s => `<button class="lnk mono" data-act="ifSub" data-v="${esc(s.v)}" aria-pressed="${UI.ifSub === s.v}" title="Open ${esc(s.v)} and list every fact about it">${esc(s.v)}</button>`;
   const card = g => `<li class="if-g${g.strength === 'none' ? ' none' : ''}"><div class="if-gh"><span class="chip sq ${lbl[g.strength][1]}">${lbl[g.strength][0]}</span><span class="t3">${esc(g.rel)}</span><b class="mono">${esc(g.v)}</b><button class="iconbtn sm" data-act="ifCopy" data-v="${esc(g.v)}" aria-label="Copy ${esc(g.v)}">${ico('copy','sm')}</button></div>
     <div class="t2 small">${esc(g.caveat || g.why)}${g.first ? ` · seen ${esc(when(g.first))}${g.last && g.last !== g.first ? ' to ' + esc(when(g.last)) : ''}` : ''}</div>
     <div class="if-subs">${g.subs.length} ${g.subs.every(s => s.k === 'ip') ? 'addresses' : 'names'}: ${g.subs.slice(0, 12).map(sub).join(', ')}${g.subs.length > 12 ? ` and ${g.subs.length - 12} more` : ''}</div></li>`;
@@ -201,7 +201,7 @@ function infraView(c){
       ${infraSvg(X)}</div>
     <section class="card if-c"><h3>What they share</h3>${real.length ? `<ul class="if-l0">${real.map(card).join('')}</ul>` : '<p class="t3">Nothing shared yet between the names and addresses here — paste results for more of them.</p>'}
       ${noise.length ? `<details class="if-noise"><summary>${noise.length} shared thing${noise.length > 1 ? 's' : ''} that mean nothing (privacy services, big DNS providers, CDN addresses)</summary><ul class="if-l0">${noise.map(card).join('')}</ul></details>` : ''}</section>
-    <section class="card if-c"><h3>All facts${UI.ifSub ? ` about <span class="mono">${esc(UI.ifSub)}</span> <button class="btn xs" data-act="ifSub" data-v="">Show all</button>` : ''} <span class="t3">${F.length}</span></h3>
+    <section class="card if-c" id="ifAll"><h3>All facts${UI.ifSub ? ` about <span class="mono">${esc(UI.ifSub)}</span> <button class="btn xs" data-act="ifSub" data-v="">Show all</button>` : ''} <span class="t3">${F.length}</span></h3>
       <div class="if-tw"><table class="if-t"><thead><tr><th scope="col">Name or address</th><th scope="col">Fact</th><th scope="col">Value</th><th scope="col">Seen</th><th scope="col">From</th></tr></thead><tbody>
       ${F.slice(0, 400).map(f => `<tr><td class="mono">${sub({v:f.s})}</td><td>${esc(f.rel)}</td><td class="mono">${esc(f.v)}${f.note ? ` <span class="t3">${esc(f.note)}</span>` : ''}</td><td class="mono t3">${esc(when(f.first))}${f.last && f.last !== f.first ? ' – ' + esc(when(f.last)) : ''}</td><td><button class="lnk small" data-act="tlxRec" data-id="${esc(f.rec)}">${esc((X.srcs.find(s => s.r.id === f.rec) || {kind:''}).kind)}</button></td></tr>`).join('')}</tbody></table></div>${F.length > 400 ? `<p class="t3 small">Showing 400 of ${F.length}.</p>` : ''}</section>`;
 }
@@ -220,6 +220,8 @@ function infraSubmit(){
 document.addEventListener('input', ev => { if(ev.target && ev.target.id === 'ifText'){ const h = $('ifHint'); if(!h) return; clearTimeout(UI.ifT); UI.ifT = setTimeout(() => { let P = null; try{ P = infraParse(ev.target.value); }catch(e){} h.textContent = P && P.facts.length ? `Recognised: ${P.kind} — ${P.facts.length} fact${P.facts.length > 1 ? 's' : ''}` : ev.target.value.trim() ? 'Not recognised yet' : ''; }, 250); } });
 const IF_ACTS = {
   ifPaste:() => infraPasteDlg(),
-  ifSub:(id, v) => { UI.ifSub = v || null; renderMain(); },
+  /* a name opens in the details panel and the facts below narrow to it */
+  ifSub:(id, v) => { UI.ifSub = v || null; if(!v) return renderMain(); const k = /^[\d.]+$/.test(v) ? 'ipv4' : v.includes(':') ? 'ipv6' : 'domain'; renderMain(); select('ent', k + ':' + v);
+    requestAnimationFrame(() => { const a = $('ifAll'); if(a){ a.scrollIntoView({block:'start'}); a.classList.add('flash'); setTimeout(() => a.classList.remove('flash'), 1200); } }); },
   ifCopy:(id, v) => copyText(v),
 };

@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Threat Intel — A · Briefing</title>
+<link rel="stylesheet" href="../css/fonts.css">
+<script src="../js/icons.js"></script>
+<style>
+:root{--font:'Geist',system-ui,sans-serif;--mono:'Geist Mono',ui-monospace,monospace;
+  --bg:#f5f6f8;--side:#fff;--surface:#fff;--surface-2:#f8f9fb;--hover:#f2f4f7;--border:#dfe3ea;--soft:#eaedf2;
+  --text:#0f172a;--text-2:#475569;--text-3:#5b6678;--accent:#4f46e5;--accent-bg:#5b54f0;--accent-soft:#5b54f012;--accent-line:#c7c4fb;
+  --green:#047857;--green-soft:#04785712;--red:#c81e1e;--red-soft:#c81e1e10;--red-line:#f3c3c3;--amber:#a14b08;--amber-soft:#a14b0812;--amber-line:#f1d3b1;--blue:#2563eb;--sh:0 1px 2px #0f172a0a}
+[data-theme=dark]{--bg:#0b0f17;--side:#0d121c;--surface:#111723;--surface-2:#151c2a;--hover:#1a2232;--border:#2a3346;--soft:#1f2737;
+  --text:#e7ebf2;--text-2:#a9b3c4;--text-3:#8f9ab0;--accent:#a5a1ff;--accent-bg:#655cf7;--accent-soft:#6d64ff1f;--accent-line:#4b4690;
+  --green:#4ade80;--green-soft:#4ade8014;--red:#f87171;--red-soft:#f8717114;--red-line:#5c2a2a;--amber:#fbbf24;--amber-soft:#fbbf2414;--amber-line:#5a4416;--blue:#93c5fd;--sh:0 1px 2px #0006}
+*{box-sizing:border-box}
+body{margin:0;background:#dfe3ea;font:14.5px/1.5 var(--font);color:var(--text);padding:24px 0 40px}
+[data-theme=dark] body{background:#05070b}
+.i{width:16px;height:16px;stroke-width:1.8;flex:none}.i.sm{width:14px;height:14px}.i.xs{width:12px;height:12px}
+.bar{width:1440px;margin:0 auto 14px;display:flex;align-items:center;gap:12px;color:#334155;font-size:13.5px}
+[data-theme=dark] .bar{color:#a9b3c4}
+.bar b{font-size:15px}.bar .sp{flex:1}
+.bar button{height:32px;padding:0 12px;border-radius:8px;border:1px solid #c5cbd6;background:#fff;font:500 13px var(--font);cursor:pointer;display:inline-flex;align-items:center;gap:6px;color:#0f172a}
+.frame{width:1440px;height:900px;margin:0 auto;display:grid;grid-template-columns:64px 1fr;background:var(--bg);overflow:hidden;border-radius:10px;box-shadow:0 20px 60px -20px #0f172a55}
+.rail{background:var(--side);border-right:1px solid var(--soft);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:6px}
+.rail .logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#6d64ff,#a855f7);margin-bottom:12px}
+.rail b{width:40px;height:36px;border-radius:9px;display:grid;place-items:center;color:var(--text-3)}.rail b.on{background:var(--accent-soft);color:var(--accent)}
+.rail hr{width:32px;border:0;border-top:1px solid var(--soft);margin:6px 0}
+.main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.top{height:56px;flex:none;display:flex;align-items:center;gap:12px;padding:0 24px;border-bottom:1px solid var(--soft)}
+.search{width:560px;height:38px;border:1px solid var(--border);border-radius:11px;background:var(--surface);display:flex;align-items:center;gap:10px;padding:0 14px;color:var(--text-3);font-size:14px}
+.sp{flex:1}
+.btn{height:34px;padding:0 13px;border-radius:9px;border:1px solid var(--border);background:var(--surface);display:inline-flex;align-items:center;gap:7px;font:500 13.5px var(--font);color:var(--text);cursor:pointer;white-space:nowrap}
+.btn.pri{background:var(--accent-bg);border-color:var(--accent-bg);color:#fff}
+.btn.sm{height:28px;padding:0 10px;font-size:12.5px;border-radius:7px}
+.btn.ghost{border-color:transparent;background:none;color:var(--text-2)}
+.page{flex:1;overflow:auto;padding:22px 28px 28px}
+.ph{display:flex;align-items:flex-start;gap:12px;margin-bottom:18px}
+.ph h1{margin:0;font-size:26px;letter-spacing:-.02em}
+.ph p{margin:3px 0 0;color:var(--text-2);font-size:14px}
+.live{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--text-2);border:1px solid var(--border);border-radius:999px;padding:0 10px;height:28px;background:var(--surface)}
+.live i{width:7px;height:7px;border-radius:50%;background:var(--green)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--soft);margin-bottom:18px}
+.tabs span{padding:9px 12px;font-weight:500;color:var(--text-2);display:inline-flex;gap:7px;align-items:center;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs span.on{color:var(--text);border-color:var(--text)}
+.tabs em{font-style:normal;font:500 11.5px var(--mono);color:var(--text-3)}
+/* ---- briefing ---- */
+.lead{display:flex;align-items:baseline;gap:14px;margin:0 0 12px}
+.lead h2{margin:0;font-size:17px;letter-spacing:-.01em}
+.lead span{color:var(--text-3);font-size:13px}
+.needs{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:26px}
+.nc{background:var(--surface);border:1px solid var(--soft);border-radius:14px;padding:16px 18px 14px;display:flex;flex-direction:column;gap:10px;box-shadow:var(--sh);cursor:pointer;transition:border-color .12s}
+.nc:hover{border-color:var(--accent-line)}
+.nc.sel{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.why{display:flex;flex-wrap:wrap;gap:6px}
+.wy{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:560;border-radius:6px;padding:2px 8px;border:1px solid var(--soft);color:var(--text-2);background:var(--surface-2)}
+.wy.case{color:var(--accent);border-color:var(--accent-line);background:var(--accent-soft)}
+.wy.kev{color:var(--red);border-color:var(--red-line);background:var(--red-soft)}
+.wy.stack{color:var(--amber);border-color:var(--amber-line);background:var(--amber-soft)}
+.nc h3{margin:0;font-size:16px;line-height:1.35;letter-spacing:-.01em}
+.nc p{margin:0;color:var(--text-2);font-size:13.5px;line-height:1.55}
+.nc .meta{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-3)}
+.src{display:inline-flex}.src i{width:20px;height:20px;border-radius:50%;border:2px solid var(--surface);display:grid;place-items:center;font:600 9px var(--font);color:#fff;font-style:normal;margin-left:-6px}.src i:first-child{margin-left:0}
+.nc .acts{display:flex;gap:6px;margin-top:auto;padding-top:4px}
+.score{margin-left:auto;display:flex;align-items:center;gap:6px;font:600 12px var(--mono);color:var(--text-2)}
+.score s{display:block;width:44px;height:5px;border-radius:3px;background:var(--soft);overflow:hidden;text-decoration:none}.score s u{display:block;height:100%;background:var(--accent);text-decoration:none}
+.grid{display:grid;grid-template-columns:1fr 360px;gap:18px;align-items:start}
+.card{background:var(--surface);border:1px solid var(--soft);border-radius:14px;box-shadow:var(--sh)}
+.card>header{display:flex;align-items:center;gap:8px;padding:13px 16px;border-bottom:1px solid var(--soft)}
+.card>header h3{margin:0;font-size:14.5px}
+.card>header .t3{color:var(--text-3);font-size:12.5px}
+.filt{display:flex;gap:6px;padding:10px 16px;border-bottom:1px solid var(--soft)}
+.chip{height:26px;padding:0 10px;border:1px solid var(--border);border-radius:999px;font-size:12.5px;display:inline-flex;align-items:center;gap:6px;color:var(--text-2);background:var(--surface)}
+.chip.on{background:var(--text);color:var(--surface);border-color:var(--text)}
+.chip em{font-style:normal;font:500 11px var(--mono);opacity:.75}
+.wk{padding:6px 16px 4px;font:600 11.5px var(--font);letter-spacing:.05em;text-transform:uppercase;color:var(--text-3);margin-top:6px}
+.row{display:grid;grid-template-columns:28px 1fr auto;gap:12px;padding:11px 16px;border-top:1px solid var(--soft);align-items:start;cursor:pointer}
+.row:hover{background:var(--hover)}
+.sev{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:var(--surface-2);color:var(--text-3)}
+.sev.c{background:var(--red-soft);color:var(--red)}.sev.h{background:var(--amber-soft);color:var(--amber)}
+.row b{font-weight:600;font-size:14px;display:block;line-height:1.35}
+.row small{display:block;color:var(--text-3);font-size:12.5px;margin-top:2px}
+.row .cl{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.ent{display:inline-flex;align-items:center;gap:4px;font:500 11.5px var(--mono);border:1px solid var(--soft);border-radius:5px;padding:1px 6px;color:var(--text-2);background:var(--surface-2)}
+.ent.hit{color:var(--accent);border-color:var(--accent-line);background:var(--accent-soft)}
+.age{font-size:12px;color:var(--text-3);white-space:nowrap;text-align:right}
+.age .n{display:block;font:500 11.5px var(--font);color:var(--text-2);margin-top:3px}
+.side{display:flex;flex-direction:column;gap:16px}
+.exp{padding:6px 0}
+.ex{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:9px 16px;border-top:1px solid var(--soft)}
+.ex:first-child{border-top:0}
+.ex b{font-size:13.5px}
+.ex small{grid-column:1/-1;color:var(--text-3);font-size:12px}
+.pill{font:600 11px var(--font);border-radius:5px;padding:1px 7px;border:1px solid var(--border);color:var(--text-2);white-space:nowrap;align-self:center}
+.pill.r{color:var(--red);border-color:var(--red-line)}.pill.a{color:var(--amber);border-color:var(--amber-line)}.pill.g{color:var(--green);border-color:#a7dcc6}
+.hitrow{display:flex;align-items:center;gap:10px;padding:10px 16px;border-top:1px solid var(--soft);font-size:13px}
+.hitrow:first-child{border-top:0}
+.hitrow .mono{font-family:var(--mono);font-size:12.5px}
+.hitrow .c{margin-left:auto;font-size:12px;color:var(--accent);font-weight:560}
+.trend{display:grid;grid-template-columns:1fr 70px 40px;gap:10px;align-items:center;padding:9px 16px;border-top:1px solid var(--soft);font-size:13px}
+.trend:first-child{border-top:0}
+.trend svg{width:70px;height:22px}
+.trend .up{font:600 11.5px var(--mono);color:var(--red);text-align:right}
+.note{font-size:12px;color:var(--text-3);padding:10px 16px;border-top:1px solid var(--soft)}
+.lbl{width:1440px;margin:12px auto 0;color:#475569;font-size:13px}
+[data-theme=dark] .lbl{color:#8f9ab0}
+</style>
+</head>
+<body>
+<div class="bar"><b>A · Briefing</b><span>Ranked by what touches your work — the three things to act on first, everything else grouped by story.</span><span class="sp"></span><button onclick="document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark'">Light / dark</button></div>
+<div id="app"></div>
+<div class="lbl"><b>Idea:</b> the page answers “what should I look at this morning?” before anything else. Every item says <i>why</i> it is here (hits a case, in your stack, known exploited, actor in a case) and gets a relevance score; stories about the same CVE or actor from several sources become one item. Click a “needs you” card to see it selected.</div>
+<script>
+const I = (n, c='') => `<svg class="i ${c}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">${LUCIDE[n]||''}</svg>`;
+const SRC = {V:'#0ea5e9', C:'#16a34a', R:'#9333ea', A:'#ea580c', W:'#64748b'};
+const src = L => `<span class="src">${L.map(x => `<i style="background:${SRC[x]}">${x}</i>`).join('')}</span>`;
+const NEEDS = [
+  {why:[['case','crosshair','Hits Op Lantern · 3 indicators']], title:'“Lamp loader” builder sold on underground forum, C2 on port 4444', p:'The loader in Op Lantern is now sold as a kit. Its C2 203.0.113.47:4444 and update-lamp.test are in your evidence — expect other buyers with the same infrastructure.', src:['W'], n:'1 source · Sep 15', score:96, acts:['Open in Op Lantern','Watch the kit']},
+  {why:[['kev','shield-alert','Known exploited'],['stack','server','In your stack · PAN-OS']], title:'CVE-2024-3400 — PAN-OS GlobalProtect command injection, exploited before a fix', p:'CVSS 10.0, EPSS 94% (top 1%). CISA due date passed. Two of your sources reported it; you have no note that it is patched.', src:['A','V'], n:'2 sources merged · Apr 12–13', score:91, acts:['Mark patched','Add to a case']},
+  {why:[['case','crosshair','Seen in Customer portal'],['','users','Credential stuffing']], title:'Credential-stuffing wave against customer portals', p:'192.0.2.66 from this wave logged in to the customer portal on Sep 12 — the same user agent and rate. One more address in the report is not in your evidence yet.', src:['C'], n:'1 source · Sep 13', score:84, acts:['Open in Customer portal','Search my logs']}];
+const ROWS = [
+  {w:'This week', items:[
+    {s:'h', t:'Patch Tuesday: CVE-2026-21001 in print spooler under active exploitation', m:'Sample Vendor Blog', e:[['CVE-2026-21001',1]], age:'Sep 11', n:'Windows · in your stack'}]},
+  {w:'Earlier — still relevant', items:[
+    {s:'c', t:'Ivanti Connect Secure zero-days chained for unauthenticated RCE', m:'Research notes · 1 source', e:[['CVE-2023-46805'],['CVE-2024-21887']], age:'Jan 10', n:'KEV'},
+    {s:'c', t:'Volt Typhoon pre-positions in critical infrastructure networks', m:'Advisory digest · 1 source', e:[['T1078'],['T1003.003']], age:'Feb 7', n:'Actor'},
+    {s:'c', t:'Fortinet FortiOS SSL VPN out-of-bounds write potentially exploited', m:'Vendor watch · 1 source', e:[['CVE-2024-21762']], age:'Feb 9', n:'In your stack'},
+    {s:'h', t:'LockBit 3.0 affiliates exploit Citrix Bleed', m:'Advisory digest · 1 source', e:[['CVE-2023-4966'],['T1550.004']], age:'Nov 21', n:'Ransomware'},
+    {s:'h', t:'Scattered Spider targets IT help desks with social engineering', m:'Advisory digest', e:[['T1621'],['T1566']], age:'Nov 16', n:'Actor'},
+    {s:'h', t:'CL0P exploits MOVEit Transfer CVE-2023-34362', m:'Research notes', e:[['CVE-2023-34362'],['T1505.003']], age:'Jun 7', n:'Ransomware'},
+    {s:'', t:'International operation disrupts QakBot botnet infrastructure', m:'Research notes', e:[], age:'Aug 29', n:'Takedown'}]}];
+const spark = (pts, col) => { const W = 70, H = 22, mx = Math.max(...pts); return `<svg viewBox="0 0 ${W} ${H}"><polyline fill="none" stroke="${col}" stroke-width="1.6" points="${pts.map((v, i) => (i * W / (pts.length - 1)).toFixed(1) + ',' + (H - 2 - v / mx * (H - 4)).toFixed(1)).join(' ')}"/></svg>`; };
+let SEL = 0;
+function draw(){
+  document.getElementById('app').innerHTML = `<section class="frame"><nav class="rail"><div class="logo"></div>${['layout-dashboard','sun','sticky-note','notebook-pen'].map(i=>`<b>${I(i)}</b>`).join('')}<hr>${['folder-open','wrench','binary','shield-check'].map(i=>`<b>${I(i)}</b>`).join('')}<hr><b class="on">${I('rss')}</b><b>${I('eye')}</b></nav>
+  <div class="main"><div class="top"><div class="search">${I('search')}Search everything — cases, evidence, IOCs, tools, notes…</div><span class="sp"></span><button class="btn pri">${I('plus')}Capture</button></div>
+  <div class="page">
+    <div class="ph"><div><h1>Threat Intel</h1><p>Good morning — 3 things need you. Checked against 4 cases, your stack (PAN-OS, FortiOS, Windows, Citrix) and 2 indicator feeds.</p></div><span class="sp"></span><span class="live"><i></i>Updated 7 min ago</span><button class="btn">${I('settings','sm')}Sources</button><button class="btn">${I('refresh-cw','sm')}Refresh</button></div>
+    <div class="tabs"><span class="on">${I('sparkles','sm')}Briefing</span><span>${I('newspaper','sm')}All stories <em>12</em></span><span>${I('bug','sm')}Vulnerabilities <em>8</em></span><span>${I('fingerprint','sm')}Indicators</span><span>${I('crosshair','sm')}Actors &amp; ATT&amp;CK</span><span>${I('scan-search','sm')}Investigate</span></div>
+    <div class="lead"><h2>Needs you</h2><span>ranked by relevance to your cases and stack</span></div>
+    <div class="needs">${NEEDS.map((x, i) => `<article class="nc${SEL === i ? ' sel' : ''}" onclick="SEL=${i};draw()"><div class="why">${x.why.map(([c, ic, t]) => `<span class="wy ${c}">${I(ic,'xs')}${t}</span>`).join('')}<span class="score" title="Relevance">${x.score}<s><u style="width:${x.score}%"></u></s></span></div>
+      <h3>${x.title}</h3><p>${x.p}</p><div class="meta">${src(x.src)}<span>${x.n}</span></div>
+      <div class="acts"><button class="btn sm pri">${x.acts[0]}</button><button class="btn sm">${x.acts[1]}</button><span class="sp"></span><button class="btn sm ghost">${I('x','sm')}Not for me</button></div></article>`).join('')}</div>
+    <div class="grid">
+      <section class="card"><header><h3>Everything else</h3><span class="t3">grouped by story · newest first</span><span class="sp"></span><button class="btn sm ghost">${I('check-check','sm')}Mark all read</button></header>
+        <div class="filt"><span class="chip on">All <em>9</em></span><span class="chip">Vulnerabilities <em>5</em></span><span class="chip">Ransomware <em>3</em></span><span class="chip">Actors <em>2</em></span><span class="chip">Phishing <em>1</em></span></div>
+        ${ROWS.map(g => `<div class="wk">${g.w}</div>${g.items.map(r => `<div class="row"><span class="sev ${r.s}">${I(r.s === 'c' ? 'flame' : r.s === 'h' ? 'triangle-alert' : 'newspaper','sm')}</span><div><b>${r.t}</b><small>${r.m}</small>${r.e.length ? `<div class="cl">${r.e.map(([v, h]) => `<span class="ent${h ? ' hit' : ''}">${v}</span>`).join('')}</div>` : ''}</div><div class="age">${r.age}<span class="n">${r.n}</span></div></div>`).join('')}`).join('')}
+      </section>
+      <aside class="side">
+        <section class="card"><header>${I('server','sm')}<h3>Your exposure</h3><span class="sp"></span><span class="t3">from your stack list</span></header><div class="exp">
+          <div class="ex"><b>PAN-OS GlobalProtect</b><span class="pill r">Unpatched?</span><small>CVE-2024-3400 · KEV · due date passed</small></div>
+          <div class="ex"><b>FortiOS SSL VPN</b><span class="pill a">Check</span><small>CVE-2024-21762 · KEV · EPSS 72%</small></div>
+          <div class="ex"><b>Windows print spooler</b><span class="pill a">Check</span><small>CVE-2026-21001 · exploited · Patch Tuesday</small></div>
+          <div class="ex"><b>Citrix NetScaler</b><span class="pill g">Patched Nov 2</span><small>CVE-2023-4966 · you marked it</small></div></div></section>
+        <section class="card"><header>${I('crosshair','sm')}<h3>Feed indicators in your cases</h3></header>
+          <div class="hitrow">${I('server','sm')}<span class="mono">203.0.113.47</span><span class="c">Op Lantern</span></div>
+          <div class="hitrow">${I('globe','sm')}<span class="mono">update-lamp.test</span><span class="c">Op Lantern</span></div>
+          <div class="hitrow">${I('server','sm')}<span class="mono">192.0.2.66</span><span class="c">Customer portal</span></div></section>
+        <section class="card"><header>${I('trending-up','sm')}<h3>Rising this month</h3></header>
+          <div class="trend"><span>CVE-2024-3400</span>${spark([0,0,1,0,2,5,7,6],'#c81e1e')}<span class="up">+6</span></div>
+          <div class="trend"><span>LockBit 3.0</span>${spark([2,1,3,2,2,4,3,5],'#a14b08')}<span class="up">+2</span></div>
+          <div class="trend"><span>T1190 Exploit public app</span>${spark([1,2,2,3,3,4,6,7],'#4f46e5')}<span class="up">+4</span></div>
+          <div class="note">Counted from your sources only — nothing is looked up.</div></section>
+      </aside>
+    </div>
+  </div></div></section>`;
+}
+draw();
+</script>
+</body>
+</html>

@@ -23,10 +23,11 @@ const TYPE_LIST = [
   ['social','Social profile','users','identity','--t-identity','social',[['username','Username','text'],['platform','Platform','select',['Facebook','X / Twitter','Instagram','LinkedIn','TikTok','YouTube','Telegram','Other']],['url','Profile URL','url'],['followers','Followers','number']]],
   ['email','Email address','mail','identity','--t-contact','email',[['email','Email address','email'],['provider','Provider','text'],['verified','Verified','select',['Unverified','Verified','Bounced']]]],
   ['phone','Phone number','phone','identity','--t-contact','phone',[['number','Phone number','tel'],['country','Country code','text'],['carrier','Carrier','text'],['type','Line type','select',['Mobile','Landline','VoIP','Unknown']]]],
+  ['pgpkey','PGP key','key-round','identity','--t-identity','pgp',[['fingerprint','Fingerprint','text'],['uids','Names and emails on the key','text'],['created','Key created','date']]],
   ['forum','Forum / market','message-square','comms','--t-contact',null,[['name','Site','text'],['url','URL','url'],['section','Section / thread','text']]],
   ['messaging','Messaging channel','message-square','comms','--t-contact',null,[['handle','Channel or handle','text'],['app','App','select',['Telegram','Signal','WhatsApp','Discord','Jabber','Other']],['members','Members','number']]],
   ['link','Web link','link','comms','--t-contact',null,[['url','URL','url'],['platform','Platform','text'],['status','Status','select',['Active','Inactive','Suspended','Unknown']]]],
-  ['crypto','Crypto wallet','bitcoin','finance','--t-finance','btc',[['address','Wallet address','text'],['currency','Currency','select',['Bitcoin','Ethereum','Monero','Litecoin','Other']],['amount','Balance / volume','text'],['txid','Notable transaction','text']]],
+  ['crypto','Crypto wallet','bitcoin','finance','--t-finance','btc',[['address','Wallet address','text'],['currency','Currency','select',['Bitcoin','Ethereum','Solana','Monero','Litecoin','Other']],['amount','Balance / volume','text'],['txid','Notable transaction','text']]],
   ['transaction','Transaction','activity','finance','--t-finance',null,[['txid','Transaction ID','text'],['amount','Amount','text'],['currency','Currency','text'],['date','Date','date']]],
   ['breach','Data breach','key-round','finance','--t-finance',null,[['name','Breach name','text'],['date','Date','date'],['records','Records exposed','text']]],
   ['domain','Domain','globe','tech','--t-infra','domain',[['domain','Domain','text'],['registrar','Registrar','text'],['created','Created','date'],['nameservers','Name servers','text']]],
@@ -41,7 +42,7 @@ const TYPE_LIST = [
   ['location','Location','map-pin','places','--t-place',null,[['address','Address','text'],['city','City','text'],['country','Country','text'],['coordinates','Coordinates','text']]],
 ];
 const TYPES = Object.fromEntries(TYPE_LIST.map(([id, label, icon, group, color, kind, fields]) => [id, {id, label, icon, group, color, kind, fields}]));
-const KIND_TO_TYPE = {ipv4:'ip', ipv6:'ip', domain:'domain', url:'url', email:'email', handle:'username', social:'social', phone:'phone', mac:'device', coords:'location', btc:'crypto', eth:'crypto', xmr:'crypto', ltc:'crypto', trx:'crypto', doge:'crypto', sha256:'file', md5:'file', sha1:'file', cve:'vulnerability', hostport:'ip'};
+const KIND_TO_TYPE = {ipv4:'ip', ipv6:'ip', domain:'domain', url:'url', email:'email', handle:'username', social:'social', phone:'phone', mac:'device', coords:'location', btc:'crypto', eth:'crypto', sol:'crypto', ens:'crypto', pgp:'pgpkey', xmr:'crypto', ltc:'crypto', trx:'crypto', doge:'crypto', sha256:'file', md5:'file', sha1:'file', cve:'vulnerability', hostport:'ip'};
 const MONO_TYPES = new Set(['email','domain','ip','url','crypto','file','username','phone','transaction','vulnerability','link','device','social']);
 
 const CASE_COLORS = ['#5470f5','#8b5cf6','#0ea5a4','#e8590c','#d6336c','#2f9e44','#e0a800','#64748b'];

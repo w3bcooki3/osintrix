@@ -52,7 +52,11 @@ function vlPaint(S, force){
   /* measure what was drawn; the space below takes up any difference */
   let changed = false;
   /* a row's height is the distance to the next row's top, so margins count */
-  const nodes = [...S.el.querySelectorAll(':scope > [data-vi]')], tops = nodes.map(x => x.getBoundingClientRect().top), tail = S.el.lastElementChild ? S.el.lastElementChild.getBoundingClientRect().top : 0;
+  /* a sticky heading reports where it is stuck, not where it sits in the list, so it is measured unstuck */
+  const nodes = [...S.el.querySelectorAll(':scope > [data-vi]')], stuck = nodes.filter(x => S.items[+x.dataset.vi].sticky);
+  stuck.forEach(x => x.style.position = 'static');
+  const tops = nodes.map(x => x.getBoundingClientRect().top), tail = S.el.lastElementChild ? S.el.lastElementChild.getBoundingClientRect().top : 0;
+  stuck.forEach(x => x.style.position = '');
   nodes.forEach((node, k) => { const i = +node.dataset.vi, h = (k + 1 < nodes.length ? tops[k + 1] : tail) - tops[k]; if(h > 0){ if(Math.abs(h - S.hs[i]) > 0.5){ S.hs[i] = h; changed = true; } S.seen.set(S.items[i].k, h); } });
   if(changed){ let b = 0; for(let i = end; i < n; i++) b += S.hs[i]; const last = S.el.lastElementChild; if(last){ const t = S.o.tbody ? last.firstElementChild : last; if(t) t.style.height = b + 'px'; } }
   if(focus){ const f = S.el.querySelector(`[data-id="${CSS.escape(focus)}"]`); if(f) f.focus({preventScroll:true}); }

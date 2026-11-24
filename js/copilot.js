@@ -27,7 +27,7 @@ function cpKind(D, kinds, tags){
   if(has('email') && (has('url') || has('domain')) && D.recs.some(r => /^(received|from|subject|return-path):/im.test(r.body || ''))) return 'pb-phish';
   if(eids.has(4625) || eids.has(4771) || D.recs.some(r => /failed (login|sign-?in|password)|brute.?force|credential stuffing/i.test(r.body || ''))) return 'pb-login';
   if(has('md5') || has('sha256') || has('sha1')) return 'pb-malware';
-  if(['btc', 'eth', 'xmr', 'ltc', 'trx', 'doge'].some(has)) return 'pb-crypto';
+  if(['btc', 'eth', 'xmr', 'ltc', 'trx', 'doge', 'sol', 'ens', 'btctx', 'ethtx', 'soltx'].some(has)) return 'pb-crypto';
   if(D.recs.some(r => /cloudtrail|azuread|signinlogs|consolelogin|okta/i.test((r.source || '') + ' ' + (r.body || '').slice(0, 2000)))) return 'pb-cloudir';
   if(has('handle') || has('social')) return 'pb-user';
   if(has('coords')) return 'pb-geo';

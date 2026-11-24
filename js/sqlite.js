@@ -153,7 +153,7 @@ function labSql(){
     <button data-act="sqView" data-v="info" aria-current="${V.kind === 'info'}">${ico('info','sm')}<span>File details</span></button></nav>`;
   return `<section class="card pc-head"><header><span class="fi-ic">${ico('database')}</span><div style="min-width:0;flex:1"><h3>${esc(S.name)}</h3>
       <p class="t3">${apps.length ? esc(apps.join(' · ')) : 'SQLite database'} · ${S.tables.filter(t => t.type === 'table').length} tables · ${fmtBytes(S.size)}${S.wal ? ' · WAL mode' : ''}</p></div>
-      <div class="wrap"><button class="btn sm" data-act="sqSave">${ico('plus','sm')}Save to ${esc(caseNm(theCase()))}</button><button class="btn sm ghost" data-act="rcShow" data-v="sqlite">${ico('history','sm')}History<span class="crt-cnt">${recentN('sqlite')}</span></button><button class="btn sm" data-act="sqClear">${ico('x','sm')}Another file</button></div></header></section>
+      <div class="wrap"><button class="btn sm" data-act="sqSave">${ico('plus','sm')}Save to ${esc(caseNm(theCase()))}</button>${casePick()}<button class="btn sm ghost" data-act="rcShow" data-v="sqlite">${ico('history','sm')}History<span class="crt-cnt">${recentN('sqlite')}</span></button><button class="btn sm" data-act="sqClear">${ico('x','sm')}Another file</button></div></header></section>
     <div class="sq-grid">${side}<div class="sq-main" id="sqMain">${sqlMain()}</div></div>`;
 }
 function sqlMain(){

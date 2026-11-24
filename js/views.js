@@ -142,6 +142,7 @@ function caseListBody(){
 }
 /* C — board card: a thumbnail of the case's own graph on top */
 function caseCard(c){
+  if(c.stash) return stashCard(c);
   const F = caseFacts(c), n = F.D.entries.length, pct = F.leads ? Math.round(F.done / F.leads * 100) : 0, N = F.nodes, at = new Map(N.map(p => [p.id, p]));
   const map = N.length ? `<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${F.edges.map(([a, b]) => `<line x1="${at.get(a).x.toFixed(1)}" y1="${at.get(a).y.toFixed(1)}" x2="${at.get(b).x.toFixed(1)}" y2="${at.get(b).y.toFixed(1)}"/>`).join('')}</svg>${N.map(p => `<i class="nd${p.m ? ' m' : ''}" style="left:${p.x.toFixed(1)}%;top:${p.y.toFixed(1)}%;--nc:var(${p.c})"></i>`).join('')}`
     : `<span class="cs2-nomap">${ico('waypoints','sm')}No entries yet</span>`;
@@ -162,9 +163,9 @@ function caseLedger(L){
   const row = c => { const F = caseFacts(c), pct = F.leads ? Math.round(F.done / F.leads * 100) : 0;
     return `<div class="cs2-r${c.status === 'closed' ? ' archived' : ''}" role="row" style="--cc:${esc(c.color)}"><a class="case-hit" href="${caseHash(c.id)}" aria-label="Open ${esc(c.name)}"></a>
       <div class="cs2-n" role="cell">${caseSq(c)}<div><b>${esc(c.name)}</b><small>${c.scope ? esc(c.scope) : '<i>No scope written yet</i>'}</small></div></div>
-      <div role="cell">${statusTag(c.status)}</div>
+      <div role="cell">${c.stash ? `<span class="chip sq" title="${esc(c.stash.file)}">${ico('archive','sm')}In a file</span>` : statusTag(c.status)}</div>
       <div class="cs2-lq" role="cell">${F.leads ? `<span>${F.done} of ${F.leads} answered</span><span class="b"><i style="width:${pct}%"></i></span>` : '<span class="none">No questions</span>'}</div>
-      <div class="num" role="cell">${F.D.entries.length}</div><div class="num" role="cell">${F.D.recs.length}</div><div class="num${F.mal ? ' r' : ''}" role="cell">${F.mal}</div>
+      <div class="num" role="cell">${c.stash ? (c.stash.n || {}).entries || 0 : F.D.entries.length}</div><div class="num" role="cell">${c.stash ? (c.stash.n || {}).records || 0 : F.D.recs.length}</div><div class="num${F.mal ? ' r' : ''}" role="cell">${F.mal}</div>
       <div role="cell" class="cs2-lsp">${caseSpark(F.weeks, c.color)}</div><div class="up" role="cell">${caseAgo(c)}</div><div role="cell" class="cs2-la">${caseActs(c)}</div></div>`; };
   const groups = [['pin', 'Pinned', L.filter(c => c.pinned)], ['', 'Active', L.filter(c => !c.pinned && c.status === 'active')], ['', 'In review', L.filter(c => !c.pinned && c.status === 'review')], ['', 'Archived', L.filter(c => !c.pinned && c.status === 'closed')]];
   return `<div class="cs2-led" role="table" aria-label="Cases"><div class="cs2-h" role="row"><span role="columnheader">Case</span><span role="columnheader">Status</span><span role="columnheader">Questions</span><span class="num" role="columnheader">Entries</span><span class="num" role="columnheader">Records</span><span class="num" role="columnheader">Malicious</span><span role="columnheader">Activity · 12 weeks</span><span class="num" role="columnheader">Updated</span><span role="columnheader"><span class="sr">Actions</span></span></div>
@@ -395,9 +396,9 @@ function storyHTML(D){
 /* ---------- questions ---------- */
 /* Infrastructure: what the case pivots on — domains and addresses, money, accounts */
 function caseInfra(c, D){
-  const v = ['dom', 'money', 'acc', 'hours'].includes(UI.ivView) ? UI.ivView : 'dom';
-  const seg = `<div class="seg qseg" role="group" aria-label="View"><button data-act="ivView" data-v="dom" aria-pressed="${v === 'dom'}">${ico('network','sm')}Domains &amp; addresses</button><button data-act="ivView" data-v="money" aria-pressed="${v === 'money'}">${ico('bitcoin','sm')}Money</button><button data-act="ivView" data-v="acc" aria-pressed="${v === 'acc'}">${ico('history','sm')}Accounts</button><button data-act="ivView" data-v="hours" aria-pressed="${v === 'hours'}">${ico('clock-3','sm')}Active hours</button></div>`;
-  const body = v === 'money' ? walletView(c) : v === 'acc' ? footView(c) : v === 'hours' ? hrView(c) : infraView(c);
+  const v = ['dom', 'money', 'acc', 'hours', 'chats'].includes(UI.ivView) ? UI.ivView : 'dom';
+  const seg = `<div class="seg qseg" role="group" aria-label="View"><button data-act="ivView" data-v="dom" aria-pressed="${v === 'dom'}">${ico('network','sm')}Domains &amp; addresses</button><button data-act="ivView" data-v="money" aria-pressed="${v === 'money'}">${ico('bitcoin','sm')}Money</button><button data-act="ivView" data-v="acc" aria-pressed="${v === 'acc'}">${ico('history','sm')}Accounts</button><button data-act="ivView" data-v="hours" aria-pressed="${v === 'hours'}">${ico('clock-3','sm')}Active hours</button><button data-act="ivView" data-v="chats" aria-pressed="${v === 'chats'}">${ico('message-square','sm')}Chats</button></div>`;
+  const body = v === 'money' ? walletView(c) : v === 'acc' ? footView(c) : v === 'hours' ? hrView(c) : v === 'chats' && typeof cnView === 'function' ? cnView(c) : infraView(c);
   return `<div class="scroll"><div class="page wide">${seg}${body}</div></div>`;
 }
 function caseQuestions(c, D){

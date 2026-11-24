@@ -16,8 +16,8 @@
      tab), first and last sighting
    ========================================================================== */
 const IDP_ROOT = new Set(['person', 'alias', 'organization']);
-const IDP_ID = new Set(['username', 'social', 'email', 'phone', 'crypto', 'messaging', 'forum', 'link', 'alias', 'device', 'transaction', 'breach', 'domain', 'location', 'media', 'document', 'file', 'ip']);
-const IDP_STRONG = new Set(['email', 'phone', 'crypto', 'device', 'transaction']);   /* shared, these say "the same person" much more than a username does */
+const IDP_ID = new Set(['pgpkey', 'username', 'social', 'email', 'phone', 'crypto', 'messaging', 'forum', 'link', 'alias', 'device', 'transaction', 'breach', 'domain', 'location', 'media', 'document', 'file', 'ip']);
+const IDP_STRONG = new Set(['pgpkey', 'email', 'phone', 'crypto', 'device', 'transaction']);   /* shared, these say "the same person" much more than a username does */
 const IDP_CONF = ['', 'Possible', 'Likely', 'Confirmed'];
 const idpKey = e => { try{ return entryKey(e); }catch(x){ return null; } };
 /* the identifiers around one root, with the weakest link on the way */

@@ -25,6 +25,13 @@ const PIV = {
   coords:[['Google Maps','https://www.google.com/maps?q=%s'],['OpenStreetMap','https://www.openstreetmap.org/?mlat=%a&mlon=%o#map=17/%a/%o'],['Street View','https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=%s']],
   xmr:[['Blockchair','https://blockchair.com/search?q=%s']], ltc:[['Blockchair','https://blockchair.com/litecoin/address/%s']], doge:[['Blockchair','https://blockchair.com/dogecoin/address/%s']], trx:[['Tronscan','https://tronscan.org/#/address/%s']],
   sha512:[['VirusTotal','https://www.virustotal.com/gui/search/%s']],
+  sol:[['Solscan','https://solscan.io/account/%s'],['Solana Explorer','https://explorer.solana.com/address/%s']],
+  ens:[['ENS app','https://app.ens.domains/%s'],['Blockscout','https://eth.blockscout.com/search-results?q=%e'],['Etherscan','https://etherscan.io/name-lookup-search?id=%e']],
+  btctx:[['mempool.space','https://mempool.space/tx/%s'],['Blockstream','https://blockstream.info/tx/%s'],['Blockchair','https://blockchair.com/bitcoin/transaction/%s']],
+  ethtx:[['Blockscout','https://eth.blockscout.com/tx/%s'],['Etherscan','https://etherscan.io/tx/%s']],
+  soltx:[['Solscan','https://solscan.io/tx/%s'],['Solana Explorer','https://explorer.solana.com/tx/%s']],
+  session:[['Google','https://www.google.com/search?q=%22%s%22']], tox:[['Google','https://www.google.com/search?q=%22%s%22']],
+  pgp:[['keys.openpgp.org','https://keys.openpgp.org/search?q=%s'],['Ubuntu keyserver','https://keyserver.ubuntu.com/pks/lookup?search=0x%s&fingerprint=on&op=index'],['Google','https://www.google.com/search?q=%22%s%22']],
 };
 PIV.hostport = PIV.ipv4;
 function pivotLinks(kind, value){
@@ -33,12 +40,13 @@ function pivotLinks(kind, value){
   if(kind === 'phone') v = v.replace(/^\+/, '');
   if(kind === 'handle') v = v.replace(/^@/, '');
   const [la, lo] = kind === 'coords' ? v.split(',') : ['', ''], tt = kind === 'ttp' ? v.replace('.', '/') : '';
-  const base = (PIV[kind] || []).map(([n, t]) => [n, E.safeUrl(t.replace(/%s/g, v).replace(/%e/g, encodeURIComponent(v)).replace(/%a/g, la).replace(/%o/g, lo).replace(/%t/g, tt))]).filter(x => x[1]);
+  const list = kind === 'domain' && /\.onion$/i.test(v) ? [['Ahmia (Tor search)','https://ahmia.fi/search/?q=%e']] : PIV[kind] || [];
+  const base = list.map(([n, t]) => [n, E.safeUrl(t.replace(/%s/g, v).replace(/%e/g, encodeURIComponent(v)).replace(/%a/g, la).replace(/%o/g, lo).replace(/%t/g, tt))]).filter(x => x[1]);
   return base.concat(toolTplLinks(kind, v).filter(x => !base.some(b => b[0].toLowerCase() === x[0].toLowerCase())));
 }
 /* your own lookup tools: any toolbox entry with a URL template such as https://example.com/search?q={value} */
 const TPL_KINDS = [['ipv4','IP address'],['domain','Domain'],['url','URL'],['email','Email'],['handle','Username'],['hash','File hash'],['phone','Phone'],['person','Person name'],['btc','Wallet'],['cve','CVE'],['any','Anything']];
-const kindGroup = k => ({md5:'hash', sha1:'hash', sha256:'hash', sha512:'hash', file:'hash', hostport:'ipv4', ipv6:'ipv4', ip:'ipv4', eth:'btc', xmr:'btc', ltc:'btc', trx:'btc', doge:'btc', crypto:'btc', username:'handle', vulnerability:'cve'})[k] || k;
+const kindGroup = k => ({md5:'hash', sha1:'hash', sha256:'hash', sha512:'hash', file:'hash', hostport:'ipv4', ipv6:'ipv4', ip:'ipv4', eth:'btc', sol:'btc', ens:'btc', xmr:'btc', ltc:'btc', trx:'btc', doge:'btc', crypto:'btc', username:'handle', vulnerability:'cve'})[k] || k;
 function toolUrl(t, v){ return t.tpl ? E.safeUrl(t.tpl.replace(/\{value\}/g, encodeURIComponent(v)).replace(/\{raw\}/g, v)) : null; }
 function toolTplLinks(kind, v){ const g = kindGroup(kind); return DB.tools.filter(t => t.tpl && (t.kinds || []).some(k => k === g || k === 'any')).map(t => [t.name, toolUrl(t, v), t.id]).filter(x => x[1]); }
 const SEED_TPL = {'Shodan':['https://www.shodan.io/host/{value}',['ipv4']], 'MalwareBazaar':['https://bazaar.abuse.ch/browse.php?search={value}',['hash']], 'Have I Been Pwned':['https://haveibeenpwned.com/account/{value}',['email']],
@@ -231,9 +239,10 @@ const TX_GI = {"Decode":"layers", "Encode & transform":"arrow-right-left", "Anal
 function txPick(v){ if(!TX[v]) return; UI.txOp = v; const bar = document.querySelector('.txbar'); if(bar) bar.outerHTML = txBar(v); const sel = $('txSel'); if(sel) sel.value = v; const n = $('txOpName'); if(n) n.textContent = TX[v][0]; return paintTx(); }
 function txBar(op){
   const grp = Object.entries(TX_GROUPS).find(([, ks]) => ks.includes(op)), g0 = grp ? grp[0] : 'Decode';
+  const used = new Set(), ex = L => { const short = k => TX[k][0].replace(/ (decode|encode)$/i, '').replace(/ —.*$/, '').replace(/ \/ .*$/, ''); const pick = L.filter(k => !used.has(short(k))).slice(0, 3); pick.forEach(k => used.add(short(k))); return pick.map(short).join(', '); };
   return `<div class="txbar" role="toolbar" aria-label="Operation"><button class="txb-auto" data-act="txOp" data-v="auto" aria-pressed="${op === 'auto'}">${ico('sparkles','sm')}<span><b>Auto-decode</b><small>Finds the layers for you</small></span></button>
     ${Object.entries(TX_GROUPS).map(([g, ks]) => { const L = ks.filter(k => TX[k] && k !== 'auto'), on = g === g0 && op !== 'auto';
-      return `<button class="txb-m" data-act="txMenu" data-v="${esc(g)}" aria-haspopup="menu" aria-pressed="${on}">${ico(TX_GI[g] || 'list','sm')}<span><small>${esc(g)} · ${L.length}</small>${on ? `<b>${esc(TX[op][0])}</b>` : `<b class="txb-ex">${esc(L.slice(0, 3).map(k => TX[k][0].replace(/ (decode|encode)$/i, '').replace(/ —.*$/, '')).join(', '))}…</b>`}</span>${ico('chevron-down','sm')}</button>`; }).join('')}</div>`;
+      return `<button class="txb-m" data-act="txMenu" data-v="${esc(g)}" aria-haspopup="menu" aria-pressed="${on}">${ico(TX_GI[g] || 'list','sm')}<span><small>${esc(g)} · ${L.length}</small>${on ? `<b>${esc(TX[op][0])}</b>` : `<b class="txb-ex">${esc(ex(L))}…</b>`}</span>${ico('chevron-down','sm')}</button>`; }).join('')}</div>`;
 }
 function viewDecoder(){
   const op = UI.txOp || 'auto';
@@ -249,7 +258,7 @@ function viewDecoder(){
         <button class="btn xs ghost" data-act="txCopy">${ico('copy','sm')}Copy</button><button class="btn xs ghost" data-act="txChain" title="Use the output as the next input">${ico('arrow-left','sm')}Use as input</button></header>
         <pre id="txOut" class="txout" tabindex="0"></pre><div id="txSteps" class="txsteps"></div></section>
     </div>
-    <section class="card txents"><header><h3>${ico('fingerprint','sm')}Indicators in the result</h3><span style="flex:1"></span><button class="btn sm primary" data-act="decSave">${ico('plus','sm')}${theCase() ? 'Save to ' + esc(caseNm(theCase())) + ' as evidence' : 'Save as evidence'}</button></header><div class="body"><div class="wrap" id="txEnts"></div></div></section>
+    <section class="card txents"><header><h3>${ico('fingerprint','sm')}Indicators in the result</h3><span style="flex:1"></span><button class="btn sm primary" data-act="decSave">${ico('plus','sm')}${theCase() ? 'Save to ' + esc(caseNm(theCase())) + ' as evidence' : 'Save as evidence'}</button>${casePick()}</header><div class="body"><div class="wrap" id="txEnts"></div></div></section>
   </div></div>`;
 }
 let txT = null;

@@ -94,8 +94,13 @@ function mountGraph(){
   const V = typeof gvVisible === 'function' ? gvVisible(D) : null, focused = !!(V && gvS().focus), bigAll = D.entries.length > BIG_GRAPH, big = (V ? V.size : D.entries.length) > BIG_GRAPH;
   if(!hasPos && bigAll){ const P = fastLayout(D.entries.map(e => e.id), D.links.map(l => [l.a, l.b])); for(const e of D.entries) if(!e.pos) e.pos = P.get(e.id); hasPos = true; save(); }
   const muted = cssVar('--text-3');
+  /* the same graph as last time (a re-render after a verdict, a note, a panel opening): keep the drawn graph and put it back,
+     instead of building a big one again — rebuilding 2,000 nodes takes over a second */
+  const els = graphElements(D), sig = [DB.active, focused, big, text, accent, bg, JSON.stringify(els)].join('|');
+  if(cy && CY_SIG === sig && cy.container() && !cy.container().isConnected){ const old = cy.container(); el.replaceWith(old); cy.resize(); graphAfter(old, focused); return; }
   if(cy){ cy.destroy(); cy = null; }
-  cy = cytoscape({container:el, elements:graphElements(D), minZoom:big ? .05 : .2, maxZoom:3, boxSelectionEnabled:false, hideEdgesOnViewport:big, textureOnViewport:big, pixelRatio:big ? 1 : 'auto',
+  CY_SIG = sig;
+  cy = cytoscape({container:el, elements:els, minZoom:big ? .05 : .2, maxZoom:3, boxSelectionEnabled:false, hideEdgesOnViewport:big, textureOnViewport:big, pixelRatio:big ? 1 : 'auto',
     layout:focused ? gvLayout(D) : hasPos ? {name:'preset'} : {name:'cose', animate:false, nodeRepulsion:() => 14000, idealEdgeLength:() => 95, nodeOverlap:20, padding:40, randomize:false, numIter:1500},
     style:[
       {selector:'node', style:{width:'data(w)', height:'data(w)', 'background-color':surface, 'background-image':'data(icon)', 'background-width':'62%', 'background-height':'62%',
@@ -151,6 +156,12 @@ function mountGraph(){
   el.onkeydown = e => { if((e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) && UI.sel && UI.sel.kind === 'entry'){ e.preventDefault(); const n = cy.getElementById(UI.sel.id), r = el.getBoundingClientRect(), p = n.renderedPosition(); nodeMenu(UI.sel.id, r.left + p.x, r.top + p.y); } };
   cy.on('mouseover', 'node', ev => { const n = ev.target, nb = n.closedNeighborhood(); cy.elements().not(nb).addClass('faded'); });
   cy.on('mouseout', 'node', () => { cy.elements().removeClass('faded'); applyFind(); });
+  graphAfter(el, focused);
+}
+let CY_SIG = '';
+/* what is redone on every render, whether the graph was rebuilt or kept: selection, highlights, the controls around it */
+function graphAfter(el, focused){
+  cy.elements().unselect().removeClass('src gvfocus faded');
   if(UI.sel && UI.sel.kind === 'entry'){ const n = cy.getElementById(UI.sel.id); if(n.length){ n.select(); if(UI.gFocus === UI.sel.id){ UI.gFocus = null; cy.animate({center:{eles:n}, zoom:Math.max(cy.zoom(), 1.1)}, {duration:280}); } } }
   if(UI.graph.first){ const n = cy.getElementById(UI.graph.first); if(n.length) n.addClass('src'); }
   if(focused){ const n = cy.getElementById(gvS().focus); if(n.length) n.addClass('gvfocus'); }

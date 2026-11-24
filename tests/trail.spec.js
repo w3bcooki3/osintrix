@@ -109,6 +109,7 @@ test('money trail (Bitcoin): sanctions exposure, labels, and into the case — v
   // payments onto the timeline, once each
   await page.evaluate(w => { DB.active = 'c-lantern'; UI.ch = null; chDlg('btc', w); }, W);
   await page.locator('#dlg [data-act=chTl]').click();
+  await expect(page.locator('.toast').last()).toContainText('added to the timeline');            // the payments are written after a storage check
   const recs = await page.evaluate(() => DB.records.filter(r => r.chainTx).map(r => [r.title, r.ents.length]));
   expect(recs.length).toBe(33);
   expect(recs).toContainEqual([`Sent 0.2 BTC to ${SANC.slice(0, 10)}…${SANC.slice(-6)} +1`, 3]);
@@ -214,4 +215,102 @@ test('money trail: accessible in both themes', async ({ page }) => {
     }
   }
   noErrors(errors.filter(e => !/Connecting to 'file:.*violates the following Content Security Policy directive: "connect-src/.test(e)));
+});
+
+test('crypto identifiers: ENS names, Solana addresses and signatures, and Bitcoin / Ethereum transactions are told apart from file hashes, and each leads somewhere', async ({ page }) => {
+  const errors = await open(page, '#/case/c-lantern/vault');
+  const BTX = 'f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16';           // the first person-to-person Bitcoin payment
+  const ETX = '0x5c504ed432cb51138bcf09aa5e8a410dd4a1e204ef84bfed1be16dfba1b22060';
+  const SHA = '2d4d7e1f2a0e8f0b0c2b4f9a5a0c3a1e2d4f6a8c0e2b4d6f8a0c2e4b6d8f0a2c';
+  const SOL = '7EcDhSYGxXyscszYEp35KHN8vvw3svAuLKTzXwCFLtV';
+  const SIG = '5VERv8NMvzbJMEkV8xnrLkEaWRtSz9CosKDYjCJjBRnbJLgp8uirBgmQpjKhoR4tjF3ZpRzrFmBV6UjKdiSZkQUW';
+  const JWT = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4ifQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
+  // a ransom note and a chat log, as an analyst pastes them
+  await capture(page, `Pay to lamp-ops.eth or the Solana wallet ${SOL}.\nThe victim paid, txid: ${BTX}\nsee also https://mempool.space/tx/${BTX}\nrefund went out in ${ETX}\nSolana signature ${SIG}\nDropper SHA-256 ${SHA}\nsession token ${JWT}\nethz.ch is a university.`, 'c-lantern');
+  const K = await page.evaluate(() => { const r = DB.records[DB.records.length - 1]; return E.extract(r.body).map(x => x.k + ' ' + x.v); });
+  expect(K).toEqual(expect.arrayContaining(['ens lamp-ops.eth', 'sol ' + SOL, 'btctx ' + BTX, 'ethtx ' + ETX, 'soltx ' + SIG, 'sha256 ' + SHA, 'url https://mempool.space/tx/' + BTX]));
+  expect(K.filter(k => /^sha256 /.test(k))).toEqual(['sha256 ' + SHA]);                       // the transaction ID is not also a file hash
+  expect(K.filter(k => /^(sol|soltx) /.test(k)).length).toBe(2);                              // nothing in the JWT is taken for a Solana value
+  expect(K.some(k => /ethz/.test(k) && !/^domain/.test(k))).toBe(false);
+
+  // a Bitcoin transaction: fetched on its own, its wallets go into the case in one step, the answer is kept as evidence
+  const hits = [];
+  await page.route('https://mempool.space/api/**', r => { hits.push(new URL(r.request().url()).pathname);
+    r.fulfill({ headers: cors, body: JSON.stringify({ txid: BTX, fee: 0, status: { confirmed: true, block_height: 170, block_time: 1231731025 },
+      vin: [{ prevout: { scriptpubkey_address: '12cbQLTFMXRnSzktFkuoG3eHoMeFtpTu3S', value: 5000000000 } }],
+      vout: [{ scriptpubkey_address: '1Q2TWHE3GMdB6BZKafqwxXtWAWgFt5Jvm3', value: 1000000000 }, { scriptpubkey_address: '12cbQLTFMXRnSzktFkuoG3eHoMeFtpTu3S', value: 4000000000 }] }) }); });
+  await page.evaluate(id => select('ent', id), 'btctx:' + BTX);
+  const P = page.locator('#insp');
+  await expect(P).toContainText('BTC transaction');
+  await expect(P.locator('.ipf, .isec').first()).toBeVisible();
+  await P.locator('[data-act=chTxGet]').click();
+  await page.click('[data-act=chTxOk]');                                                        // asks first: only the ID is sent
+  const sec = P.locator('.isec.ch');
+  await expect(sec.locator('.ch-kv')).toContainText('Confirmed'); await expect(sec.locator('.ch-kv')).toContainText('170');
+  await expect(sec).toContainText('To · 2 outputs · 50 BTC'); await expect(sec.locator('.ch-cp', { hasText: '1Q2TWHE3' })).toContainText('10 BTC');
+  expect(hits).toEqual(['/api/tx/' + BTX]);
+  expect(await page.evaluate(() => DB.records.filter(r => r.source === 'chain:mempool.space' && /transaction f4184fc5/.test(r.title)).length)).toBe(1);
+  await P.locator('[data-act=chTxWal]').click();
+  expect(await page.evaluate(() => DB.entries.filter(e => e.caseId === 'c-lantern' && e.type === 'crypto' && /^1(Q2TWHE3|2cbQLTF)/.test(e.fields.address)).length)).toBe(2);
+  // the wallet opens with its own trail section, which knows this transaction already
+  await sec.locator('.ent', { hasText: '1Q2TWHE3' }).first().click(); await expect(P).toContainText('Money trail');
+
+  // an Ethereum transaction, with a token transfer
+  await page.route('https://eth.blockscout.com/api/v2/**', r => { const u = new URL(r.request().url()); hits.push(u.pathname + u.search);
+    if (u.pathname.startsWith('/api/v2/search')) return r.fulfill({ headers: cors, body: JSON.stringify({ items: [{ type: 'token', name: 'Lamp', address_hash: '0x' + '99'.repeat(20) }, { type: 'ens_domain', address_hash: '0xA1E4380A3B1f749673E270229993eE55F35663b4', ens_info: { name: 'lamp-ops.eth', expiry_date: '2025-01-01T00:00:00.000Z' } }] }) });
+    r.fulfill({ headers: cors, body: JSON.stringify({ hash: ETX, from: { hash: '0xA1E4380A3B1f749673E270229993eE55F35663b4', ens_domain_name: 'lamp-ops.eth' }, to: { hash: '0x5DF9B87991262F6BA471F09758CDE1c0FC1De734' }, value: '31337', timestamp: '2015-08-07T03:30:33.000000Z', status: 'ok', result: 'success', block_number: 46147, fee: { type: 'actual', value: '1050000000000000000' },
+      token_transfers: [{ log_index: 0, from: { hash: '0xA1E4380A3B1f749673E270229993eE55F35663b4' }, to: { hash: '0x' + '22'.repeat(20) }, token: { symbol: 'USDT', decimals: '6', address_hash: '0x' + '33'.repeat(20) }, total: { value: '250000000', decimals: '6' }, token_type: 'ERC-20' }] }) }); });
+  await page.evaluate(id => { lkSettings().on.bscout = true; select('ent', id); }, 'ethtx:' + ETX);
+  await P.locator('[data-act=chTxGet]').click();
+  await expect(sec.locator('.ch-kv')).toContainText('1.05 ETH');                                 // the fee
+  await expect(sec).toContainText('Tokens moved'); await expect(sec).toContainText('250 USDT');
+  await expect(sec.locator('.ch-cp', { hasText: '0xa1e4380a' }).first()).toContainText('lamp-ops.eth'); // the sender's ENS, from Blockscout
+
+  // an ENS name resolves to its wallet; an expired registration is called out
+  await page.evaluate(() => select('ent', 'ens:lamp-ops.eth'));
+  await P.locator('[data-act=chEnsGet]').click();
+  await expect(P.locator('.isec.ch .ent')).toContainText('0xa1e4380a3b1f749673e270229993ee55f35663b4');
+  await expect(P.locator('.isec.ch')).toContainText('expired — anyone can register it');
+  await P.locator('[data-act=chEnsAdd]').click();
+  expect(await page.evaluate(() => { const e = DB.entries.find(x => x.caseId === 'c-lantern' && x.fields.address === '0xa1e4380a3b1f749673e270229993ee55f35663b4'); return e && e.notes; })).toBe('ENS: lamp-ops.eth');
+  expect(await page.evaluate(() => DB.records.some(r => r.title === 'ENS lamp-ops.eth → 0xa1e4380a3b1f749673e270229993ee55f35663b4'))).toBe(true);
+
+  // Solana: checked offline, opened in an explorer — nothing is fetched
+  const before = hits.length;
+  await page.evaluate(id => select('ent', id), 'sol:' + SOL);
+  await expect(P).toContainText('Solana address'); await expect(P.locator(`a[href="https://solscan.io/account/${SOL}"]`).first()).toBeVisible();
+  await page.evaluate(id => select('ent', id), 'soltx:' + SIG);
+  await expect(P.locator(`a[href="https://solscan.io/tx/${SIG}"]`).first()).toBeVisible();
+  expect(hits.length).toBe(before);
+  // a 64-hex hash found next to payment words offers to be read as a transaction
+  await page.evaluate(id => select('ent', id), 'sha256:' + SHA);
+  await expect(P.locator('[data-act=selEnt][data-id="btctx:' + SHA + '"]')).toHaveCount(1);
+  // stored lookups survive the cleaner
+  expect(await page.evaluate(() => { const C = chClean(JSON.parse(JSON.stringify(DB.chain))); return [Object.keys(C.txq).length, C.ens['lamp-ops.eth'].a]; })).toEqual([2, '0xa1e4380a3b1f749673e270229993ee55f35663b4']);
+  noErrors(errors);
+});
+
+test('Solana: transfers exported from an explorer become a trail — raw units read with their decimals, SOL and tokens apart — and nothing is fetched', async ({ page }) => {
+  const net = []; page.on('request', r => { if (!/^(file|data|blob):/.test(r.url())) net.push(r.url()); });
+  const errors = await open(page, '#/case/c-lantern/vault');
+  const W = 'GfsJWjmGXMfct8JMR9Lm9ySUnniZbnGUTQDbT8ipWf9U', V = '2smn4jxZEcnQuRmjJhNbcgeouXDCD6ALD8TKHMfCBSCY', X = 'CX7qmkwesTtKaXrzaN5MWf5qtbXjaP8nwArq2WMhewQU';
+  await capture(page, 'Victim was told to send SOL to ' + W, 'c-lantern');
+  await page.waitForTimeout(400);                                                                  // the capture opens the timeline; select once it has
+  const P = page.locator('#insp .isec.ch');
+  await expect.poll(async () => { await page.evaluate(w => select('ent', 'sol:' + w), W); return P.count(); }).toBe(1);
+  await expect(P).toContainText('Import its transfers'); await expect(P.locator('[data-act=chGet]')).toHaveCount(0);   // no fetch offered — none would work
+  const [fc] = await Promise.all([page.waitForEvent('filechooser'), P.locator('[data-act=chImport]').click()]);
+  await fc.setFiles(require('path').join(__dirname, 'fixtures', 'trail', 'solscan-transfers.csv'));
+  await expect(page.locator('.toast').last()).toContainText('4 transactions imported (Solana transfers)'); await expect(page.locator('.toast').last()).toContainText('1 row skipped');
+  const T = await page.evaluate(w => { const T = chTrail('sol', w); return { n: T.n, tot: Object.fromEntries(Object.entries(T.tot).map(([k, x]) => [k, [chFmt(x.in, x.dec), chFmt(x.out, x.dec)]])), cps: T.cps.map(r => r.a) }; }, W);
+  expect(T.n).toBe(4);
+  expect(T.tot.SOL).toEqual(['4', '3.9']);                                                       // 2.5 + 1.5 in, 3.9 out — from lamports and 9 decimals
+  expect(Object.entries(T.tot).find(([k]) => k !== 'SOL')[1]).toEqual(['0', '1,250']);             // the USDC transfer, with its own 6 decimals
+  expect(T.cps).toEqual(expect.arrayContaining([V, X]));
+  // the wallets go into the case with Solana as their currency
+  await page.evaluate(w => { UI.ch = null; chDlg('sol', w); }, W);
+  await page.locator(`#dlg [data-chpick="${X}"]`).check(); await page.locator('#dlg [data-act=chVault]').click();
+  expect(await page.evaluate(x => { const e = DB.entries.find(e => e.caseId === 'c-lantern' && e.fields.address === x); return e && e.fields.currency; }, X)).toBe('Solana');
+  expect(net).toEqual([]);
+  noErrors(errors);
 });

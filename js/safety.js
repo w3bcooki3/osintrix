@@ -203,6 +203,7 @@ function fileRecord(m, cid){
   return {id:uid('r'), caseId:cid, type:'evidence', title:what + ': ' + m.name, body, tsRaw:new Date(made ?? m.modified).toISOString(), tsZone:made != null && m.meta.tz === 'assumed' ? 'UTC' : 'explicit', ts:made ?? m.modified, source:'attachment', host:'', tags:[k === 'image' ? 'screenshot' : k === 'video' || k === 'audio' ? k : 'file'], ents:E.extract(body).filter(e => e.k !== 'file'), answer:'', addedBy:'You', addedAt:Date.now(), hash:'', att:[m]}; }
 async function attachFiles(files, recId){
   files = [...files].filter(f => f && f.size != null); if(!files.length) return;
+  if(!recId && typeof isChatExport === 'function'){ const chats = []; for(const f of files) if(await isChatExport(f)) chats.push(f); if(chats.length){ files = files.filter(f => !chats.includes(f)); await importChats(chats); if(!files.length) return; } }
   if(!recId){ const pages = files.filter(isWebPage); if(pages.length){ files = files.filter(f => !isWebPage(f)); await importWebPages(pages); if(!files.length) return; } }
   if(!STORE.idb) return toast('Attachments need IndexedDB, which this browser blocked');
   const made = [], metas = [], bigs = []; let skipped = 0;

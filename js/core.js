@@ -134,7 +134,7 @@ function entryKey(e){
   let k = t.kind;
   if(e.type === 'crypto') k = E.cryptoKind(v);
   if(e.type === 'ip' && v.includes(':') && E.validIPv6(v.trim())) k = 'ipv6';
-  if(/^(phone|mac)$/.test(k)) v = E.norm(k, v);
+  if(/^(phone|mac|pgp)$/.test(k)) v = E.norm(k, v);
   if(e.type === 'username') v = '@' + v.replace(/^@/, '');
   if(/^(ipv4|ipv6|domain|url|email|sha256|handle)$/.test(k)) v = v.toLowerCase();
   v = v.trim();
@@ -198,7 +198,7 @@ function passes(r){
 }
 
 /* ---------- routing ---------- */
-const AREAS = ['today','security','watch','trash','help','ctf','lab','home','cases','case','toolbox','entities','feeds','decoder','reference','settings','detections','playbooks','queries','notes','cloud','whatsnew','pad','notebook','certs','regex'];
+const AREAS = ['today','security','watch','trash','help','ctf','lab','home','cases','case','toolbox','entities','feeds','decoder','reference','settings','detections','playbooks','queries','notes','cloud','whatsnew','pad','notebook','certs','tradecraft','regex'];
 const CASE_TABS = [['overview','Overview','layout-dashboard'],['vault','Vault','layers'],['entities','Entities','fingerprint'],['timeline','Timeline','clock'],['graph','Graph','waypoints'],['map','Places','map-pin'],['media','Media','images'],['infra','Infrastructure','network'],['questions','Analysis','scale'],['report','Report','file-chart-column']];
 function parseHash(){
   const p = (location.hash || '#/home').replace(/^#\/?/, '').split('/').map(decodeURIComponent);
@@ -209,6 +209,8 @@ function parseHash(){
 /* how a case is called on screen: its name, up to the first “ — ” (“Op Lantern”). The TN-… code is kept as an
    internal reference — exports, search and “in TN-2026-014” still know it — but people read names, not numbers. */
 const caseNm = (c, max = 48) => { if(typeof c === 'string') c = theCase(c); if(!c) return ''; const n = String(c.name || 'Untitled case').split(' — ')[0].trim() || String(c.name || 'Untitled case'); return n.length > max ? n.slice(0, max - 1).trimEnd() + '…' : n; };
+/* the ▾ beside every “Save to <case>” button: pick which case it goes to (that case becomes the current one) */
+const casePick = () => `<button type="button" class="btn ctpick" data-act="casePick" aria-haspopup="menu" aria-label="Choose the case to save to" title="Choose the case">${ico('chevron-down','sm')}</button>`;
 const caseHash = (id, tab) => '#/case/' + encodeURIComponent(id || DB.active) + '/' + (tab || SHELL_HOME);
 function go(h){ if(location.hash === h) onRoute(); else location.hash = h; }
 
@@ -228,7 +230,7 @@ function toast(msg, label, fn){
 /* ---------- shared render helpers ---------- */
 const typeOfKind = k => TYPES[KIND_TO_TYPE[k]] || null;
 function tbadge(typeId, cls = ''){ const t = TYPES[typeId] || {icon:'hash', color:'--t-file'}; return `<span class="tb ${cls}" style="--c:var(${t.color})">${ico(t.icon)}</span>`; }
-function kindBadge(k, cls = ''){ const t = typeOfKind(k); return t ? tbadge(t.id, cls) : `<span class="tb ${cls}" style="--c:var(--t-file)">${ico(k === 'eventid' ? 'activity' : k === 'path' || k === 'file' ? 'file-code' : k === 'account' ? 'user' : 'hash')}</span>`; }
+function kindBadge(k, cls = ''){ const t = typeOfKind(k); return t ? tbadge(t.id, cls) : `<span class="tb ${cls}" style="--c:var(${/tx$/.test(k) ? '--t-finance' : k === 'pgp' ? '--t-identity' : k === 'session' || k === 'tox' || k === 'tgid' || k === 'dcid' ? '--t-contact' : '--t-file'})">${ico(/tx$/.test(k) ? 'arrow-right-left' : k === 'pgp' ? 'key-round' : k === 'session' || k === 'tox' || k === 'tgid' || k === 'dcid' ? 'message-square' : k === 'eventid' ? 'activity' : k === 'path' || k === 'file' ? 'file-code' : k === 'account' ? 'user' : 'hash')}</span>`; }
 function entPill(id, opts = {}){
   const {k, v} = entSplit(id);
   return `<button class="ent${UI.sel && UI.sel.id === id ? ' on' : ''}" data-v="${verdictOf(id)}" data-act="selEnt" data-id="${esc(id)}" title="${esc(E.LABEL[k] || k)}">${kindBadge(k)}<span class="v">${esc(v)}</span>${opts.n ? `<span class="n">×${opts.n}</span>` : ''}</button>`;

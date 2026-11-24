@@ -50,9 +50,65 @@ function validIPv6(s){
 const ibanOK = s => { s = s.replace(/\s+/g, '').toUpperCase(); if(!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(s)) return false;
   const r = (s.slice(4) + s.slice(0, 4)).replace(/[A-Z]/g, c => c.charCodeAt(0) - 55); let m = 0; for(const ch of r) m = (m * 10 + +ch) % 97; return m === 1; };
 const mixedB58 = s => /\d/.test(s) && /[a-z]/.test(s) && /[A-Z]/.test(s);
+/* how many bytes a base58 string decodes to (leading 1s are zero bytes) — a Solana address is 32, a signature 64 */
+const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+function b58Bytes(s){ let n = 0n; for(const ch of s){ const i = B58.indexOf(ch); if(i < 0) return -1; n = n * 58n + BigInt(i); }
+  let len = 0; while(n > 0n){ n >>= 8n; len++; } let z = 0; while(s[z] === '1') z++; return len + z; }
+/* a 64-hex value written next to "tx", "txid", "transaction" or a block-explorer path is a Bitcoin transaction, not a file hash */
+const BTC_TX_CTX = /(?:\b(?:tx|txid|txn|tx[\s_-]?hash|tx[\s_-]?id|transaction(?:[\s_-]?(?:id|hash))?|spent in|paid in|funded by)\b[^\n\w]{0,4}|(?:mempool\.space|blockstream\.info|blockchair\.com|blockchain\.com|btcscan\.org|blockcypher\.com)\/[\w\/-]*?\/(?:tx|transactions?)\/(?:btc\/)?)$/i;
+/* ---------- dark web: Tor onion addresses and OpenPGP keys, read offline ---------- */
+/* SHA-1 (an OpenPGP v4 fingerprint) and SHA3-256 (a Tor v3 address checksum) over bytes */
+function sha1(b){ const l = b.length, n = ((l + 8 >> 6) + 1) << 4, w = new Int32Array(n); for(let i = 0; i < l; i++) w[i >> 2] |= b[i] << (24 - (i & 3) * 8);
+  w[l >> 2] |= 0x80 << (24 - (l & 3) * 8); w[n - 1] = l * 8; let h0 = 0x67452301, h1 = 0xEFCDAB89, h2 = 0x98BADCFE, h3 = 0x10325476, h4 = 0xC3D2E1F0; const x = new Int32Array(80);
+  for(let i = 0; i < n; i += 16){ let a = h0, bb = h1, c = h2, d = h3, e = h4;
+    for(let j = 0; j < 80; j++){ x[j] = j < 16 ? w[i + j] : (t => t << 1 | t >>> 31)(x[j - 3] ^ x[j - 8] ^ x[j - 14] ^ x[j - 16]);
+      const f = j < 20 ? (bb & c | ~bb & d) + 0x5A827999 : j < 40 ? (bb ^ c ^ d) + 0x6ED9EBA1 : j < 60 ? (bb & c | bb & d | c & d) + 0x8F1BBCDC : (bb ^ c ^ d) + 0xCA62C1D6;
+      const t = ((a << 5 | a >>> 27) + f + e + x[j]) | 0; e = d; d = c; c = bb << 30 | bb >>> 2; bb = a; a = t; }
+    h0 = h0 + a | 0; h1 = h1 + bb | 0; h2 = h2 + c | 0; h3 = h3 + d | 0; h4 = h4 + e | 0; }
+  return [h0, h1, h2, h3, h4].map(h => (h >>> 0).toString(16).padStart(8, '0')).join(''); }
+const KRC = [1n,0x8082n,0x800000000000808an,0x8000000080008000n,0x808bn,0x80000001n,0x8000000080008081n,0x8000000000008009n,0x8an,0x88n,0x80008009n,0x8000000an,0x8000808bn,0x800000000000008bn,0x8000000000008089n,0x8000000000008003n,0x8000000000008002n,0x8000000000000080n,0x800an,0x800000008000000an,0x8000000080008081n,0x8000000000008080n,0x80000001n,0x8000000080008008n];
+const KRO = [0,1,62,28,27,36,44,6,55,20,3,10,43,25,39,41,45,15,21,8,18,2,61,56,14], M64 = (1n << 64n) - 1n, rot = (v, r) => r ? ((v << BigInt(r)) | (v >> BigInt(64 - r))) & M64 : v;
+function sha3_256(bytes){ const rate = 136, m = [...bytes, 0x06]; while(m.length % rate) m.push(0); m[m.length - 1] |= 0x80; const S = new Array(25).fill(0n);
+  for(let o = 0; o < m.length; o += rate){ for(let i = 0; i < rate / 8; i++){ let v = 0n; for(let k = 7; k >= 0; k--) v = (v << 8n) | BigInt(m[o + i * 8 + k]); S[i] ^= v; }
+    for(let r = 0; r < 24; r++){ const C = [0, 1, 2, 3, 4].map(x => S[x] ^ S[x + 5] ^ S[x + 10] ^ S[x + 15] ^ S[x + 20]);
+      for(let x = 0; x < 5; x++){ const D = C[(x + 4) % 5] ^ rot(C[(x + 1) % 5], 1); for(let y = 0; y < 25; y += 5) S[x + y] ^= D; }
+      const B = new Array(25); for(let x = 0; x < 5; x++) for(let y = 0; y < 5; y++) B[y + ((2 * x + 3 * y) % 5) * 5] = rot(S[x + 5 * y], KRO[x + 5 * y]);
+      for(let x = 0; x < 5; x++) for(let y = 0; y < 25; y += 5) S[x + y] = B[x + y] ^ ((~B[(x + 1) % 5 + y] & M64) & B[(x + 2) % 5 + y]);
+      S[0] ^= KRC[r]; } }
+  const out = []; for(let i = 0; i < 4; i++){ let v = S[i]; for(let k = 0; k < 8; k++){ out.push(Number(v & 255n)); v >>= 8n; } } return out; }
+const B32A = 'abcdefghijklmnopqrstuvwxyz234567';
+function b32dec(s){ let bits = 0, val = 0; const out = []; for(const ch of s.toLowerCase()){ const i = B32A.indexOf(ch); if(i < 0) return null; val = (val << 5) | i; bits += 5; if(bits >= 8){ out.push((val >>> (bits - 8)) & 255); bits -= 8; } } return out; }
+/* a Tor onion address: v3 is 56 base32 characters = ed25519 key, 2-byte checksum, version 3 */
+function onionInfo(host){ const h = String(host).toLowerCase().replace(/^.*?([a-z2-7]+)\.onion$/, '$1');
+  if(h.length === 16) return {v:2, ok:null}; if(h.length !== 56) return null; const b = b32dec(h); if(!b || b.length !== 35) return {v:3, ok:false};
+  const key = b.slice(0, 32), sum = b.slice(32, 34), ver = b[34], want = sha3_256([...'.onion checksum'].map(c => c.charCodeAt(0)).concat(key, [3]));
+  return {v:ver, ok:ver === 3 && want[0] === sum[0] && want[1] === sum[1], key:key.map(x => x.toString(16).padStart(2, '0')).join('')}; }
+/* an armoured OpenPGP public key: each primary key and subkey with its v4 fingerprint, algorithm, size, date and user IDs */
+const PGP_ALGO = {1:'RSA', 2:'RSA', 3:'RSA', 16:'ElGamal', 17:'DSA', 18:'ECDH', 19:'ECDSA', 22:'EdDSA', 25:'X25519', 27:'Ed25519'};
+const PGP_CURVE = {'2b060104019755010501':'Curve25519', '2b06010401da470f01':'Ed25519', '2a8648ce3d030107':'NIST P-256', '2b81040022':'NIST P-384', '2b81040023':'NIST P-521', '2b2403030208010107':'brainpoolP256r1'};
+function pgpParse(text){
+  const m = /-----BEGIN PGP PUBLIC KEY BLOCK-----([\s\S]*?)-----END PGP PUBLIC KEY BLOCK-----/.exec(String(text)); if(!m) return [];
+  const b64 = m[1].split(/\r?\n/).filter(l => !/^[\w-]+:\s/.test(l) && !/^=/.test(l.trim())).join('').replace(/[^A-Za-z0-9+/=]/g, '');
+  let bin; try{ bin = atob(b64); }catch(e){ return []; } const B = Uint8Array.from(bin, c => c.charCodeAt(0)), keys = []; let i = 0, cur = null;
+  while(i < B.length && keys.length < 40){ const h = B[i++]; if(!(h & 0x80)) break; let tag, len;
+    if(h & 0x40){ tag = h & 63; const o = B[i++]; if(o < 192) len = o; else if(o < 224) len = ((o - 192) << 8) + B[i++] + 192; else if(o === 255){ len = (B[i] << 24 | B[i + 1] << 16 | B[i + 2] << 8 | B[i + 3]) >>> 0; i += 4; } else break; }
+    else { tag = (h >> 2) & 15; const lt = h & 3; len = lt === 0 ? B[i++] : lt === 1 ? (B[i++] << 8 | B[i++]) : lt === 2 ? ((B[i++] << 24 | B[i++] << 16 | B[i++] << 8 | B[i++]) >>> 0) : B.length - i; }
+    const body = B.subarray(i, i + len); i += len; if(body.length < len) break;
+    if((tag === 6 || tag === 14) && body[0] === 4){ const fp = sha1([0x99, len >> 8 & 255, len & 255, ...body]).toUpperCase(), algo = body[5];
+      let bits = 0, curve = ''; if(algo <= 3 || algo === 16 || algo === 17){ bits = body[6] << 8 | body[7]; }
+      else if(algo === 18 || algo === 19 || algo === 22){ const ol = body[6]; curve = PGP_CURVE[[...body.subarray(7, 7 + ol)].map(x => x.toString(16).padStart(2, '0')).join('')] || 'other curve'; }
+      else if(algo === 27) curve = 'Ed25519'; else if(algo === 25) curve = 'Curve25519';
+      const k = {fp, id:fp.slice(-16), sub:tag === 14, algo:PGP_ALGO[algo] || 'algorithm ' + algo, bits, curve, created:((body[1] << 24 | body[2] << 16 | body[3] << 8 | body[4]) >>> 0) * 1000, uids:[]};
+      keys.push(k); if(tag === 6) cur = k; }
+    else if((tag === 6 || tag === 14) && body[0] !== 4) keys.push({fp:'', sub:tag === 14, v:body[0], uids:[]});
+    else if(tag === 13 && cur && cur.uids.length < 20){ try{ cur.uids.push(new TextDecoder().decode(body).slice(0, 200)); }catch(e){} } }
+  return keys; }
+
 function norm(k, v){
   v = String(v).trim();
   switch(k){
+    case 'pgp': return v.replace(/\s+/g, '').replace(/^0x/i, '').toUpperCase();
+    case 'tox': return v.toUpperCase();
     case 'phone': return normPhone(v);
     case 'mac': return normMac(v);
     case 'ipv6': return v.toLowerCase();
@@ -65,10 +121,21 @@ function norm(k, v){
   }
 }
 function cryptoKind(v){ v = String(v).trim();
-  if(/^0x[a-f0-9]{40}$/i.test(v)) return 'eth'; if(/^4[0-9AB][1-9A-HJ-NP-Za-km-z]{93}$/.test(v)) return 'xmr'; if(/^(ltc1|[LM][a-km-zA-HJ-NP-Z1-9]{26,33}$)/.test(v)) return 'ltc';
+  if(/^0x[a-f0-9]{40}$/i.test(v)) return 'eth'; if(/^[a-z0-9-]{3,}(?:\.[a-z0-9-]+)*\.eth$/i.test(v)) return 'ens';
+  if(/^[1-9A-HJ-NP-Za-km-z]{43,44}$/.test(v) && b58Bytes(v) === 32) return 'sol'; if(/^4[0-9AB][1-9A-HJ-NP-Za-km-z]{93}$/.test(v)) return 'xmr'; if(/^(ltc1|[LM][a-km-zA-HJ-NP-Z1-9]{26,33}$)/.test(v)) return 'ltc';
   if(/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(v)) return 'trx'; if(/^D[5-9A-HJ-NP-U][1-9A-HJ-NP-Za-km-z]{32}$/.test(v)) return 'doge'; return 'btc'; }
 const PATTERNS = [
   ['sha512',/\b[a-f0-9]{128}\b/gi],
+  /* private messengers dark-web vendors list as contacts: a Session ID is 05 + 32 bytes, a Tox ID 38 bytes, both hex */
+  /* chat accounts' permanent numbers, where a text names them (an imported chat export writes them this way) */
+  ['tgid',/\bTelegram (?:user )?ID:?\s*(\d{5,15})\b/gi,1],
+  ['dcid',/\bDiscord (?:user |server |channel )?ID:?\s*(\d{17,20})\b/gi,1],
+  ['session',/\b05[0-9a-f]{64}\b/gi],
+  ['tox',/\b[0-9A-F]{76}\b/gi],
+  ['pgp',/\b[0-9A-F]{4}(?: [0-9A-F]{4}){4} {1,2}[0-9A-F]{4}(?: [0-9A-F]{4}){4}\b/gi],
+  ['ethtx',/\b0x[a-fA-F0-9]{64}\b/g],
+  /* Solana: base58 that decodes to 32 bytes (an address) or 64 (a signature); not a piece of base64, a JWT or a longer token */
+  ['soltx',/(?<![\w+=.-])[1-9A-HJ-NP-Za-km-z]{86,88}(?![\w+=-]|[.\/]\w)/g],
   ['sha256',/\b[a-f0-9]{64}\b/gi],
   ['sha1',/\b[a-f0-9]{40}\b/gi],
   ['md5',/\b[a-f0-9]{32}\b/gi],
@@ -77,10 +144,12 @@ const PATTERNS = [
   ['ttp',/\bT1\d{3}(?:\.\d{3})?\b/g],
   ['eth',/\b0x[a-fA-F0-9]{40}\b/g],
   ['xmr',/\b4[0-9AB][1-9A-HJ-NP-Za-km-z]{93}\b/g],
+  ['ens',/\b[a-z0-9-]{3,}(?:\.[a-z0-9-]+)*\.eth\b(?![.-]\w)/gi],
   ['btc',/\b(?:bc1[ac-hj-np-z02-9]{25,59}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})\b/g],
   ['ltc',/\b(?:ltc1[ac-hj-np-z02-9]{39,59}|[LM][a-km-zA-HJ-NP-Z1-9]{26,33})\b/g],
   ['trx',/\bT[1-9A-HJ-NP-Za-km-z]{33}\b/g],
   ['doge',/\bD[5-9A-HJ-NP-U][1-9A-HJ-NP-Za-km-z]{32}\b/g],
+  ['sol',/(?<![\w+=.-])[1-9A-HJ-NP-Za-km-z]{43,44}(?![\w+=-]|[.\/]\w)/g],
   ['iban',/\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]{4}){2,7}(?: ?[A-Z0-9]{1,4})?\b/g],
   ['sid',/\bS-1-(?:\d{1,10}-){1,14}\d{1,10}\b/g],
   ['social',/\b(?:https?:\/\/)?(?:www\.|m\.|mobile\.|old\.)?(?:twitter\.com|x\.com|instagram\.com|facebook\.com|fb\.com|tiktok\.com|github\.com|gitlab\.com|t\.me|telegram\.me|reddit\.com|linkedin\.com|youtube\.com|threads\.net|pinterest\.com|medium\.com|twitch\.tv|vk\.com|keybase\.io|bsky\.app|snapchat\.com|soundcloud\.com|steamcommunity\.com|hackerone\.com|patreon\.com|onlyfans\.com)\/[^\s"'<>()\[\]]+/gi],
@@ -104,15 +173,15 @@ const PATTERNS = [
   ['domain',/(?<![\w\u00C0-\uFFFF-])(?=[\w-]*[\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF])[\w\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF-]{1,63}(?:\.[\w\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF-]{1,63})*\.[a-z\u0400-\u04FF]{2,24}\b/gi],
   ['domain',/\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:[a-z]{2,24})\b/gi],
 ];
-const KINDS = ['ipv4','ipv6','hostport','domain','url','email','handle','social','phone','btc','eth','xmr','ltc','trx','doge','iban','md5','sha1','sha256','sha512',
+const KINDS = ['ipv4','ipv6','hostport','domain','url','email','handle','social','phone','btc','eth','xmr','ltc','trx','doge','sol','ens','btctx','ethtx','soltx','pgp','session','tox','tgid','dcid','iban','md5','sha1','sha256','sha512',
   'mac','asn','coords','file','path','regkey','account','sid','eventid','cve','ttp','custom'];
-const GROUP = {ipv6:'net',mac:'net',asn:'net',social:'id',phone:'id',xmr:'id',ltc:'id',trx:'id',doge:'id',iban:'id',sha512:'hash',coords:'place',ttp:'vuln',ipv4:'net',hostport:'net',domain:'net',url:'net',email:'id',handle:'id',btc:'id',eth:'id',
+const GROUP = {tgid:'id',dcid:'id',session:'id',tox:'id',pgp:'id',sol:'id',ens:'id',btctx:'id',ethtx:'id',soltx:'id',ipv6:'net',mac:'net',asn:'net',social:'id',phone:'id',xmr:'id',ltc:'id',trx:'id',doge:'id',iban:'id',sha512:'hash',coords:'place',ttp:'vuln',ipv4:'net',hostport:'net',domain:'net',url:'net',email:'id',handle:'id',btc:'id',eth:'id',
   md5:'hash',sha1:'hash',sha256:'hash',file:'host',path:'host',regkey:'host',account:'id',sid:'id',
   eventid:'host',cve:'vuln',custom:'hash'};
-const LABEL = {ipv6:'IPv6',mac:'MAC address',asn:'ASN',social:'Social profile',phone:'Phone',xmr:'XMR wallet',ltc:'LTC wallet',trx:'TRON wallet',doge:'DOGE wallet',iban:'IBAN',sha512:'SHA-512',coords:'Coordinates',ttp:'ATT&CK technique',ipv4:'IP',hostport:'IP:port',domain:'Domain',url:'URL',email:'Email',handle:'Handle',
+const LABEL = {tgid:'Telegram ID',dcid:'Discord ID',session:'Session ID',tox:'Tox ID',pgp:'PGP key',sol:'SOL wallet',ens:'ENS name',btctx:'BTC transaction',ethtx:'ETH transaction',soltx:'SOL transaction',ipv6:'IPv6',mac:'MAC address',asn:'ASN',social:'Social profile',phone:'Phone',xmr:'XMR wallet',ltc:'LTC wallet',trx:'TRON wallet',doge:'DOGE wallet',iban:'IBAN',sha512:'SHA-512',coords:'Coordinates',ttp:'ATT&CK technique',ipv4:'IP',hostport:'IP:port',domain:'Domain',url:'URL',email:'Email',handle:'Handle',
   btc:'BTC wallet',eth:'ETH wallet',md5:'MD5',sha1:'SHA-1',sha256:'SHA-256',file:'File',path:'Path',
   regkey:'Reg key',account:'Account',sid:'SID',eventid:'Event ID',cve:'CVE',custom:'Custom'};
-const LOWER = /^(ipv4|ipv6|hostport|domain|url|email|md5|sha1|sha256|sha512|file|handle)$/;
+const LOWER = /^(ipv4|ipv6|hostport|domain|url|email|md5|sha1|sha256|sha512|file|handle|ens|btctx|ethtx|session)$/;
 const validIP = s => s.split('.').every(o => o.length < 4 && +o <= 255);
 /* punctuation around a value is not part of it — but a closing bracket that closes one opened inside it is */
 const trimEdge = s => { let v = String(s).replace(/^[('"[{]+/,''), p;
@@ -135,6 +204,10 @@ function extract(text){
   // characters, so such runs are cut into 256-character pieces before matching.
   let work = refang(text).replace(/\S{400,}/g, run => run.replace(/(.{256})/g, '$1 '));
   const out = [], seen = new Set();
+  /* an armoured public key: its fingerprints and the names and emails it carries are read, then the block is set aside so its base64 yields nothing else */
+  const pgpKeys = [];
+  work = work.replace(/-----BEGIN PGP PUBLIC KEY BLOCK-----[\s\S]{0,200000}?-----END PGP PUBLIC KEY BLOCK-----/g, blk => { try{ pgpKeys.push(...pgpParse(blk)); }catch(e){} return blk.replace(/[^\n]/g, '\u0000'); });
+  const orig = work;   // masking keeps lengths, so a URL that held a hash is read back whole from orig
   const push = (k, raw) => {
     let v = trimEdge(String(raw).trim()); if(!v) return;
     if(k === 'cve') v = v.toUpperCase(); else if(LOWER.test(k)) v = v.toLowerCase(); else v = norm(k, v);
@@ -142,17 +215,23 @@ function extract(text){
     const id = k + ':' + v; if(seen.has(id)) return; seen.add(id); out.push({k, v});
   };
   for(const [kind, re, cap] of PATTERNS){
+    /* cheap tests first: most text holds none of these */
+    if((kind === 'ens' && !/\.eth\b/i.test(work)) || (kind === 'tgid' && !/telegram/i.test(work)) || (kind === 'dcid' && !/discord/i.test(work)) || ((kind === 'session' || kind === 'tox' || kind === 'ethtx') && !/[0-9a-f]{60}/i.test(work))) continue;
     re.lastIndex = 0; const hits = []; let m;
     while((m = re.exec(work)) !== null){
       if(!m[0].length){ re.lastIndex++; continue; }
-      const v = trimEdge(String(cap ? m[cap] : m[0]).trim()); if(!v) continue;
+      const v = trimEdge(String(cap ? m[cap] : (kind === 'url' || kind === 'social') && m[0].includes('\u0000') ? orig.substr(m.index, m[0].length) : m[0]).trim()); if(!v) continue;
       if(kind === 'ipv4' && !validIP(v)) continue;
       if(kind === 'ipv6' && (!validIPv6(v) || /^[0-9]+:[0-9]+(:[0-9]+)?$/.test(v) || (v.match(/:/g) || []).length < 2)) continue;
       if(kind === 'social' && !normSocial(v)) continue;
       if(kind === 'phone'){ const d = v.replace(/\D/g, ''); if(d.length < 8 || d.length > 15 || /^(19|20)\d{6}$/.test(d)) continue; }
       if(kind === 'coords' && (Math.abs(+m[1]) > 90 || Math.abs(+m[2]) > 180 || (+m[1] === 0 && +m[2] === 0))) continue;
       if(kind === 'iban' && !ibanOK(v)) continue;
-      if(/^(btc|ltc|trx|doge|xmr)$/.test(kind) && !/^(bc1|ltc1)/.test(v) && !mixedB58(v)) continue;
+      if(/^(btc|ltc|trx|doge|xmr|sol|soltx)$/.test(kind) && !/^(bc1|ltc1)/.test(v) && !mixedB58(v)) continue;
+      if(kind === 'sol' && b58Bytes(v) !== 32) continue;
+      if(kind === 'soltx' && b58Bytes(v) !== 64) continue;
+      if(kind === 'sha1' && /\b(?:pgp|gpg|openpgp|fingerprint|fpr)\b(?:\s+key)?(?:\s+(?:id|fingerprint))?[^\n\w]{0,6}$/i.test(work.slice(Math.max(0, m.index - 40), m.index))){ hits.push([m.index, m[0].length, v, 'pgp']); continue; }
+      if(kind === 'sha256' && BTC_TX_CTX.test(work.slice(Math.max(0, m.index - 80), m.index))){ hits.push([m.index, m[0].length, v, 'btctx']); continue; }
       if(kind === 'uname' && /^(name|password|id|agent|none|null|admin|root|unknown|required|here|the|and|for|with|from)$/i.test(v)) continue;
       if(kind === 'domain' && (/^\d+\./.test(v) || FILE_EXT_TLD.test(v) || !plausibleTLD(v))) continue;
       if(kind === 'domain' && m.index > 0 && /[\u00C0-\uFFFF]/.test(work[m.index - 1])) continue;   // the tail of a word in another script is not a domain
@@ -163,7 +242,8 @@ function extract(text){
       for(const [i, len] of hits){ built += work.slice(at, i) + '\u0000'.repeat(len); at = i + len; }
       work = built + work.slice(at);
     }
-    for(const [,, v] of hits){
+    for(const [,, v, as] of hits){
+      if(as){ push(as, v); continue; }
       if(kind === 'phone'){ push('phone', v.replace(/^[^\d+]*(?=[+\d(])/, '').replace(/^tel:/i, '')); continue; }
       if(kind === 'uname'){ push('handle', v); continue; }
       if(kind === 'social'){ const s = normSocial(v); push('social', s.v); if(/^(x\.com|instagram\.com|tiktok\.com|github\.com|t\.me|threads\.net|twitch\.tv|gitlab\.com|keybase\.io|bsky\.app)$/.test(s.host) && /^[A-Za-z0-9_]{3,30}$/.test(s.user)) push('handle', s.user); continue; }
@@ -177,6 +257,8 @@ function extract(text){
       }
     }
   }
+  for(const k of pgpKeys){ if(!k.fp || k.sub) continue; const id = 'pgp:' + k.fp; if(!seen.has(id)){ seen.add(id); out.push({k:'pgp', v:k.fp}); }
+    for(const u of k.uids){ const em = /<([^<>\s]+@[^<>\s]+\.[a-z]{2,24})>/i.exec(u) || /\b([\w.+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+)\b/i.exec(u); if(em && !seen.has('email:' + em[1].toLowerCase())){ seen.add('email:' + em[1].toLowerCase()); out.push({k:'email', v:em[1].toLowerCase()}); } } }
   return out.sort((a, b) => KINDS.indexOf(a.k) - KINDS.indexOf(b.k));
 }
 
@@ -411,7 +493,7 @@ function parseQuery(q){
 }
 
 const REF = {EVENTIDS, SYSMON, EVIL_PORTS, PORTS, LOLBINS};
-return {REF, esc, safeUrl, refang, extract, norm, normSocial, normPhone, normMac, cryptoKind, validIPv6, KINDS, GROUP, LABEL, parseTime, carriesZone, lineTime, zoneAbbr,
+return {REF, esc, safeUrl, refang, extract, pgpParse, onionInfo, sha1, sha3_256, norm, normSocial, normPhone, normMac, cryptoKind, validIPv6, KINDS, GROUP, LABEL, parseTime, carriesZone, lineTime, zoneAbbr,
   fmtClock, fmtFull, fmtDate, fmtDay, fmtGap, fmtAgo, relClock, meaning, observations, ipClass, beaconOf,
   chapters, parseQuery};
 })();

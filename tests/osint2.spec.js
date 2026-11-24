@@ -1298,3 +1298,124 @@ test('cases are called by their names on screen — the TN-… number is not sho
   await page.fill('#srQ', 'case:op-l'); await expect(page.getByText('case:op-lantern', { exact: true }).first()).toBeVisible();
   noErrors(errors);
 });
+
+test('timeline: scrolling never leaves a blank screen — sticky day headings are measured where they sit, at any size and length', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  const scan = async (step, max) => page.evaluate(async ([step, max]) => { const sc = document.querySelector('#main .scroll'), bad = [];
+    for(let y = 0; y < Math.min(max, sc.scrollHeight); y += step){ sc.scrollTop = y; await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const sr = sc.getBoundingClientRect(), rows = [...document.querySelectorAll('#tlV > [data-vi]')].map(e => e.getBoundingClientRect()).filter(b => b.height > 0), last = rows.length ? Math.max(...rows.map(b => b.bottom)) : 0, sp = document.querySelector('#tlV').lastElementChild.getBoundingClientRect().height;
+      if(last < sr.bottom - 120 && sp > 50) bad.push(y); } return bad; }, [step, max]);
+  // the OSINT sample case: tall evidence cards between day headings
+  await page.evaluate(async () => { delete window.__noOsintSample; await sampleOsintAdd(); });
+  const cid = 'c-harbour'; expect(await page.evaluate(() => DB.cases.some(c => c.id === 'c-harbour'))).toBe(true);
+  for (const [w, h] of [[1668, 903], [1100, 760]]) { await page.setViewportSize({ width: w, height: h }); await page.evaluate(c => go(caseHash(c, 'timeline')), cid); await expect(page.locator('#tlV > [data-vi]').first()).toBeVisible();
+    expect(await scan(70, 12000)).toEqual([]); }
+  // a long one: 20,000 events over 200 days stays drawn wherever you land, and quickly
+  await page.evaluate(() => { const c = {id:'c-big', code:'BIG-1', name:'Big timeline', color:'#64748b', status:'active', created:Date.now(), updated:Date.now()}; DB.cases.push(c); const t0 = Date.UTC(2026, 0, 1);
+    for(let i = 0; i < 20000; i++) DB.records.push({id:'rb' + i, caseId:'c-big', type:'evidence', title:'Event ' + i, body:i % 3 ? '' : 'line one\nline two\nline three of event ' + i, tsRaw:'', ts:t0 + i * 864000, source:'log', host:'H' + (i % 7), tags:[], ents:[], answer:'', addedBy:'You', addedAt:Date.now(), hash:''}); mutate('big'); go(caseHash('c-big', 'timeline')); });
+  await expect(page.locator('#tlV > [data-vi]').first()).toBeVisible();
+  const t = Date.now(); const bad = await page.evaluate(async () => { const sc = document.querySelector('#main .scroll'), out = [];
+    for(const f of [0.01, 0.13, 0.37, 0.5, 0.71, 0.93, 1, 0.2]){ sc.scrollTop = f * (sc.scrollHeight - sc.clientHeight); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const sr = sc.getBoundingClientRect(), vis = [...document.querySelectorAll('#tlV > [data-vi]')].filter(e => { const b = e.getBoundingClientRect(); return b.bottom > sr.top + 80 && b.top < sr.bottom - 40; }).length; if(!vis) out.push(f); } return [out, document.querySelectorAll('#tlV > [data-vi]').length]; });
+  expect(bad[0]).toEqual([]); expect(bad[1]).toBeLessThan(200);   // only the rows near the screen exist
+  expect(Date.now() - t).toBeLessThan(15000);
+  noErrors(errors);
+});
+
+test('inspector: nothing in it is wider than the panel — every vault entry and indicator of the OSINT sample case', async ({ page }) => {
+  const errors = await open(page, '#/home');
+  await page.setViewportSize({ width: 1500, height: 900 });
+  await page.evaluate(async () => { delete window.__noOsintSample; await sampleOsintAdd(); DB.active = 'c-harbour'; go(caseHash('c-harbour', 'graph')); });
+  const wide = await page.evaluate(async () => { const out = [], ids = DB.entries.filter(e => e.caseId === 'c-harbour').map(e => ['entry', e.id]).concat([...derive('c-harbour').ents.keys()].slice(0, 120).map(k => ['ent', k]));
+    for(const [k, id] of ids){ select(k, id); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      for(const el of document.querySelectorAll('#insp, #insp .ibody')) if(el.scrollWidth > el.clientWidth + 1) out.push(id + ' ' + el.scrollWidth + '>' + el.clientWidth); }
+    return out; });
+  expect(wide).toEqual([]);
+  // the legend sits at the bottom when there is no time slider
+  await page.evaluate(() => { UI.sel = null; go(caseHash('c-harbour', 'graph')); });
+  const gap = await page.evaluate(() => { const c = document.querySelector('.gcanvas').getBoundingClientRect(), l = document.querySelector('.glegend').getBoundingClientRect(); return [!!document.querySelector('.gtime'), Math.round(c.bottom - l.bottom)]; });
+  expect(gap[1]).toBe(gap[0] ? 72 : 16);
+  noErrors(errors);
+});
+
+test('saving from a tool: the ▾ beside “Save to <case>” picks the case, and what you were doing stays on screen', async ({ page }) => {
+  const errors = await open(page, '#/decoder');
+  await page.fill('#decIn', 'aHR0cHM6Ly9ldmlsLmV4YW1wbGUvZ2F0ZS5waHA=');
+  const save = page.locator('.txents [data-act=decSave]');
+  await expect(save).toHaveText(/Save to Op Lantern as evidence/);
+  await page.locator('.txents .ctpick').click();
+  await expect(page.locator('#ctx .ctx-title')).toHaveText('Save to which case?');
+  await page.locator('#ctx .ctx-it', { hasText: 'Customer portal' }).click();
+  await expect(save).toHaveText(/Save to Customer portal as evidence/);
+  expect(await page.inputValue('#decIn')).toBe('aHR0cHM6Ly9ldmlsLmV4YW1wbGUvZ2F0ZS5waHA=');   // nothing was redrawn
+  const n0 = await page.evaluate(() => DB.records.filter(r => r.caseId === 'c-portal').length);
+  await save.click();
+  await expect(page.locator('#capCase')).toHaveValue('c-portal');   // the capture window opens on the chosen case
+  await page.click('[data-act=capSave]'); await expect(page.locator('#capBody')).toHaveCount(0);
+  expect(await page.evaluate(() => DB.records.filter(r => r.caseId === 'c-portal').length)).toBe(n0 + 1);
+  // the picker sits beside save buttons elsewhere too, joined to them
+  for (const r of ['#/certs', '#/queries']) { await page.evaluate(h => go(h), r); }
+  await page.evaluate(() => go('#/decoder'));
+  await expect(page.locator('.txents .ctsplit > .ctpick')).toHaveCount(1);
+  noErrors(errors);
+});
+
+test('threat intel overview: the four findings are worked out from the stories, the cases, the stack and the rules, and every link goes where it says', async ({ page }) => {
+  const errors = await open(page, '#/feeds');
+  await expect(page.locator('[data-act=itab][data-v=over]')).toHaveAttribute('aria-selected', 'true');                 // the Overview opens first
+  const tk = page.locator('.tio-tk');
+  await expect(tk.nth(0)).toContainText('no products listed');                                                           // an empty stack says so — no invented products
+  await page.evaluate(() => { DB.intel.stack = [{ vendor: 'Palo Alto Networks', product: '' }, { vendor: 'Fortinet', product: '' }]; mutate('stack'); renderMain(); });
+  await expect(tk.nth(0).locator('.v')).toHaveText(/^2/); await expect(tk.nth(0)).toContainText('PAN-OS'); await expect(tk.nth(0)).toContainText('FortiOS');
+  // indicators in the evidence: the sample stories name 203.0.113.47 etc., which Op Lantern holds
+  const ev = await page.evaluate(() => { const T = tioData(); return { n: T.ind.size, cases: [...T.perCase.keys()].map(c => caseNm(theCase(c))) }; });
+  expect(ev.n).toBeGreaterThan(0); await expect(tk.nth(1).locator('.v')).toHaveText(new RegExp('^' + ev.n + '[a-z]')); expect(ev.cases.join(' ')).toContain('Op Lantern');
+  // actor coverage, checked independently: Volt Typhoon's ATT&CK techniques against the techniques the rules are tagged with
+  const cov = await page.evaluate(() => { const g = ctiDict().grp.get('G1017'), tags = new Set(DB.rules.flatMap(ruleTechs)); const c = g.t.filter(t => tags.has(t) || tags.has(t.split('.')[0])).length; return { c, n: g.t.length }; });
+  const g0 = await page.evaluate(() => tioData().groups.map(g => [g.id, g.cov.cov, g.cov.n]));
+  expect(g0.find(g => g[0] === 'G1017').slice(1)).toEqual([cov.c, cov.n]);
+  await expect(tk.nth(2)).toContainText(`Your rules cover ${await page.evaluate(() => tioData().groups[0].cov.cov)} of the`);
+  // the filters narrow the table; “In my cases” keeps only stories whose indicators are in a case
+  await page.click('[data-act=tiof][data-v=cases]');
+  const rows = page.locator('.tio-tbl tbody tr'); await expect(rows).toHaveCount(await page.evaluate(() => tioData().S.filter(s => s.caseIds.size).length));
+  await expect(rows.first()).toContainText('Lamp loader');
+  await page.click('[data-act=tiof][data-v=kev]'); for (const t of await rows.allTextContents()) expect(t).toMatch(/CVE-\d{4}-\d+|zero-day|Citrix Bleed|MOVEit|Ivanti/);
+  // a KEV row opens the CVE; an actor opens ATT&CK
+  await page.click('[data-act=tiof][data-v=all]');
+  await page.click('.tio-kt tbody tr:has-text("CVE-2024-3400")'); await expect(page.locator('.ti-kevbox')).toContainText('Known exploited'); await page.keyboard.press('Escape');
+  await page.click('.tio-lr:has-text("Volt Typhoon")'); await expect(page.locator('.ti-actor-h h2')).toHaveText('Volt Typhoon');
+  // the thinnest technique starts a Sigma rule tagged with it
+  await page.click('[data-act=itab][data-v=over]');
+  const tid = await page.evaluate(() => tioData().techs.slice().sort((a, b) => a.rules - b.rules || b.n - a.n)[0].id);
+  await page.click('[data-act=tioRule]'); await expect(page).toHaveURL(/#\/detections/);
+  const r = await page.evaluate(() => DB.rules[0]); expect(r.technique).toBe(tid); expect(r.code).toContain('attack.' + tid.toLowerCase()); expect(r.title).toContain(tid);
+  noErrors(errors);
+});
+
+test('threat intel story panel: why it matters first, the source summary, previous / next and J / K through the list, no link when the story has none', async ({ page }) => {
+  const errors = await open(page, '#/feeds');
+  await page.evaluate(() => { DB.intel.stack = [{ vendor: 'Palo Alto Networks', product: '' }]; mutate('stack'); renderMain(); });
+  await page.click('.tio-tbl tbody tr:has-text("PAN-OS GlobalProtect")');
+  const P = page.locator('#insp');
+  await expect(P).toHaveClass(/story/); expect((await P.boundingBox()).width).toBeGreaterThan(440);
+  await expect(P.locator('.st-why')).toContainText('CVE-2024-3400 is known exploited'); await expect(P.locator('.st-why')).toContainText('in your stack');
+  await expect(P.locator('.st-why')).toContainText('T1190');
+  await expect(P.locator('.story-b')).toContainText('GlobalProtect');                                                     // the source's own summary
+  await expect(P.locator('.st-foot')).toContainText('No link to the original'); await expect(P.locator('.st-foot a')).toHaveCount(0);
+  const nav = await page.evaluate(() => UI.tioNav), at = nav.indexOf(await page.evaluate(() => UI.sel.id));
+  await expect(P.locator('.st-pos')).toHaveText(`${at + 1} of ${nav.length}`);
+  await page.click('[data-act=stNav][data-v="1"]'); await expect(P.locator('.st-pos')).toHaveText(`${at + 2} of ${nav.length}`);
+  await page.locator('body').press('k'); await expect(P.locator('.st-pos')).toHaveText(`${at + 1} of ${nav.length}`);
+  await page.locator('body').press('j'); await page.locator('body').press('j'); await expect(P.locator('.st-pos')).toHaveText(`${at + 3} of ${nav.length}`);
+  await expect(page.locator('.tio-tbl tbody tr.on')).toHaveCount(1);
+  // the Lamp loader story: its indicators are already in a case, and that comes first
+  await page.click('.tio-tbl tbody tr:has-text("Lamp loader")');
+  await expect(P.locator('.st-w.hot').first()).toContainText('already in Op Lantern'); await expect(P.locator('.st-w.hot .ent, .st-w.hot [data-act]').first()).toBeVisible();
+  // triage from the panel keeps the panel on the same story
+  await P.locator('[data-act=ctiStar]').click(); await expect(P.locator('[data-act=ctiStar]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(P.locator('h2')).toContainText('Lamp loader');
+  // a story with a link offers the original
+  await page.evaluate(() => { const f = DB.feed.find(x => /Lamp loader/.test(x.title)); f.link = 'https://example.org/lamp'; mutate('x'); renderInsp(); });
+  await expect(P.locator('.st-foot a')).toHaveAttribute('href', 'https://example.org/lamp');
+  noErrors(errors);
+});

@@ -15,16 +15,19 @@
    ========================================================================== */
 const CH = {STEP:200, MAX:5000, ROWS:400, TL:300};
 const CH_NATIVE = {btc:{sym:'BTC', dec:8, name:'Bitcoin', prov:'mempool', tx:'https://mempool.space/tx/', addr:'https://mempool.space/address/'},
-  eth:{sym:'ETH', dec:18, name:'Ethereum', prov:'bscout', tx:'https://eth.blockscout.com/tx/', addr:'https://eth.blockscout.com/address/'}};
+  eth:{sym:'ETH', dec:18, name:'Ethereum', prov:'bscout', tx:'https://eth.blockscout.com/tx/', addr:'https://eth.blockscout.com/address/'},
+  /* Solana: no fetching — the public endpoint refuses browsers and the others need a key — so its trail comes from files you export */
+  sol:{sym:'SOL', dec:9, name:'Solana', prov:'', tx:'https://solscan.io/tx/', addr:'https://solscan.io/account/'}};
+const CH_SOL_NATIVE = /^So1{38,}[12]$/;
 const CH_SANC_URL = 'https://raw.githubusercontent.com/0xB10C/ofac-sanctioned-digital-currency-addresses/lists/sanctioned_addresses_';
 const CH_SANC_LISTS = [['XBT', 'btc'], ['ETH', 'eth'], ['USDT', ''], ['USDC', ''], ['TRX', 'trx']];
 const CH_KINDS = [['exchange', 'Exchange'], ['mixer', 'Mixer'], ['service', 'Service or merchant'], ['scam', 'Scam or fraud'], ['victim', 'Victim'], ['suspect', 'Suspect'], ['other', 'Other']];
 
 function chDB(){ const C = DB.chain = DB.chain && typeof DB.chain === 'object' ? DB.chain : {};
-  for(const k of ['tx', 'addr', 'meta', 'labels']) if(!C[k] || typeof C[k] !== 'object' || Array.isArray(C[k])) C[k] = {}; return C; }
-const chOf = k => k === 'btc' || k === 'eth' ? k : null;
+  for(const k of ['tx', 'addr', 'meta', 'labels', 'txq', 'ens']) if(!C[k] || typeof C[k] !== 'object' || Array.isArray(C[k])) C[k] = {}; return C; }
+const chOf = k => k === 'btc' || k === 'eth' || k === 'sol' ? k : null;
 const chNorm = (c, a) => { a = String(a || '').trim(); return c === 'eth' || /^(bc1|tb1)/i.test(a) ? a.toLowerCase() : a; };
-const chGuess = a => /^0x[0-9a-f]{40}$/i.test(a) ? 'eth' : /^(bc1|tb1|[13mn2])[a-zA-HJ-NP-Z0-9]{20,90}$/.test(a) ? 'btc' : null;
+const chGuess = a => /^0x[0-9a-f]{40}$/i.test(a) ? 'eth' : /^[1-9A-HJ-NP-Za-km-z]{43,44}$/.test(a) && E.cryptoKind(a) === 'sol' ? 'sol' : /^(bc1|tb1|[13mn2])[a-zA-HJ-NP-Z0-9]{20,90}$/.test(a) ? 'btc' : null;
 const chShort = a => a && a.length > 18 ? a.slice(0, 10) + '…' + a.slice(-6) : a || '';
 let CH_REV = 0; const chTouch = () => { CH_REV++; CH_IDX = null; };
 
@@ -150,13 +153,16 @@ function chCpAmt(r, c){ const nat = CH_NATIVE[c], p = []; const s = r.amt[nat.sy
 
 /* ---------- in the inspector ---------- */
 function chSection(k, v){
-  const c = chOf(k); if(!c) return ''; const N = CH_NATIVE[c], T = chTrail(c, v), p = lkProv(N.prov), on = p && lkSettings().on[p.id], S = chDB().sanc;
+  const c = chOf(k); if(!c) return chSection2(k, v); const N = CH_NATIVE[c], T = chTrail(c, v), p = lkProv(N.prov), on = p && lkSettings().on[p.id], S = chDB().sanc;
   const head = `<h4>Money trail <span class="t3">${T.n ? T.n.toLocaleString() + ' transaction' + (T.n === 1 ? '' : 's') + (T.R && T.R.src ? ' · ' + esc(T.R.src) + ' ' + esc(E.fmtAgo(Date.now() - T.R.at)) : ' · from your files') : 'who paid it, whom it paid'}</span></h4>`;
   const flags = []; if(T.L.some(l => l.lvl === 'bad')) flags.push(['bad', 'This wallet is on the OFAC sanctions list', 'Dealing with it can be illegal for US persons. List as of ' + E.fmtDate(S.at, tz()) + '.']);
   if(T.sancCp.length) flags.push(['bad', T.sancCp.length + ' counterpart' + (T.sancCp.length > 1 ? 'ies are' : 'y is') + ' sanctioned', T.sancCp.slice(0, 3).map(r => chShort(r.a)).join(', ') + ' — direct exposure, one step away.']);
   if(T.cj) flags.push(['warn', T.cj + ' transaction' + (T.cj > 1 ? 's look' : ' looks') + ' like CoinJoin', 'Mixing breaks the trail; ownership estimates skip them.']);
   const fl = flags.map(([l, t, w]) => `<div class="ipf-f ${l}"><span class="ipf-i">${ico(l === 'bad' ? 'shield-alert' : 'triangle-alert','sm')}</span><div><b>${esc(t)}</b><small>${esc(w)}</small></div></div>`).join('');
   const sancNote = S ? '' : `<p class="t3 small ch-sn">Sanctions: <button class="lnk" data-act="chSancGet">download the OFAC list once</button> to check every wallet here, offline from then on.</p>`;
+  if(!T.n && !p) return `<div class="isec ch">${head}${fl}${T.L.length ? `<div class="wrap ch-l">${chChips(T.L)}</div>` : ''}<p class="t2 small" style="margin:0 0 10px">Import its transfers to see the money: export them as CSV from an explorer (Solscan → the account → Transfers → Export), then bring the file in here.</p>
+    <div class="wrap"><button class="btn sm primary" data-act="chImport" data-id="${esc(k + ':' + v)}">${ico('upload','sm')}Import a file…</button></div>
+    <p class="t3 small ch-sn">Read here, offline. Nothing is fetched for ${esc(N.name)}: its public endpoint refuses browser requests and the alternatives need an account key.</p></div>`;
   if(!T.n) return `<div class="isec ch">${head}${fl}${T.L.length ? `<div class="wrap ch-l">${chChips(T.L)}</div>` : ''}<p class="t2 small" style="margin:0 0 10px">Bring in its transactions to see the money: amounts, dates, counterparties, wallets that are probably the same owner.</p>
     <div class="wrap"><button class="btn sm primary" data-act="chGet" data-id="${esc(k + ':' + v)}">${ico('download','sm')}Fetch from ${esc(p.host)}</button><button class="btn sm" data-act="chImport" data-id="${esc(k + ':' + v)}">${ico('upload','sm')}Import a file…</button></div>
     <p class="t3 small ch-sn">${on ? 'Sends only this address to ' + esc(p.host) + '.' : 'Asks first: only this address would be sent, to ' + esc(p.host) + '.'} A file you exported works offline: explorer JSON (Blockstream, mempool.space, blockchain.com, BlockCypher, Etherscan, Blockscout), an Etherscan CSV, or any CSV with from, to and amount.</p>${sancNote}</div>`;
@@ -222,7 +228,7 @@ async function chTimeline(){
 function chCsv(){
   const S = UI.ch; if(!S) return; const T = chTrail(S.c, S.a), rows = [];
   for(const x of T.rows){ const ins = x.t.i.map(([a]) => a), outs = x.t.o.map(([a]) => a);
-    rows.push([x.t.h, x.t.t ? new Date(x.t.t).toISOString() : '', S.c === 'btc' ? 'bitcoin' : 'ethereum', x.dir === 'in' ? (x.who[0] || ins[0] || '') : S.a, x.dir === 'in' ? S.a : (x.who[0] || outs[0] || ''), chFmt(x.amt, x.A.dec).replace(/,/g, ''), x.A.sym, x.dir, x.who.join(' ')].map(csvCell).join(',')); }
+    rows.push([x.t.h, x.t.t ? new Date(x.t.t).toISOString() : '', S.c === 'btc' ? 'bitcoin' : S.c === 'sol' ? 'solana' : 'ethereum', x.dir === 'in' ? (x.who[0] || ins[0] || '') : S.a, x.dir === 'in' ? S.a : (x.who[0] || outs[0] || ''), chFmt(x.amt, x.A.dec).replace(/,/g, ''), x.A.sym, x.dir, x.who.join(' ')].map(csvCell).join(',')); }
   download(safeName('trail-' + S.a.slice(0, 16) + '.csv'), 'hash,time,chain,from,to,amount,asset,direction,counterparties\n' + rows.join('\n') + '\n', 'text/csv');
 }
 
@@ -259,16 +265,21 @@ async function chSancGet(ok){
 function chParse(text, name){
   const t0 = String(text).replace(/^\uFEFF/, '').slice(0, 30e6), first = t0.slice(0, t0.indexOf('\n') + 1 || 2000), rows = csvParse(t0, (first.match(/\t/g) || []).length > (first.match(/,/g) || []).length ? '\t' : first.includes(';') && !first.includes(',') ? ';' : ',').filter(r => r.some(x => String(x).trim())); if(rows.length < 2) return {err:'No rows found'};
   const H = rows[0].map(h => String(h).trim().toLowerCase()), col = (...re) => { for(const r of re){ const i = H.findIndex(h => r.test(h)); if(i >= 0) return i; } return -1; };
-  const iH = col(/^transaction hash$/, /^(tx_?)?hash$/, /^txid$/, /^tx( id)?$/, /^transaction( id)?$/), iT = col(/^unixtimestamp$/, /^timestamp$/, /^date ?time/, /^time/, /^date/, /^block_?time/), iF = col(/^from$/, /^from_?address$/, /^sender$/, /^source$/), iTo = col(/^to$/, /^to_?address$/, /^recipient$/, /^receiver$/, /^destination$/);
-  const iIn = col(/^value_in\(/), iOut = col(/^value_out\(/), iV = col(/^tokenvalue$/, /^amount$/, /^value$/, /^quantity$/, /^value \(/), iSym = col(/^tokensymbol$/, /^asset$/, /^symbol$/, /^currency$/, /^token$/), iTok = col(/^contractaddress$/, /^token_?address$/), iTn = col(/^tokenname$/), iSt = col(/^status$/), iFee = col(/^txnfee\(/, /^fee$/), iBlk = col(/^blockno$/, /^block( number)?$/), iCh = col(/^chain$/, /^network$/);
+  const iH = col(/^transaction hash$/, /^(tx_?)?hash$/, /^txid$/, /^tx( id)?$/, /^transaction( id)?$/, /^signature$/, /^tx[ _]?signature$/), iT = col(/^unixtimestamp$/, /^timestamp$/, /^block[ _]?time$/, /^date ?time/, /^time/, /^date/, /^block_?time/), iF = col(/^from$/, /^from[ _]?address$/, /^sender$/, /^source$/, /^from[ _]?owner$/), iTo = col(/^to$/, /^to[ _]?address$/, /^to[ _]?owner$/, /^recipient$/, /^receiver$/, /^destination$/);
+  const iIn = col(/^value_in\(/), iOut = col(/^value_out\(/), iV = col(/^tokenvalue$/, /^amount$/, /^value$/, /^quantity$/, /^value \(/), iSym = col(/^tokensymbol$/, /^asset$/, /^symbol$/, /^currency$/, /^token$/), iTok = col(/^contractaddress$/, /^token[ _]?address$/, /^mint$/), iDec = col(/^decimals?$/), iTn = col(/^tokenname$/), iSt = col(/^status$/), iFee = col(/^txnfee\(/, /^fee$/), iBlk = col(/^blockno$/, /^block( number)?$/), iCh = col(/^chain$/, /^network$/);
   if(iF < 0 || iTo < 0 || (iV < 0 && iIn < 0)) return {err:'The file needs from, to and amount (or value) columns'};
-  const fmt = iIn >= 0 ? 'Etherscan transactions' : iSym >= 0 && H[iSym] === 'tokensymbol' ? 'Etherscan token transfers' : 'CSV';
+  const fmt = iIn >= 0 ? 'Etherscan transactions' : iSym >= 0 && H[iSym] === 'tokensymbol' ? 'Etherscan token transfers' : iH >= 0 && /signature/.test(H[iH]) ? 'Solana transfers' : 'CSV';
   const out = [], bad = [];
   rows.slice(1, 200001).forEach((r, n) => {
-    const f = String(r[iF] || '').trim(), to = String(r[iTo] || '').trim(), c = (iCh >= 0 && /eth/i.test(r[iCh])) ? 'eth' : (iCh >= 0 && /btc|bitcoin/i.test(r[iCh])) ? 'btc' : chGuess(f) || chGuess(to);
+    const f = String(r[iF] || '').trim(), to = String(r[iTo] || '').trim(), c = (iCh >= 0 && /eth/i.test(r[iCh])) ? 'eth' : (iCh >= 0 && /btc|bitcoin/i.test(r[iCh])) ? 'btc' : (iCh >= 0 && /^sol/i.test(r[iCh])) ? 'sol' : chGuess(f) || chGuess(to);
     if(!c || !(chGuess(f) || chGuess(to))){ bad.push(n + 2); return; }
-    const sym = iSym >= 0 ? String(r[iSym] || '').trim().slice(0, 20) : '', isTok = !!sym && sym.toUpperCase() !== CH_NATIVE[c].sym, dec = isTok ? 18 : CH_NATIVE[c].dec;
-    let raw = iIn >= 0 ? (+String(r[iIn]).replace(/,/g, '') ? r[iIn] : r[iOut]) : r[iV]; const v = chUnits(raw, dec); if(v == null){ bad.push(n + 2); return; }
+    const tokA = iTok >= 0 ? String(r[iTok] || '').trim() : '', solNat = c === 'sol' && (!tokA || CH_SOL_NATIVE.test(tokA));
+    const sym = iSym >= 0 ? String(r[iSym] || '').trim().slice(0, 20) : c === 'sol' && !solNat ? tokA.slice(0, 4) + '…' + tokA.slice(-4) : '', isTok = c === 'sol' ? !solNat : !!sym && sym.toUpperCase() !== CH_NATIVE[c].sym;
+    const fd = iDec >= 0 && /^\d{1,2}$/.test(String(r[iDec]).trim()) ? +String(r[iDec]).trim() : null, dec = isTok ? (fd != null ? fd : 18) : CH_NATIVE[c].dec;
+    let raw = iIn >= 0 ? (+String(r[iIn]).replace(/,/g, '') ? r[iIn] : r[iOut]) : r[iV];
+    /* a file that gives whole raw units next to a decimals column (Solana explorers do): 1500000000 with 9 decimals is 1.5 */
+    if(fd != null && /^\d+$/.test(String(raw).trim()) && String(raw).trim().length > fd) raw = String(raw).trim().slice(0, -fd || undefined) + (fd ? '.' + String(raw).trim().slice(-fd) : '');
+    const v = chUnits(raw, dec); if(v == null){ bad.push(n + 2); return; }
     const tsr = iT >= 0 ? String(r[iT]).trim() : '', t = /^\d{9,11}$/.test(tsr) ? +tsr * 1000 : /^\d{12,14}$/.test(tsr) ? +tsr : Date.parse(/[zZ]|[+-]\d\d:?\d\d$/.test(tsr) || !tsr ? tsr : tsr.replace(' ', 'T') + 'Z') || 0;
     const h = (iH >= 0 ? String(r[iH]).trim() : '').slice(0, 80) || ('row' + (n + 2) + '-' + name);
     const fee = iFee >= 0 && !isTok ? chUnits(r[iFee], CH_NATIVE[c].dec) || '0' : '0';
@@ -322,14 +333,111 @@ const CHAIN_ACTS = {
 function chClean(C){
   if(!C || typeof C !== 'object' || Array.isArray(C)) return undefined;
   const str = (v, n) => typeof v === 'string' ? v.slice(0, n) : '', num = v => Number.isFinite(+v) ? +v : 0, amt = v => /^-?\d{1,80}$/.test(String(v)) ? String(v) : '0', obj = o => o && typeof o === 'object' && !Array.isArray(o) ? o : {};
-  const pair = p => Array.isArray(p) ? [str(p[0], 100) || 'unknown', amt(p[1])] : null, out = {tx:{}, addr:{}, meta:{}, labels:{}};
-  for(const [k, t] of Object.entries(obj(C.tx)).slice(0, 200000)){ if(!t || !/^(btc|eth)$/.test(t.c) || !Array.isArray(t.i) || !Array.isArray(t.o)) continue;
+  const pair = p => Array.isArray(p) ? [str(p[0], 100) || 'unknown', amt(p[1])] : null, out = {tx:{}, addr:{}, meta:{}, labels:{}, txq:{}, ens:{}};
+  for(const [k, t] of Object.entries(obj(C.tx)).slice(0, 200000)){ if(!t || !/^(btc|eth|sol)$/.test(t.c) || !Array.isArray(t.i) || !Array.isArray(t.o)) continue;
     out.tx[str(k, 200)] = {id:str(k, 200), c:t.c, h:str(t.h, 80), t:num(t.t), b:num(t.b), f:amt(t.f), i:t.i.slice(0, 400).map(pair).filter(Boolean), o:t.o.slice(0, 400).map(pair).filter(Boolean), ok:t.ok !== false, ...(t.pend ? {pend:true} : {}), ...(t.src ? {src:str(t.src, 20)} : {}), ...(t.m ? {m:str(t.m, 40)} : {}),
       ...(t.tok && typeof t.tok === 'object' ? {tok:{s:str(t.tok.s, 20), d:Math.max(0, Math.min(36, num(t.tok.d))), a:str(t.tok.a, 60), n:str(t.tok.n, 60)}} : {})}; }
-  for(const [k, R] of Object.entries(obj(C.addr)).slice(0, 20000)){ if(!R || !/^(btc|eth)$/.test(R.c)) continue;
+  for(const [k, R] of Object.entries(obj(C.addr)).slice(0, 20000)){ if(!R || !/^(btc|eth|sol)$/.test(R.c)) continue;
     out.addr[str(k, 200)] = {a:str(R.a, 100), c:R.c, ids:Array.isArray(R.ids) ? R.ids.filter(x => typeof x === 'string').slice(0, CH.MAX) : [], at:num(R.at), src:str(R.src, 60), n:R.n == null ? null : num(R.n), bal:amt(R.bal), cur:str(R.cur, 2000), curT:str(R.curT, 2000), done:!!R.done, doneT:!!R.doneT}; }
   for(const [k, M] of Object.entries(obj(C.meta)).slice(0, 50000)) if(M && typeof M === 'object') out.meta[str(k, 200)] = {ens:str(M.ens, 120), tags:Array.isArray(M.tags) ? M.tags.map(x => str(x, 60)).filter(Boolean).slice(0, 6) : [], scam:!!M.scam, contract:!!M.contract};
   for(const [k, L] of Object.entries(obj(C.labels)).slice(0, 50000)) if(L && typeof L.t === 'string' && L.t.trim()) out.labels[str(k, 200)] = {t:str(L.t, 80), kind:CH_KINDS.some(x => x[0] === L.kind) ? L.kind : 'other', at:num(L.at)};
+  for(const [k, q] of Object.entries(obj(C.txq)).slice(0, 20000)) if(q && /^(btc|eth):/.test(k)) out.txq[str(k, 120)] = {at:num(q.at), src:str(q.src, 60), ids:Array.isArray(q.ids) ? q.ids.filter(x => typeof x === 'string').map(x => x.slice(0, 200)).slice(0, 400) : []};
+  for(const [k, n] of Object.entries(obj(C.ens)).slice(0, 20000)) if(n && /^[a-z0-9.-]{3,200}\.eth$/.test(k)) out.ens[k] = {a:/^0x[0-9a-f]{40}$/.test(n.a) ? n.a : '', exp:str(n.exp, 40), at:num(n.at), src:str(n.src, 60)};
   if(C.sanc && typeof C.sanc === 'object'){ const L = v => Array.isArray(v) ? v.filter(x => typeof x === 'string' && x.length < 100).slice(0, 50000) : []; out.sanc = {at:num(C.sanc.at), src:str(C.sanc.src, 80), btc:L(C.sanc.btc), eth:L(C.sanc.eth), trx:L(C.sanc.trx)}; }
   return out;
 }
+
+/* ==========================================================================
+   One transaction, an ENS name, a Solana address — what the trail can say about each
+     • a Bitcoin or Ethereum transaction: fetched on its own (mempool.space, eth.blockscout.com) or read from
+       trails already fetched — who paid whom, how much, when, the fee; its wallets go into the case in one step
+     • an ENS name (name.eth): resolved to its Ethereum address through Blockscout's search, kept as evidence
+     • a Solana address or signature: checked offline (base58, 32 or 64 bytes) and opened in an explorer —
+       no free keyless Solana source is used here
+   ========================================================================== */
+const CH_TXK = {btctx:'btc', ethtx:'eth'};
+function chTxGet(c, h){ const C = chDB(), q = C.txq[c + ':' + chNorm(c, h)]; if(q) return q.ids.map(id => C.tx[id]).filter(Boolean);
+  return Object.values(C.tx).filter(t => t.c === c && chNorm(c, t.h) === chNorm(c, h)); }
+async function chTxFetch(c, h){
+  const C = chDB(), p = lkProv(CH_NATIVE[c].prov), got = []; let raw;
+  if(c === 'btc'){ raw = await chGet(p, 'https://mempool.space/api/tx/' + encodeURIComponent(h)); if(!raw || !raw.txid) throw new Error('Not a transaction'); got.push(chBtcTx(raw)); }
+  else { raw = await chGet(p, 'https://eth.blockscout.com/api/v2/transactions/' + encodeURIComponent(h)); if(!raw || !raw.hash) throw new Error('Not a transaction');
+    const t = chEthTx(raw); got.push(t); for(const x of (raw.token_transfers || []).slice(0, 100)){ const k = chEthTok({...x, transaction_hash:raw.hash, timestamp:raw.timestamp, block_number:raw.block_number}); if(k) got.push(k); } }
+  const text = JSON.stringify(c === 'btc' ? [raw] : {items:[raw]});
+  if(!await stoGuard(JSON.stringify(got).length * 2 + text.length * 2, 'keep this transaction')) return {n:0};
+  for(const t of got) C.tx[t.id] = t; C.txq[c + ':' + chNorm(c, h)] = {at:Date.now(), src:p.host, ids:got.map(t => t.id)}; chTouch();
+  let rec = null; if(DB.active && typeof walletParse === 'function'){ const P = walletParse(text); if(P){ P.label = `${CH_NATIVE[c].name} transaction ${chShort(h)} — from ${p.host}`; rec = walletKeep(text, P, DB.active, p.host); } }
+  mutate('fetched transaction ' + chShort(h)); return {n:got.length, rec};
+}
+async function chEnsFetch(name){
+  const C = chDB(), p = lkProv('bscout'), j = await chGet(p, 'https://eth.blockscout.com/api/v2/search?q=' + encodeURIComponent(name));
+  const it = (j.items || []).find(x => x.type === 'ens_domain' && String(x.ens_info && x.ens_info.name || x.name || '').toLowerCase() === name);
+  const a = it ? String(it.address_hash || (it.ens_info && it.ens_info.address_hash) || '').toLowerCase() : '';
+  C.ens[name] = {a:/^0x[0-9a-f]{40}$/.test(a) ? a : '', exp:it && it.ens_info && it.ens_info.expiry_date ? String(it.ens_info.expiry_date).slice(0, 40) : '', at:Date.now(), src:p.host};
+  let rec = null;
+  if(C.ens[name].a && DB.active && !DB.records.some(r => r.caseId === DB.active && r.type === 'evidence' && r.title === 'ENS ' + name + ' → ' + C.ens[name].a)){
+    const body = `ENS name ${name} resolves to ${C.ens[name].a}${C.ens[name].exp ? ' (registration expires ' + C.ens[name].exp.slice(0, 10) + ')' : ''} — from ${p.host}, ${new Date().toISOString()}\n\n${JSON.stringify(it, null, 1)}`;
+    if(await stoGuard(body.length * 2, 'keep this lookup')){ rec = {id:uid('r'), caseId:DB.active, type:'evidence', title:'ENS ' + name + ' → ' + C.ens[name].a, body, tsRaw:new Date().toISOString(), tsZone:'explicit', ts:Date.now(), source:'chain:ens', host:'', tags:['ens'], ents:extractRich(body).slice(0, 3000), answer:'', addedBy:'You', addedAt:Date.now(), hash:''};
+      DB.records.push(rec); if(typeof hashRecords === 'function') hashRecords(); } }
+  mutate('resolved ' + name); return {a:C.ens[name].a, rec};
+}
+const chParty = (c, a, amt, sym, dec) => { const known = /^0x[0-9a-f]{40}$/i.test(a) || chGuess(a) === 'btc', L = known ? chLabels(c, a) : [];
+  return `<div class="ch-cp">${known ? entPill(c + ':' + chNorm(c, a)) : `<span class="t3">${esc(a === 'coinbase' ? 'New coins (coinbase)' : a)}</span>`}<span class="ch-am">${esc(chFmt(amt, dec, sym))}</span>${L.length ? `<span class="ch-cl">${chChips(L.slice(0, 2))}</span>` : ''}</div>`; };
+function chTxBlock(c, T){
+  const t = T[0], N = CH_NATIVE[c], toks = T.filter(x => x.tok);
+  const head = `<dl class="kv ch-kv"><dt>When</dt><dd>${t.t ? esc(E.fmtDate(t.t, tz())) + (Date.now() - t.t < 365 * 864e5 ? ` <span class="t3">${esc(E.fmtAgo(Date.now() - t.t))}</span>` : '') : '<span class="ch-out">Not yet in a block</span>'}</dd>${t.b ? `<dt>Block</dt><dd class="mono">${t.b.toLocaleString()}</dd>` : ''}
+    <dt>Status</dt><dd>${t.ok ? (t.t ? 'Confirmed' : 'Waiting in the mempool') : '<span class="ch-out">Failed — nothing moved</span>'}</dd><dt>Fee</dt><dd>${esc(chFmt(t.f, N.dec, N.sym))}</dd>${t.m ? `<dt>Call</dt><dd class="mono">${esc(t.m)}</dd>` : ''}</dl>`;
+  const nat = T.filter(x => !x.tok), ins = nat.flatMap(x => x.i), outs = nat.flatMap(x => x.o), tot = outs.reduce((s, [, v]) => s + chBig(v), 0n);
+  const side = (h, L) => `<div class="caps ch-caps">${h}</div>${L.slice(0, 8).map(([a, v]) => chParty(c, a, v, N.sym, N.dec)).join('')}${L.length > 8 ? `<p class="t3 small">and ${L.length - 8} more</p>` : ''}`;
+  return head + (c === 'btc' ? side(`From · ${ins.length} input${ins.length === 1 ? '' : 's'}`, ins) + side(`To · ${outs.length} output${outs.length === 1 ? '' : 's'} · ${esc(chFmt(tot, N.dec, N.sym))}`, outs)
+      : side('From', ins) + side('To', outs))
+    + (toks.length ? `<div class="caps ch-caps">Tokens moved</div>${toks.slice(0, 8).map(x => `<div class="ch-cp"><span class="mono small">${esc(chShort(x.i[0][0]))} → ${esc(chShort(x.o[0][0]))}</span><span class="ch-am">${esc(chFmt(x.i[0][1], x.tok.d, x.tok.s))}</span></div>`).join('')}` : '')
+    + (c === 'btc' && chCoinJoin(t) ? `<div class="ipf-f warn"><span class="ipf-i">${ico('triangle-alert','sm')}</span><div><b>Looks like CoinJoin</b><small>Several equal outputs — inputs here need not share an owner.</small></div></div>` : '');
+}
+function chSection2(k, v){
+  const C = chDB(), ask = p => lkSettings().on[p.id] ? 'Sends only this ID to ' + esc(p.host) + '.' : 'Asks first: only this ID would be sent, to ' + esc(p.host) + '.';
+  if(CH_TXK[k]){ const c = CH_TXK[k], p = lkProv(CH_NATIVE[c].prov), T = chTxGet(c, v), q = C.txq[c + ':' + chNorm(c, v)], id = esc(k + ':' + v);
+    const head = `<h4>Transaction <span class="t3">${T.length ? (q ? esc(q.src) + ' ' + esc(E.fmtAgo(Date.now() - q.at)) : 'from a trail you fetched') : 'who paid whom, how much, when'}</span></h4>`;
+    if(!T.length) return `<div class="isec ch">${head}<div class="wrap"><button class="btn sm primary" data-act="chTxGet" data-id="${id}">${ico('download','sm')}Fetch from ${esc(p.host)}</button></div><p class="t3 small ch-sn">${ask(p)}</p></div>`;
+    const wal = [...new Set(T.flatMap(t => t.i.concat(t.o)).map(x => x[0]).filter(a => /^0x[0-9a-f]{40}$/i.test(a) || chGuess(a) === 'btc'))];
+    return `<div class="isec ch">${head}${chTxBlock(c, T)}<div class="wrap" style="margin-top:10px">${wal.length && DB.active ? `<button class="btn sm primary" data-act="chTxWal" data-id="${id}">${ico('plus','sm')}Add its ${wal.length} wallet${wal.length === 1 ? '' : 's'} to ${esc(caseNm(theCase(), 28))}</button>` : ''}${q ? `<button class="btn sm" data-act="chTxGet" data-id="${id}">${ico('refresh-cw','sm')}Refetch</button>` : ''}</div></div>`; }
+  if(k === 'ens'){ const n = String(v).toLowerCase(), R = C.ens[n], p = lkProv('bscout'), parent = n.split('.').length > 2 ? n.split('.').slice(1).join('.') : '';
+    const head = `<h4>ENS name <span class="t3">${R ? esc(R.src) + ' ' + esc(E.fmtAgo(Date.now() - R.at)) : 'which wallet it points to'}</span></h4>`;
+    const note = parent ? `<p class="t3 small ch-sn">A subname of <b>${esc(parent)}</b> — whoever controls ${esc(parent)} can repoint it.</p>` : '';
+    if(!R) return `<div class="isec ch">${head}<p class="t2 small" style="margin:0 0 10px">A readable name for an Ethereum wallet. Resolve it to see the address and follow its money.</p><div class="wrap"><button class="btn sm primary" data-act="chEnsGet" data-id="${esc(n)}">${ico('search','sm')}Resolve on ${esc(p.host)}</button></div><p class="t3 small ch-sn">${ask(p).replace('ID', 'name')}</p>${note}</div>`;
+    if(!R.a) return `<div class="isec ch">${head}<p class="t2 small">Not registered, or not pointing at any address, when looked up.</p><div class="wrap"><button class="btn sm" data-act="chEnsGet" data-id="${esc(n)}">${ico('refresh-cw','sm')}Look again</button></div>${note}</div>`;
+    const exp = R.exp && Date.parse(R.exp), L = chLabels('eth', R.a);
+    return `<div class="isec ch">${head}<div class="ch-cp">${entPill('eth:' + R.a)}${L.length ? `<span class="ch-cl">${chChips(L.slice(0, 2))}</span>` : ''}</div>
+      <dl class="kv ch-kv">${exp ? `<dt>Expires</dt><dd>${esc(E.fmtDate(exp, tz()))}${exp < Date.now() ? ' <span class="ch-out">expired — anyone can register it</span>' : ''}</dd>` : ''}</dl>
+      <div class="wrap" style="margin-top:8px">${DB.active ? `<button class="btn sm primary" data-act="chEnsAdd" data-id="${esc(n)}">${ico('plus','sm')}Add the wallet to ${esc(caseNm(theCase(), 28))}</button>` : ''}<button class="btn sm" data-act="selEnt" data-id="${esc('eth:' + R.a)}">${ico('arrow-right-left','sm')}Its money trail</button><button class="btn sm" data-act="chEnsGet" data-id="${esc(n)}">${ico('refresh-cw','sm')}Look again</button></div>${note}</div>`; }
+  if(k === 'sha256'){ const g = globalEnts().get('sha256:' + v);
+    if(g && g.recs.some(r => /bitcoin|\bbtc\b|wallet|ransom|payment|\bpaid\b|satoshi|mempool|blockchain/i.test(String(r.body || '').slice(0, 200000))))
+      return `<div class="isec ch"><p class="small t2" style="margin:0">Found next to payment words — 64 hex characters can also be a Bitcoin transaction ID. <button class="lnk" data-act="selEnt" data-id="${esc('btctx:' + v)}">Look at it as one</button></p></div>`; }
+  return '';
+}
+async function chTxGo(id){
+  const {k, v} = entSplit(id), c = CH_TXK[k]; if(!c) return; const p = lkProv(CH_NATIVE[c].prov);
+  if(!lkSettings().on[p.id]) return openDlg(dhead('Fetch from ' + esc(p.host) + '?') + `<div class="in"><p>Only this transaction ID is sent to <b>${esc(p.host)}</b>:</p><p class="mono small" style="overflow-wrap:anywhere">${esc(v)}</p><p class="t2">The service sees which transaction you asked about, nothing else from your case. This switches ${esc(p.name)} on in Settings → Lookups, where you can switch it off.</p></div>
+    <footer><button class="btn" data-act="dclose">Cancel</button><button class="btn primary" data-act="chTxOk" data-id="${esc(id)}">Switch on and fetch</button></footer>`);
+  const b = document.querySelector(`#insp [data-act=chTxGet][data-id="${CSS.escape(id)}"]`); if(b){ b.disabled = true; b.textContent = 'Fetching…'; }
+  try{ const {n, rec} = await chTxFetch(c, v); renderInsp(); if(n) toast(`Transaction from ${p.host}${rec ? ' — kept as evidence in ' + caseNm(theCase(rec.caseId)) : ''}`); }
+  catch(e){ renderInsp(); toast('Could not fetch — ' + (e.message || e).toString().replace('this address', 'this transaction')); }
+}
+async function chEnsGo(n){
+  const p = lkProv('bscout');
+  if(!lkSettings().on[p.id]) return openDlg(dhead('Look up on ' + esc(p.host) + '?') + `<div class="in"><p>Only this name is sent to <b>${esc(p.host)}</b>:</p><p class="mono small">${esc(n)}</p><p class="t2">This switches ${esc(p.name)} on in Settings → Lookups, where you can switch it off.</p></div>
+    <footer><button class="btn" data-act="dclose">Cancel</button><button class="btn primary" data-act="chEnsOk" data-id="${esc(n)}">Switch on and look up</button></footer>`);
+  const b = document.querySelector(`#insp [data-act=chEnsGet]`); if(b){ b.disabled = true; b.textContent = 'Looking up…'; }
+  try{ const {a, rec} = await chEnsFetch(n); renderInsp(); toast(a ? `${n} → ${chShort(a)}${rec ? ' — kept as evidence in ' + caseNm(theCase(rec.caseId)) : ''}` : n + ' does not resolve to an address'); }
+  catch(e){ renderInsp(); toast('Could not look up — ' + (e.message || e)); }
+}
+Object.assign(CHAIN_ACTS, {
+  chTxGet:id => chTxGo(id),
+  chTxOk:id => { const p = lkProv(CH_NATIVE[CH_TXK[entSplit(id).k]].prov); lkSettings().on[p.id] = true; save(); closeDlg(); chTxGo(id); },
+  chTxWal:id => { const {k, v} = entSplit(id), c = CH_TXK[k], made = [];
+    for(const a of new Set(chTxGet(c, v).flatMap(t => t.i.concat(t.o)).map(x => x[0]))) if(/^0x[0-9a-f]{40}$/i.test(a) || chGuess(a) === 'btc') chEntry(c, a, DB.active, made);
+    if(made.length){ mutate('added ' + made.length + ' wallets'); renderMain(); } renderInsp(); toast(made.length ? `${made.length} wallet${made.length === 1 ? '' : 's'} added to ${caseNm(theCase())}` : 'They are already in this case'); },
+  chEnsGet:id => chEnsGo(id),
+  chEnsOk:id => { lkSettings().on[lkProv('bscout').id] = true; save(); closeDlg(); chEnsGo(id); },
+  chEnsAdd:id => { const R = chDB().ens[id]; if(!R || !R.a) return; const made = []; const e = chEntry('eth', R.a, DB.active, made); if(made.length){ e.notes = 'ENS: ' + id; e.tags = [...new Set(e.tags.concat('ens'))]; mutate('added ' + id); renderMain(); } renderInsp(); toast(made.length ? id + ' → ' + chShort(R.a) + ' added to ' + caseNm(theCase()) : 'Already in this case'); },
+});

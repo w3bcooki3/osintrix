@@ -26,7 +26,7 @@ function maskText(text, opts = {}){
     else if(x.k === 'handle') vals.push(['handle', v, put('handle', v, () => `@user-${next('user')}`)]);
     else if(x.k === 'mac') vals.push(['mac', v, put('mac', v, () => `00:00:5e:00:53:${(next('mac') % 256).toString(16).padStart(2, '0')}`)]);
     else if(/^(md5|sha1|sha256|sha512)$/.test(x.k)) vals.push([x.k, v, put('hash', v, () => next('hash').toString(16).padStart(v.length, '0'))]);
-    else if(/^(btc|eth|ltc|trx|doge|xmr)$/.test(x.k)) vals.push(['wallet', v, put('wallet', v, () => `wallet-${next('wallet')}`)]);
+    else if(/^(btc|eth|ltc|trx|doge|xmr|sol|ens)$/.test(x.k)) vals.push(['wallet', v, put('wallet', v, () => `wallet-${next('wallet')}`)]);
     else if(x.k === 'phone') vals.push(['phone', v, put('phone', v, () => `+1 555 01${String(next('phone') % 100).padStart(2, '0')}`)]);
     else if(x.k === 'iban') vals.push(['iban', v, put('iban', v, () => `XX00MASK${String(next('iban')).padStart(10, '0')}`)]);
   }

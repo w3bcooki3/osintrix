@@ -1,0 +1,77 @@
+{
+ "name": "Lamp Market Support",
+ "type": "public_supergroup",
+ "id": 1234567890,
+ "messages": [
+  {
+   "id": 1,
+   "type": "service",
+   "date": "2025-09-14T09:59:00",
+   "date_unixtime": "1757843940",
+   "actor": "Lamp Support",
+   "actor_id": "user5550001",
+   "action": "create_group",
+   "title": "Lamp Market Support"
+  },
+  {
+   "id": 2,
+   "type": "message",
+   "date": "",
+   "date_unixtime": "1757844000",
+   "from": "Lamp Support",
+   "from_id": "user5550001",
+   "text": [
+    "Welcome. For orders use the bot, for problems dm ",
+    {
+     "type": "mention",
+     "text": "@lamp_ops"
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "type": "message",
+   "date": "",
+   "date_unixtime": "1757847600",
+   "from": "Buyer Bob",
+   "from_id": "user5550002",
+   "text": "my order didnt arrive, its been 9 days"
+  },
+  {
+   "id": 4,
+   "type": "message",
+   "date": "",
+   "date_unixtime": "1757851200",
+   "from": "Lamp Support",
+   "from_id": "user5550001",
+   "text": "Refunds only in XMR to 4AMASi45ub7Qe4ZE36UT5G6cU4ud8Fhhe4deS4F3cw9KTAb8dLcukC7edhDQ7cn5d4gEYkbUrMWeWQLGsCmrG6dLaYyNoVK after you send the tracking screenshot"
+  },
+  {
+   "id": 5,
+   "type": "message",
+   "date": "",
+   "date_unixtime": "1757854800",
+   "from": "Buyer Bob",
+   "from_id": "user5550002",
+   "text": "ok sending now"
+  },
+  {
+   "id": 6,
+   "type": "message",
+   "date": "",
+   "date_unixtime": "1757858400",
+   "from": "Lamp Support",
+   "from_id": "user5550001",
+   "text": "New mirror is up, check the pinned post. Old links are dead."
+  },
+  {
+   "id": 20,
+   "type": "message",
+   "date_unixtime": "1757876400",
+   "from": "Lamp Market News",
+   "from_id": "channel777",
+   "text": "Maintenance tonight",
+   "forwarded_from": "Lamp Market News"
+  }
+ ]
+}

@@ -8359,5 +8359,2062 @@ const RULE_PACK = [
     "modified": "2026-11-03T00:00:00Z",
     "starred": false,
     "level": "advanced"
+  },
+  {
+    "id": "pk-sig-290",
+    "type": "sigma",
+    "title": "AWS CloudTrail Logging Stopped or Trail Deleted",
+    "description": "Detects a CloudTrail trail being stopped, deleted or re-pointed — the first thing an intruder does to blind the account.",
+    "code": "title: 'AWS CloudTrail Logging Stopped or Trail Deleted'\nid: f74d45ad-464e-572a-bb31-75284df70c35\nstatus: experimental\ndescription: 'Detects a CloudTrail trail being stopped, deleted or re-pointed — the first thing an intruder does to blind the account.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.defense-evasion\n    - attack.t1562.008\nlogsource:\n    product: aws\n    service: cloudtrail\ndetection:\n    selection:\n        eventSource: 'cloudtrail.amazonaws.com'\n        eventName:\n            - 'StopLogging'\n            - 'DeleteTrail'\n            - 'UpdateTrail'\n            - 'PutEventSelectors'\n    condition: selection\nfalsepositives:\n    - 'Planned trail migrations by the platform team'\nlevel: high",
+    "severity": "high",
+    "category": "defense-evasion",
+    "technique": "T1562.008",
+    "author": "OSINTrix pack",
+    "platform": "AWS",
+    "tags": [
+      "aws",
+      "cloudtrail",
+      "logging"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-291",
+    "type": "sigma",
+    "title": "AWS Bedrock Model Invocation Logging Disabled",
+    "description": "Bedrock prompt and response logging switched off — seen in LLMjacking, where stolen keys are used to resell model access and the logging is removed first.",
+    "code": "title: 'AWS Bedrock Model Invocation Logging Disabled'\nid: 15306038-776b-5e97-a161-3e9c35b66d12\nstatus: experimental\ndescription: 'Bedrock prompt and response logging switched off — seen in LLMjacking, where stolen keys are used to resell model access and the logging is removed first.'\nreferences:\n    - https://sysdig.com/blog/llmjacking-stolen-cloud-credentials-used-in-new-ai-attack/\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.defense-evasion\n    - attack.t1562.008\nlogsource:\n    product: aws\n    service: cloudtrail\ndetection:\n    selection:\n        eventSource: 'bedrock.amazonaws.com'\n        eventName: 'DeleteModelInvocationLoggingConfiguration'\n    condition: selection\nfalsepositives:\n    - 'Cost-driven changes to logging by the AI platform owner'\nlevel: high",
+    "severity": "high",
+    "category": "defense-evasion",
+    "technique": "T1562.008",
+    "author": "OSINTrix pack",
+    "platform": "AWS",
+    "tags": [
+      "aws",
+      "bedrock",
+      "llmjacking"
+    ],
+    "references": [
+      "https://sysdig.com/blog/llmjacking-stolen-cloud-credentials-used-in-new-ai-attack/"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-sig-292",
+    "type": "sigma",
+    "title": "AWS Bedrock Foundation Model Access Requested",
+    "description": "Model access requested or enabled in Bedrock. In accounts that do not use Bedrock this is a strong sign of stolen keys being used for LLMjacking.",
+    "code": "title: 'AWS Bedrock Foundation Model Access Requested'\nid: ccec88a3-921a-5f0e-8bab-d4c1c11dec47\nstatus: experimental\ndescription: 'Model access requested or enabled in Bedrock. In accounts that do not use Bedrock this is a strong sign of stolen keys being used for LLMjacking.'\nreferences:\n    - https://permiso.io/blog/exploiting-hosted-models\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.impact\n    - attack.t1496\nlogsource:\n    product: aws\n    service: cloudtrail\ndetection:\n    selection:\n        eventSource: 'bedrock.amazonaws.com'\n        eventName:\n            - 'PutFoundationModelEntitlement'\n            - 'PutUseCaseForModelAccess'\n            - 'CreateFoundationModelAgreement'\n    condition: selection\nfalsepositives:\n    - 'New AI projects enabling models'\nlevel: medium",
+    "severity": "medium",
+    "category": "impact",
+    "technique": "T1496",
+    "author": "OSINTrix pack",
+    "platform": "AWS",
+    "tags": [
+      "aws",
+      "bedrock",
+      "llmjacking"
+    ],
+    "references": [
+      "https://permiso.io/blog/exploiting-hosted-models"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-sig-293",
+    "type": "sigma",
+    "title": "AWS SES Sending Enabled or Quota Checked From New Identity",
+    "description": "SES account sending turned on, or a production-access request made — stolen keys are commonly tested against SES to send phishing and spam.",
+    "code": "title: 'AWS SES Sending Enabled or Quota Checked From New Identity'\nid: 02834646-38ad-598c-8996-9805be1b08f1\nstatus: experimental\ndescription: 'SES account sending turned on, or a production-access request made — stolen keys are commonly tested against SES to send phishing and spam.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.resource-development\n    - attack.t1585.002\nlogsource:\n    product: aws\n    service: cloudtrail\ndetection:\n    selection:\n        eventSource: 'ses.amazonaws.com'\n        eventName:\n            - 'UpdateAccountSendingEnabled'\n            - 'PutAccountDetails'\n            - 'VerifyEmailIdentity'\n            - 'CreateEmailIdentity'\n    condition: selection\nfalsepositives:\n    - 'Mail teams onboarding new sending domains'\nlevel: medium",
+    "severity": "medium",
+    "category": "resource-development",
+    "technique": "T1585.002",
+    "author": "OSINTrix pack",
+    "platform": "AWS",
+    "tags": [
+      "aws",
+      "ses",
+      "phishing"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-sig-294",
+    "type": "sigma",
+    "title": "AWS S3 Block Public Access Removed",
+    "description": "S3 Block Public Access deleted at bucket or account level, usually the step just before a bucket is made public.",
+    "code": "title: 'AWS S3 Block Public Access Removed'\nid: 0401e21c-223c-5e71-8e77-1f42a4028d71\nstatus: experimental\ndescription: 'S3 Block Public Access deleted at bucket or account level, usually the step just before a bucket is made public.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.exfiltration\n    - attack.t1537\nlogsource:\n    product: aws\n    service: cloudtrail\ndetection:\n    selection:\n        eventSource:\n            - 's3.amazonaws.com'\n            - 's3-control.amazonaws.com'\n        eventName:\n            - 'DeleteBucketPublicAccessBlock'\n            - 'DeleteAccountPublicAccessBlock'\n            - 'PutAccountPublicAccessBlock'\n    condition: selection\nfalsepositives:\n    - 'Static website buckets set up on purpose'\nlevel: medium",
+    "severity": "medium",
+    "category": "exfiltration",
+    "technique": "T1537",
+    "author": "OSINTrix pack",
+    "platform": "AWS",
+    "tags": [
+      "aws",
+      "s3",
+      "public"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-295",
+    "type": "sigma",
+    "title": "AWS Federation Token or Console Sign-In Token Created for IAM User",
+    "description": "GetFederationToken issued to an IAM user. Tools like aws_consoler turn stolen access keys into a console session this way, and the session outlives a key rotation.",
+    "code": "title: 'AWS Federation Token or Console Sign-In Token Created for IAM User'\nid: 01cf1a2d-e075-5cdd-a852-e3164bec5166\nstatus: experimental\ndescription: 'GetFederationToken issued to an IAM user. Tools like aws_consoler turn stolen access keys into a console session this way, and the session outlives a key rotation.'\nreferences:\n    - https://github.com/NetSPI/aws_consoler\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.persistence\n    - attack.t1550.001\nlogsource:\n    product: aws\n    service: cloudtrail\ndetection:\n    selection:\n        eventSource: 'sts.amazonaws.com'\n        eventName: 'GetFederationToken'\n    condition: selection\nfalsepositives:\n    - 'Legacy brokers that still mint federation tokens'\nlevel: medium",
+    "severity": "medium",
+    "category": "persistence",
+    "technique": "T1550.001",
+    "author": "OSINTrix pack",
+    "platform": "AWS",
+    "tags": [
+      "aws",
+      "sts",
+      "console"
+    ],
+    "references": [
+      "https://github.com/NetSPI/aws_consoler"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-sig-296",
+    "type": "sigma",
+    "title": "AWS EC2 Instance Connect SSH Key Pushed",
+    "description": "A temporary SSH key pushed to an instance with EC2 Instance Connect — a quiet way onto a host for anyone holding the right IAM permission.",
+    "code": "title: 'AWS EC2 Instance Connect SSH Key Pushed'\nid: 8f937bf5-6c5b-5991-a9b8-7cd39ff30105\nstatus: experimental\ndescription: 'A temporary SSH key pushed to an instance with EC2 Instance Connect — a quiet way onto a host for anyone holding the right IAM permission.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.lateral-movement\n    - attack.t1021.004\nlogsource:\n    product: aws\n    service: cloudtrail\ndetection:\n    selection:\n        eventSource: 'ec2-instance-connect.amazonaws.com'\n        eventName:\n            - 'SendSSHPublicKey'\n            - 'SendSerialConsoleSSHPublicKey'\n    condition: selection\nfalsepositives:\n    - 'Engineers using Instance Connect from the console'\nlevel: low",
+    "severity": "low",
+    "category": "lateral-movement",
+    "technique": "T1021.004",
+    "author": "OSINTrix pack",
+    "platform": "AWS",
+    "tags": [
+      "aws",
+      "ec2",
+      "ssh"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-297",
+    "type": "sigma",
+    "title": "AWS Organizations Guardrail Detached or Deleted",
+    "description": "A service control policy detached or deleted, or the account leaving its guardrails — often done to lift region and service limits before abuse.",
+    "code": "title: 'AWS Organizations Guardrail Detached or Deleted'\nid: 494f1640-108e-56f0-a883-7a8b99bc1a73\nstatus: experimental\ndescription: 'A service control policy detached or deleted, or the account leaving its guardrails — often done to lift region and service limits before abuse.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.defense-evasion\n    - attack.t1562.001\nlogsource:\n    product: aws\n    service: cloudtrail\ndetection:\n    selection:\n        eventSource: 'organizations.amazonaws.com'\n        eventName:\n            - 'DetachPolicy'\n            - 'DeletePolicy'\n            - 'DisablePolicyType'\n    condition: selection\nfalsepositives:\n    - 'Organisation restructuring by cloud governance'\nlevel: high",
+    "severity": "high",
+    "category": "defense-evasion",
+    "technique": "T1562.001",
+    "author": "OSINTrix pack",
+    "platform": "AWS",
+    "tags": [
+      "aws",
+      "organizations",
+      "scp"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-298",
+    "type": "sigma",
+    "title": "AWS Route 53 Domain Transfer Lock Removed or Domain Moved",
+    "description": "A registered domain unlocked for transfer or moved to another AWS account — a hijack of the company domain and its mail.",
+    "code": "title: 'AWS Route 53 Domain Transfer Lock Removed or Domain Moved'\nid: f381db87-6a71-5db3-8f87-31ef1dd4cc4a\nstatus: experimental\ndescription: 'A registered domain unlocked for transfer or moved to another AWS account — a hijack of the company domain and its mail.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.impact\n    - attack.t1584.001\nlogsource:\n    product: aws\n    service: cloudtrail\ndetection:\n    selection:\n        eventSource: 'route53domains.amazonaws.com'\n        eventName:\n            - 'DisableDomainTransferLock'\n            - 'TransferDomainToAnotherAwsAccount'\n            - 'TransferDomain'\n    condition: selection\nfalsepositives:\n    - 'Planned domain consolidation'\nlevel: high",
+    "severity": "high",
+    "category": "impact",
+    "technique": "T1584.001",
+    "author": "OSINTrix pack",
+    "platform": "AWS",
+    "tags": [
+      "aws",
+      "route53",
+      "domain"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-299",
+    "type": "sigma",
+    "title": "AWS IAM Roles Anywhere Trust Anchor Created",
+    "description": "A Roles Anywhere trust anchor or profile created. It lets anyone holding a certificate from the anchored CA assume roles from outside AWS — durable access that survives key rotation.",
+    "code": "title: 'AWS IAM Roles Anywhere Trust Anchor Created'\nid: ac7af71d-cc45-5e15-8952-aedbf08845b1\nstatus: experimental\ndescription: 'A Roles Anywhere trust anchor or profile created. It lets anyone holding a certificate from the anchored CA assume roles from outside AWS — durable access that survives key rotation.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.persistence\n    - attack.t1098.001\nlogsource:\n    product: aws\n    service: cloudtrail\ndetection:\n    selection:\n        eventSource: 'rolesanywhere.amazonaws.com'\n        eventName:\n            - 'CreateTrustAnchor'\n            - 'CreateProfile'\n            - 'UpdateTrustAnchor'\n    condition: selection\nfalsepositives:\n    - 'On-premises workloads being onboarded'\nlevel: high",
+    "severity": "high",
+    "category": "persistence",
+    "technique": "T1098.001",
+    "author": "OSINTrix pack",
+    "platform": "AWS",
+    "tags": [
+      "aws",
+      "iam",
+      "roles-anywhere"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-sig-300",
+    "type": "sigma",
+    "title": "AWS RDS Snapshot Shared Publicly or With Another Account",
+    "description": "An RDS snapshot made restorable by all accounts or by an outside account — the database leaves without a single query.",
+    "code": "title: 'AWS RDS Snapshot Shared Publicly or With Another Account'\nid: 54f18a34-34a8-5167-a160-d9dc047fbfcf\nstatus: experimental\ndescription: 'An RDS snapshot made restorable by all accounts or by an outside account — the database leaves without a single query.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.exfiltration\n    - attack.t1537\nlogsource:\n    product: aws\n    service: cloudtrail\ndetection:\n    selection:\n        eventSource: 'rds.amazonaws.com'\n        eventName:\n            - 'ModifyDBSnapshotAttribute'\n            - 'ModifyDBClusterSnapshotAttribute'\n        requestParameters.attributeName: 'restore'\n    condition: selection\nfalsepositives:\n    - 'Snapshots shared with a known DR or analytics account'\nlevel: high",
+    "severity": "high",
+    "category": "exfiltration",
+    "technique": "T1537",
+    "author": "OSINTrix pack",
+    "platform": "AWS",
+    "tags": [
+      "aws",
+      "rds",
+      "snapshot"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-301",
+    "type": "sigma",
+    "title": "AWS Secrets Manager Resource Policy Changed",
+    "description": "A resource policy put on a secret — can grant an outside account read access to it.",
+    "code": "title: 'AWS Secrets Manager Resource Policy Changed'\nid: 4aeaa2ca-d5b3-5c61-96e2-8a58c0336339\nstatus: experimental\ndescription: 'A resource policy put on a secret — can grant an outside account read access to it.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.persistence\n    - attack.t1098\nlogsource:\n    product: aws\n    service: cloudtrail\ndetection:\n    selection:\n        eventSource: 'secretsmanager.amazonaws.com'\n        eventName:\n            - 'PutResourcePolicy'\n            - 'DeleteResourcePolicy'\n    condition: selection\nfalsepositives:\n    - 'Cross-account secret sharing set up by the platform team'\nlevel: medium",
+    "severity": "medium",
+    "category": "persistence",
+    "technique": "T1098",
+    "author": "OSINTrix pack",
+    "platform": "AWS",
+    "tags": [
+      "aws",
+      "secrets"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-302",
+    "type": "sigma",
+    "title": "Entra ID Owner Added to Application or Service Principal",
+    "description": "A user added as owner of an app registration or service principal. Owners can add credentials and so act as the app — a common backdoor.",
+    "code": "title: 'Entra ID Owner Added to Application or Service Principal'\nid: c36e0806-2436-5166-a45b-51966c317e73\nstatus: experimental\ndescription: 'A user added as owner of an app registration or service principal. Owners can add credentials and so act as the app — a common backdoor.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.persistence\n    - attack.t1098\nlogsource:\n    product: azure\n    service: auditlogs\ndetection:\n    selection:\n        OperationName:\n            - 'Add owner to application'\n            - 'Add owner to service principal'\n    condition: selection\nfalsepositives:\n    - 'App teams handing over ownership'\nlevel: medium",
+    "severity": "medium",
+    "category": "persistence",
+    "technique": "T1098",
+    "author": "OSINTrix pack",
+    "platform": "Azure",
+    "tags": [
+      "entra",
+      "app",
+      "owner"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-sig-303",
+    "type": "sigma",
+    "title": "Entra ID Application Permission Granted to Service Principal",
+    "description": "An application (app-only) permission such as Mail.Read or Directory.ReadWrite.All granted to a service principal — tenant-wide access with no user involved.",
+    "code": "title: 'Entra ID Application Permission Granted to Service Principal'\nid: 2fe969fe-f916-557c-802d-c755ea3c3e6a\nstatus: experimental\ndescription: 'An application (app-only) permission such as Mail.Read or Directory.ReadWrite.All granted to a service principal — tenant-wide access with no user involved.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.persistence\n    - attack.t1098.003\nlogsource:\n    product: azure\n    service: auditlogs\ndetection:\n    selection:\n        OperationName: 'Add app role assignment to service principal'\n    condition: selection\nfalsepositives:\n    - 'Admins approving integrations'\nlevel: high",
+    "severity": "high",
+    "category": "persistence",
+    "technique": "T1098.003",
+    "author": "OSINTrix pack",
+    "platform": "Azure",
+    "tags": [
+      "entra",
+      "oauth",
+      "graph"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-sig-304",
+    "type": "sigma",
+    "title": "Entra ID Sign-In From Scripted Client User Agent",
+    "description": "A sign-in whose user agent is a scripting library (axios, python-requests, Go, node-fetch). Account-takeover kits and AiTM proxies replay stolen sessions this way.",
+    "code": "title: 'Entra ID Sign-In From Scripted Client User Agent'\nid: ef2e4d84-4800-56c1-a893-705bf039c58b\nstatus: experimental\ndescription: 'A sign-in whose user agent is a scripting library (axios, python-requests, Go, node-fetch). Account-takeover kits and AiTM proxies replay stolen sessions this way.'\nreferences:\n    - https://www.proofpoint.com/us/blog/cloud-security/revisiting-mact-malicious-applications-credible-cloud-tenants\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.initial-access\n    - attack.t1078.004\nlogsource:\n    product: azure\n    service: signinlogs\ndetection:\n    selection:\n        UserAgent|contains:\n            - 'axios/'\n            - 'python-requests'\n            - 'Go-http-client'\n            - 'node-fetch'\n            - 'aiohttp'\n    condition: selection\nfalsepositives:\n    - 'Automation accounts and approved scripts'\nlevel: medium",
+    "severity": "medium",
+    "category": "initial-access",
+    "technique": "T1078.004",
+    "author": "OSINTrix pack",
+    "platform": "Azure",
+    "tags": [
+      "entra",
+      "aitm",
+      "user-agent"
+    ],
+    "references": [
+      "https://www.proofpoint.com/us/blog/cloud-security/revisiting-mact-malicious-applications-credible-cloud-tenants"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-sig-305",
+    "type": "sigma",
+    "title": "Entra ID ROPC Password Sign-In",
+    "description": "A sign-in with the Resource Owner Password Credentials flow — a plain username and password, no interactive MFA. Used by spray tools and old scripts.",
+    "code": "title: 'Entra ID ROPC Password Sign-In'\nid: 9d6def79-2ce9-5bbb-a3dc-dbbd4a9f454f\nstatus: experimental\ndescription: 'A sign-in with the Resource Owner Password Credentials flow — a plain username and password, no interactive MFA. Used by spray tools and old scripts.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.credential-access\n    - attack.t1110.003\nlogsource:\n    product: azure\n    service: signinlogs\ndetection:\n    selection:\n        AuthenticationProtocol: 'ropc'\n    condition: selection\nfalsepositives:\n    - 'Legacy line-of-business apps'\nlevel: medium",
+    "severity": "medium",
+    "category": "credential-access",
+    "technique": "T1110.003",
+    "author": "OSINTrix pack",
+    "platform": "Azure",
+    "tags": [
+      "entra",
+      "ropc",
+      "spray"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-306",
+    "type": "sigma",
+    "title": "Azure Key Vault Access Policy Changed",
+    "description": "A Key Vault access policy written — can give a new identity read access to keys, secrets and certificates.",
+    "code": "title: 'Azure Key Vault Access Policy Changed'\nid: e242b960-b2c4-55b3-97b5-43fa9761e9ea\nstatus: experimental\ndescription: 'A Key Vault access policy written — can give a new identity read access to keys, secrets and certificates.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.credential-access\n    - attack.t1555.006\nlogsource:\n    product: azure\n    service: activitylogs\ndetection:\n    selection:\n        operationName: 'Microsoft.KeyVault/vaults/accessPolicies/write'\n    condition: selection\nfalsepositives:\n    - 'Platform teams onboarding apps'\nlevel: medium",
+    "severity": "medium",
+    "category": "credential-access",
+    "technique": "T1555.006",
+    "author": "OSINTrix pack",
+    "platform": "Azure",
+    "tags": [
+      "azure",
+      "keyvault"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-307",
+    "type": "sigma",
+    "title": "Azure Role Assignment Created",
+    "description": "An Azure RBAC role assignment written. Review Owner, Contributor and User Access Administrator grants to unexpected identities.",
+    "code": "title: 'Azure Role Assignment Created'\nid: d646190a-3a17-5f5d-96a5-375e8eedec9e\nstatus: experimental\ndescription: 'An Azure RBAC role assignment written. Review Owner, Contributor and User Access Administrator grants to unexpected identities.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.privilege-escalation\n    - attack.t1098\nlogsource:\n    product: azure\n    service: activitylogs\ndetection:\n    selection:\n        operationName: 'Microsoft.Authorization/roleAssignments/write'\n    condition: selection\nfalsepositives:\n    - 'Normal access management'\nlevel: low",
+    "severity": "low",
+    "category": "privilege-escalation",
+    "technique": "T1098",
+    "author": "OSINTrix pack",
+    "platform": "Azure",
+    "tags": [
+      "azure",
+      "rbac"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-308",
+    "type": "sigma",
+    "title": "Azure Disk or Snapshot Export Link Generated",
+    "description": "A SAS download link generated for a managed disk or snapshot — the whole disk can be pulled down from anywhere.",
+    "code": "title: 'Azure Disk or Snapshot Export Link Generated'\nid: 6ef3cd5f-0359-5537-8332-235740d1faee\nstatus: experimental\ndescription: 'A SAS download link generated for a managed disk or snapshot — the whole disk can be pulled down from anywhere.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.exfiltration\n    - attack.t1537\nlogsource:\n    product: azure\n    service: activitylogs\ndetection:\n    selection:\n        operationName:\n            - 'Microsoft.Compute/disks/beginGetAccess/action'\n            - 'Microsoft.Compute/snapshots/beginGetAccess/action'\n    condition: selection\nfalsepositives:\n    - 'Backup and migration tooling'\nlevel: high",
+    "severity": "high",
+    "category": "exfiltration",
+    "technique": "T1537",
+    "author": "OSINTrix pack",
+    "platform": "Azure",
+    "tags": [
+      "azure",
+      "disk",
+      "exfiltration"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-sig-309",
+    "type": "sigma",
+    "title": "Azure Automation Runbook Created or Modified",
+    "description": "A runbook written in an Automation account. Runbooks run with the account managed identity on a schedule — used for persistence and privilege escalation.",
+    "code": "title: 'Azure Automation Runbook Created or Modified'\nid: 639a0751-6730-5d57-a541-843caea225b2\nstatus: experimental\ndescription: 'A runbook written in an Automation account. Runbooks run with the account managed identity on a schedule — used for persistence and privilege escalation.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.persistence\n    - attack.t1053\nlogsource:\n    product: azure\n    service: activitylogs\ndetection:\n    selection:\n        operationName:\n            - 'Microsoft.Automation/automationAccounts/runbooks/write'\n            - 'Microsoft.Automation/automationAccounts/webhooks/write'\n    condition: selection\nfalsepositives:\n    - 'Operations teams maintaining runbooks'\nlevel: medium",
+    "severity": "medium",
+    "category": "persistence",
+    "technique": "T1053",
+    "author": "OSINTrix pack",
+    "platform": "Azure",
+    "tags": [
+      "azure",
+      "automation"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-sig-310",
+    "type": "sigma",
+    "title": "Azure Network Security Group Rule Changed",
+    "description": "A rule written or deleted in a network security group — check for RDP, SSH or management ports opened to any source.",
+    "code": "title: 'Azure Network Security Group Rule Changed'\nid: 21285049-2e05-5c59-8969-063b895b3811\nstatus: experimental\ndescription: 'A rule written or deleted in a network security group — check for RDP, SSH or management ports opened to any source.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.defense-evasion\n    - attack.t1562.007\nlogsource:\n    product: azure\n    service: activitylogs\ndetection:\n    selection:\n        operationName:\n            - 'Microsoft.Network/networkSecurityGroups/securityRules/write'\n            - 'Microsoft.Network/networkSecurityGroups/securityRules/delete'\n    condition: selection\nfalsepositives:\n    - 'Network changes by the cloud team'\nlevel: low",
+    "severity": "low",
+    "category": "defense-evasion",
+    "technique": "T1562.007",
+    "author": "OSINTrix pack",
+    "platform": "Azure",
+    "tags": [
+      "azure",
+      "nsg",
+      "firewall"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-311",
+    "type": "sigma",
+    "title": "Exchange Mailbox Folder Permission Granted to Default or Anonymous",
+    "description": "Folder permissions given to Default or Anonymous on a mailbox — every user, or anyone, can then read it. A known quiet persistence trick.",
+    "code": "title: 'Exchange Mailbox Folder Permission Granted to Default or Anonymous'\nid: 4fb0778c-9257-5558-9a6d-d7936ac67cbd\nstatus: experimental\ndescription: 'Folder permissions given to Default or Anonymous on a mailbox — every user, or anyone, can then read it. A known quiet persistence trick.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.persistence\n    - attack.t1098.002\nlogsource:\n    product: m365\n    service: audit\ndetection:\n    selection:\n        Operation:\n            - 'Add-MailboxFolderPermission'\n            - 'Set-MailboxFolderPermission'\n        Parameters|contains:\n            - 'Default'\n            - 'Anonymous'\n    condition: selection\nfalsepositives:\n    - 'Shared calendars opened to the organisation'\nlevel: medium",
+    "severity": "medium",
+    "category": "persistence",
+    "technique": "T1098.002",
+    "author": "OSINTrix pack",
+    "platform": "M365",
+    "tags": [
+      "exchange",
+      "mailbox",
+      "permissions"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-sig-312",
+    "type": "sigma",
+    "title": "Exchange Management Role Assigned",
+    "description": "A management role assignment created in Exchange Online — for example ApplicationImpersonation or Mailbox Import Export.",
+    "code": "title: 'Exchange Management Role Assigned'\nid: 4d4498df-924c-5668-a39b-8bf0d0604ccc\nstatus: experimental\ndescription: 'A management role assignment created in Exchange Online — for example ApplicationImpersonation or Mailbox Import Export.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.privilege-escalation\n    - attack.t1098\nlogsource:\n    product: m365\n    service: audit\ndetection:\n    selection:\n        Operation: 'New-ManagementRoleAssignment'\n    condition: selection\nfalsepositives:\n    - 'Exchange administrators delegating roles'\nlevel: medium",
+    "severity": "medium",
+    "category": "privilege-escalation",
+    "technique": "T1098",
+    "author": "OSINTrix pack",
+    "platform": "M365",
+    "tags": [
+      "exchange",
+      "rbac"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-313",
+    "type": "sigma",
+    "title": "Okta Admin Session Impersonation Started",
+    "description": "An Okta admin or support impersonation session started — check it was requested.",
+    "code": "title: 'Okta Admin Session Impersonation Started'\nid: c238cb88-2002-5507-9528-3dd9f7039c06\nstatus: experimental\ndescription: 'An Okta admin or support impersonation session started — check it was requested.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.privilege-escalation\n    - attack.t1078\nlogsource:\n    product: okta\n    service: okta\ndetection:\n    selection:\n        eventType: 'user.session.impersonation.initiate'\n    condition: selection\nfalsepositives:\n    - 'Okta support sessions you requested'\nlevel: high",
+    "severity": "high",
+    "category": "privilege-escalation",
+    "technique": "T1078",
+    "author": "OSINTrix pack",
+    "platform": "Okta",
+    "tags": [
+      "okta",
+      "impersonation"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-314",
+    "type": "sigma",
+    "title": "Okta Session Used From Another Network (Cookie Theft)",
+    "description": "Okta saw a session move between networks or clients — the signature of a stolen session cookie replayed by a stealer customer.",
+    "code": "title: 'Okta Session Used From Another Network (Cookie Theft)'\nid: 4186d44d-e609-52e6-94c3-475053aec966\nstatus: experimental\ndescription: 'Okta saw a session move between networks or clients — the signature of a stolen session cookie replayed by a stealer customer.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.credential-access\n    - attack.t1539\nlogsource:\n    product: okta\n    service: okta\ndetection:\n    selection:\n        eventType: 'security.session.detect_client_roaming'\n    condition: selection\nfalsepositives:\n    - 'Users roaming between VPN and mobile networks'\nlevel: high",
+    "severity": "high",
+    "category": "credential-access",
+    "technique": "T1539",
+    "author": "OSINTrix pack",
+    "platform": "Okta",
+    "tags": [
+      "okta",
+      "session",
+      "cookie"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-sig-315",
+    "type": "sigma",
+    "title": "Okta User Reported Suspicious Activity",
+    "description": "A user pressed \"report suspicious activity\" on an Okta notification — a sign-in they did not make.",
+    "code": "title: 'Okta User Reported Suspicious Activity'\nid: 66b45f44-6885-56d8-b7f1-67ad90648196\nstatus: experimental\ndescription: 'A user pressed \"report suspicious activity\" on an Okta notification — a sign-in they did not make.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.initial-access\n    - attack.t1078\nlogsource:\n    product: okta\n    service: okta\ndetection:\n    selection:\n        eventType: 'user.account.report_suspicious_activity_by_enduser'\n    condition: selection\nfalsepositives:\n    - 'Mistaken reports'\nlevel: high",
+    "severity": "high",
+    "category": "initial-access",
+    "technique": "T1078",
+    "author": "OSINTrix pack",
+    "platform": "Okta",
+    "tags": [
+      "okta",
+      "user-report"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-316",
+    "type": "sigma",
+    "title": "GCP Project-Wide SSH Key Added",
+    "description": "SSH keys written to project-wide metadata — every instance in the project accepts them.",
+    "code": "title: 'GCP Project-Wide SSH Key Added'\nid: 96a24ec8-1d5b-5117-b421-5d35c0c418d3\nstatus: experimental\ndescription: 'SSH keys written to project-wide metadata — every instance in the project accepts them.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.persistence\n    - attack.t1098.004\nlogsource:\n    product: gcp\n    service: gcp.audit\ndetection:\n    selection:\n        data.protoPayload.methodName|endswith: 'setCommonInstanceMetadata'\n    condition: selection\nfalsepositives:\n    - 'Engineers adding keys through the console'\nlevel: medium",
+    "severity": "medium",
+    "category": "persistence",
+    "technique": "T1098.004",
+    "author": "OSINTrix pack",
+    "platform": "GCP",
+    "tags": [
+      "gcp",
+      "ssh",
+      "metadata"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-317",
+    "type": "sigma",
+    "title": "GCP Service Account Created",
+    "description": "A new service account created. Pair with key creation and role grants to spot a backdoor identity.",
+    "code": "title: 'GCP Service Account Created'\nid: ca000def-336f-5f33-9c0b-d76faa7cfd91\nstatus: experimental\ndescription: 'A new service account created. Pair with key creation and role grants to spot a backdoor identity.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.persistence\n    - attack.t1136.003\nlogsource:\n    product: gcp\n    service: gcp.audit\ndetection:\n    selection:\n        data.protoPayload.methodName: 'google.iam.admin.v1.CreateServiceAccount'\n    condition: selection\nfalsepositives:\n    - 'Infrastructure-as-code pipelines'\nlevel: low",
+    "severity": "low",
+    "category": "persistence",
+    "technique": "T1136.003",
+    "author": "OSINTrix pack",
+    "platform": "GCP",
+    "tags": [
+      "gcp",
+      "iam"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-318",
+    "type": "sigma",
+    "title": "GCP Cloud Function Made Publicly Invocable",
+    "description": "allUsers given the invoker role on a Cloud Function — anyone on the internet can call it.",
+    "code": "title: 'GCP Cloud Function Made Publicly Invocable'\nid: aa80cdc9-13c5-53e9-88da-a290a9efe6b9\nstatus: experimental\ndescription: 'allUsers given the invoker role on a Cloud Function — anyone on the internet can call it.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.initial-access\n    - attack.t1190\nlogsource:\n    product: gcp\n    service: gcp.audit\ndetection:\n    selection:\n        data.protoPayload.methodName|endswith: 'SetIamPolicy'\n        data.protoPayload.serviceName: 'cloudfunctions.googleapis.com'\n        data.protoPayload.serviceData.policyDelta.bindingDeltas.member: 'allUsers'\n    condition: selection\nfalsepositives:\n    - 'Public webhooks by design'\nlevel: medium",
+    "severity": "medium",
+    "category": "initial-access",
+    "technique": "T1190",
+    "author": "OSINTrix pack",
+    "platform": "GCP",
+    "tags": [
+      "gcp",
+      "functions",
+      "public"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-319",
+    "type": "sigma",
+    "title": "GCP Secret Manager Secret Read",
+    "description": "A secret version accessed in Secret Manager. Unexpected callers, or many secrets read by one principal, point to credential harvesting.",
+    "code": "title: 'GCP Secret Manager Secret Read'\nid: cefb2f7b-7216-59d0-8509-f311ead4bba5\nstatus: experimental\ndescription: 'A secret version accessed in Secret Manager. Unexpected callers, or many secrets read by one principal, point to credential harvesting.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.credential-access\n    - attack.t1555.006\nlogsource:\n    product: gcp\n    service: gcp.audit\ndetection:\n    selection:\n        data.protoPayload.methodName: 'google.cloud.secretmanager.v1.SecretManagerService.AccessSecretVersion'\n    condition: selection\nfalsepositives:\n    - 'Applications reading their own secrets at start-up'\nlevel: low",
+    "severity": "low",
+    "category": "credential-access",
+    "technique": "T1555.006",
+    "author": "OSINTrix pack",
+    "platform": "GCP",
+    "tags": [
+      "gcp",
+      "secrets"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-320",
+    "type": "sigma",
+    "title": "Google Workspace Admin Privilege Granted",
+    "description": "An admin role granted to a Workspace user.",
+    "code": "title: 'Google Workspace Admin Privilege Granted'\nid: 1889e0b0-0ff8-5cfc-96c6-24feb1a0adfd\nstatus: experimental\ndescription: 'An admin role granted to a Workspace user.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.privilege-escalation\n    - attack.t1098.003\nlogsource:\n    product: google_workspace\n    service: google_workspace.admin\ndetection:\n    selection:\n        eventService: 'admin.googleapis.com'\n        eventName:\n            - 'GRANT_ADMIN_PRIVILEGE'\n            - 'ASSIGN_ROLE'\n    condition: selection\nfalsepositives:\n    - 'Admin onboarding'\nlevel: medium",
+    "severity": "medium",
+    "category": "privilege-escalation",
+    "technique": "T1098.003",
+    "author": "OSINTrix pack",
+    "platform": "Google Workspace",
+    "tags": [
+      "workspace",
+      "admin"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-321",
+    "type": "sigma",
+    "title": "Google Workspace Domain-Wide Delegation Granted",
+    "description": "An API client given domain-wide delegation — it can act as any user (read all mail, all Drive). One of the most powerful backdoors in Workspace.",
+    "code": "title: 'Google Workspace Domain-Wide Delegation Granted'\nid: 6ddf55e2-804a-5d9c-87e4-fb6aa7724e40\nstatus: experimental\ndescription: 'An API client given domain-wide delegation — it can act as any user (read all mail, all Drive). One of the most powerful backdoors in Workspace.'\nreferences:\n    - https://github.com/SigmaHQ/sigma/tree/master/rules/cloud/gworkspace\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.persistence\n    - attack.t1098.001\nlogsource:\n    product: google_workspace\n    service: google_workspace.admin\ndetection:\n    selection:\n        eventService: 'admin.googleapis.com'\n        eventName: 'AUTHORIZE_API_CLIENT_ACCESS'\n    condition: selection\nfalsepositives:\n    - 'Approved integrations such as backup or e-discovery'\nlevel: high",
+    "severity": "high",
+    "category": "persistence",
+    "technique": "T1098.001",
+    "author": "OSINTrix pack",
+    "platform": "Google Workspace",
+    "tags": [
+      "workspace",
+      "delegation",
+      "oauth"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma/tree/master/rules/cloud/gworkspace"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-sig-322",
+    "type": "sigma",
+    "title": "Google Workspace 2-Step Verification Enforcement Changed",
+    "description": "The 2-Step Verification enforcement setting changed for the domain or an organisational unit.",
+    "code": "title: 'Google Workspace 2-Step Verification Enforcement Changed'\nid: 162d950b-3cd2-5b79-8cd6-956d57aae1df\nstatus: experimental\ndescription: 'The 2-Step Verification enforcement setting changed for the domain or an organisational unit.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.defense-evasion\n    - attack.t1556\nlogsource:\n    product: google_workspace\n    service: google_workspace.admin\ndetection:\n    selection:\n        eventService: 'admin.googleapis.com'\n        eventName: 'ENFORCE_STRONG_AUTHENTICATION'\n    condition: selection\nfalsepositives:\n    - 'Planned policy roll-outs'\nlevel: medium",
+    "severity": "medium",
+    "category": "defense-evasion",
+    "technique": "T1556",
+    "author": "OSINTrix pack",
+    "platform": "Google Workspace",
+    "tags": [
+      "workspace",
+      "mfa"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-323",
+    "type": "sigma",
+    "title": "GitHub Repository Visibility Changed",
+    "description": "A repository changed between private and public — leaked source and secrets in one click.",
+    "code": "title: 'GitHub Repository Visibility Changed'\nid: 6d0aa3a4-d977-509c-b5cf-4b5e305c45ee\nstatus: experimental\ndescription: 'A repository changed between private and public — leaked source and secrets in one click.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.exfiltration\n    - attack.t1567.001\nlogsource:\n    product: github\n    service: audit\ndetection:\n    selection:\n        action: 'repo.access'\n    condition: selection\nfalsepositives:\n    - 'Open-sourcing on purpose'\nlevel: medium",
+    "severity": "medium",
+    "category": "exfiltration",
+    "technique": "T1567.001",
+    "author": "OSINTrix pack",
+    "platform": "GitHub",
+    "tags": [
+      "github",
+      "repo",
+      "visibility"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-324",
+    "type": "sigma",
+    "title": "GitHub Branch Protection Removed or Overridden",
+    "description": "Branch protection deleted or bypassed — code can then reach the main branch without review.",
+    "code": "title: 'GitHub Branch Protection Removed or Overridden'\nid: e3e24ce9-965c-55a8-a571-173782b0bd43\nstatus: experimental\ndescription: 'Branch protection deleted or bypassed — code can then reach the main branch without review.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.impact\n    - attack.t1195.002\nlogsource:\n    product: github\n    service: audit\ndetection:\n    selection:\n        action:\n            - 'protected_branch.destroy'\n            - 'protected_branch.policy_override'\n            - 'protected_branch.rejected_ref_update'\n    condition: selection\nfalsepositives:\n    - 'Administrators fixing a broken release'\nlevel: medium",
+    "severity": "medium",
+    "category": "impact",
+    "technique": "T1195.002",
+    "author": "OSINTrix pack",
+    "platform": "GitHub",
+    "tags": [
+      "github",
+      "branch",
+      "supply-chain"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-sig-325",
+    "type": "sigma",
+    "title": "GitHub Organization Two-Factor Requirement Disabled",
+    "description": "The organisation stopped requiring two-factor authentication for members.",
+    "code": "title: 'GitHub Organization Two-Factor Requirement Disabled'\nid: ce2e5ad9-d851-53dc-92f1-848f7e3448a6\nstatus: experimental\ndescription: 'The organisation stopped requiring two-factor authentication for members.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.defense-evasion\n    - attack.t1556\nlogsource:\n    product: github\n    service: audit\ndetection:\n    selection:\n        action: 'org.disable_two_factor_requirement'\n    condition: selection\nfalsepositives:\n    - 'None expected'\nlevel: high",
+    "severity": "high",
+    "category": "defense-evasion",
+    "technique": "T1556",
+    "author": "OSINTrix pack",
+    "platform": "GitHub",
+    "tags": [
+      "github",
+      "mfa"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-326",
+    "type": "sigma",
+    "title": "GitHub Secret Scanning Push Protection Disabled",
+    "description": "Push protection turned off for a repository or the enterprise — leaked tokens will no longer be blocked at push.",
+    "code": "title: 'GitHub Secret Scanning Push Protection Disabled'\nid: 20734a84-d069-56ed-b4da-6149e130e0f9\nstatus: experimental\ndescription: 'Push protection turned off for a repository or the enterprise — leaked tokens will no longer be blocked at push.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.defense-evasion\n    - attack.t1562.001\nlogsource:\n    product: github\n    service: audit\ndetection:\n    selection:\n        action:\n            - 'repository_secret_scanning_push_protection.disable'\n            - 'business_secret_scanning_push_protection.disable'\n            - 'org.secret_scanning_push_protection_disable'\n    condition: selection\nfalsepositives:\n    - 'Temporary bypass during a migration'\nlevel: medium",
+    "severity": "medium",
+    "category": "defense-evasion",
+    "technique": "T1562.001",
+    "author": "OSINTrix pack",
+    "platform": "GitHub",
+    "tags": [
+      "github",
+      "secrets"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-327",
+    "type": "sigma",
+    "title": "Kubernetes Admission Webhook Created or Changed",
+    "description": "A mutating or validating admission webhook registered — it sees, and can rewrite, every object the cluster creates. Used for stealthy persistence.",
+    "code": "title: 'Kubernetes Admission Webhook Created or Changed'\nid: b4956963-07f4-50d3-abe2-da9e2b961cd1\nstatus: experimental\ndescription: 'A mutating or validating admission webhook registered — it sees, and can rewrite, every object the cluster creates. Used for stealthy persistence.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.persistence\n    - attack.t1546\nlogsource:\n    product: kubernetes\n    service: audit\ndetection:\n    selection:\n        objectRef.resource:\n            - 'mutatingwebhookconfigurations'\n            - 'validatingwebhookconfigurations'\n        verb:\n            - 'create'\n            - 'update'\n            - 'patch'\n    condition: selection\nfalsepositives:\n    - 'Policy engines and service meshes being installed'\nlevel: medium",
+    "severity": "medium",
+    "category": "persistence",
+    "technique": "T1546",
+    "author": "OSINTrix pack",
+    "platform": "Kubernetes",
+    "tags": [
+      "kubernetes",
+      "webhook"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-sig-328",
+    "type": "sigma",
+    "title": "Kubernetes Events Deleted",
+    "description": "Cluster events deleted — removes the short-lived trail of what ran.",
+    "code": "title: 'Kubernetes Events Deleted'\nid: 62507027-d4d2-5fd9-a392-6ef02241473c\nstatus: experimental\ndescription: 'Cluster events deleted — removes the short-lived trail of what ran.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.defense-evasion\n    - attack.t1070\nlogsource:\n    product: kubernetes\n    service: audit\ndetection:\n    selection:\n        objectRef.resource: 'events'\n        verb:\n            - 'delete'\n            - 'deletecollection'\n    condition: selection\nfalsepositives:\n    - 'Event clean-up controllers'\nlevel: medium",
+    "severity": "medium",
+    "category": "defense-evasion",
+    "technique": "T1070",
+    "author": "OSINTrix pack",
+    "platform": "Kubernetes",
+    "tags": [
+      "kubernetes",
+      "events"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-329",
+    "type": "sigma",
+    "title": "Kubernetes Node Proxy or Kubelet API Accessed Through API Server",
+    "description": "The nodes/proxy subresource used — a route straight to the kubelet that bypasses pod-level audit.",
+    "code": "title: 'Kubernetes Node Proxy or Kubelet API Accessed Through API Server'\nid: c012ee80-6abd-5817-884e-0a3d2a8b32d8\nstatus: experimental\ndescription: 'The nodes/proxy subresource used — a route straight to the kubelet that bypasses pod-level audit.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.execution\n    - attack.t1609\nlogsource:\n    product: kubernetes\n    service: audit\ndetection:\n    selection:\n        objectRef.resource: 'nodes'\n        objectRef.subresource: 'proxy'\n    condition: selection\nfalsepositives:\n    - 'Monitoring agents that scrape the kubelet'\nlevel: medium",
+    "severity": "medium",
+    "category": "execution",
+    "technique": "T1609",
+    "author": "OSINTrix pack",
+    "platform": "Kubernetes",
+    "tags": [
+      "kubernetes",
+      "kubelet"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-sig-330",
+    "type": "sigma",
+    "title": "Discord Webhook Used by Non-Browser Client",
+    "description": "A post to a Discord webhook from something that is not a browser — stealers and RATs exfiltrate logs and screenshots this way.",
+    "code": "title: 'Discord Webhook Used by Non-Browser Client'\nid: 81684ce7-b740-5290-b840-a2222a2162cd\nstatus: experimental\ndescription: 'A post to a Discord webhook from something that is not a browser — stealers and RATs exfiltrate logs and screenshots this way.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.exfiltration\n    - attack.t1567\nlogsource:\n    category: proxy\ndetection:\n    selection:\n        c-uri|contains:\n            - 'discord.com/api/webhooks/'\n            - 'discordapp.com/api/webhooks/'\n            - 'canary.discord.com/api/webhooks/'\n    filter_browser:\n        c-useragent|contains: 'Mozilla/5.0'\n    condition: selection and not filter_browser\nfalsepositives:\n    - 'Monitoring and CI notifications posting to Discord'\nlevel: medium",
+    "severity": "medium",
+    "category": "exfiltration",
+    "technique": "T1567",
+    "author": "OSINTrix pack",
+    "platform": "Network",
+    "tags": [
+      "discord",
+      "webhook",
+      "stealer",
+      "exfiltration"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-sig-331",
+    "type": "sigma",
+    "title": "Telegram Bot Polling for Commands (getUpdates)",
+    "description": "A client polling a Telegram bot for new messages — the command channel of bot-controlled RATs. Exfil uses sendDocument; control uses getUpdates.",
+    "code": "title: 'Telegram Bot Polling for Commands (getUpdates)'\nid: 62b1e150-af36-5098-9cf5-4b76361dcd9a\nstatus: experimental\ndescription: 'A client polling a Telegram bot for new messages — the command channel of bot-controlled RATs. Exfil uses sendDocument; control uses getUpdates.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.command-and-control\n    - attack.t1102.002\nlogsource:\n    category: proxy\ndetection:\n    selection:\n        c-uri|contains: 'api.telegram.org/bot'\n    selection_poll:\n        c-uri|contains: '/getUpdates'\n    filter_browser:\n        c-useragent|contains: 'Mozilla/5.0'\n    condition: selection and selection_poll and not filter_browser\nfalsepositives:\n    - 'Chat-ops bots run by your own teams'\nlevel: high",
+    "severity": "high",
+    "category": "command-and-control",
+    "technique": "T1102.002",
+    "author": "OSINTrix pack",
+    "platform": "Network",
+    "tags": [
+      "telegram",
+      "c2",
+      "bot"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-sig-332",
+    "type": "sigma",
+    "title": "Slack Incoming Webhook Used by Non-Browser Client",
+    "description": "A post to a Slack incoming webhook from something other than a browser — another exfil channel used by stealers and red-team implants.",
+    "code": "title: 'Slack Incoming Webhook Used by Non-Browser Client'\nid: 4cc41141-c3c8-57c8-a701-e8424e98e4e2\nstatus: experimental\ndescription: 'A post to a Slack incoming webhook from something other than a browser — another exfil channel used by stealers and red-team implants.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.exfiltration\n    - attack.t1567\nlogsource:\n    category: proxy\ndetection:\n    selection:\n        c-uri|contains: 'hooks.slack.com/services/'\n    filter_browser:\n        c-useragent|contains: 'Mozilla/5.0'\n    condition: selection and not filter_browser\nfalsepositives:\n    - 'Monitoring and CI notifications'\nlevel: low",
+    "severity": "low",
+    "category": "exfiltration",
+    "technique": "T1567",
+    "author": "OSINTrix pack",
+    "platform": "Network",
+    "tags": [
+      "slack",
+      "webhook"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-333",
+    "type": "sigma",
+    "title": "Dead-Drop Resolver Profile Fetched by Non-Browser Client",
+    "description": "A Steam profile or Telegram channel page fetched by something that is not a browser. Stealers such as Vidar read their C2 address from these pages.",
+    "code": "title: 'Dead-Drop Resolver Profile Fetched by Non-Browser Client'\nid: 6a4bed49-3570-5df9-bcce-2ea31545bbc9\nstatus: experimental\ndescription: 'A Steam profile or Telegram channel page fetched by something that is not a browser. Stealers such as Vidar read their C2 address from these pages.'\nreferences:\n    - https://attack.mitre.org/techniques/T1102/001/\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.command-and-control\n    - attack.t1102.001\nlogsource:\n    category: proxy\ndetection:\n    selection:\n        c-uri|contains:\n            - 'steamcommunity.com/profiles/'\n            - 'steamcommunity.com/id/'\n            - 't.me/'\n            - 'telegram.me/'\n    filter_browser:\n        c-useragent|contains: 'Mozilla/5.0'\n    condition: selection and not filter_browser\nfalsepositives:\n    - 'Link preview services and RSS readers'\nlevel: medium",
+    "severity": "medium",
+    "category": "command-and-control",
+    "technique": "T1102.001",
+    "author": "OSINTrix pack",
+    "platform": "Network",
+    "tags": [
+      "dead-drop",
+      "stealer",
+      "steam",
+      "telegram"
+    ],
+    "references": [
+      "https://attack.mitre.org/techniques/T1102/001/"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-sig-334",
+    "type": "sigma",
+    "title": "Blockchain RPC Endpoint Contacted by Script Host",
+    "description": "A script host (PowerShell, wscript, mshta, node) resolving a public blockchain RPC endpoint. EtherHiding-style loaders keep their next stage in a smart contract.",
+    "code": "title: 'Blockchain RPC Endpoint Contacted by Script Host'\nid: 853e163d-19fe-520d-9ee1-4be1266017ad\nstatus: experimental\ndescription: 'A script host (PowerShell, wscript, mshta, node) resolving a public blockchain RPC endpoint. EtherHiding-style loaders keep their next stage in a smart contract.'\nreferences:\n    - https://labs.guard.io/etherhiding-hiding-web2-malicious-code-in-web3-smart-contracts-65ea78efad16\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.command-and-control\n    - attack.t1102\nlogsource:\n    category: dns_query\n    product: windows\ndetection:\n    selection:\n        QueryName|contains:\n            - 'bsc-dataseed'\n            - 'bsc-testnet'\n            - 'binance.org'\n            - 'infura.io'\n            - 'alchemy.com'\n            - 'publicnode.com'\n            - 'llamarpc.com'\n    selection_img:\n        Image|endswith:\n            - '\\powershell.exe'\n            - '\\pwsh.exe'\n            - '\\wscript.exe'\n            - '\\cscript.exe'\n            - '\\mshta.exe'\n            - '\\node.exe'\n    condition: selection and selection_img\nfalsepositives:\n    - 'Developers testing web3 code with node'\nlevel: high",
+    "severity": "high",
+    "category": "command-and-control",
+    "technique": "T1102",
+    "author": "OSINTrix pack",
+    "platform": "Windows",
+    "tags": [
+      "etherhiding",
+      "blockchain",
+      "loader"
+    ],
+    "references": [
+      "https://labs.guard.io/etherhiding-hiding-web2-malicious-code-in-web3-smart-contracts-65ea78efad16"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-sig-335",
+    "type": "sigma",
+    "title": "IP Geolocation Service Queried by Non-Browser Process",
+    "description": "A process that is not a browser looked up its own public IP or country — stealers do this to tag logs and skip CIS countries.",
+    "code": "title: 'IP Geolocation Service Queried by Non-Browser Process'\nid: 0c77ceb9-1e32-509a-8a23-f747c39d2d5e\nstatus: experimental\ndescription: 'A process that is not a browser looked up its own public IP or country — stealers do this to tag logs and skip CIS countries.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.discovery\n    - attack.t1614\nlogsource:\n    category: dns_query\n    product: windows\ndetection:\n    selection:\n        QueryName:\n            - 'ip-api.com'\n            - 'ipinfo.io'\n            - 'api.ipify.org'\n            - 'icanhazip.com'\n            - 'checkip.amazonaws.com'\n            - 'ipwho.is'\n            - 'ifconfig.me'\n            - 'api.myip.com'\n            - 'freegeoip.app'\n    filter_browser:\n        Image|endswith:\n            - '\\chrome.exe'\n            - '\\msedge.exe'\n            - '\\firefox.exe'\n            - '\\brave.exe'\n            - '\\opera.exe'\n            - '\\Telegram.exe'\n            - '\\Discord.exe'\n    condition: selection and not filter_browser\nfalsepositives:\n    - 'VPN clients and updaters checking connectivity'\nlevel: low",
+    "severity": "low",
+    "category": "discovery",
+    "technique": "T1614",
+    "author": "OSINTrix pack",
+    "platform": "Windows",
+    "tags": [
+      "stealer",
+      "geofencing",
+      "discovery"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-336",
+    "type": "sigma",
+    "title": "Telegram or Discord API Resolved by Non-Browser Process",
+    "description": "A process other than a browser or the official app resolving the Telegram Bot API or Discord — typical of stealers and bot-controlled RATs.",
+    "code": "title: 'Telegram or Discord API Resolved by Non-Browser Process'\nid: 2a777ffa-8e2c-5480-b4e7-0ecb0b8bf31f\nstatus: experimental\ndescription: 'A process other than a browser or the official app resolving the Telegram Bot API or Discord — typical of stealers and bot-controlled RATs.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.command-and-control\n    - attack.t1102.002\nlogsource:\n    category: dns_query\n    product: windows\ndetection:\n    selection:\n        QueryName:\n            - 'api.telegram.org'\n            - 'discord.com'\n            - 'discordapp.com'\n    filter_browser:\n        Image|endswith:\n            - '\\chrome.exe'\n            - '\\msedge.exe'\n            - '\\firefox.exe'\n            - '\\brave.exe'\n            - '\\opera.exe'\n            - '\\Telegram.exe'\n            - '\\Discord.exe'\n    condition: selection and not filter_browser\nfalsepositives:\n    - 'Gaming overlays and chat-ops tools'\nlevel: medium",
+    "severity": "medium",
+    "category": "command-and-control",
+    "technique": "T1102.002",
+    "author": "OSINTrix pack",
+    "platform": "Windows",
+    "tags": [
+      "telegram",
+      "discord",
+      "c2"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-sig-337",
+    "type": "sigma",
+    "title": "Paste or Anonymous File Host Resolved by Script Host",
+    "description": "PowerShell, wscript, cscript or mshta resolving a paste site or anonymous file host — staging for the next payload.",
+    "code": "title: 'Paste or Anonymous File Host Resolved by Script Host'\nid: c73ca619-065c-5867-b590-689484f697ba\nstatus: experimental\ndescription: 'PowerShell, wscript, cscript or mshta resolving a paste site or anonymous file host — staging for the next payload.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.command-and-control\n    - attack.t1105\nlogsource:\n    category: dns_query\n    product: windows\ndetection:\n    selection:\n        QueryName|endswith:\n            - 'pastebin.com'\n            - 'paste.ee'\n            - 'rentry.co'\n            - 'transfer.sh'\n            - 'file.io'\n            - 'gofile.io'\n            - 'temp.sh'\n            - 'catbox.moe'\n            - 'textbin.net'\n    selection_img:\n        Image|endswith:\n            - '\\powershell.exe'\n            - '\\pwsh.exe'\n            - '\\wscript.exe'\n            - '\\cscript.exe'\n            - '\\mshta.exe'\n    condition: selection and selection_img\nfalsepositives:\n    - 'Admin scripts that pull from paste sites (rare)'\nlevel: high",
+    "severity": "high",
+    "category": "command-and-control",
+    "technique": "T1105",
+    "author": "OSINTrix pack",
+    "platform": "Windows",
+    "tags": [
+      "paste",
+      "staging"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-338",
+    "type": "sigma",
+    "title": "PowerShell Started From the Run Dialog With a Download (ClickFix)",
+    "description": "PowerShell or mshta launched by Explorer with a URL or download cradle — the pasted command of a fake CAPTCHA or \"fix it\" page.",
+    "code": "title: 'PowerShell Started From the Run Dialog With a Download (ClickFix)'\nid: c13fa025-d84a-58e5-ad9c-ff9e1e49032f\nstatus: experimental\ndescription: 'PowerShell or mshta launched by Explorer with a URL or download cradle — the pasted command of a fake CAPTCHA or \"fix it\" page.'\nreferences:\n    - https://attack.mitre.org/techniques/T1204/004/\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.execution\n    - attack.t1204.004\nlogsource:\n    category: process_creation\n    product: windows\ndetection:\n    selection_parent:\n        ParentImage|endswith: '\\explorer.exe'\n    selection_img:\n        Image|endswith:\n            - '\\powershell.exe'\n            - '\\pwsh.exe'\n            - '\\mshta.exe'\n    selection_cli:\n        CommandLine|contains:\n            - '://'\n            - 'Invoke-WebRequest'\n            - 'Invoke-RestMethod'\n            - 'iwr '\n            - 'irm '\n            - 'iex'\n            - 'DownloadString'\n    condition: all of selection_*\nfalsepositives:\n    - 'Admins pasting install one-liners'\nlevel: high",
+    "severity": "high",
+    "category": "execution",
+    "technique": "T1204.004",
+    "author": "OSINTrix pack",
+    "platform": "Windows",
+    "tags": [
+      "clickfix",
+      "fake-captcha",
+      "powershell"
+    ],
+    "references": [
+      "https://attack.mitre.org/techniques/T1204/004/"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-sig-339",
+    "type": "sigma",
+    "title": "Headless Conhost Launching a Shell",
+    "description": "conhost.exe started with --headless to run a command without a window — a 2024-25 ClickFix and loader trick.",
+    "code": "title: 'Headless Conhost Launching a Shell'\nid: 2ed8339c-87e0-5ec1-bdf4-834366539813\nstatus: experimental\ndescription: 'conhost.exe started with --headless to run a command without a window — a 2024-25 ClickFix and loader trick.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.defense-evasion\n    - attack.t1564.003\nlogsource:\n    category: process_creation\n    product: windows\ndetection:\n    selection:\n        Image|endswith: '\\conhost.exe'\n        CommandLine|contains: '--headless'\n    condition: selection\nfalsepositives:\n    - 'Rare legitimate use by terminal tools'\nlevel: high",
+    "severity": "high",
+    "category": "defense-evasion",
+    "technique": "T1564.003",
+    "author": "OSINTrix pack",
+    "platform": "Windows",
+    "tags": [
+      "conhost",
+      "clickfix"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-sig-340",
+    "type": "sigma",
+    "title": "Windows OpenSSH Reverse or Dynamic Tunnel",
+    "description": "The built-in ssh.exe opening a reverse (-R) or SOCKS (-D) tunnel — used by ransomware crews to keep access through firewalls.",
+    "code": "title: 'Windows OpenSSH Reverse or Dynamic Tunnel'\nid: 2531ea8d-8bc5-544f-853a-acd877d8a4f2\nstatus: experimental\ndescription: 'The built-in ssh.exe opening a reverse (-R) or SOCKS (-D) tunnel — used by ransomware crews to keep access through firewalls.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.command-and-control\n    - attack.t1572\nlogsource:\n    category: process_creation\n    product: windows\ndetection:\n    selection:\n        Image|endswith: '\\ssh.exe'\n        CommandLine|contains:\n            - ' -R '\n            - ' -D '\n            - ' -w '\n    condition: selection\nfalsepositives:\n    - 'Engineers tunnelling to jump hosts'\nlevel: medium",
+    "severity": "medium",
+    "category": "command-and-control",
+    "technique": "T1572",
+    "author": "OSINTrix pack",
+    "platform": "Windows",
+    "tags": [
+      "ssh",
+      "tunnel"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-341",
+    "type": "sigma",
+    "title": "MSIX App Installer Protocol Used From Command Line or Browser",
+    "description": "The ms-appinstaller: protocol launched with a remote source — abused to install signed malicious MSIX packages.",
+    "code": "title: 'MSIX App Installer Protocol Used From Command Line or Browser'\nid: f219b13a-c0e5-5224-8034-64209a2ac223\nstatus: experimental\ndescription: 'The ms-appinstaller: protocol launched with a remote source — abused to install signed malicious MSIX packages.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.initial-access\n    - attack.t1204.002\nlogsource:\n    category: process_creation\n    product: windows\ndetection:\n    selection:\n        CommandLine|contains: 'ms-appinstaller:?source='\n    condition: selection\nfalsepositives:\n    - 'Internal software catalogues using App Installer'\nlevel: medium",
+    "severity": "medium",
+    "category": "initial-access",
+    "technique": "T1204.002",
+    "author": "OSINTrix pack",
+    "platform": "Windows",
+    "tags": [
+      "msix",
+      "appinstaller"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-342",
+    "type": "sigma",
+    "title": "Search-ms Protocol Pointing at a Remote Share",
+    "description": "Explorer opened through search-ms: with a remote location — lures show a \"folder\" on an attacker WebDAV share full of shortcuts.",
+    "code": "title: 'Search-ms Protocol Pointing at a Remote Share'\nid: 6da69962-26a9-5e00-ba33-23a098b222f4\nstatus: experimental\ndescription: 'Explorer opened through search-ms: with a remote location — lures show a \"folder\" on an attacker WebDAV share full of shortcuts.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.initial-access\n    - attack.t1204.002\nlogsource:\n    category: process_creation\n    product: windows\ndetection:\n    selection:\n        CommandLine|contains: 'search-ms:'\n    selection_remote:\n        CommandLine|contains:\n            - 'crumb=location:'\n            - 'DavWWWRoot'\n            - '@SSL'\n    condition: selection and selection_remote\nfalsepositives:\n    - 'None expected'\nlevel: high",
+    "severity": "high",
+    "category": "initial-access",
+    "technique": "T1204.002",
+    "author": "OSINTrix pack",
+    "platform": "Windows",
+    "tags": [
+      "search-ms",
+      "webdav",
+      "lure"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-sig-343",
+    "type": "sigma",
+    "title": "WebDAV Payload Fetched via Rundll32 Davclnt",
+    "description": "rundll32 calling davclnt.dll DavSetCookie with a URL — the trace of a file opened from a WebDAV server (shortcut and URL-file lures).",
+    "code": "title: 'WebDAV Payload Fetched via Rundll32 Davclnt'\nid: ff559d95-7185-51bb-a9ea-e4d5cd6816f2\nstatus: experimental\ndescription: 'rundll32 calling davclnt.dll DavSetCookie with a URL — the trace of a file opened from a WebDAV server (shortcut and URL-file lures).'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.execution\n    - attack.t1218.011\nlogsource:\n    category: process_creation\n    product: windows\ndetection:\n    selection:\n        Image|endswith: '\\rundll32.exe'\n        CommandLine|contains|all:\n            - 'davclnt.dll'\n            - 'DavSetCookie'\n            - 'http'\n    condition: selection\nfalsepositives:\n    - 'Mapped WebDAV drives in some organisations'\nlevel: medium",
+    "severity": "medium",
+    "category": "execution",
+    "technique": "T1218.011",
+    "author": "OSINTrix pack",
+    "platform": "Windows",
+    "tags": [
+      "webdav",
+      "rundll32"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-sig-344",
+    "type": "sigma",
+    "title": "Quick Assist Started",
+    "description": "Quick Assist launched. Help-desk impersonation crews (e.g. Storm-1811) call users on Teams and get them to open it.",
+    "code": "title: 'Quick Assist Started'\nid: bf371045-39f1-5fe6-adeb-8af108bb8962\nstatus: experimental\ndescription: 'Quick Assist launched. Help-desk impersonation crews (e.g. Storm-1811) call users on Teams and get them to open it.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.initial-access\n    - attack.t1219\nlogsource:\n    category: process_creation\n    product: windows\ndetection:\n    selection:\n        Image|endswith: '\\QuickAssist.exe'\n    condition: selection\nfalsepositives:\n    - 'Genuine IT support sessions'\nlevel: low",
+    "severity": "low",
+    "category": "initial-access",
+    "technique": "T1219",
+    "author": "OSINTrix pack",
+    "platform": "Windows",
+    "tags": [
+      "quick-assist",
+      "help-desk",
+      "social-engineering"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-345",
+    "type": "sigma",
+    "title": "AnyDesk Unattended Password Set From Command Line",
+    "description": "AnyDesk given an unattended-access password from the command line — persistent remote access with no user at the keyboard.",
+    "code": "title: 'AnyDesk Unattended Password Set From Command Line'\nid: e2df0b75-6118-5670-9276-f616184a4a98\nstatus: experimental\ndescription: 'AnyDesk given an unattended-access password from the command line — persistent remote access with no user at the keyboard.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.persistence\n    - attack.t1219\nlogsource:\n    category: process_creation\n    product: windows\ndetection:\n    selection:\n        CommandLine|contains|all:\n            - 'anydesk'\n            - '--set-password'\n    condition: selection\nfalsepositives:\n    - 'IT deploying AnyDesk with a managed password'\nlevel: high",
+    "severity": "high",
+    "category": "persistence",
+    "technique": "T1219",
+    "author": "OSINTrix pack",
+    "platform": "Windows",
+    "tags": [
+      "anydesk",
+      "rmm"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-346",
+    "type": "sigma",
+    "title": "Shell Spawned by WinRAR (Archive Lure Exploit)",
+    "description": "A shell or script interpreter started directly by WinRAR — the pattern of CVE-2023-38831 and of archives built to run a script on open.",
+    "code": "title: 'Shell Spawned by WinRAR (Archive Lure Exploit)'\nid: a253f388-2681-5af0-9f02-fedd3ff29d52\nstatus: experimental\ndescription: 'A shell or script interpreter started directly by WinRAR — the pattern of CVE-2023-38831 and of archives built to run a script on open.'\nreferences:\n    - https://nvd.nist.gov/vuln/detail/CVE-2023-38831\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.execution\n    - attack.t1203\nlogsource:\n    category: process_creation\n    product: windows\ndetection:\n    selection:\n        ParentImage|endswith: '\\WinRAR.exe'\n        Image|endswith:\n            - '\\cmd.exe'\n            - '\\powershell.exe'\n            - '\\wscript.exe'\n            - '\\cscript.exe'\n            - '\\mshta.exe'\n    condition: selection\nfalsepositives:\n    - 'Self-extracting installers'\nlevel: high",
+    "severity": "high",
+    "category": "execution",
+    "technique": "T1203",
+    "author": "OSINTrix pack",
+    "platform": "Windows",
+    "tags": [
+      "winrar",
+      "cve-2023-38831"
+    ],
+    "references": [
+      "https://nvd.nist.gov/vuln/detail/CVE-2023-38831"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-347",
+    "type": "sigma",
+    "title": "Browser Credential Store Copied From Command Line",
+    "description": "A command line copying a browser Login Data, Cookies or Local State file — credential theft by hand or by script.",
+    "code": "title: 'Browser Credential Store Copied From Command Line'\nid: 108c6d38-3bcc-545c-820e-d193071f5357\nstatus: experimental\ndescription: 'A command line copying a browser Login Data, Cookies or Local State file — credential theft by hand or by script.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.credential-access\n    - attack.t1555.003\nlogsource:\n    category: process_creation\n    product: windows\ndetection:\n    selection:\n        CommandLine|contains:\n            - '\\Login Data'\n            - '\\Network\\Cookies'\n            - '\\Local State'\n            - 'logins.json'\n            - 'key4.db'\n    filter_browser:\n        Image|endswith:\n            - '\\chrome.exe'\n            - '\\msedge.exe'\n            - '\\firefox.exe'\n            - '\\brave.exe'\n            - '\\opera.exe'\n            - '\\Telegram.exe'\n            - '\\Discord.exe'\n    condition: selection and not filter_browser\nfalsepositives:\n    - 'Backup tools copying the whole profile'\nlevel: high",
+    "severity": "high",
+    "category": "credential-access",
+    "technique": "T1555.003",
+    "author": "OSINTrix pack",
+    "platform": "Windows",
+    "tags": [
+      "browser",
+      "credentials",
+      "stealer"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-348",
+    "type": "sigma",
+    "title": "Certreq Used to Upload or Download a File",
+    "description": "certreq.exe -Post sending or fetching data from a URL — a signed binary used as a tiny HTTP client.",
+    "code": "title: 'Certreq Used to Upload or Download a File'\nid: 19e0e250-2582-54f1-acb0-c38b9a04b875\nstatus: experimental\ndescription: 'certreq.exe -Post sending or fetching data from a URL — a signed binary used as a tiny HTTP client.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.command-and-control\n    - attack.t1105\nlogsource:\n    category: process_creation\n    product: windows\ndetection:\n    selection:\n        Image|endswith: '\\certreq.exe'\n        CommandLine|contains: '-Post'\n    condition: selection\nfalsepositives:\n    - 'Certificate enrolment scripts'\nlevel: medium",
+    "severity": "medium",
+    "category": "command-and-control",
+    "technique": "T1105",
+    "author": "OSINTrix pack",
+    "platform": "Windows",
+    "tags": [
+      "lolbin",
+      "certreq"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-349",
+    "type": "sigma",
+    "title": "RDP Session Hijack With Tscon",
+    "description": "tscon.exe connecting another user session to the console — taking over a logged-in admin RDP session without their password.",
+    "code": "title: 'RDP Session Hijack With Tscon'\nid: 6b76c2c2-8412-596c-801f-07eb2de3d634\nstatus: experimental\ndescription: 'tscon.exe connecting another user session to the console — taking over a logged-in admin RDP session without their password.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.lateral-movement\n    - attack.t1563.002\nlogsource:\n    category: process_creation\n    product: windows\ndetection:\n    selection:\n        Image|endswith: '\\tscon.exe'\n        CommandLine|contains: '/dest:'\n    condition: selection\nfalsepositives:\n    - 'Admins reconnecting their own sessions'\nlevel: high",
+    "severity": "high",
+    "category": "lateral-movement",
+    "technique": "T1563.002",
+    "author": "OSINTrix pack",
+    "platform": "Windows",
+    "tags": [
+      "rdp",
+      "hijack"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-350",
+    "type": "sigma",
+    "title": "Node.js Running Inline Code From a User Folder",
+    "description": "node.exe started from AppData or Temp with inline code — a growing family of stealers and loaders ships a portable Node runtime.",
+    "code": "title: 'Node.js Running Inline Code From a User Folder'\nid: 853cee93-6cdd-50e3-b9a9-5d601a6b618f\nstatus: experimental\ndescription: 'node.exe started from AppData or Temp with inline code — a growing family of stealers and loaders ships a portable Node runtime.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.execution\n    - attack.t1059.007\nlogsource:\n    category: process_creation\n    product: windows\ndetection:\n    selection:\n        Image|endswith: '\\node.exe'\n        Image|contains:\n            - '\\AppData\\'\n            - '\\Temp\\'\n        CommandLine|contains:\n            - ' -e '\n            - ' --eval'\n            - '.js'\n    condition: selection\nfalsepositives:\n    - 'Developer tools installed per user'\nlevel: medium",
+    "severity": "medium",
+    "category": "execution",
+    "technique": "T1059.007",
+    "author": "OSINTrix pack",
+    "platform": "Windows",
+    "tags": [
+      "node",
+      "loader"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-351",
+    "type": "sigma",
+    "title": "Mark of the Web Removed With Unblock-File",
+    "description": "Unblock-File used on downloaded files — strips the Zone.Identifier so SmartScreen and Office protections stop applying.",
+    "code": "title: 'Mark of the Web Removed With Unblock-File'\nid: 57a83df4-45ae-5dc3-9341-ca4faacd7bee\nstatus: experimental\ndescription: 'Unblock-File used on downloaded files — strips the Zone.Identifier so SmartScreen and Office protections stop applying.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.defense-evasion\n    - attack.t1553.005\nlogsource:\n    category: process_creation\n    product: windows\ndetection:\n    selection:\n        CommandLine|contains: 'Unblock-File'\n    condition: selection\nfalsepositives:\n    - 'Admins unblocking scripts they trust'\nlevel: low",
+    "severity": "low",
+    "category": "defense-evasion",
+    "technique": "T1553.005",
+    "author": "OSINTrix pack",
+    "platform": "Windows",
+    "tags": [
+      "motw",
+      "powershell"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-352",
+    "type": "sigma",
+    "title": "Cloud Instance Metadata Credentials Read From Shell",
+    "description": "curl or wget reading cloud instance credentials from the metadata service — the first move after a web or container compromise in AWS, Azure or GCP.",
+    "code": "title: 'Cloud Instance Metadata Credentials Read From Shell'\nid: 4f612966-fe87-5371-b836-016b20ef0df4\nstatus: experimental\ndescription: 'curl or wget reading cloud instance credentials from the metadata service — the first move after a web or container compromise in AWS, Azure or GCP.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.credential-access\n    - attack.t1552.005\nlogsource:\n    category: process_creation\n    product: linux\ndetection:\n    selection:\n        CommandLine|contains:\n            - '169.254.169.254/latest/meta-data/iam/security-credentials'\n            - '169.254.169.254/metadata/identity/oauth2/token'\n            - 'metadata.google.internal/computeMetadata/v1/instance/service-accounts'\n            - '169.254.170.2$AWS_CONTAINER_CREDENTIALS_RELATIVE_URI'\n    condition: selection\nfalsepositives:\n    - 'SDKs never do this through curl; build scripts sometimes do'\nlevel: high",
+    "severity": "high",
+    "category": "credential-access",
+    "technique": "T1552.005",
+    "author": "OSINTrix pack",
+    "platform": "Linux",
+    "tags": [
+      "imds",
+      "cloud",
+      "credentials"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-sig-353",
+    "type": "sigma",
+    "title": "Telegram Bot API Called From a Linux Shell",
+    "description": "curl, wget or python posting to the Telegram Bot API from a server — botnets and cryptojackers report new victims this way.",
+    "code": "title: 'Telegram Bot API Called From a Linux Shell'\nid: 0947360a-4118-53e8-9be2-b05bdb8bbb55\nstatus: experimental\ndescription: 'curl, wget or python posting to the Telegram Bot API from a server — botnets and cryptojackers report new victims this way.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.exfiltration\n    - attack.t1567\nlogsource:\n    category: process_creation\n    product: linux\ndetection:\n    selection:\n        CommandLine|contains: 'api.telegram.org/bot'\n    condition: selection\nfalsepositives:\n    - 'Server alerting scripts that post to Telegram'\nlevel: medium",
+    "severity": "medium",
+    "category": "exfiltration",
+    "technique": "T1567",
+    "author": "OSINTrix pack",
+    "platform": "Linux",
+    "tags": [
+      "telegram",
+      "bot",
+      "botnet"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-354",
+    "type": "sigma",
+    "title": "Cloud Secrets Bulk Read With CLI",
+    "description": "The AWS, gcloud or az CLI used to read secret values on a host — check that the host normally does this.",
+    "code": "title: 'Cloud Secrets Bulk Read With CLI'\nid: 64f58e9d-a46d-5b6b-9f5c-914221da18df\nstatus: experimental\ndescription: 'The AWS, gcloud or az CLI used to read secret values on a host — check that the host normally does this.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.credential-access\n    - attack.t1555.006\nlogsource:\n    category: process_creation\n    product: linux\ndetection:\n    selection:\n        CommandLine|contains:\n            - 'secretsmanager get-secret-value'\n            - 'ssm get-parameters-by-path'\n            - 'secrets versions access'\n            - 'keyvault secret show'\n    condition: selection\nfalsepositives:\n    - 'Deployment scripts'\nlevel: low",
+    "severity": "low",
+    "category": "credential-access",
+    "technique": "T1555.006",
+    "author": "OSINTrix pack",
+    "platform": "Linux",
+    "tags": [
+      "cloud",
+      "secrets",
+      "cli"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-355",
+    "type": "sigma",
+    "title": "Secret Scanning Tool Run on a Server",
+    "description": "TruffleHog, Gitleaks or similar run on a server — useful to defenders, but intruders run them too to harvest keys from repos and disks.",
+    "code": "title: 'Secret Scanning Tool Run on a Server'\nid: 58f89b0f-b335-5fa8-ac82-9adad0bbfcb2\nstatus: experimental\ndescription: 'TruffleHog, Gitleaks or similar run on a server — useful to defenders, but intruders run them too to harvest keys from repos and disks.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.credential-access\n    - attack.t1552.001\nlogsource:\n    category: process_creation\n    product: linux\ndetection:\n    selection:\n        Image|endswith:\n            - '/trufflehog'\n            - '/gitleaks'\n            - '/noseyparker'\n    condition: selection\nfalsepositives:\n    - 'Security teams scanning'\nlevel: low",
+    "severity": "low",
+    "category": "credential-access",
+    "technique": "T1552.001",
+    "author": "OSINTrix pack",
+    "platform": "Linux",
+    "tags": [
+      "secrets",
+      "trufflehog"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-356",
+    "type": "sigma",
+    "title": "SSH Reverse or SOCKS Tunnel Opened From Linux Host",
+    "description": "ssh started with -R or -D, optionally with -N — persistent tunnels out of a compromised server.",
+    "code": "title: 'SSH Reverse or SOCKS Tunnel Opened From Linux Host'\nid: ce16eff9-cf7f-5e5b-8b1f-a59b6e8310d9\nstatus: experimental\ndescription: 'ssh started with -R or -D, optionally with -N — persistent tunnels out of a compromised server.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.command-and-control\n    - attack.t1572\nlogsource:\n    category: process_creation\n    product: linux\ndetection:\n    selection:\n        Image|endswith: '/ssh'\n        CommandLine|contains:\n            - ' -R '\n            - ' -D '\n    condition: selection\nfalsepositives:\n    - 'Engineers using jump hosts'\nlevel: low",
+    "severity": "low",
+    "category": "command-and-control",
+    "technique": "T1572",
+    "author": "OSINTrix pack",
+    "platform": "Linux",
+    "tags": [
+      "ssh",
+      "tunnel"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-357",
+    "type": "sigma",
+    "title": "SELinux or AppArmor Disabled",
+    "description": "setenforce 0, or AppArmor stopped or torn down — the first step of many cryptojacking scripts.",
+    "code": "title: 'SELinux or AppArmor Disabled'\nid: 30b8b93b-c758-55da-a4c3-d7005100f765\nstatus: experimental\ndescription: 'setenforce 0, or AppArmor stopped or torn down — the first step of many cryptojacking scripts.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.defense-evasion\n    - attack.t1562.001\nlogsource:\n    category: process_creation\n    product: linux\ndetection:\n    selection_selinux:\n        CommandLine|contains: 'setenforce 0'\n    selection_apparmor:\n        CommandLine|contains:\n            - 'aa-teardown'\n            - 'systemctl stop apparmor'\n            - 'systemctl disable apparmor'\n    condition: 1 of selection_*\nfalsepositives:\n    - 'Troubleshooting by admins'\nlevel: high",
+    "severity": "high",
+    "category": "defense-evasion",
+    "technique": "T1562.001",
+    "author": "OSINTrix pack",
+    "platform": "Linux",
+    "tags": [
+      "selinux",
+      "apparmor",
+      "cryptojacking"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-358",
+    "type": "sigma",
+    "title": "Cloud Credential Files Read by Unusual Process",
+    "description": "A file event on the AWS, gcloud, Azure or kube credential files — check which process touched them.",
+    "code": "title: 'Cloud Credential Files Read by Unusual Process'\nid: b0872796-0f2c-57d8-9972-3b98775cb872\nstatus: experimental\ndescription: 'A file event on the AWS, gcloud, Azure or kube credential files — check which process touched them.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.credential-access\n    - attack.t1552.001\nlogsource:\n    category: file_event\n    product: linux\ndetection:\n    selection:\n        TargetFilename|contains:\n            - '/.aws/credentials'\n            - '/.config/gcloud/credentials.db'\n            - '/.config/gcloud/application_default_credentials.json'\n            - '/.azure/msal_token_cache'\n            - '/.kube/config'\n    filter_cli:\n        Image|endswith:\n            - '/aws'\n            - '/gcloud'\n            - '/az'\n            - '/kubectl'\n            - '/terraform'\n    condition: selection and not filter_cli\nfalsepositives:\n    - 'Backup agents and IDEs'\nlevel: medium",
+    "severity": "medium",
+    "category": "credential-access",
+    "technique": "T1552.001",
+    "author": "OSINTrix pack",
+    "platform": "Linux",
+    "tags": [
+      "cloud",
+      "credentials",
+      "teamtnt"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-sig-359",
+    "type": "sigma",
+    "title": "macOS TCC Database Read or Modified With Sqlite3",
+    "description": "sqlite3 opening TCC.db — reading or granting privacy permissions (screen, camera, Full Disk Access) behind the user back.",
+    "code": "title: 'macOS TCC Database Read or Modified With Sqlite3'\nid: e0fb6a5f-a9ed-52e0-86f3-383c2cdf0322\nstatus: experimental\ndescription: 'sqlite3 opening TCC.db — reading or granting privacy permissions (screen, camera, Full Disk Access) behind the user back.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.defense-evasion\n    - attack.t1548\nlogsource:\n    category: process_creation\n    product: macos\ndetection:\n    selection:\n        Image|endswith: '/sqlite3'\n        CommandLine|contains: 'TCC.db'\n    condition: selection\nfalsepositives:\n    - 'MDM troubleshooting'\nlevel: high",
+    "severity": "high",
+    "category": "defense-evasion",
+    "technique": "T1548",
+    "author": "OSINTrix pack",
+    "platform": "macOS",
+    "tags": [
+      "tcc",
+      "privacy"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-360",
+    "type": "sigma",
+    "title": "macOS Shell Script Run From a Mounted Disk Image",
+    "description": "A shell running a script from /Volumes — stealer installers (AMOS and others) ship as a DMG with a \"drag to terminal\" step.",
+    "code": "title: 'macOS Shell Script Run From a Mounted Disk Image'\nid: 68f55470-15d7-5118-b8a7-356c8d2b0848\nstatus: experimental\ndescription: 'A shell running a script from /Volumes — stealer installers (AMOS and others) ship as a DMG with a \"drag to terminal\" step.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.execution\n    - attack.t1204.002\nlogsource:\n    category: process_creation\n    product: macos\ndetection:\n    selection:\n        Image|endswith:\n            - '/bash'\n            - '/sh'\n            - '/zsh'\n        CommandLine|contains: '/Volumes/'\n    condition: selection\nfalsepositives:\n    - 'Installers that run scripts from their DMG'\nlevel: medium",
+    "severity": "medium",
+    "category": "execution",
+    "technique": "T1204.002",
+    "author": "OSINTrix pack",
+    "platform": "macOS",
+    "tags": [
+      "dmg",
+      "stealer",
+      "amos"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-sig-361",
+    "type": "sigma",
+    "title": "macOS Hardware Fingerprint Collected With System_profiler",
+    "description": "system_profiler asked for hardware or display details from a script — stealers fingerprint the Mac and skip virtual machines this way.",
+    "code": "title: 'macOS Hardware Fingerprint Collected With System_profiler'\nid: 6d138361-7dbc-57b8-8be3-787807e6b1b7\nstatus: experimental\ndescription: 'system_profiler asked for hardware or display details from a script — stealers fingerprint the Mac and skip virtual machines this way.'\nreferences:\n    - https://github.com/SigmaHQ/sigma\nauthor: OSINTrix pack\ndate: 2026-11-23\ntags:\n    - attack.discovery\n    - attack.t1497.001\nlogsource:\n    category: process_creation\n    product: macos\ndetection:\n    selection:\n        Image|endswith: '/system_profiler'\n        CommandLine|contains:\n            - 'SPHardwareDataType'\n            - 'SPDisplaysDataType'\n    filter:\n        ParentImage|endswith: '/System Information'\n    condition: selection and not filter\nfalsepositives:\n    - 'Inventory agents'\nlevel: low",
+    "severity": "low",
+    "category": "discovery",
+    "technique": "T1497.001",
+    "author": "OSINTrix pack",
+    "platform": "macOS",
+    "tags": [
+      "stealer",
+      "vm-check"
+    ],
+    "references": [
+      "https://github.com/SigmaHQ/sigma"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-yar-078",
+    "type": "yara",
+    "title": "Discord Webhook Exfiltration in Binary or Script",
+    "description": "A file that posts to a Discord webhook with a multipart upload — how stealers and grabbers ship logs, screenshots and tokens.",
+    "code": "rule EXFIL_Discord_Webhook_Upload {\n    meta:\n        description = \"A file that posts to a Discord webhook with a multipart upload — how stealers and grabbers ship logs, screenshots and tokens.\"\n        author = \"OSINTrix pack\"\n        date = \"2026-11-23\"\n        reference = \"https://github.com/Neo23x0/signature-base\"\n        severity = \"high\"\n        mitre_attack = \"T1567\"\n    strings:\n        $w1 = \"discord.com/api/webhooks/\" ascii wide nocase\n        $w2 = \"discordapp.com/api/webhooks/\" ascii wide nocase\n        $u1 = \"multipart/form-data\" ascii wide\n        $u2 = \"Content-Disposition\" ascii wide\n        $u3 = \"username\" ascii wide\n        $u4 = \"avatar_url\" ascii wide\n    condition:\n        any of ($w*) and 2 of ($u*)\n}",
+    "severity": "high",
+    "category": "exfiltration",
+    "technique": "T1567",
+    "author": "OSINTrix pack",
+    "platform": "Any",
+    "tags": [
+      "discord",
+      "webhook",
+      "stealer"
+    ],
+    "references": [
+      "https://github.com/Neo23x0/signature-base"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-yar-079",
+    "type": "yara",
+    "title": "Telegram Bot Token Embedded in a File",
+    "description": "A Telegram bot token next to the Bot API host. The digits before the colon are the bot’s permanent ID — search them across cases and reports, but do not call the API with the token.",
+    "code": "rule C2_Telegram_Bot_Token_Embedded {\n    meta:\n        description = \"A Telegram bot token next to the Bot API host. The digits before the colon are the bot’s permanent ID — search them across cases and reports, but do not call the API with the token.\"\n        author = \"OSINTrix pack\"\n        date = \"2026-11-23\"\n        reference = \"https://github.com/Neo23x0/signature-base\"\n        severity = \"high\"\n        mitre_attack = \"T1102.002\"\n    strings:\n        $api = \"api.telegram.org\" ascii wide nocase\n        $tok = /[0-9]{8,10}:AA[A-Za-z0-9_\\-]{33}/ ascii wide\n        $chat = \"chat_id\" ascii wide nocase\n    condition:\n        $api and $tok\n}",
+    "severity": "high",
+    "category": "command-and-control",
+    "technique": "T1102.002",
+    "author": "OSINTrix pack",
+    "platform": "Any",
+    "tags": [
+      "telegram",
+      "bot-token",
+      "c2"
+    ],
+    "references": [
+      "https://github.com/Neo23x0/signature-base"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-yar-080",
+    "type": "yara",
+    "title": "Dead-Drop Resolver via Steam or Telegram Profile",
+    "description": "An executable that holds a Steam profile or Telegram channel URL plus HTTP request code — the Vidar-style way of reading the real C2 address from a public page.",
+    "code": "rule C2_Dead_Drop_Steam_Telegram {\n    meta:\n        description = \"An executable that holds a Steam profile or Telegram channel URL plus HTTP request code — the Vidar-style way of reading the real C2 address from a public page.\"\n        author = \"OSINTrix pack\"\n        date = \"2026-11-23\"\n        reference = \"https://github.com/Neo23x0/signature-base\"\n        severity = \"medium\"\n        mitre_attack = \"T1102.001\"\n    strings:\n        $d1 = \"steamcommunity.com/profiles/\" ascii wide\n        $d2 = \"t.me/\" ascii wide\n        $d3 = \"telegram.me/\" ascii wide\n        $h1 = \"WinHttpOpenRequest\" ascii\n        $h2 = \"InternetOpenUrl\" ascii\n        $h3 = \"HttpSendRequest\" ascii\n    condition:\n        uint16(0) == 0x5A4D and any of ($d*) and any of ($h*)\n}",
+    "severity": "medium",
+    "category": "command-and-control",
+    "technique": "T1102.001",
+    "author": "OSINTrix pack",
+    "platform": "Windows",
+    "tags": [
+      "dead-drop",
+      "stealer",
+      "vidar"
+    ],
+    "references": [
+      "https://github.com/Neo23x0/signature-base"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-yar-081",
+    "type": "yara",
+    "title": "Stealer Targeting Chrome App-Bound Encryption",
+    "description": "Code that reads Chrome app_bound_encrypted_key or the elevation service — the 2024+ bypass stealers use to decrypt cookies.",
+    "code": "rule STEALER_Chrome_AppBound_Key {\n    meta:\n        description = \"Code that reads Chrome app_bound_encrypted_key or the elevation service — the 2024+ bypass stealers use to decrypt cookies.\"\n        author = \"OSINTrix pack\"\n        date = \"2026-11-23\"\n        reference = \"https://security.googleblog.com/2024/07/improving-security-of-chrome-cookies-on.html\"\n        severity = \"high\"\n        mitre_attack = \"T1555.003\"\n    strings:\n        $a1 = \"app_bound_encrypted_key\" ascii wide\n        $a2 = \"IElevator\" ascii wide\n        $a3 = \"DecryptData\" ascii wide\n        $b1 = \"Local State\" ascii wide\n        $b2 = \"Network\\\\Cookies\" ascii wide\n    condition:\n        $a1 and 1 of ($b*) or ($a2 and $a3 and $b1)\n}",
+    "severity": "high",
+    "category": "credential-access",
+    "technique": "T1555.003",
+    "author": "OSINTrix pack",
+    "platform": "Windows",
+    "tags": [
+      "stealer",
+      "chrome",
+      "cookies"
+    ],
+    "references": [
+      "https://security.googleblog.com/2024/07/improving-security-of-chrome-cookies-on.html"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-yar-082",
+    "type": "yara",
+    "title": "ClickFix or Fake CAPTCHA Clipboard Lure",
+    "description": "A web page that writes a command to the clipboard and tells the visitor to press Win+R and paste — the ClickFix / fake CAPTCHA lure.",
+    "code": "rule LURE_ClickFix_Clipboard_Page {\n    meta:\n        description = \"A web page that writes a command to the clipboard and tells the visitor to press Win+R and paste — the ClickFix / fake CAPTCHA lure.\"\n        author = \"OSINTrix pack\"\n        date = \"2026-11-23\"\n        reference = \"https://github.com/Neo23x0/signature-base\"\n        severity = \"high\"\n        mitre_attack = \"T1204.004\"\n    strings:\n        $c1 = \"navigator.clipboard.writeText\" ascii nocase\n        $c2 = \"execCommand(\\\"copy\\\")\" ascii nocase\n        $c3 = \"execCommand('copy')\" ascii nocase\n        $p1 = \"powershell\" ascii nocase\n        $p2 = \"mshta\" ascii nocase\n        $p3 = \"cmd /c\" ascii nocase\n        $i1 = \"Win + R\" ascii nocase\n        $i2 = \"Windows + R\" ascii nocase\n        $i3 = \"Win+R\" ascii nocase\n        $i4 = \"CTRL + V\" ascii nocase\n        $i5 = \"Verification ID\" ascii nocase\n        $i6 = \"I'm not a robot\" ascii nocase\n    condition:\n        filesize < 3MB and any of ($c*) and any of ($p*) and any of ($i*)\n}",
+    "severity": "high",
+    "category": "execution",
+    "technique": "T1204.004",
+    "author": "OSINTrix pack",
+    "platform": "Web",
+    "tags": [
+      "clickfix",
+      "fake-captcha",
+      "lure"
+    ],
+    "references": [
+      "https://github.com/Neo23x0/signature-base"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-yar-083",
+    "type": "yara",
+    "title": "EtherHiding Loader Fetching Code From a Smart Contract",
+    "description": "JavaScript that calls a blockchain RPC (eth_call) and then decodes and runs the result — next stages kept in a BNB Smart Chain or Ethereum contract.",
+    "code": "rule LOADER_EtherHiding_Contract_Fetch {\n    meta:\n        description = \"JavaScript that calls a blockchain RPC (eth_call) and then decodes and runs the result — next stages kept in a BNB Smart Chain or Ethereum contract.\"\n        author = \"OSINTrix pack\"\n        date = \"2026-11-23\"\n        reference = \"https://labs.guard.io/etherhiding-hiding-web2-malicious-code-in-web3-smart-contracts-65ea78efad16\"\n        severity = \"high\"\n        mitre_attack = \"T1102\"\n    strings:\n        $r1 = \"bsc-dataseed\" ascii nocase\n        $r2 = \"bsc-testnet\" ascii nocase\n        $r3 = \"eth_call\" ascii\n        $r4 = \"\\\"jsonrpc\\\"\" ascii\n        $x1 = \"atob(\" ascii\n        $x2 = \"eval(\" ascii\n        $x3 = \"new Function(\" ascii\n        $x4 = \"fromCharCode\" ascii\n    condition:\n        filesize < 2MB and ($r3 or $r4) and any of ($r1, $r2) and any of ($x*)\n}",
+    "severity": "high",
+    "category": "command-and-control",
+    "technique": "T1102",
+    "author": "OSINTrix pack",
+    "platform": "Web",
+    "tags": [
+      "etherhiding",
+      "clearfake",
+      "blockchain"
+    ],
+    "references": [
+      "https://labs.guard.io/etherhiding-hiding-web2-malicious-code-in-web3-smart-contracts-65ea78efad16"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-yar-084",
+    "type": "yara",
+    "title": "Wallet Drainer Kit Reporting to Telegram",
+    "description": "A web3 page that asks for token approvals and reports to a Telegram bot — the shape of a crypto drainer kit.",
+    "code": "rule PHISH_Wallet_Drainer_Telegram_Report {\n    meta:\n        description = \"A web3 page that asks for token approvals and reports to a Telegram bot — the shape of a crypto drainer kit.\"\n        author = \"OSINTrix pack\"\n        date = \"2026-11-23\"\n        reference = \"https://github.com/Neo23x0/signature-base\"\n        severity = \"high\"\n        mitre_attack = \"T1657\"\n    strings:\n        $w1 = \"eth_requestAccounts\" ascii\n        $w2 = \"setApprovalForAll\" ascii\n        $w3 = \"increaseAllowance\" ascii\n        $w4 = \"eth_signTypedData_v4\" ascii\n        $w5 = \"transferFrom\" ascii\n        $t1 = \"api.telegram.org/bot\" ascii nocase\n        $t2 = \"sendMessage\" ascii\n    condition:\n        filesize < 5MB and $w1 and 2 of ($w2, $w3, $w4, $w5) and $t1\n}",
+    "severity": "high",
+    "category": "impact",
+    "technique": "T1657",
+    "author": "OSINTrix pack",
+    "platform": "Web",
+    "tags": [
+      "drainer",
+      "crypto",
+      "phishing",
+      "telegram"
+    ],
+    "references": [
+      "https://github.com/Neo23x0/signature-base"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-yar-085",
+    "type": "yara",
+    "title": "Evilginx Phishlet Configuration",
+    "description": "A phishlet file for Evilginx — the adversary-in-the-middle proxy that steals session cookies past MFA. Finding one tells you the target brand and the phishing hosts.",
+    "code": "rule PHISH_Evilginx_Phishlet {\n    meta:\n        description = \"A phishlet file for Evilginx — the adversary-in-the-middle proxy that steals session cookies past MFA. Finding one tells you the target brand and the phishing hosts.\"\n        author = \"OSINTrix pack\"\n        date = \"2026-11-23\"\n        reference = \"https://github.com/kgretzky/evilginx2\"\n        severity = \"high\"\n        mitre_attack = \"T1557\"\n    strings:\n        $a = \"proxy_hosts:\" ascii\n        $b = \"sub_filters:\" ascii\n        $c = \"auth_tokens:\" ascii\n        $d = \"credentials:\" ascii\n        $e = \"login:\" ascii\n        $f = \"phish_sub\" ascii\n    condition:\n        filesize < 200KB and 4 of them\n}",
+    "severity": "high",
+    "category": "credential-access",
+    "technique": "T1557",
+    "author": "OSINTrix pack",
+    "platform": "Any",
+    "tags": [
+      "evilginx",
+      "aitm",
+      "phishing"
+    ],
+    "references": [
+      "https://github.com/kgretzky/evilginx2"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-yar-086",
+    "type": "yara",
+    "title": "Cloud Credential Harvester Script",
+    "description": "A script that collects AWS, gcloud, Azure and kube credentials and the instance metadata service together — TeamTNT-style cloud worms.",
+    "code": "rule HUNT_Cloud_Credential_Harvester_Script {\n    meta:\n        description = \"A script that collects AWS, gcloud, Azure and kube credentials and the instance metadata service together — TeamTNT-style cloud worms.\"\n        author = \"OSINTrix pack\"\n        date = \"2026-11-23\"\n        reference = \"https://github.com/Neo23x0/signature-base\"\n        severity = \"high\"\n        mitre_attack = \"T1552.005\"\n    strings:\n        $c1 = \".aws/credentials\" ascii\n        $c2 = \".config/gcloud\" ascii\n        $c3 = \".azure/\" ascii\n        $c4 = \".kube/config\" ascii\n        $c5 = \".docker/config.json\" ascii\n        $m1 = \"169.254.169.254\" ascii\n        $m2 = \"metadata.google.internal\" ascii\n    condition:\n        filesize < 1MB and 3 of ($c*) and any of ($m*)\n}",
+    "severity": "high",
+    "category": "credential-access",
+    "technique": "T1552.005",
+    "author": "OSINTrix pack",
+    "platform": "Linux",
+    "tags": [
+      "cloud",
+      "credentials",
+      "teamtnt"
+    ],
+    "references": [
+      "https://github.com/Neo23x0/signature-base"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-yar-087",
+    "type": "yara",
+    "title": "AWS Access Key and Secret in a File",
+    "description": "An AWS access key ID together with a secret key assignment — triage for leaks found in repos, pastes and stealer logs.",
+    "code": "rule LEAK_AWS_Access_Key_Pair {\n    meta:\n        description = \"An AWS access key ID together with a secret key assignment — triage for leaks found in repos, pastes and stealer logs.\"\n        author = \"OSINTrix pack\"\n        date = \"2026-11-23\"\n        reference = \"https://github.com/Neo23x0/signature-base\"\n        severity = \"high\"\n        mitre_attack = \"T1552.001\"\n    strings:\n        $id = /(AKIA|ASIA)[0-9A-Z]{16}/ ascii wide\n        $s1 = \"aws_secret_access_key\" ascii wide nocase\n        $s2 = \"AWS_SECRET_ACCESS_KEY\" ascii wide\n        $s3 = \"secretAccessKey\" ascii wide\n    condition:\n        $id and any of ($s*)\n}",
+    "severity": "high",
+    "category": "credential-access",
+    "technique": "T1552.001",
+    "author": "OSINTrix pack",
+    "platform": "Any",
+    "tags": [
+      "aws",
+      "leak",
+      "secrets"
+    ],
+    "references": [
+      "https://github.com/Neo23x0/signature-base"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-yar-088",
+    "type": "yara",
+    "title": "Private Key Material in a File",
+    "description": "An unencrypted private key block (OpenSSH, RSA, EC, PKCS#8) — check where the file came from and which hosts trust the key.",
+    "code": "rule LEAK_Private_Key_Material {\n    meta:\n        description = \"An unencrypted private key block (OpenSSH, RSA, EC, PKCS#8) — check where the file came from and which hosts trust the key.\"\n        author = \"OSINTrix pack\"\n        date = \"2026-11-23\"\n        reference = \"https://github.com/Neo23x0/signature-base\"\n        severity = \"medium\"\n        mitre_attack = \"T1552.004\"\n    strings:\n        $k1 = \"-----BEGIN OPENSSH PRIVATE KEY-----\" ascii\n        $k2 = \"-----BEGIN RSA PRIVATE KEY-----\" ascii\n        $k3 = \"-----BEGIN EC PRIVATE KEY-----\" ascii\n        $k4 = \"-----BEGIN PRIVATE KEY-----\" ascii\n        $k5 = \"-----BEGIN DSA PRIVATE KEY-----\" ascii\n    condition:\n        any of them\n}",
+    "severity": "medium",
+    "category": "credential-access",
+    "technique": "T1552.004",
+    "author": "OSINTrix pack",
+    "platform": "Any",
+    "tags": [
+      "private-key",
+      "leak"
+    ],
+    "references": [
+      "https://github.com/Neo23x0/signature-base"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-yar-089",
+    "type": "yara",
+    "title": "SaaS and Cloud API Tokens in a File",
+    "description": "Tokens for Slack, GitHub, Google API, Stripe or Discord bots in one file — common in leaked repos and stealer logs.",
+    "code": "rule LEAK_SaaS_API_Tokens {\n    meta:\n        description = \"Tokens for Slack, GitHub, Google API, Stripe or Discord bots in one file — common in leaked repos and stealer logs.\"\n        author = \"OSINTrix pack\"\n        date = \"2026-11-23\"\n        reference = \"https://github.com/Neo23x0/signature-base\"\n        severity = \"medium\"\n        mitre_attack = \"T1552.001\"\n    strings:\n        $t1 = /xox[baprs]-[0-9A-Za-z\\-]{10,72}/ ascii\n        $t2 = /ghp_[0-9A-Za-z]{36}/ ascii\n        $t3 = /github_pat_[0-9A-Za-z_]{60,90}/ ascii\n        $t4 = /AIza[0-9A-Za-z_\\-]{35}/ ascii\n        $t5 = /sk_live_[0-9A-Za-z]{24,99}/ ascii\n        $t6 = /[MN][A-Za-z0-9]{23,25}\\.[A-Za-z0-9_\\-]{6}\\.[A-Za-z0-9_\\-]{27,38}/ ascii\n    condition:\n        any of them\n}",
+    "severity": "medium",
+    "category": "credential-access",
+    "technique": "T1552.001",
+    "author": "OSINTrix pack",
+    "platform": "Any",
+    "tags": [
+      "tokens",
+      "leak",
+      "secrets"
+    ],
+    "references": [
+      "https://github.com/Neo23x0/signature-base"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "common"
+  },
+  {
+    "id": "pk-yar-090",
+    "type": "yara",
+    "title": "Info-Stealer Log Credential File",
+    "description": "The Passwords.txt of a stealer log — many URL / username / password blocks. Tells you a machine was infected, and which accounts were taken.",
+    "code": "rule HUNT_Stealer_Log_Passwords_File {\n    meta:\n        description = \"The Passwords.txt of a stealer log — many URL / username / password blocks. Tells you a machine was infected, and which accounts were taken.\"\n        author = \"OSINTrix pack\"\n        date = \"2026-11-23\"\n        reference = \"https://github.com/Neo23x0/signature-base\"\n        severity = \"medium\"\n        mitre_attack = \"T1555.003\"\n    strings:\n        $u1 = \"URL:\" ascii nocase\n        $u2 = \"Host:\" ascii\n        $n1 = \"Username:\" ascii nocase\n        $n2 = \"Login:\" ascii\n        $p1 = \"Password:\" ascii nocase\n        $a1 = \"Application:\" ascii\n        $a2 = \"Soft:\" ascii\n        $a3 = \"Browser:\" ascii\n    condition:\n        filesize < 20MB and #p1 > 5 and (#u1 > 5 or #u2 > 5) and any of ($n*) and any of ($a*)\n}",
+    "severity": "medium",
+    "category": "credential-access",
+    "technique": "T1555.003",
+    "author": "OSINTrix pack",
+    "platform": "Any",
+    "tags": [
+      "stealer-log",
+      "redline",
+      "lumma"
+    ],
+    "references": [
+      "https://github.com/Neo23x0/signature-base"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-yar-091",
+    "type": "yara",
+    "title": "Info-Stealer Log System Information File",
+    "description": "The machine profile a stealer log carries (UserInformation.txt / System.txt) — HWID, build ID, IP and country of the victim, and sometimes the build tag that names the customer.",
+    "code": "rule HUNT_Stealer_Log_System_Info {\n    meta:\n        description = \"The machine profile a stealer log carries (UserInformation.txt / System.txt) — HWID, build ID, IP and country of the victim, and sometimes the build tag that names the customer.\"\n        author = \"OSINTrix pack\"\n        date = \"2026-11-23\"\n        reference = \"https://github.com/Neo23x0/signature-base\"\n        severity = \"low\"\n        mitre_attack = \"T1082\"\n    strings:\n        $a1 = \"HWID:\" ascii nocase\n        $a2 = \"Build ID:\" ascii nocase\n        $a3 = \"MachineName:\" ascii\n        $a4 = \"Log date:\" ascii nocase\n        $a5 = \"Install Date:\" ascii nocase\n        $b1 = \"Country:\" ascii\n        $b2 = \"IP: \" ascii\n        $b3 = \"Location:\" ascii\n        $b4 = \"TimeZone:\" ascii\n    condition:\n        filesize < 1MB and 2 of ($a*) and 2 of ($b*)\n}",
+    "severity": "low",
+    "category": "collection",
+    "technique": "T1082",
+    "author": "OSINTrix pack",
+    "platform": "Any",
+    "tags": [
+      "stealer-log",
+      "victim"
+    ],
+    "references": [
+      "https://github.com/Neo23x0/signature-base"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
+  },
+  {
+    "id": "pk-yar-092",
+    "type": "yara",
+    "title": "Phishing Kit Sending Victim Data to Telegram",
+    "description": "A PHP phishing kit that posts the form fields to a Telegram bot — the bot token in it leads to the operator.",
+    "code": "rule PHISH_Kit_Telegram_Exfil_PHP {\n    meta:\n        description = \"A PHP phishing kit that posts the form fields to a Telegram bot — the bot token in it leads to the operator.\"\n        author = \"OSINTrix pack\"\n        date = \"2026-11-23\"\n        reference = \"https://github.com/Neo23x0/signature-base\"\n        severity = \"high\"\n        mitre_attack = \"T1056.003\"\n    strings:\n        $php = \"<?php\" ascii nocase\n        $tg = \"api.telegram.org/bot\" ascii nocase\n        $p1 = \"$_POST\" ascii\n        $p2 = \"$_REQUEST\" ascii\n        $f1 = \"password\" ascii nocase\n        $f2 = \"passwd\" ascii nocase\n        $f3 = \"passcode\" ascii nocase\n        $ip = \"REMOTE_ADDR\" ascii\n    condition:\n        filesize < 500KB and $php and $tg and any of ($p*) and any of ($f*)\n}",
+    "severity": "high",
+    "category": "collection",
+    "technique": "T1056.003",
+    "author": "OSINTrix pack",
+    "platform": "Web",
+    "tags": [
+      "phishing-kit",
+      "telegram",
+      "php"
+    ],
+    "references": [
+      "https://github.com/Neo23x0/signature-base"
+    ],
+    "created": "2026-11-23T00:00:00Z",
+    "modified": "2026-11-23T00:00:00Z",
+    "starred": false,
+    "level": "advanced"
   }
 ];

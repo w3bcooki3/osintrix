@@ -1,0 +1,35 @@
+{
+ "guild": {
+  "id": "1110000000000000000",
+  "name": "Drainer Hub"
+ },
+ "channel": {
+  "id": "1110000000000000001",
+  "type": "GuildTextChat",
+  "name": "general"
+ },
+ "messages": [
+  {
+   "id": "1",
+   "type": "Default",
+   "timestamp": "2025-09-14T10:00:00+00:00",
+   "content": "Claim your airdrop here before it ends: hxxps://claim-lamp[.]example/connect",
+   "author": {
+    "id": "1023456789012345678",
+    "name": "claimbot",
+    "nickname": "Support"
+   }
+  },
+  {
+   "id": "2",
+   "type": "Default",
+   "timestamp": "2025-09-14T10:05:00+00:00",
+   "content": "is this legit?",
+   "author": {
+    "id": "1099999999999999999",
+    "name": "newuser",
+    "nickname": null
+   }
+  }
+ ]
+}

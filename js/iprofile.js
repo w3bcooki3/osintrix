@@ -121,7 +121,7 @@ function ipfDomain(host, F, out){
   const s = IPF_SHORT.find(d => ipfEnds(asc, d)); if(s) info('Link shortener', 'Expand it before judging — the real destination is hidden. Many add “+” or “-” to the link to show it.');
   const sh = IPF_SHARE.find(d => ipfEnds(asc, d)); if(sh) info('Paste or file-sharing site', 'Content is the uploader’s; such sites host payloads and leaks. Save what is there — it is often deleted.');
   const ex = IPF_EXFIL.find(([d]) => !d.includes('/') && ipfEnds(asc, d)); if(ex) warn(ex[1].split(' — ')[0], ex[1].includes(' — ') ? ex[1].split(' — ')[1][0].toUpperCase() + ex[1].split(' — ')[1].slice(1) + '.' : '');
-  if(/\.onion$/.test(asc)) info('Tor onion service', asc.length - 6 === 56 ? 'Version 3 address — reachable only through Tor.' : 'Version 2 address — retired by Tor in 2021, no longer reachable.');
+  if(/\.onion$/.test(asc)){ ipfOnion(asc, F, out); return; }
   /* machine-made names */
   const L = (R.platform ? name : RA.name) || '', letters = L.replace(/[^a-z]/g, ''), vow = (letters.match(/[aeiouy]/g) || []).length, run = Math.max(0, ...(letters.match(/[^aeiouy]+/g) || ['']).map(x => x.length)), dig = (L.match(/\d/g) || []).length;
   const ent = (() => { const f = {}; for(const c of L) f[c] = (f[c] || 0) + 1; let e = 0; for(const c in f){ const p = f[c] / L.length; e -= p * Math.log2(p); } return e; })();
@@ -132,6 +132,30 @@ function ipfDomain(host, F, out){
   else if(m) info(m.t, 'Cannot exist on the internet; it appears in examples and tests.');
 }
 
+/* ---------- Tor onion services ----------
+   The address is the service's public key, so a typo is caught by its checksum. A fake mirror is a real key with a
+   look-alike start — scammers grind keys until the first characters match the site they copy. */
+function ipfOnion(host, F, out){
+  const I = E.onionInfo(host), h = host.replace(/\.onion$/, ''), sv = h.split('.').pop();
+  if(!I){ out.push({lvl:'bad', t:'Not an onion address', why:'Version 3 addresses are 56 characters of a–z and 2–7; this is ' + sv.length + '.'}); return; }
+  if(I.v === 2){ F.push(['Tor version', '2 — 16 characters']); out.push({lvl:'warn', t:'Version 2 onion — dead since October 2021', why:'Tor no longer reaches these. A v2 address in recent material was copied from an old list.'}); return; }
+  F.push(['Tor version', '3 — ed25519 key']); if(h.includes('.')) F.push(['Subdomain', h.slice(0, h.lastIndexOf('.'))]);
+  if(!I.ok){ out.push({lvl:'bad', t:'Checksum fails', why:'Not a real onion address — a typo, a truncated copy, or made up. Tor would refuse it.'}); return; }
+  F.push(['Checksum', 'Valid']); F.push(['Reachable', 'Only through Tor — open it in Tor Browser, not here']);
+  /* other onion addresses you hold: the same start is a vanity look-alike or a mirror; in the same text, a mirror list */
+  const g = typeof globalEnts === 'function' ? globalEnts() : null; if(!g) return;
+  const mine = [...g.keys()].filter(k => /^domain:[a-z2-7]{56}\.onion$/.test(k) && k !== 'domain:' + sv + '.onion').map(k => k.slice(7)).filter(o => { const x = E.onionInfo(o); return x && x.ok; });   // a broken copy is reported on its own
+  let pre = 0, like = []; for(const o of mine){ let n = 0; while(n < 56 && o[n] === sv[n]) n++; if(n >= 5){ if(n > pre){ pre = n; like = [o]; } else if(n === pre) like.push(o); } }
+  if(like.length) out.push({lvl:'warn', t:'Starts like ' + like.length + ' other onion' + (like.length > 1 ? 's' : '') + ' in your cases', why:'Same first ' + pre + ' characters (“' + sv.slice(0, pre) + '…”) as ' + like.slice(0, 2).map(x => x.slice(0, 12) + '…').join(', ') + '. Making that takes deliberate key grinding: the same operator’s mirror, or a phishing copy of it. Compare the full address with one you trust.'});
+  const me = g.get('domain:' + sv + '.onion'); if(me){ const near = new Set(); for(const r of me.recs.slice(0, 50)) for(const o of mine) if(String(r.body || '').toLowerCase().includes(o)) near.add(o);
+    if(near.size) F.push(['Listed with', near.size + ' other onion' + (near.size > 1 ? 's' : '') + ' in the same text — often a mirror list']); }
+}
+/* ---------- OpenPGP keys ----------
+   A vendor's key is the one identity they keep across markets, forums and rebrands. What the key itself says —
+   when it was made, its user IDs (names and emails) — is read from any armoured block in your evidence. */
+function ipfPgpKey(fp){ const g = typeof globalEnts === 'function' ? globalEnts().get('pgp:' + fp) : null; if(!g) return null;
+  for(const r of g.recs.slice(0, 40)){ const b = String(r.body || ''); if(!b.includes('BEGIN PGP PUBLIC KEY BLOCK')) continue; for(const blk of b.match(/-----BEGIN PGP PUBLIC KEY BLOCK-----[\s\S]{0,200000}?-----END PGP PUBLIC KEY BLOCK-----/g) || []){ const K = E.pgpParse(blk), i = K.findIndex(k => k.fp === fp); if(i >= 0){ const subs = []; for(let j = i + 1; j < K.length && K[j].sub; j++) subs.push(K[j]); return {...K[i], subs}; } } }
+  return null; }
 /* ---------- URLs ---------- */
 const IPF_PHISH = /(log-?in|sign-?in|verify|verification|account|secure|update|wallet|password|passwd|auth|confirm|invoice|billing|unlock|suspend|recover|webscr|banking|kyc|2fa|mfa|ssn)/gi;
 const IPF_PAYLOAD = /\.(exe|dll|scr|msi|ps1|bat|cmd|vbs|vbe|js|jse|hta|jar|lnk|iso|img|vhd|vhdx|zip|rar|7z|apk|dmg|pkg|sh|elf|bin|docm|xlsm|pptm|one|cab|appx|msix)$/i;
@@ -216,6 +240,28 @@ function ipfMisc(k, v, F, out){
     if(/^(bc|tb|bcrt)1/i.test(v)){ const c = ipfBech(v); if(c === false) out.push({lvl:'bad', t:'Checksum fails', why:'Not a valid address — a typo, a truncated copy, or made up. Funds sent to it would be refused.'}); else if(c) F.push(['Checksum', 'Valid (' + c + ')']); } else if(ipfB58(v)) F.push(['Checksum', 'Valid (Base58Check)']); else out.push({lvl:'bad', t:'Checksum fails', why:'Not a valid address — a typo, a truncated copy, or made up. Funds sent to it would be refused.'});
     if(net === 'Testnet') out.push({lvl:'info', t:'Testnet address', why:'Test coins with no value — from a developer, or a fake.'}); }
   else if(k === 'eth'){ F.push(['Type', 'Ethereum-style address (also BSC, Polygon, Arbitrum…)']); if(/^0x0{40}$/.test(low)) out.push({lvl:'info', t:'The zero address', why:'Used to burn tokens and in contract creation; nobody owns it.'}); else if(/^0x0{20,}/.test(low) || /^0x0+dead$/.test(low)) out.push({lvl:'info', t:'Burn or vanity address', why:'Long runs of zeros are made on purpose.'}); F.push(['Checksum', /[a-f]/.test(v.slice(2)) && /[A-F]/.test(v.slice(2)) ? 'Mixed case (EIP-55 checksummed form)' : 'Not in checksummed form']); }
+  else if(k === 'sol'){ F.push(['Type', 'Solana address — a 32-byte public key, base58']); F.push(['Explorers', 'Solscan, Solana Explorer (links below)']);
+    if(/^1{32,}$/.test(v)) out.push({lvl:'info', t:'The system program', why:'Built into Solana; nobody owns it.'}); }
+  else if(k === 'ens'){ const parts = low.split('.'); F.push(['Type', 'ENS name — a readable name for an Ethereum wallet']); if(parts.length > 2) F.push(['Parent', parts.slice(1).join('.')]);
+    if(/[^\x00-\x7f]/.test(v) || /xn--/.test(low)) out.push({lvl:'warn', t:'Non-Latin characters', why:'A name can look like a known one and point somewhere else — check the address it resolves to.'});
+    if(/^0x[0-9a-f]{6,}/.test(parts[0])) out.push({lvl:'warn', t:'Made to look like an address', why:'A name starting with 0x… is chosen to be mistaken for a wallet address.'}); }
+  else if(k === 'tgid'){ F.push(['Type', 'Telegram account number — permanent; the name and username can change, this does not']); F.push(['Where it shows', 'from_id in a Telegram Desktop export (user' + v + ')']); }
+  else if(k === 'dcid'){ const ms = Number(BigInt(String(v)) >> 22n) + 1420070400000; F.push(['Type', 'Discord ID (snowflake) — permanent']); if(ms > 1420070400000 && ms < Date.now() + 864e5){ F.push(['Created', new Date(ms).toISOString().slice(0, 19).replace('T', ' ') + ' UTC']); if(Date.now() - ms < 30 * 864e5) out.push({lvl:'warn', t:'Made in the last 30 days', why:'A new account or server — common for scams that are set up, used and abandoned.'}); } }
+  else if(k === 'session'){ F.push(['Type', 'Session messenger ID — an ed25519 key; no phone number or email behind it']); F.push(['Note', 'Anyone who has it can message the owner; it never changes unless they make a new account']); }
+  else if(k === 'tox'){ F.push(['Type', 'Tox ID — public key, anti-spam value and checksum']); const b = String(v).match(/../g).map(h => parseInt(h, 16)); let a = 0, c = 0; for(let i = 0; i < 36; i += 2){ a ^= b[i]; c ^= b[i + 1]; } if(a === b[36] && c === b[37]) F.push(['Checksum', 'Valid']); else out.push({lvl:'bad', t:'Checksum fails', why:'Not a working Tox ID — a typo or a truncated copy.'}); }
+  else if(k === 'pgp'){ const K = ipfPgpKey(String(v).toUpperCase());
+    F.push(['Key ID', String(v).slice(-16).replace(/(.{4})(?=.)/g, '$1 ')]);
+    if(!K){ F.push(['Key', 'Only the fingerprint is in your evidence — paste the public key block to read its names, emails and date']); return; }
+    F.push(['Algorithm', K.algo + (K.bits ? ' ' + K.bits + ' bits' : K.curve ? ' · ' + K.curve : '')]); if(K.created) F.push(['Created', new Date(K.created).toISOString().slice(0, 10)]);
+    for(const u of K.uids.slice(0, 4)) F.push(['User ID', u]); if(K.uids.length > 4) F.push(['User IDs', '+' + (K.uids.length - 4) + ' more']);
+    if(K.subs.length) F.push(['Subkeys', K.subs.map(x => x.algo + (x.curve ? ' ' + x.curve : x.bits ? ' ' + x.bits : '')).join(', ')]);
+    if(K.algo === 'RSA' && K.bits && K.bits < 2048) out.push({lvl:'warn', t:'Weak key (' + K.bits + '-bit RSA)', why:'Below today’s minimum; old, or made by someone careless.'});
+    if(K.algo === 'DSA') out.push({lvl:'info', t:'DSA key', why:'An old algorithm — the key, or its owner’s habits, date from before about 2015.'});
+    if(K.uids.length > 1) out.push({lvl:'info', t:K.uids.length + ' names on one key', why:'Each user ID was added by the key’s owner — every name and email here belongs to the same person or group.'});
+    if(K.created && K.created > Date.now() - 30 * 864e5) out.push({lvl:'info', t:'Made in the last 30 days', why:'A fresh key: a new identity, or a rebrand. Look for an older key under the same names.'}); }
+  else if(k === 'btctx'){ F.push(['Type', 'Bitcoin transaction ID — 32 bytes, hex']); F.push(['Why not a file hash', 'It sits next to transaction words or a block-explorer link']); }
+  else if(k === 'ethtx'){ F.push(['Type', 'Ethereum transaction hash (also BSC, Polygon, Arbitrum…)']); }
+  else if(k === 'soltx'){ F.push(['Type', 'Solana transaction signature — 64 bytes, base58']); }
   else if(k === 'email' && typeof idEmail === 'function'){ const I = idEmail(v); if(!I) return;
     F.push(['Mailbox', I.free ? 'Free webmail' : I.disposable ? 'Throwaway' : 'Organisation or private domain']); if(I.canon !== I.e) F.push(['Same inbox as', I.canon]); if(I.tag) F.push(['Tag', '+' + I.tag + ' — the owner made this address for one site']);
     if(I.disposable) out.push({lvl:'warn', t:'Throwaway mailbox', why:'Made in seconds, gone in hours — used to avoid being traced.'});
@@ -233,7 +279,7 @@ function ipfProfile(k, v){
   if(IPF.cache.size > IPF.MAX) IPF.cache.clear(); IPF.cache.set(key, {at:ipfMineStamp(), p}); return p;
 }
 let IPF_ST = {t:0, v:''};
-const ipfMineStamp = () => { const n = performance.now(); if(n - IPF_ST.t > 40){ IPF_ST = {t:n, v:(DB && DB.verdicts ? Object.keys(DB.verdicts).length : 0) + ':' + (DB && DB.entries ? DB.entries.length : 0)}; } return IPF_ST.v; };
+const ipfMineStamp = () => { const n = performance.now(); if(n - IPF_ST.t > 40){ IPF_ST = {t:n, v:(DB && DB.verdicts ? Object.keys(DB.verdicts).length : 0) + ':' + (DB && DB.entries ? DB.entries.length : 0) + ':' + (DB && DB.records ? DB.records.length : 0)}; } return IPF_ST.v; };
 const ipfWorst = (k, v) => { const f = ipfProfile(k, v).flags[0]; return f && f.lvl !== 'info' ? f : null; };
 const IPF_ICO = {bad:'shield-alert', warn:'triangle-alert', info:'info'};
 /* extracted URLs are kept in lower case; their query (a base64 email, a token) needs the case it was written in */

@@ -105,21 +105,21 @@ function storyMine(st){ const g = globalEnts(), hits = new Set(), stack = ctiSta
 const triage = f => f.st || (f.live ? 'new' : 'new');
 
 /* ---------- the page ---------- */
-const ITABS = [['feed','News','newspaper'], ['look','Investigate','radar'], ['vulns','Vulnerabilities','bug'], ['iocs','Indicators','fingerprint'], ['attack','Actors & ATT&CK','crosshair'], ['brief','Briefs','file-text']];
+const ITABS = [['over','Overview','layout-dashboard'], ['feed','News','newspaper'], ['look','Investigate','radar'], ['vulns','Vulnerabilities','bug'], ['iocs','Indicators','fingerprint'], ['attack','Actors & ATT&CK','crosshair'], ['brief','Briefs','file-text']];
 function viewIntel(){
   ensureIntel();
   if(!CTI.iocs){ ctiLoad().then(() => { if(UI.route.area === 'feeds') renderMain(); }); }
-  const tab = ITABS.some(t => t[0] === UI.itab) ? UI.itab : 'feed', live = !!DB.prefs.liveFeeds, last = DB.prefs.lastFeedRefresh;
+  const tab = ITABS.some(t => t[0] === UI.itab) ? UI.itab : 'over', live = !!DB.prefs.liveFeeds, last = DB.prefs.lastFeedRefresh;
   const onN = DB.intel.sources.filter(s => s.on).length + (live ? DB.feedSources.filter(s => s.on).length : 0), hits = CTI.iocs ? ctiIocHits().length : 0;
   const unread = DB.feed.filter(f => triage(f) === 'new').length;
   const kevNew = CTI.kev ? [...CTI.kev.values()].filter(k => Date.parse(k.added) > Date.now() - 7 * 864e5).length : 0;
-  const body = tab === 'look' ? ctiLookView() : tab === 'vulns' ? ctiVulnsView() : tab === 'iocs' ? ctiIocsView() : tab === 'attack' ? ctiAttackView() : tab === 'brief' ? ctiBriefView() : ctiFeedView();
+  const body = tab === 'look' ? ctiLookView() : tab === 'vulns' ? ctiVulnsView() : tab === 'iocs' ? ctiIocsView() : tab === 'attack' ? ctiAttackView() : tab === 'brief' ? ctiBriefView() : tab === 'over' ? ctiOverView() : ctiFeedView();
   return `<div class="scroll"><div class="page wide ti">
     ${pageHead('rss','#e5484d','Threat Intel','News, vulnerabilities, indicators and adversaries — checked against every case, your stack and your indicator feeds.',
       `<span class="iv-live${onN ? ' on' : ''}"><i></i>${onN ? 'Live · ' + onN + ' source' + (onN > 1 ? 's' : '') + (last ? ' · ' + esc(iAgo(last)) : '') : 'Offline'}</span>
        <button class="btn" data-act="feedSources">${ico('settings','sm')}Sources</button>
        <button class="btn primary" data-act="feedRefresh" ${intelBusy ? 'disabled' : ''}>${ico('refresh-cw', intelBusy ? 'sm spin' : 'sm')}${intelBusy ? 'Refreshing…' : onN ? 'Refresh' : 'Go live'}</button>`,
-      [[unread, 'unread stories'], [DB.feed.filter(f => f.sev === 'critical').length, 'critical'], [kevNew, 'KEV added this week', kevNew ? '<em class="r"></em>' : ''], [hits, 'feed indicators in your cases', hits ? '<em class="r"></em>' : '']])}
+      tab === 'over' ? null : [[unread, 'unread stories'], [DB.feed.filter(f => f.sev === 'critical').length, 'critical'], [kevNew, 'KEV added this week', kevNew ? '<em class="r"></em>' : ''], [hits, 'feed indicators in your cases', hits ? '<em class="r"></em>' : '']])}
     <nav class="ti-tabs" role="tablist" aria-label="Threat Intel">${ITABS.map(([k, l, i]) => `<button role="tab" data-act="itab" data-v="${k}" aria-selected="${tab === k}">${ico(i,'sm')}${l}${k === 'feed' && unread ? `<span>${unread}</span>` : k === 'iocs' && hits ? `<span class="r">${hits}</span>` : ''}</button>`).join('')}</nav>
     ${body}
   </div></div>`;
@@ -259,7 +259,7 @@ function ctiCveDlg(cve){
     <h4 class="ti-h4">In the news <span class="t3">${arts.length}</span></h4>
     ${arts.length ? `<ul class="ti-arts">${arts.slice(0, 8).map(f => `<li><button class="linkbtn" data-act="ctiOpenFeed" data-id="${f.id}">${esc(f.title)}</button><small>${esc(f.source)} · ${esc(iAgo(f.ts))}</small></li>`).join('')}</ul>` : '<p class="t3">No story you have mentions it.</p>'}
     <p class="ti-links"><a href="https://nvd.nist.gov/vuln/detail/${encodeURIComponent(cve)}" target="_blank" rel="noopener noreferrer">${ico('external-link','sm')}NVD</a><a href="https://www.cve.org/CVERecord?id=${encodeURIComponent(cve)}" target="_blank" rel="noopener noreferrer">${ico('external-link','sm')}CVE.org</a>${k ? `<a href="https://www.cisa.gov/known-exploited-vulnerabilities-catalog?search_api_fulltext=${encodeURIComponent(cve)}" target="_blank" rel="noopener noreferrer">${ico('external-link','sm')}CISA KEV</a>` : ''}${(s.refs || []).map(u => E.safeUrl(String(u))).filter(Boolean).slice(0, 3).map(u => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${ico('external-link','sm')}${esc(hostOf(u))}</a>`).join('')}</p>
-    </div><footer><button class="btn" data-act="ient" data-v="cve:${esc(cve)}">${ico('newspaper','sm')}Show stories</button><span class="sp"></span><button class="btn primary" data-act="ctiCveToCase" data-v="${esc(cve)}">${ico('plus','sm')}Add to ${esc(caseNm(theCase()))}</button></footer>`);
+    </div><footer><button class="btn" data-act="ient" data-v="cve:${esc(cve)}">${ico('newspaper','sm')}Show stories</button><span class="sp"></span><button class="btn primary" data-act="ctiCveToCase" data-v="${esc(cve)}">${ico('plus','sm')}Add to ${esc(caseNm(theCase()))}</button>${casePick()}</footer>`);
 }
 
 /* ---------- Indicators ---------- */
@@ -482,6 +482,8 @@ function ctiAddEntry(k, v, label){
   DB.records.push({id:uid('r'), caseId:DB.active, type:'evidence', title:cap(label || v, 200), body:v + (label ? '\n\n' + label : ''), tsRaw:'', tsZone:'explicit', ts:Date.now(), source:'threat intel', host:'', tags:['intel'], ents:E.extract(v), answer:'', addedBy:'You', addedAt:Date.now(), hash:''});
   return true;
 }
+/* triage from a list or from the story panel: the panel shows the new state too */
+const ctiInspAgain = () => { if(UI.inspOpen && UI.sel && UI.sel.kind === 'feed') renderInsp(); };
 const CTI_ACTS = {
   itab:(id, v, t) => { UI.itab = v; if(t && t.dataset.x === 'hits') UI.ohits = true; UI.sel = null; renderMain(); const s = document.querySelector('#main .scroll'); if(s) s.scrollTop = 0; },
   itri:(id, v) => { UI.itri = v; UI.ilim = 0; renderMain(); }, istack:() => { UI.istack = !UI.istack; renderMain(); }, ient:(id, v) => { UI.ient = v; UI.itab = 'feed'; UI.itri = v ? 'all' : UI.itri; closeDlg(); renderMain(); },
@@ -493,8 +495,8 @@ const CTI_ACTS = {
   ctiTech:(id, v) => { const t = ctiDict().tech.get(v) || ctiDict().tech.get(String(v).split('.')[0]); showMenu(innerWidth / 2 - 140, 160, [{label:(t ? v + ' — ' + t[1] : v), icon:'crosshair', fn:() => {}, disabled:true},
     {label:'Stories that name it', icon:'newspaper', fn:() => CTI_ACTS.ient(null, 'ttp:' + v)}, {label:'Open on attack.mitre.org', icon:'external-link', fn:() => window.open('https://attack.mitre.org/techniques/' + String(v).replace('.', '/') + '/', '_blank', 'noopener,noreferrer')}]); },
   ctiCve:(id, v) => ctiCveDlg(v),
-  ctiStar:id => { const L = ctiStoryOf(id), on = !L.some(f => f.star); L.forEach(f => { f.star = on; f.read = true; }); mutate(on ? 'starred a story' : 'unstarred a story'); renderMain(); },
-  ctiTri:(id, v) => { const L = ctiStoryOf(id); L.forEach(f => { f.st = f.st === v && v === 'relevant' ? 'new' : v; f.read = true; }); mutate('triaged a story'); renderMain(); if(v === 'dismissed') toast('Dismissed — find it under Dismissed', 'Undo', () => { L.forEach(f => f.st = 'new'); mutate('undo dismiss'); renderMain(); }); },
+  ctiStar:id => { const L = ctiStoryOf(id), on = !L.some(f => f.star); L.forEach(f => { f.star = on; f.read = true; }); mutate(on ? 'starred a story' : 'unstarred a story'); renderMain(); ctiInspAgain(); },
+  ctiTri:(id, v) => { const L = ctiStoryOf(id); L.forEach(f => { f.st = f.st === v && v === 'relevant' ? 'new' : v; f.read = true; }); mutate('triaged a story'); renderMain(); ctiInspAgain(); if(v === 'dismissed') toast('Dismissed — find it under Dismissed', 'Undo', () => { L.forEach(f => f.st = 'new'); mutate('undo dismiss'); renderMain(); }); },
   ctiReadAll:() => { const S = ctiFeedList(); S.forEach(st => st.items.forEach(f => f.read = true)); mutate('marked stories read'); renderMain(); },
   ctiStoryMenu:(id, v, t) => { const r = t.getBoundingClientRect(), f = DB.feed.find(x => x.id === id), L = ctiStoryOf(id), u = E.safeUrl(f.link);
     showMenu(r.right - 240, r.bottom + 4, [...(u ? [{label:'Read the original', icon:'external-link', fn:() => window.open(u, '_blank', 'noopener,noreferrer')}] : []),

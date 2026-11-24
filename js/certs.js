@@ -227,7 +227,7 @@ function cxDecoder(){
           ${cxKind(c) ? `<button class="crt-pill crt-kind" data-act="cxType" data-v="${cxKind(c)}" title="What this type of certificate is for">${ico('book-open','sm')}${esc(CX_KIND[cxKind(c)])}</button>` : ''}
           <span class="crt-pill">${esc(c.key.label)}</span><span class="crt-pill">${esc(c.sigAlg.name)}</span>${c.selfIssued ? `<span class="crt-pill">Self-signed${c.selfOk === true ? ' ✓' : ''}</span>` : ''}
           ${bad ? `<span class="crt-pill red">${ico('triangle-alert','sm')}${bad} red flag${bad > 1 ? 's' : ''}</span>` : ''}${reuse.length ? `<span class="crt-pill blue">${ico('key-round','sm')}Key shared with ${reuse.length}</span>` : ''}</div></div>
-      <div class="crt-ha">${S.rec ? `<span class="crt-pill green">${ico('check','sm')}Saved</span>` : `<button class="btn sm primary" data-act="cxSave">${ico('plus','sm')}Save to case</button>`}<button class="btn sm" data-act="cxCopyPem">${ico('copy','sm')}Copy PEM</button><button class="btn sm ghost" data-act="cxExport" aria-haspopup="menu">${ico('download','sm')}Export${ico('chevron-down','sm')}</button></div></section>
+      <div class="crt-ha">${S.rec ? `<span class="crt-pill green">${ico('check','sm')}Saved</span>` : `<button class="btn sm primary" data-act="cxSave">${ico('plus','sm')}Save to ${esc(caseNm(theCase()) || 'a case')}</button>${casePick()}`}<button class="btn sm" data-act="cxCopyPem">${ico('copy','sm')}Copy PEM</button><button class="btn sm ghost" data-act="cxExport" aria-haspopup="menu">${ico('download','sm')}Export${ico('chevron-down','sm')}</button></div></section>
     ${cxFacts(c)}
     ${cxAssessCard(c, R, F, reuse, inds, seen)}
     <div class="crt-2">
@@ -236,7 +236,7 @@ function cxDecoder(){
           <div class="crt-lg"><span>From ${esc(cxDate(c.notBefore))}</span><span>To ${esc(cxDate(c.notAfter))}</span></div></div></section>
       <section class="card crt-s"><h3>${ico('globe','sm')}Names it covers${c.san.length ? `<span class="crt-n">${c.san.length}</span>` : ''}</h3>
         ${c.san.length ? `<div class="crt-chips">${c.san.slice(0, 80).map(s => `<span class="chip mono${looks.has(s.v) ? ' hl' : ''}" title="${esc(s.t)}">${looks.has(s.v) ? ico('triangle-alert','sm') : ''}${s.t !== 'DNS' && s.t !== 'IP' ? `<i>${esc(s.t)}</i>` : ''}${esc(s.v)}</span>`).join('')}${c.san.length > 80 ? `<span class="chip">+${c.san.length - 80} more</span>` : ''}</div>
-          <div class="crt-ba">${S.rec ? '' : `<button class="btn sm" data-act="cxSave">${ico('plus','sm')}Add ${c.san.length} to case as entities</button>`}<button class="btn sm ghost" data-act="cxCopyNames">${ico('copy','sm')}Copy list</button></div>`
+          <div class="crt-ba">${S.rec ? '' : `<button class="btn sm" data-act="cxSave">${ico('plus','sm')}Add ${c.san.length} to ${esc(caseNm(theCase()) || 'a case')} as entities</button>${casePick()}`}<button class="btn sm ghost" data-act="cxCopyNames">${ico('copy','sm')}Copy list</button></div>`
           : `<p class="crt-e">No subject alternative names.${c.cn ? ' Only the common name: <span class="mono">' + esc(c.cn) + '</span>' : ''}</p>`}</section></div>
     ${cxIndCard(c, inds, seen)}
     <div class="crt-2">${cxTestCard(c)}${reuse.length ? cxReuseCard(c, reuse) : cxCompareHint(c)}</div>
@@ -343,7 +343,7 @@ function cxPeCard(R){
   const P = R.pe, sd = P.sigs[0], sg = sd && sd.signers[0], ck = P.checked;
   const head = `<div class="crt-ch"><span class="crt-big ${!sd ? 'warn' : !ck ? 'inf' : sd.fileOk === false || (sg && sg.sigOk === false) ? 'bad' : 'ok'}">${ico('app-window')}</span><div><h2>${esc(P.name)}</h2>
       <p>${P.dll ? 'Windows library (DLL)' : 'Windows program'} · ${esc(P.machine)} · ${cxBytes(P.size)}${isFinite(P.compiled) && P.compiled > 0 ? ' · built ' + esc(cxDate(P.compiled)) + ' (from the header, easy to fake)' : ''}</p></div>
-    ${sd && !S_rec() ? `<div class="crt-ha"><button class="btn sm primary" data-act="cxSave">${ico('plus','sm')}Save to case</button></div>` : ''}</div>`;
+    ${sd && !S_rec() ? `<div class="crt-ha"><button class="btn sm primary" data-act="cxSave">${ico('plus','sm')}Save to ${esc(caseNm(theCase()) || 'a case')}</button>${casePick()}</div>` : ''}</div>`;
   const hash = P.sha256 ? `<div class="crt-fr"><span>File SHA-256</span><code>${esc(P.sha256)}</code><button class="iconbtn" data-act="cxCopy" data-v="${P.sha256}" aria-label="Copy the file's SHA-256">${ico('copy','sm')}</button><a class="btn xs ghost" href="https://www.virustotal.com/gui/file/${P.sha256}" target="_blank" rel="noopener noreferrer">${ico('external-link','sm')}VirusTotal</a></div>` : '';
   if(!sd) return `<section class="card crt-csr crt-pe">${head}<div class="crt-checks">${cxChk('warn', P.err ? esc(P.err) : 'Not signed', P.err ? '' : 'There is no Authenticode signature in this file, so nothing vouches for who made it. Most legitimate software from large vendors is signed; unsigned programs are common in malware and in-house tools.')}</div>${hash}</section>`;
   const pub = sg && sg.cert ? [(sg.cert.subject.map.O || sg.cert.subject.map.CN || [sg.cert.title])[0], (sg.cert.issuer.map.CN || [])[0]] : null;
@@ -501,7 +501,7 @@ function cxCsr(){
     const chk = (s, t, d) => `<div class="crt-fd"><span class="crt-sv ${s}">${ico(s === 'ok' ? 'check' : s === 'inf' ? 'info' : 'triangle-alert','sm')}</span><div><b>${t}</b><small>${d}</small></div></div>`;
     const keyOk = !(q.key.type === 'RSA' && q.key.bits < 2048);
     return `<section class="card crt-csr"><div class="crt-ch"><span class="crt-big inf">${ico('file-text')}</span><div><h2>Signing request · ${esc(q.title)}</h2><p>A request for a certificate — nothing has been issued yet</p></div>
-        <div class="crt-ha">${S.rec ? `<span class="crt-pill green">${ico('check','sm')}Saved</span>` : `<button class="btn sm primary" data-act="cxSave">${ico('plus','sm')}Save to case</button>`}<button class="btn sm" data-act="cxCopyPem">${ico('copy','sm')}Copy</button></div></div>
+        <div class="crt-ha">${S.rec ? `<span class="crt-pill green">${ico('check','sm')}Saved</span>` : `<button class="btn sm primary" data-act="cxSave">${ico('plus','sm')}Save to ${esc(caseNm(theCase()) || 'a case')}</button>${casePick()}`}<button class="btn sm" data-act="cxCopyPem">${ico('copy','sm')}Copy</button></div></div>
       ${cxFacts(q)}
       <div class="crt-checks">
         ${q.selfOk === undefined ? chk('inf', 'Checking the signature…', '') : q.selfOk ? chk('ok', 'Signature is valid', 'The request was not changed after it was made, and the requester holds the private key') : q.selfOk === false ? chk('bad', 'Signature does not verify', 'The request was altered, or is broken') : chk('inf', 'Signature type can’t be checked in the browser', esc(q.sigAlg.name))}

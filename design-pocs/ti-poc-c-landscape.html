@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Threat Intel — C · Landscape</title>
+<link rel="stylesheet" href="../css/fonts.css">
+<script src="../js/icons.js"></script>
+<style>
+:root{--font:'Geist',system-ui,sans-serif;--mono:'Geist Mono',ui-monospace,monospace;
+  --bg:#f5f6f8;--side:#fff;--surface:#fff;--surface-2:#f8f9fb;--hover:#f2f4f7;--border:#dfe3ea;--soft:#eaedf2;
+  --text:#0f172a;--text-2:#475569;--text-3:#5b6678;--accent:#4f46e5;--accent-bg:#5b54f0;--accent-soft:#5b54f012;--accent-line:#c7c4fb;
+  --green:#047857;--green-soft:#04785712;--red:#c81e1e;--red-soft:#c81e1e10;--red-line:#f3c3c3;--amber:#a14b08;--amber-soft:#a14b0812;--amber-line:#f1d3b1;--blue:#2563eb;--sh:0 1px 2px #0f172a0a}
+[data-theme=dark]{--bg:#0b0f17;--side:#0d121c;--surface:#111723;--surface-2:#151c2a;--hover:#1a2232;--border:#2a3346;--soft:#1f2737;
+  --text:#e7ebf2;--text-2:#a9b3c4;--text-3:#8f9ab0;--accent:#a5a1ff;--accent-bg:#655cf7;--accent-soft:#6d64ff1f;--accent-line:#4b4690;
+  --green:#4ade80;--green-soft:#4ade8014;--red:#f87171;--red-soft:#f8717114;--red-line:#5c2a2a;--amber:#fbbf24;--amber-soft:#fbbf2414;--amber-line:#5a4416;--blue:#93c5fd;--sh:0 1px 2px #0006}
+*{box-sizing:border-box}
+body{margin:0;background:#dfe3ea;font:14.5px/1.5 var(--font);color:var(--text);padding:24px 0 40px}
+[data-theme=dark] body{background:#05070b}
+.i{width:16px;height:16px;stroke-width:1.8;flex:none}.i.sm{width:14px;height:14px}.i.xs{width:12px;height:12px}
+.bar{width:1440px;margin:0 auto 14px;display:flex;align-items:center;gap:12px;color:#334155;font-size:13.5px}
+[data-theme=dark] .bar{color:#a9b3c4}
+.bar b{font-size:15px}.bar .sp{flex:1}
+.bar button{height:32px;padding:0 12px;border-radius:8px;border:1px solid #c5cbd6;background:#fff;font:500 13px var(--font);cursor:pointer;display:inline-flex;align-items:center;gap:6px;color:#0f172a}
+.frame{width:1440px;height:900px;margin:0 auto;display:grid;grid-template-columns:64px 1fr;background:var(--bg);overflow:hidden;border-radius:10px;box-shadow:0 20px 60px -20px #0f172a55}
+.rail{background:var(--side);border-right:1px solid var(--soft);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:6px}
+.rail .logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#6d64ff,#a855f7);margin-bottom:12px}
+.rail b{width:40px;height:36px;border-radius:9px;display:grid;place-items:center;color:var(--text-3)}.rail b.on{background:var(--accent-soft);color:var(--accent)}
+.rail hr{width:32px;border:0;border-top:1px solid var(--soft);margin:6px 0}
+.main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.top{height:56px;flex:none;display:flex;align-items:center;gap:12px;padding:0 24px;border-bottom:1px solid var(--soft)}
+.search{width:560px;height:38px;border:1px solid var(--border);border-radius:11px;background:var(--surface);display:flex;align-items:center;gap:10px;padding:0 14px;color:var(--text-3);font-size:14px}
+.sp{flex:1}
+.btn{height:34px;padding:0 13px;border-radius:9px;border:1px solid var(--border);background:var(--surface);display:inline-flex;align-items:center;gap:7px;font:500 13.5px var(--font);color:var(--text);cursor:pointer;white-space:nowrap}
+.btn.pri{background:var(--accent-bg);border-color:var(--accent-bg);color:#fff}
+.btn.sm{height:28px;padding:0 10px;font-size:12.5px;border-radius:7px}
+.btn.ghost{border-color:transparent;background:none;color:var(--text-2)}
+.page{flex:1;overflow:auto;padding:22px 28px 28px}
+.ph{display:flex;align-items:flex-start;gap:12px;margin-bottom:18px}
+.ph h1{margin:0;font-size:26px;letter-spacing:-.02em}
+.ph p{margin:3px 0 0;color:var(--text-2);font-size:14px}
+.live{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--text-2);border:1px solid var(--border);border-radius:999px;padding:0 10px;height:28px;background:var(--surface)}
+.live i{width:7px;height:7px;border-radius:50%;background:var(--green)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--soft);margin-bottom:18px}
+.tabs span{padding:9px 12px;font-weight:500;color:var(--text-2);display:inline-flex;gap:7px;align-items:center;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs span.on{color:var(--text);border-color:var(--text)}
+.tabs em{font-style:normal;font:500 11.5px var(--mono);color:var(--text-3)}
+/* ---- landscape ---- */
+.page{padding:20px 26px 26px;display:flex;flex-direction:column;gap:16px}
+.ph{margin-bottom:0}
+.range{display:inline-flex;border:1px solid var(--border);border-radius:9px;overflow:hidden;background:var(--surface)}
+.range span{padding:6px 12px;font-size:13px;color:var(--text-2);border-left:1px solid var(--soft);cursor:pointer}.range span:first-child{border-left:0}
+.range span.on{background:var(--text);color:var(--surface)}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface);border:1px solid var(--soft);border-radius:14px;box-shadow:var(--sh)}
+.kpi{padding:12px 16px;border-left:1px solid var(--soft)}.kpi:first-child{border-left:0}
+.kpi b{display:block;font:650 22px var(--mono);letter-spacing:-.02em}
+.kpi span{font-size:12.5px;color:var(--text-3)}
+.kpi em{font-style:normal;font:600 11.5px var(--mono);margin-left:6px}
+.kpi em.up{color:var(--red)}.kpi em.dn{color:var(--green)}
+.card{background:var(--surface);border:1px solid var(--soft);border-radius:14px;box-shadow:var(--sh);min-width:0}
+.card>header{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--soft)}
+.card>header h3{margin:0;font-size:14.5px}
+.card>header .t3{color:var(--text-3);font-size:12.5px}
+.lanes{padding:8px 16px 12px}
+.lane{display:grid;grid-template-columns:150px 1fr;align-items:center;height:38px;border-bottom:1px dashed var(--soft)}
+.lane:last-of-type{border-bottom:0}
+.lane span{font-size:13px;color:var(--text-2);display:flex;align-items:center;gap:8px}
+.lane span i{width:9px;height:9px;border-radius:3px;display:inline-block}
+.track{position:relative;height:100%}
+.dotx{position:absolute;top:50%;transform:translate(-50%,-50%);border-radius:50%;border:2px solid var(--surface);cursor:pointer}
+.dotx:hover{outline:2px solid var(--accent)}
+.dotx.hit{box-shadow:0 0 0 3px var(--accent-soft),0 0 0 4px var(--accent)}
+.axis{display:grid;grid-template-columns:150px 1fr;font:500 11px var(--mono);color:var(--text-3);padding:0 16px 10px}
+.axis div{display:flex;justify-content:space-between}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--text-3);margin-left:auto}
+.legend b{display:inline-block;border-radius:50%;background:var(--text-3);margin-right:5px;vertical-align:middle}
+.three{display:grid;grid-template-columns:1.15fr 1fr .9fr;gap:16px;min-height:0;flex:1}
+.three .card{display:flex;flex-direction:column;min-height:0}
+.body{overflow:auto;flex:1}
+.ac{display:grid;grid-template-columns:36px 1fr auto;gap:10px;padding:11px 16px;border-top:1px solid var(--soft);align-items:center;cursor:pointer}
+.ac:first-child{border-top:0}
+.ac:hover{background:var(--hover)}
+.ac.on{background:var(--accent-soft)}
+.av{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font:700 12px var(--font);color:#fff}
+.ac b{display:block;font-size:14px}
+.ac small{display:block;font-size:12px;color:var(--text-3)}
+.ac .ch{display:flex;gap:4px;margin-top:4px;flex-wrap:wrap}
+.ac .ch span{font:500 10.5px var(--mono);border:1px solid var(--soft);border-radius:4px;padding:0 5px;color:var(--text-2)}
+.ac .ch span.case{font-family:var(--font);font-weight:600;color:var(--accent);border-color:var(--accent-line)}
+.ac .n{text-align:right;font:650 16px var(--mono);color:var(--text)}
+.ac .n small{display:block;font:400 11.5px var(--font);color:var(--text-3)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+td,th{padding:9px 10px;border-top:1px solid var(--soft);text-align:left;white-space:nowrap}
+th{font-weight:500;color:var(--text-3);font-size:12px;border-top:0;position:sticky;top:0;background:var(--surface)}
+td.m{font-family:var(--mono);font-size:12.5px}
+.ep{display:inline-flex;align-items:center;gap:6px;font:600 12px var(--mono)}
+.ep s{display:inline-block;width:38px;height:5px;border-radius:3px;background:var(--soft);overflow:hidden}.ep s u{display:block;height:100%;background:var(--red)}
+.k{font:650 10px var(--font);letter-spacing:.04em;color:var(--red);border:1px solid var(--red-line);border-radius:4px;padding:0 5px}
+.st{font-size:12px;font-weight:560}.st.y{color:var(--amber)}.st.n{color:var(--text-3);font-weight:400}
+.mat{padding:12px 16px}
+.mat .tac{font-size:11.5px;color:var(--text-3);margin:10px 0 5px;text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+.mat .tac:first-child{margin-top:0}
+.cells{display:flex;flex-wrap:wrap;gap:5px}
+.cell{font:500 11.5px var(--mono);border-radius:6px;padding:4px 7px;border:1px solid var(--soft);color:var(--text-2);background:var(--surface-2)}
+.cell.cov{border-color:#a7dcc6;color:var(--green)}
+.cell.gap{border-color:var(--amber-line);color:var(--amber);background:var(--amber-soft)}
+.cell sup{font-family:var(--font);font-weight:600;margin-left:3px}
+.mk{display:flex;gap:14px;font-size:12px;color:var(--text-3);padding:0 16px 12px}
+.mk i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px;border:1px solid}
+.drawer{position:absolute;right:0;top:56px;bottom:0;width:400px;background:var(--surface);border-left:1px solid var(--soft);box-shadow:-20px 0 40px -24px #0f172a40;padding:18px 20px;overflow:auto;display:none}
+.frame{position:relative}
+.drawer.on{display:block}
+.drawer h2{margin:6px 0 2px;font-size:20px}
+.drawer .t3{color:var(--text-3);font-size:12.5px}
+.drawer .x{position:absolute;right:14px;top:14px}
+.dsec{margin-top:16px}
+.dsec h4{margin:0 0 8px;font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3)}
+.dsec p{margin:0;font-size:13.5px;line-height:1.6;color:var(--text-2)}
+.dl{display:flex;flex-direction:column}
+.dl div{display:flex;gap:10px;padding:7px 0;border-top:1px solid var(--soft);font-size:13px}
+.dl div:first-child{border-top:0}
+.dl time{font:500 12px var(--mono);color:var(--text-3);width:78px;flex:none}
+.lbl{width:1440px;margin:12px auto 0;color:#475569;font-size:13px}
+[data-theme=dark] .lbl{color:#8f9ab0}
+</style>
+</head>
+<body>
+<div class="bar"><b>C · Landscape</b><span>Intel by threat, not by story: what is moving, who is active, which weaknesses matter — and where your cases and rules stand.</span><span class="sp"></span><button onclick="document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark'">Light / dark</button></div>
+<div id="app"></div>
+<div class="lbl"><b>Idea:</b> the stories become a picture. A swim-lane timeline shows when each kind of threat was reported (ringed dots touch your cases); actors and malware, vulnerabilities and ATT&amp;CK techniques are ranked lists built from every story, each linked to your cases, your stack and your detection rules. Click an actor or a dot to open its dossier on the right.</div>
+<script>
+const I = (n, c='') => `<svg class="i ${c}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">${LUCIDE[n]||''}</svg>`;
+const LANES = [['Vulnerabilities','#d97706'],['Ransomware','#dc2626'],['Nation-state & APT','#7c3aed'],['Phishing & fraud','#2563eb'],['Malware','#db2777']];
+/* [lane, position 0..1, size, ring = touches a case, label] */
+const DOTS = [[0,.05,12],[0,.09,14],[0,.13,16,1],[0,.36,18],[0,.40,14],[0,.71,12],[0,.93,14,1],[1,.18,12],[1,.30,16],[1,.55,14],[1,.61,12],[1,.84,10],[2,.22,16],[2,.48,12],[2,.66,10],[3,.70,10],[3,.90,12,1],[3,.95,10],[4,.80,10],[4,.97,14,1]];
+const ACT = [
+ {i:'LB', c:'#dc2626', n:'LockBit 3.0', k:'Ransomware · affiliates', ch:['CVE-2023-4966','T1486'], s:4, last:'Nov 21'},
+ {i:'VT', c:'#7c3aed', n:'Volt Typhoon', k:'Nation-state · PRC', ch:['T1078','T1003.003'], s:2, last:'Feb 7'},
+ {i:'LL', c:'#db2777', n:'Lamp loader', k:'Malware · loader kit', ch:['Op Lantern','203.0.113.47'], s:1, last:'Sep 15', case:1},
+ {i:'CL', c:'#ea580c', n:'CL0P', k:'Ransomware · data theft', ch:['CVE-2023-34362','T1505.003'], s:2, last:'Jun 7'},
+ {i:'SS', c:'#2563eb', n:'Scattered Spider', k:'Social engineering', ch:['T1621','T1566'], s:1, last:'Nov 16'},
+ {i:'QB', c:'#64748b', n:'QakBot', k:'Botnet · taken down', ch:['takedown'], s:1, last:'Aug 29'}];
+const VUL = [['CVE-2024-3400','PAN-OS',94,1,'y'],['CVE-2023-4966','Citrix ADC',93,1,'p'],['CVE-2024-21887','Ivanti ICS',97,1,''],['CVE-2023-34362','MOVEit',95,1,''],['CVE-2024-21762','FortiOS',72,1,'y'],['CVE-2026-21001','Windows',41,0,'y'],['CVE-2023-46805','Ivanti ICS',96,1,'']];
+const TAC = [['Initial access',[['T1190',6,'cov'],['T1566',3,'cov'],['T1078',2,'gap']]],['Execution & persistence',[['T1059',3,'cov'],['T1505.003',2,'gap']]],['Credential access',[['T1003.003',1,'gap'],['T1621',1,''],['T1550.004',1,'gap']]],['Impact',[['T1486',3,'cov']]]];
+let SEL = 2, DR = false;
+function draw(){
+  const months = ['Jun','Jul','Aug','Sep','Oct','Nov'];
+  document.getElementById('app').innerHTML = `<section class="frame"><nav class="rail"><div class="logo"></div>${['layout-dashboard','sun','sticky-note','notebook-pen'].map(i=>`<b>${I(i)}</b>`).join('')}<hr>${['folder-open','wrench','binary','shield-check'].map(i=>`<b>${I(i)}</b>`).join('')}<hr><b class="on">${I('rss')}</b><b>${I('eye')}</b></nav>
+  <div class="main"><div class="top"><div class="search">${I('search')}Search everything — cases, evidence, IOCs, tools, notes…</div><span class="sp"></span><button class="btn pri">${I('plus')}Capture</button></div>
+  <div class="page">
+    <div class="ph"><div><h1>Threat landscape</h1><p>What your 5 sources reported, set against your cases, your stack and your detection rules.</p></div><span class="sp"></span><span class="range"><span>7 days</span><span>30 days</span><span class="on">6 months</span><span>All</span></span><button class="btn">${I('newspaper','sm')}Stories</button><button class="btn">${I('settings','sm')}Sources</button></div>
+    <div class="kpis"><div class="kpi"><b>12<em class="up">+3</em></b><span>stories</span></div><div class="kpi"><b>5</b><span>critical</span></div><div class="kpi"><b>7<em class="up">+2</em></b><span>known-exploited CVEs mentioned</span></div><div class="kpi"><b>3</b><span>feed indicators in your cases</span></div><div class="kpi"><b>6</b><span>actors &amp; malware active</span></div></div>
+    <section class="card"><header>${I('activity','sm')}<h3>When it was reported</h3><span class="t3">each dot is a story · size is severity</span><span class="legend"><span><b style="width:8px;height:8px"></b>normal</span><span><b style="width:14px;height:14px"></b>critical</span><span><b style="width:10px;height:10px;box-shadow:0 0 0 2px var(--accent)"></b>touches a case</span></span></header>
+      <div class="lanes">${LANES.map(([l, c], li) => `<div class="lane"><span><i style="background:${c}"></i>${l}</span><div class="track">${DOTS.filter(d => d[0] === li).map(d => `<span class="dotx${d[3] ? ' hit' : ''}" style="left:${d[1] * 100}%;width:${d[2]}px;height:${d[2]}px;background:${c}" onclick="DR=true;draw()"></span>`).join('')}</div></div>`).join('')}</div>
+      <div class="axis"><span></span><div>${months.map(m => `<span>${m}</span>`).join('')}</div></div></section>
+    <div class="three">
+      <section class="card"><header>${I('crosshair','sm')}<h3>Actors &amp; malware</h3><span class="sp"></span><span class="t3">by stories</span></header><div class="body">${ACT.map((a, i) => `<div class="ac${SEL === i ? ' on' : ''}" onclick="SEL=${i};DR=true;draw()"><span class="av" style="background:${a.c}">${a.i}</span><div><b>${a.n}</b><small>${a.k}</small><div class="ch">${a.ch.map((x, j) => `<span class="${a.case && j === 0 ? 'case' : ''}">${x}</span>`).join('')}</div></div><div class="n">${a.s}<small>stor${a.s > 1 ? 'ies' : 'y'} · ${a.last}</small></div></div>`).join('')}</div></section>
+      <section class="card"><header>${I('bug','sm')}<h3>Vulnerabilities that matter</h3><span class="sp"></span><span class="t3">EPSS · KEV · your stack</span></header><div class="body"><table><tr><th>CVE</th><th>Product</th><th>EPSS</th><th></th><th>Yours</th></tr>
+        ${VUL.sort((a, b) => (b[4] === 'y') - (a[4] === 'y') || b[2] - a[2]).map(v => `<tr><td class="m">${v[0]}</td><td>${v[1]}</td><td><span class="ep">${v[2]}%<s><u style="width:${v[2]}%"></u></s></span></td><td>${v[3] ? '<span class="k">KEV</span>' : ''}</td><td>${v[4] === 'y' ? '<span class="st y">In stack</span>' : v[4] === 'p' ? '<span class="st n">Patched</span>' : '<span class="st n">—</span>'}</td></tr>`).join('')}</table></div></section>
+      <section class="card"><header>${I('grid-3x3','sm')}<h3>Techniques reported</h3><span class="sp"></span><span class="t3">vs your rules</span></header><div class="body"><div class="mat">${TAC.map(([t, L]) => `<div class="tac">${t}</div><div class="cells">${L.map(([id, n, c]) => `<span class="cell ${c}">${id}<sup>${n}</sup></span>`).join('')}</div>`).join('')}</div>
+        <div class="mk"><span><i style="border-color:#a7dcc6"></i>a rule covers it</span><span><i style="border-color:var(--amber-line);background:var(--amber-soft)"></i>no rule yet</span></div></div></section>
+    </div>
+  </div></div>
+  <aside class="drawer${DR ? ' on' : ''}"><button class="btn sm ghost x" onclick="DR=false;draw()">${I('x','sm')}</button>
+    <span class="t3">Malware · dossier</span><h2>${ACT[SEL].n}</h2><span class="t3">${ACT[SEL].k} · ${ACT[SEL].s} stor${ACT[SEL].s > 1 ? 'ies' : 'y'} · last ${ACT[SEL].last}</span>
+    <div class="dsec"><h4>In your work</h4><p><b style="color:var(--accent)">Op Lantern</b> — its C2 203.0.113.47:4444 and update-lamp.test are in 6 records of that case. No other case.</p></div>
+    <div class="dsec"><h4>What the sources say</h4><p>A commodity loader delivered by invoice-themed LNK files; the builder is now sold on an underground forum, so expect other operators with the same C2 pattern on port 4444.</p></div>
+    <div class="dsec"><h4>Timeline</h4><div class="dl"><div><time>2026-09-15</time><span>Builder sold on forum — Sample Intel Weekly</span></div><div><time>2026-09-14</time><span>Seen in Op Lantern (your evidence)</span></div></div></div>
+    <div class="dsec"><h4>Indicators</h4><div class="cells"><span class="cell">203.0.113.47:4444</span><span class="cell">update-lamp.test</span></div></div>
+    <div class="dsec" style="display:flex;gap:8px"><button class="btn pri">${I('eye','sm')}Watch</button><button class="btn">${I('plus','sm')}Add to a case</button></div>
+  </aside></section>`;
+}
+draw();
+</script>
+</body>
+</html>
