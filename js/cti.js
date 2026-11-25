@@ -342,7 +342,7 @@ async function ctiImportText(text, src, defaults = {}){
   const P = ctiParse(text, defaults.fmt);
   const items = P.items.map(x => ({...x, tlp:x.tlp || defaults.tlp, conf:x.conf == null ? defaults.conf : x.conf, tags:[...(Array.isArray(x.tags) ? x.tags : String(x.tags || '').split(/[,;|]/)), ...(defaults.tags || [])],
     exp:x.exp || (defaults.days ? new Date(Date.now() + defaults.days * 864e5).toISOString() : '')}));
-  const r = ctiAddIocs(items, src || P.name || P.fmt); await ctiSaveIocs(); return {...r, fmt:P.fmt, total:P.items.length, name:P.name};
+  const S = src || P.name || P.fmt, r = ctiAddIocs(items, S); await ctiSaveIocs(); return {...r, fmt:P.fmt, total:P.items.length, name:P.name, src:S};
 }
 async function ctiRefreshIocFeed(id){
   const s = ctiSrc(id); const st = DB.intel.sources.find(x => x.id === id);
@@ -384,6 +384,14 @@ function ctiCsv(items){
   const head = ['type', 'value', 'tlp', 'confidence', 'first_seen', 'last_seen', 'expires', 'threat', 'tags', 'sources', 'description'];
   const d = t => t ? new Date(t).toISOString() : '';
   return [head.join(','), ...items.map(x => [x.k, x.v, x.tlp || '', x.conf == null ? '' : x.conf, d(x.first), d(x.last), d(x.exp), x.threat || '', (x.tags || []).join('|'), (x.srcs || []).join('|'), x.desc || ''].map(csvCell).join(','))].join('\n');
+}
+/* one value per line for WinForensicX (Invoke-WfxHunt -IocFile): only what a Windows host can show — CVEs, ASNs and wallets stay here */
+const HUNT_KINDS = new Set(['ipv4', 'ipv6', 'domain', 'url', 'email', 'md5', 'sha1', 'sha256', 'hostport']);
+function ctiHuntList(items){ return [...new Set(items.filter(x => HUNT_KINDS.has(x.k)).map(x => String(x.v).replace(/[\r\n]+/g, ' ').trim()).filter(v => v && v[0] !== '#'))]; }
+function ctiHunt(items, title, tlp){
+  const L = ctiHuntList(items), one = s => String(s || '').replace(/[\r\n]+/g, ' ');
+  return ['# OSINTrix hunt list: ' + one(title), '# ' + new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC · TLP:' + String(tlp || 'clear').toUpperCase() + ' · ' + L.length + ' indicator' + (L.length === 1 ? '' : 's'),
+    '# Invoke-WfxHunt -IocFile <this file> -InputPath <case folder>   (or on the live host, as administrator)', '', ...L].join('\r\n') + '\r\n';
 }
 /* a case's indicators in the same shape as the store */
 function ctiCaseItems(caseId){

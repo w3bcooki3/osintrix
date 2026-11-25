@@ -75,7 +75,7 @@ function ctiLookView(){
           : `<p class="t3">${busy ? 'Waiting for answers…' : V.answered.length ? 'No source has anything against it, or for it.' : 'Nothing asked yet.'}</p>`}
           ${V.failed.length ? `<p class="t3 small">${esc(V.failed.join(', '))} did not answer.</p>` : ''}</section>
         ${pivots.length ? `<section class="card lk-piv"><h3>What it is</h3><dl>${pivots.map(([l, x]) => `<dt>${esc(l)}</dt><dd>${lkVal(x)}</dd>`).join('')}</dl></section>` : ''}
-        ${rel.length ? `<section class="card lk-rel"><h3>Leads to <span class="t3">${rel.length}</span>${rel.length > 1 ? `<button class="btn sm ghost" data-act="lookRelAll">${ico('plus','sm')}Add all to ${esc(caseNm(theCase()))}</button>` : ''}</h3>
+        ${rel.length ? `<section class="card lk-rel"><h3>Leads to <span class="t3">${rel.length}</span>${rel.length > 1 ? `<button class="btn sm ghost" data-act="lookRelAll">${ico('plus','sm')}Add all to ${esc(caseNm(theCase()))}</button>${casePick()}` : ''}</h3>
           <ul>${rel.slice(0, 40).map((x, i) => `<li>${kindBadge(x.k, 'sm')}<span class="mono">${esc(x.v)}</span><small>${esc(x.rel.join(', '))}</small><button class="iconbtn" data-act="lookRel" data-v="${i}" aria-label="Investigate ${esc(x.v)}" title="Investigate">${ico('radar','sm')}</button><button class="iconbtn" data-act="lookRelAdd" data-v="${i}" aria-label="Add ${esc(x.v)} to the case" title="Add to ${esc(caseNm(theCase()))}">${ico('plus','sm')}</button></li>`).join('')}</ul>
           ${rel.length > 40 ? `<p class="t3 small">${rel.length - 40} more not shown.</p>` : ''}</section>` : ''}
       </div>

@@ -171,7 +171,7 @@ function ruleEditor(r){
       <div class="cx"><div class="cx-g" id="rGut" aria-hidden="true"></div><div class="cx-ed"><pre class="cx-hl" id="rHl" aria-hidden="true"></pre>
         <label class="sr" for="rCode">Rule source</label><textarea id="rCode" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off">${esc(r.code)}</textarea></div></div>
       <div class="cx-bar" id="rStatus"></div>
-      <div class="rtest"><button type="button" class="btn sm" data-act="rTest" data-id="${esc(r.id)}">${ico('play','sm')}Test against ${esc((caseNm(theCase()) || 'case'))} evidence</button>${r.type === 'yara' ? `<button type="button" class="btn sm" data-act="rTestFile" data-id="${esc(r.id)}">${ico('file-search','sm')}Scan a file…</button>` : ''}<span class="t3">Runs locally on the current rule text — saved or not.</span></div>
+      <div class="rtest"><button type="button" class="btn sm" data-act="rTest" data-id="${esc(r.id)}">${ico('play','sm')}Test against ${esc((caseNm(theCase()) || 'case'))} evidence</button>${casePick()}${r.type === 'yara' ? `<button type="button" class="btn sm" data-act="rTestFile" data-id="${esc(r.id)}">${ico('file-search','sm')}Scan a file…</button>` : ''}<span class="t3">Runs locally on the current rule text — saved or not.</span></div>
       <div id="rTestOut"></div>
       ${r.type === 'sigma' && !/^\s*title\s*:/m.test(r.code) ? `<p class="hint rx-note">${ico('circle-help','sm')}The title above is added as <span class="mono">title:</span> when you copy or download this rule.</p>` : ''}</div>
     <div class="rx-pane" data-pane="lab"${/^(tests|queries|evasion|history)$/.test(tab) ? '' : ' hidden'}><div id="dlPane" aria-live="polite"></div></div>

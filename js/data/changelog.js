@@ -4,6 +4,74 @@
    Each change has a type: "added" | "changed" | "fixed" | "removed". */
 const CHANGELOG_DATA = [
   {
+    "version": "1.77",
+    "name": "Save to any case, clearer tools",
+    "date": "2026-11-24",
+    "summary": "Everything you save can go to any case or a new one; every Investigate and Decode tool has Clear and, if you switch it on, its last 10 searches; Look-alikes lists candidates at once; Page hash shows what a saved page sends and to whom; Hashes takes apart and decodes what can be decoded.",
+    "changes": [
+      {
+        "type": "added",
+        "text": "The ▾ beside a save button lists every case and “New case…”, which makes the case with just a name and keeps you on the tool you were using. The ▾ is now beside the save buttons that lacked it: Identity usernames, Coordinates, Page hash, Phishing kit, Stealer log, Browser profile, Detections (“Test against”), the detection lab, Entities personas, Investigate “Add all”, Cloud, Scratchpad and the money trail."
+      },
+      {
+        "type": "changed",
+        "text": "Query library: the tick box and arrow are one labelled choice, “Record the search in”: any case, nowhere, or a new case."
+      },
+      {
+        "type": "added",
+        "text": "Every Investigate and Decode tool has Clear. Settings → Data → “Search history in tools” (off unless you turn it on) lists the last 10 things you looked up in each tool above it; turning it off forgets them. A search is kept when you press Enter or leave the box, not on every keystroke."
+      },
+      {
+        "type": "changed",
+        "text": "Look-alikes: Generate shows every candidate straight away, marked not checked; after checking, switch between the ones that exist and all of them. A whole row opens Investigate (mouse or Enter). Watched domains are a list with when each was checked and how many existed, and each can be dropped."
+      },
+      {
+        "type": "added",
+        "text": "Page hash → “What the page loads and sends” reads the saved page like a kit analyst: what stands out (credentials or card details sent to another site, Telegram, Discord or form-relay drops, IP and location checks, anti-analysis, hidden code, frames), each form with where it sends and which fields it asks for, the calls in its scripts, every site it talks to with what each is, redirects, and the favicon as a picture with its Shodan hash when it is written into the page. Bot tokens and webhook keys are hidden. A page with none of this says so."
+      },
+      {
+        "type": "fixed",
+        "text": "Page hash: a favicon written into the page with quotes inside it was cut short, and the browser's own “saved from url=…” note was offered as a FOFA query — it can contain a path on your computer. It is no longer a comment or a query."
+      },
+      {
+        "type": "added",
+        "text": "Hashes: crypt and capture strings are taken apart (bcrypt cost and salt, SHA-crypt rounds, Argon2 memory and threads, phpass iterations, the user and domain of NetNTLM, the account, realm and SPN of a Kerberoast ticket, the network name in a WPA capture), base64 and LDAP {SHA}/{SSHA} digests are shown as hex with hash lookups, JWTs are decoded with their dates, and hex or base64 that is really text is shown as text. 40 more formats with their hashcat modes: Office, PDF, ZIP, 7-Zip, RAR, KeePass, WPA, DCC2, Cisco 8/9, Drupal, PostgreSQL, MSSQL, Oracle, macOS, Atlassian, wallets, DPAPI, SSH and GPG keys and others."
+      },
+      {
+        "type": "added",
+        "text": "Toolbox → Add a tool: “Something else” names your own lookup type (IBAN, Telegram ID, licence plate…). When it is something OSINTrix picks out of evidence, the tool shows up under Look up for it."
+      },
+      {
+        "type": "fixed",
+        "text": "Entities: persona cards kept the long “Make a profile in …” button inside the card and the reasons under each tie readable; Settings: no gap above Storage."
+      }
+    ]
+  },
+  {
+    "version": "1.76",
+    "name": "WinForensicX hand-off",
+    "date": "2026-11-24",
+    "summary": "Indicators you tick in a WinForensicX case report import as one batch with the finding, host and TLP they came from; any set of indicators exports as a hunt list WinForensicX runs on a host; and a hash filed in a case now joins the same hash in records.",
+    "changes": [
+      {
+        "type": "added",
+        "text": "Threat Intel → Indicators → Export: “Hunt list for WinForensicX (.txt)”. One value per line under a commented header (source, date, TLP, count, the command to run), for Invoke-WfxHunt -IocFile. Only what a Windows host can show goes in: addresses, domains, URLs, emails and hashes; CVEs, ASNs and wallets stay here. Works for the shown list, the whole library or one case."
+      },
+      {
+        "type": "added",
+        "text": "Import indicators: “Also add them to <the open case>” files the imported indicators in the case, each with its description as the note (for a WinForensicX export, the host and finding it came from). Off unless you tick it; re-importing never files anything twice."
+      },
+      {
+        "type": "changed",
+        "text": "After an import, the indicator list shows just that import (filtered by its source), so a batch can be read, exported or added to a case on its own."
+      },
+      {
+        "type": "fixed",
+        "text": "A file entry in a case holding an MD5 or SHA-1 was treated as a SHA-256, so it never joined the same hash found in records or indicator feeds, and its verdict sat on the wrong key. Hashes are now named by their length, and verdicts, watches and research notes saved under the old key move across when the app opens."
+      }
+    ]
+  },
+  {
     "version": "1.75",
     "name": "Design pass across every screen",
     "date": "2026-11-24",

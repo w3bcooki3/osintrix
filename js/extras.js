@@ -46,6 +46,11 @@ function pivotLinks(kind, value){
 }
 /* your own lookup tools: any toolbox entry with a URL template such as https://example.com/search?q={value} */
 const TPL_KINDS = [['ipv4','IP address'],['domain','Domain'],['url','URL'],['email','Email'],['handle','Username'],['hash','File hash'],['phone','Phone'],['person','Person name'],['btc','Wallet'],['cve','CVE'],['any','Anything']];
+/* a tool's own type name ("IBAN", "telegram id", "MAC") to the entity kind it matches, if there is one */
+function toolKindOf(name){ const n = String(name || '').trim().toLowerCase().replace(/\s+/g, ' '); if(!n) return '';
+  const alias = {telegram:'tgid', 'telegram user id':'tgid', discord:'dcid', 'discord user id':'dcid', mac:'mac', 'bssid':'mac', 'autonomous system':'asn', 'as number':'asn', 'bank account':'iban', 'hostname':'domain', 'ip':'ipv4', 'ipv6 address':'ipv6', 'ethereum':'eth', 'bitcoin':'btc', 'monero':'xmr', 'registry key':'regkey', 'windows event id':'eventid', 'event id':'eventid', 'sid':'sid', 'pgp':'pgp', 'gps':'coords', 'coordinates':'coords'};
+  const k = alias[n] || Object.keys(E.LABEL).find(x => x !== 'custom' && (x === n || E.LABEL[x].toLowerCase() === n)) || '';
+  return k ? kindGroup(k) : ''; }
 const kindGroup = k => ({md5:'hash', sha1:'hash', sha256:'hash', sha512:'hash', file:'hash', hostport:'ipv4', ipv6:'ipv4', ip:'ipv4', eth:'btc', sol:'btc', ens:'btc', xmr:'btc', ltc:'btc', trx:'btc', doge:'btc', crypto:'btc', username:'handle', vulnerability:'cve'})[k] || k;
 function toolUrl(t, v){ return t.tpl ? E.safeUrl(t.tpl.replace(/\{value\}/g, encodeURIComponent(v)).replace(/\{raw\}/g, v)) : null; }
 function toolTplLinks(kind, v){ const g = kindGroup(kind); return DB.tools.filter(t => t.tpl && (t.kinds || []).some(k => k === g || k === 'any')).map(t => [t.name, toolUrl(t, v), t.id]).filter(x => x[1]); }
@@ -55,7 +60,7 @@ function ensureToolTpl(){ if(DB.tplSeeded) return; for(const t of DB.tools){ con
 function toolRunDlg(id){
   const t = DB.tools.find(x => x.id === id); if(!t || !t.tpl) return;
   const g = new Set(t.kinds || []), sug = [...derive().ents.values()].filter(x => g.has('any') || g.has(kindGroup(x.k))).slice(0, 12);
-  openDlg(dhead('Run ' + t.name) + `<form data-form="toolRun" data-id="${t.id}"><div class="in"><div class="field"><label for="trV">Value</label><input id="trV" required autofocus placeholder="${esc((TPL_KINDS.find(k => k[0] === (t.kinds || [])[0]) || ['','value'])[1].toLowerCase())}"><span class="hint mono">${esc(t.tpl)}</span></div>
+  openDlg(dhead('Run ' + t.name) + `<form data-form="toolRun" data-id="${t.id}"><div class="in"><div class="field"><label for="trV">Value</label><input id="trV" required autofocus placeholder="${esc(t.kindOther || (TPL_KINDS.find(k => k[0] === (t.kinds || [])[0]) || ['','value'])[1].toLowerCase())}"><span class="hint mono">${esc(t.tpl)}</span></div>
     ${sug.length ? `<div class="t3" style="font-size:calc(13px * var(--ts,1));margin:4px 0 8px">From ${esc(caseNm(theCase()))}:</div><div class="wrap">${sug.map(x => `<button type="button" class="chip" data-act="trPick" data-v="${esc(x.v)}">${esc(x.v.length > 40 ? x.v.slice(0, 39) + '…' : x.v)}</button>`).join('')}</div>` : ''}</div>
     <footer><button class="btn" type="button" data-act="dclose">Cancel</button><button class="btn primary" type="submit">${ico('arrow-up-right','sm')}Open</button></footer></form>`);
 }

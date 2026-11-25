@@ -152,6 +152,7 @@ function viewLab(){
     <nav class="labtabs lt-one" aria-label="Tools">${LAB_GROUPS.map(([g, ks], gi) => { const T = ks.map(k => LAB_TABS.find(x => x[0] === k)).filter(Boolean), cur = T.find(x => x[0] === t), open = UI.ltOpen === gi;
       return `<div class="lt-c${cur ? ' on' : ''}"><button class="lt-cat" data-act="ltCat" data-v="${gi}" aria-expanded="${open}" aria-haspopup="true">${ico(cur ? cur[2] : T[0][2],'sm')}<span class="lt-cl">${g}</span>${cur ? `<span class="lt-cur">${cur[1]}</span>` : `<span class="lt-n">${T.length}</span>`}${ico('chevron-down','sm')}</button>
         <div class="lt-pop" role="menu"${open ? '' : ' hidden'}>${T.map(([k, l, i]) => `<button role="menuitemradio" data-act="labTab" data-v="${k}" aria-checked="${t === k}">${ico(i,'sm')}${l}</button>`).join('')}</div></div>`; }).join('')}</nav>
+    ${labStrip(t)}
     ${body}</div></div>`;
 }
 /* file inspector */
@@ -472,13 +473,60 @@ const HASHES = [
   [/^\$2[abxy]?\$\d{2}\$[.\/A-Za-z0-9]{53}$/, ['bcrypt'], '3200'], [/^\$1\$[^$]{0,8}\$[.\/A-Za-z0-9]{22}$/, ['MD5-crypt (Unix $1$)'], '500'], [/^\$5\$/, ['SHA-256-crypt (Unix $5$)'], '7400'], [/^\$6\$/, ['SHA-512-crypt (Unix $6$)'], '1800'],
   [/^\$y\$/, ['yescrypt (modern Linux shadow)'], '—'], [/^\$argon2(id|i|d)\$/, ['Argon2'], '—'], [/^\$apr1\$/, ['Apache APR1-MD5'], '1600'], [/^pbkdf2_sha256\$/, ['Django PBKDF2-SHA256'], '10000'],
   [/^\$P\$|^\$H\$/, ['phpass (WordPress, phpBB)'], '400'], [/^[^:]+::[^:]*:[a-f0-9]{16}:[a-f0-9]{32}:[a-f0-9]+$/i, ['NetNTLMv2'], '5600'], [/^[^:]+::[^:]*:[a-f0-9]{48}:[a-f0-9]{48}:[a-f0-9]{16}$/i, ['NetNTLMv1'], '5500'],
-  [/^\$krb5tgs\$23\$/, ['Kerberos 5 TGS-REP (Kerberoast)'], '13100'], [/^\$krb5asrep\$23\$/, ['Kerberos 5 AS-REP (AS-REP roast)'], '18200'], [/^eyJ[\w-]+\.eyJ[\w-]+\.[\w-]*$/, ['JWT (JSON Web Token) — decode in Decoder'], '16500'],
-  [/^[A-Za-z0-9+/]{27}=$/, ['Base64 SHA-1 (e.g. LDAP {SHA})'], '101'], [/^[A-Za-z0-9+/]{43}=$/, ['Base64 SHA-256'], '1411'], [/^\{SSHA\}/i, ['LDAP SSHA'], '111']];
+  [/^\$krb5tgs\$23\$/, ['Kerberos 5 TGS-REP (Kerberoast)'], '13100'], [/^\$krb5asrep\$23\$/, ['Kerberos 5 AS-REP (AS-REP roast)'], '18200'], [/^eyJ[\w-]+\.eyJ[\w-]+\.[\w-]*$/, ['JWT (JSON Web Token)'], '16500'],
+  [/^[A-Za-z0-9+/]{22}==$/, ['Base64 MD5'], '—'], [/^[A-Za-z0-9+/]{27}=$/, ['Base64 SHA-1 (e.g. LDAP {SHA})'], '101'], [/^[A-Za-z0-9+/]{43}=$/, ['Base64 SHA-256'], '1411'], [/^\{SSHA\}/i, ['LDAP SSHA'], '111'],
+  [/^\{SHA\}/i, ['LDAP SHA-1'], '101'], [/^\{(MD5)\}/i, ['LDAP MD5'], '—'], [/^\{SMD5\}/i, ['LDAP salted MD5'], '—'], [/^\{SSHA256\}/i, ['LDAP salted SHA-256'], '1411'], [/^\{SSHA512\}/i, ['LDAP salted SHA-512'], '1711'],
+  [/^\$DCC2\$\d+#[^#]+#[a-f0-9]{32}$/i, ['Domain Cached Credentials 2 (mscash2)'], '2100'], [/^[a-f0-9]{32}:[^:]{1,64}$/i, ['Salted MD5/NTLM, or Domain Cached Credentials 1 (hash:user)'], '10 · 20 · 1100'],
+  [/^\$8\$[.\/A-Za-z0-9]{14}\$[.\/A-Za-z0-9]{43}$/, ['Cisco type 8 (PBKDF2-SHA256)'], '9200'], [/^\$9\$[.\/A-Za-z0-9]{14}\$[.\/A-Za-z0-9]{43}$/, ['Cisco type 9 (scrypt)'], '9300'], [/^\$sha1\$\d+\$/, ['SHA1-crypt (NetBSD)'], '15100'],
+  [/^\$S\$[.\/A-Za-z0-9]{52}$/, ['Drupal 7'], '7900'], [/^md5[a-f0-9]{32}$/i, ['PostgreSQL MD5'], '12'], [/^0x0100[a-f0-9]{48}$/i, ['MSSQL 2005'], '132'], [/^0x0200[a-f0-9]{136}$/i, ['MSSQL 2012+'], '1731'],
+  [/^S:[a-f0-9]{60}$/i, ['Oracle 11g (S:)'], '112'], [/^\$ml\$\d+\$[a-f0-9]{64}\$[a-f0-9]{128}$/i, ['macOS 10.8+ (PBKDF2-SHA512)'], '7100'], [/^\{PKCS5S2\}/, ['Atlassian (PBKDF2-SHA1)'], '12001'],
+  [/^\$pbkdf2-sha(256|512|1)\$/, ['PBKDF2 (passlib)'], '10900 · 20200'], [/^\$7\$|^SCRYPT:/, ['scrypt'], '8900'], [/^\$office\$\*20(07|10|13)\*/, ['Microsoft Office document password'], '9400 · 9500 · 9600'],
+  [/^\$oldoffice\$/, ['Microsoft Office 97–2003 password'], '9700 · 9800'], [/^\$pdf\$/, ['PDF password'], '10400 · 10500 · 10600 · 10700'], [/^\$zip2\$/, ['WinZip AES archive'], '13600'], [/^\$pkzip2?\$/, ['PKZIP archive'], '17200–17230'],
+  [/^\$7z\$/, ['7-Zip archive'], '11600'], [/^\$rar5\$/, ['RAR5 archive'], '13000'], [/^\$RAR3\$/, ['RAR3 archive'], '12500'], [/^\$keepass\$/, ['KeePass database'], '13400'], [/^WPA\*0[12]\*/, ['WPA/WPA2 handshake or PMKID'], '22000'],
+  [/^\$bitcoin\$/, ['Bitcoin Core wallet'], '11300'], [/^\$ethereum\$/, ['Ethereum keystore'], '15600 · 15700'], [/^\$metamask\$/, ['MetaMask vault'], '26600'], [/^\$electrum\$/, ['Electrum wallet'], '16600 · 21700'], [/^\$blockchain\$/, ['Blockchain.com wallet'], '12700'],
+  [/^\$DPAPImk\$/, ['Windows DPAPI master key'], '15300 · 15900'], [/^\$sshng\$/, ['SSH private key passphrase'], '22911 – 22941'], [/^\$gpg\$/, ['GPG private key passphrase'], '17010'], [/^\$itunes_backup\$/, ['iTunes backup'], '14700 · 14800'],
+  [/^\$telegram\$/, ['Telegram desktop passcode'], '22301'], [/^\$krb5tgs\$(17|18)\$/, ['Kerberos 5 TGS-REP AES (Kerberoast)'], '19600 · 19700'], [/^\$krb5pa\$/, ['Kerberos 5 AS-REQ pre-auth'], '7500 · 19800 · 19900']];
+/* what a hash-shaped string holds that can be read: the parts of crypt and capture formats, base64 and LDAP digests as hex,
+   a JWT's header and payload, and hex or base64 that is really text. A digest itself cannot be reversed — that is said, not faked. */
+function hashDecode(h){
+  const R = [], hexOf = b => [...b].map(x => x.toString(16).padStart(2, '0')).join(''), b64 = s => { try{ s = s.replace(/-/g, '+').replace(/_/g, '/').replace(/\s+/g, ''); while(s.length % 4) s += '='; const bin = atob(s); return Uint8Array.from(bin, c => c.charCodeAt(0)); }catch(e){ return null; } };
+  const dig = n => ({16:'MD5', 20:'SHA-1', 28:'SHA-224', 32:'SHA-256', 48:'SHA-384', 64:'SHA-512'})[n] || '', text = b => { try{ const t = new TextDecoder('utf-8', {fatal:true}).decode(b); return /^[\t\n\r\x20-\x7e\u00a0-\uffff]+$/.test(t) && !/[\ufffd]/.test(t) ? t : null; }catch(e){ return null; } };
+  let m;
+  if((m = /^\$2([abxy]?)\$(\d{2})\$([.\/A-Za-z0-9]{22})([.\/A-Za-z0-9]{31})$/.exec(h))) R.push(['Cost', m[2] + ' (2^' + (+m[2]) + ' = ' + (2 ** +m[2]).toLocaleString() + ' rounds)'], ['Salt', m[3]], ['Hash', m[4]]);
+  else if((m = /^\$(1|5|6|apr1)\$(?:rounds=(\d+)\$)?([^$]*)\$(.+)$/.exec(h))) R.push(['Scheme', {1:'MD5-crypt', 5:'SHA-256-crypt', 6:'SHA-512-crypt', apr1:'Apache APR1'}[m[1]]], ['Rounds', m[2] ? (+m[2]).toLocaleString() : (m[1] === '5' || m[1] === '6' ? '5,000 (default)' : '1,000 (fixed)')], ['Salt', m[3]], ['Hash', m[4]]);
+  else if((m = /^\$argon2(id|i|d)\$v=(\d+)\$m=(\d+),t=(\d+),p=(\d+)\$([^$]+)\$(.+)$/.exec(h))){ const sb = b64(m[6]); R.push(['Variant', 'Argon2' + m[1] + ', version ' + m[2]], ['Memory', (+m[3]).toLocaleString() + ' KiB'], ['Passes / threads', m[4] + ' / ' + m[5]], ['Salt', m[6] + (sb ? ' (' + sb.length + ' bytes)' : '')], ['Hash', m[7]]); }
+  else if((m = /^\$y\$([^$]+)\$([^$]+)\$(.+)$/.exec(h))) R.push(['Parameters', m[1]], ['Salt', m[2]], ['Hash', m[3]]);
+  else if((m = /^pbkdf2_(sha\d+)\$(\d+)\$([^$]+)\$(.+)$/.exec(h))){ const d = b64(m[4]); R.push(['Algorithm', 'PBKDF2-' + m[1].toUpperCase()], ['Iterations', (+m[2]).toLocaleString()], ['Salt', m[3]], ['Hash', m[4] + (d ? ' = ' + hexOf(d) : '')]); }
+  else if((m = /^\$(P|H)\$(.)(.{8})(.{22})$/.exec(h))){ const it = './0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'.indexOf(m[2]); R.push(['Iterations', it > 0 ? '2^' + it + ' = ' + (2 ** it).toLocaleString() : '?'], ['Salt', m[3]], ['Hash', m[4]]); }
+  else if((m = /^([^:]+)::([^:]*):([a-f0-9]{16}):([a-f0-9]{32}):([a-f0-9]+)$/i.exec(h))) R.push(['User', m[1]], ['Domain', m[2] || '(none)'], ['Server challenge', m[3]], ['NT proof', m[4]], ['Client blob', m[5].length / 2 + ' bytes']);
+  else if((m = /^([^:]+)::([^:]*):([a-f0-9]{48}):([a-f0-9]{48}):([a-f0-9]{16})$/i.exec(h))) R.push(['User', m[1]], ['Domain', m[2] || '(none)'], ['LM response', m[3]], ['NT response', m[4]], ['Server challenge', m[5]]);
+  else if((m = /^\$krb5tgs\$(\d+)\$\*([^$*]+)\$([^$*]+)\$([^*]+)\*\$/.exec(h))) R.push(['Encryption', m[1] === '23' ? 'RC4 (etype 23)' : 'AES (etype ' + m[1] + ')'], ['Account', m[2]], ['Realm', m[3]], ['Service (SPN)', m[4].replace(/~/g, ':')]);
+  else if((m = /^\$krb5asrep\$(\d+)\$([^:$]+)@?([^:$]*):/.exec(h))) R.push(['Encryption', 'etype ' + m[1]], ['Account', m[2] + (m[3] ? '@' + m[3] : '')]);
+  else if((m = /^\$DCC2\$(\d+)#([^#]+)#([a-f0-9]{32})$/i.exec(h))) R.push(['Iterations', (+m[1]).toLocaleString()], ['User', m[2]], ['Hash', m[3]]);
+  else if((m = /^md5([a-f0-9]{32})$/i.exec(h))) R.push(['Hash', m[1]], ['Note', 'md5(password + username) — the username is the salt']);
+  else if((m = /^0x0(100|200)([a-f0-9]{8})([a-f0-9]+)$/i.exec(h))) R.push(['Salt', m[2]], ['Hash', m[3]]);
+  else if((m = /^S:([a-f0-9]{40})([a-f0-9]{20})$/i.exec(h))) R.push(['Hash (SHA-1)', m[1]], ['Salt', m[2]]);
+  else if((m = /^\{(SHA|SSHA|MD5|SMD5|SSHA256|SSHA512)\}(.+)$/i.exec(h))){ const b = b64(m[2]), sch = m[1].toUpperCase(), n = {SHA:20, SSHA:20, MD5:16, SMD5:16, SSHA256:32, SSHA512:64}[sch];
+    if(b && b.length >= n){ R.push(['Digest (hex)', hexOf(b.slice(0, n))]); if(b.length > n) R.push(['Salt (hex)', hexOf(b.slice(n))]); } }
+  else if((m = /^\{PKCS5S2\}(.+)$/.exec(h))){ const b = b64(m[1]); if(b && b.length === 48) R.push(['Salt (hex)', hexOf(b.slice(0, 16))], ['Hash (hex)', hexOf(b.slice(16))], ['Iterations', '10,000']); }
+  else if((m = /^WPA\*0([12])\*([a-f0-9]{32})\*([a-f0-9]{12})\*([a-f0-9]{12})\*([a-f0-9]*)\*/i.exec(h))){ const ss = text(Uint8Array.from(m[5].match(/../g) || [], x => parseInt(x, 16)));
+    R.push(['Kind', m[1] === '1' ? 'PMKID' : 'EAPOL handshake'], ['Access point (BSSID)', m[3].match(/../g).join(':')], ['Client', m[4].match(/../g).join(':')], ['Network name (SSID)', ss || m[5]]); }
+  else if(/^eyJ[\w-]+\.eyJ[\w-]+\.[\w-]*$/.test(h)){ const [a, b2] = h.split('.'), A = b64(a), B = b64(b2); try{ const H2 = JSON.parse(new TextDecoder().decode(A)), P = JSON.parse(new TextDecoder().decode(B));
+      R.push(['Header', JSON.stringify(H2)], ['Payload', JSON.stringify(P)]); for(const k of ['iat', 'nbf', 'exp']) if(typeof P[k] === 'number') R.push([{iat:'Issued', nbf:'Valid from', exp:'Expires'}[k], new Date(P[k] * 1000).toISOString().replace('T', ' ').slice(0, 19) + ' UTC' + (k === 'exp' && P[k] * 1000 < Date.now() ? ' (expired)' : '')]);
+      R.push(['Signature', H2.alg === 'none' ? 'none — the token is not signed and can be forged' : 'not checked (needs the key)']); }catch(e){} }
+  else if(/^[A-Za-z0-9+/]+={0,2}$/.test(h) && h.length >= 16 && h.length % 4 === 0 && !/^[a-f0-9]+$/i.test(h)){ const b = b64(h); if(b){ const t = text(b);
+      if(dig(b.length) && !t) R.push(['Base64 of ' + (/^[AEIOUM]/.test(dig(b.length)) ? 'an ' : 'a ') + dig(b.length) + '-sized digest', hexOf(b)], ['Note', 'The hex is what hash lookups take — links below.']); else if(t && t.length >= 4) R.push(['Base64 text', t.length > 400 ? t.slice(0, 400) + '…' : t]); } }
+  else if(/^([a-f0-9]{2}){6,}$/i.test(h) && !dig(h.length / 2) && h.length !== 8 && h.length !== 16){ const t = text(Uint8Array.from(h.match(/../g), x => parseInt(x, 16))); if(t && t.length >= 4) R.push(['Hex text', t.length > 400 ? t.slice(0, 400) + '…' : t]); }
+  else if(/^([a-f0-9]{2}){8,}$/i.test(h) && dig(h.length / 2)){ const t = text(Uint8Array.from(h.match(/../g), x => parseInt(x, 16))); if(t && t.length >= 6 && /^[\x20-\x7e]+$/.test(t)) R.push(['Also reads as text', t]); }
+  return R;
+}
 function hashTable(input){
   const lines = String(input || '').split('\n').map(s => s.trim()).filter(Boolean).slice(0, 50);
   if(!lines.length) return '<p class="t3">Paste one hash per line — hex digests, Unix crypt strings, NetNTLM, Kerberos tickets, JWTs…</p>';
-  return lines.map(h => { const m = HASHES.filter(([re]) => re.test(h)); const kind = h.length === 64 ? 'sha256' : h.length === 40 ? 'sha1' : h.length === 32 ? 'md5' : '';
-    return `<div class="hrow"><code>${esc(h.length > 90 ? h.slice(0, 90) + '…' : h)}</code><div>${m.length ? m.map(([, n, mode]) => `<span class="hcand"><b>${esc(n[0])}</b>${n.slice(1).length ? `<span class="t3"> · or ${esc(n.slice(1).join(', '))}</span>` : ''}<span class="mono hmode">hashcat -m ${esc(mode)}</span></span>`).join('') : '<span class="t3">Unknown format</span>'}
+  return lines.map(h => { const m = HASHES.filter(([re]) => re.test(h)), dec = hashDecode(h); const kind = h.length === 64 ? 'sha256' : h.length === 40 ? 'sha1' : h.length === 32 ? 'md5' : '';
+    return `<div class="hrow"><code>${esc(h.length > 90 ? h.slice(0, 90) + '…' : h)}</code><div>${m.length ? m.map(([, n, mode]) => `<span class="hcand"><b>${esc(n[0])}</b>${n.slice(1).length ? `<span class="t3"> · or ${esc(n.slice(1).join(', '))}</span>` : ''}<span class="mono hmode">${mode === '—' ? 'not in hashcat' : 'hashcat -m ' + esc(mode)}</span></span>`).join('') : `<span class="t3">${dec.length ? 'Not a hash format — decoded below' : 'Unknown format'}</span>`}
+      ${dec.length ? `<dl class="hdec">${dec.map(([k, v]) => `<dt>${esc(k)}</dt><dd class="mono">${esc(v)}</dd>`).join('')}</dl>` : ''}
+      ${(d => d ? `<div class="pivots" style="margin-top:6px">${pivotLinks(d[1].length === 64 ? 'sha256' : d[1].length === 40 ? 'sha1' : 'md5', d[1]).map(([n, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(n)}${ico('arrow-up-right','sm')}</a>`).join('')}</div>` : '')(dec.find(([k, v]) => /^(Base64 of a|Digest \(hex\))/.test(k) && [32, 40, 64].includes(v.length)))}
       ${/^[a-f0-9]+$/i.test(h) && kind ? `<div class="pivots" style="margin-top:6px">${pivotLinks(kind, h).map(([n, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(n)}${ico('arrow-up-right','sm')}</a>`).join('')}</div>` : ''}</div></div>`; }).join('');
 }
 function labHash(){
@@ -510,7 +558,7 @@ function geoOut(s){
     <div class="kv"><span>DMS</span><code>${esc(toDMS(la, 'N', 'S') + ' ' + toDMS(lo, 'E', 'W'))}</code><button class="iconbtn" data-act="flagCopy" data-v="${esc(toDMS(la, 'N', 'S') + ' ' + toDMS(lo, 'E', 'W'))}" aria-label="Copy">${ico('copy','sm')}</button></div>
     <div class="kv"><span>Degrees, decimal minutes</span><code>${esc(ddm(la, 'N', 'S') + ', ' + ddm(lo, 'E', 'W'))}</code></div>
     <div class="isec"><h4>Open in</h4><div class="pivots">${geoLinks(la, lo).map(([n, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(n)}${ico('arrow-up-right','sm')}</a>`).join('')}</div></div>
-    <button class="btn primary" data-act="geoSave" data-v="${la}, ${lo}" style="margin-top:14px">${ico('map-pin','sm')}Add as a location to ${esc(caseNm(theCase()))}</button>`;
+    <button class="btn primary" data-act="geoSave" data-v="${la}, ${lo}" style="margin-top:14px">${ico('map-pin','sm')}Add as a location to ${esc(caseNm(theCase()))}</button>${casePick()}`;
 }
 function labGeo(){
   return `<div class="labgrid one"><section class="card"><header><h3>Read coordinates</h3></header><div class="body">
@@ -658,3 +706,34 @@ const GEN_ACTS = {
     const L = (v === 'u' ? R.users : v === 'c' ? R.corp : R.personal).map(x => x.v), a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([L.join('\n') + '\n'], {type:'text/plain'}));
     a.download = ((UI.genName || 'names').trim().replace(/[^\w-]+/g, '-').toLowerCase() || 'names') + '-' + ({u:'usernames', c:'work-email', p:'personal-email'}[v]) + '.txt'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); },
 };
+
+/* ---------- every Investigate / Decode tool: Clear, and (if you switch it on) the last 10 things you looked up ----------
+   History is off unless Settings → Data → "Search history in tools" is on; turning it off forgets it. A search is recorded
+   when you press Enter in the box or leave it — not on every keystroke. */
+const LAB_IN = {
+  twist:{ids:['twD'], run:v => actFor('twTry')(null, v), clear:() => actFor('twClear')()},
+  ident:{ids:['idQ'], run:v => { UI.idq = v; renderMain(); }, clear:() => { UI.idq = ''; renderMain(); refocus('idQ'); }},
+  corp:{ids:['fpD'], run:v => { const i = $('fpD'); if(i){ i.value = v; i.focus(); } }, clear:() => { if(UI.fp && UI.fp.sig) UI.fp.sig.stop = true; UI.fp = null; UI.fpD = ''; renderMain(); refocus('fpD'); }},
+  geo:{keys:['geoIn']}, net:{keys:['cidrIn', 'macIn', 'uaIn']}, gen:{keys:['genName', 'genNums', 'genDom']},
+  time:{keys:['tsIn']}, hash:{keys:['hashIn']}, email:{keys:['emlIn'], noHist:true},
+  fav:{clear:() => { UI.fxFav = null; renderMain(); }, noHist:true}, clean:{clear:() => clickAct('clClear'), noHist:true}};
+const LAB_HIST_ID = {}; for(const [t, C] of Object.entries(LAB_IN)) if(!C.noHist) for(const id of (C.ids || C.keys)) LAB_HIST_ID[id] = t;
+const labHistOn = () => !!(DB.prefs && DB.prefs.toolHist === 'on');
+const labHistOf = t => (labHistOn() && DB.work && DB.work.hist && Array.isArray(DB.work.hist[t])) ? DB.work.hist[t] : [];
+function labHistAdd(id, v){
+  const t = LAB_HIST_ID[id]; v = String(v || '').trim(); if(!t || !labHistOn() || v.length < 2 || v.length > 300) return;
+  DB.work = DB.work || {}; const H = DB.work.hist = DB.work.hist && typeof DB.work.hist === 'object' ? DB.work.hist : {};
+  const L = (H[t] || []).filter(h => !(h.k === id && h.v === v)); L.unshift({k:id, v, at:Date.now()}); H[t] = L.slice(0, 10); save();
+}
+document.addEventListener('change', ev => { const el = ev.target; if(el && LAB_HIST_ID[el.id]) labHistAdd(el.id, el.value); });
+function labStrip(t){
+  const C = LAB_IN[t]; if(!C) return '';
+  const H = C.noHist ? [] : labHistOf(t), cut = s => s.length > 42 ? s.slice(0, 40) + '…' : s;
+  const rec = !C.noHist && labHistOn() ? (H.length ? `<span class="t3 small">Recent</span>${H.map((h, i) => `<button class="chip mono" data-act="labHist" data-id="${t}" data-v="${i}" title="${esc(h.v)}">${esc(cut(h.v.replace(/\s+/g, ' ')))}</button>`).join('')}<button class="lnk small" data-act="labHistDel" data-v="${t}">Forget these</button>` : '<span class="t3 small">What you look up here will be listed (last 10).</span>') : '';
+  return `<div class="lab-strip">${rec}<span class="sp"></span><button class="btn sm ghost" data-act="labToolClear" data-v="${t}" title="Clear this tool">${ico('eraser','sm')}Clear</button></div>`;
+}
+const LAB_HIST_ACTS = {
+  labToolClear:(id, v) => { const C = LAB_IN[v]; if(!C) return; if(C.clear) C.clear(); else { C.keys.forEach(k => { UI[k] = ''; }); renderMain(); } if(typeof workSync === 'function') workSync(); },
+  labHist:(id, v) => { const C = LAB_IN[id], h = labHistOf(id)[+v]; if(!C || !h) return; if(C.run) C.run(h.v); else { UI[h.k] = h.v; renderMain(); refocus(h.k); } if(typeof workSync === 'function') workSync(); },
+  labHistDel:(id, v) => { if(DB.work && DB.work.hist) delete DB.work.hist[v]; save(); renderMain(); toast('Forgotten'); },
+  toolHist:(id, v) => { DB.prefs.toolHist = v === 'on' ? 'on' : 'off'; if(v !== 'on' && DB.work) delete DB.work.hist; save(); renderMain(); toast(v === 'on' ? 'Tools remember your last 10 searches' : 'Tool history off — and forgotten'); }};

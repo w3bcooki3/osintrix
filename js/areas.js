@@ -253,20 +253,24 @@ function viewSettings(){
       <div class="wrap" style="align-items:center;margin-top:14px"><button class="btn" data-act="showWelcome">${ico('eye','sm')}Show welcome</button><button class="btn" data-act="setupOpen">${ico('sparkles','sm')}Run setup</button></div></div>
       <p class="t3" style="margin:16px 0 0;font-size:calc(13px * var(--ts,1))">A private, browser-only OSINT workspace. Geist, Geist Mono, Inter and JetBrains Mono (OFL 1.1) · Lucide icons (ISC) · Cytoscape.js (MIT) · jsQR (Apache-2.0) · IEEE OUI list via oui-data (BSD-2) — all bundled, nothing loads from the network. <a href="#/help">Help &amp; FAQ</a></p></div></section>
     <div class="grid cols-2" style="align-items:start">
+      <div class="set-col">
       <section class="card"><header><h3>Appearance</h3></header><div class="body">
         <div class="field"><span class="label">Theme</span>${seg('theme', [['dark','Dark','moon'],['light','Light','sun']])}</div>
         <div class="field"><span class="label">Text size</span>${seg('size', [['s','Small'],['m','Default'],['l','Large']])}</div>
         <div class="field"><span class="label">Density</span>${seg('density', [['comfortable','Comfortable'],['compact','Compact']])}</div>
         <div class="field" style="margin:0"><label for="tzSel">Show times in</label><select id="tzSel" data-pref="tz">${['UTC','America/New_York','America/Chicago','America/Los_Angeles','Europe/London','Europe/Berlin','Asia/Kolkata','Asia/Tokyo','Australia/Sydney'].map(z => `<option${p.tz === z ? ' selected' : ''}>${z}</option>`).join('')}</select></div></div></section>
+      ${storageCard()}
+      </div>
       <section class="card"><header><h3>Data</h3></header><div class="body">
         <p class="t2" style="margin:0 0 14px">Everything lives in this browser. Export regularly — see <a href="#/help">Help</a> for backup, import and reset.</p>
         <div class="wrap"><button class="btn" data-act="exportAll">${ico('download','sm')}Export everything</button>${DB.sample ? `<button class="btn" data-act="removeSample">${ico('trash-2','sm')}Remove sample data</button>` : ''}<button class="btn danger" data-act="resetDemo">${ico('undo-2','sm')}Reset to demo</button></div>
         <p class="t3" style="font-size:calc(13px * var(--ts,1));margin:12px 0 0">${DB.prefs.lastExport ? 'Last exported ' + esc(ago(DB.prefs.lastExport)) + '.' : 'Never exported.'} <a href="#/trash">Trash &amp; restore points</a> · <a href="#/security">Security &amp; audit</a>${(DB.trash || []).length ? ' · ' + DB.trash.length + ' in trash' : ''}</p>
         <div class="isec"><h4>Works offline</h4><p class="t2" style="margin:0 0 10px;font-size:calc(13.5px * var(--ts,1))">${!/^https?:$/.test(location.protocol) ? 'Opened as a file, so the app is already on this computer — nothing to set up.' : 'Keeps a copy of the app\'s own files (never your data) so it opens instantly and works with no connection.'}</p>
           ${/^https?:$/.test(location.protocol) ? `<div class="seg"><button data-act="offlineSet" data-v="on" aria-pressed="${!DB.prefs.noOffline}">${ico('wifi-off','sm')}On</button><button data-act="offlineSet" data-v="off" aria-pressed="${!!DB.prefs.noOffline}">Off</button></div>` : ''}</div>
+        <div class="isec"><h4>Search history in tools</h4><p class="t2" style="margin:0 0 8px">When on, the Forensics kit lists the last 10 things you looked up in each tool. Off keeps nothing; turning it off forgets what was kept.</p>
+          <div class="seg"><button data-act="toolHist" data-v="off" aria-pressed="${DB.prefs.toolHist !== 'on'}">Off</button><button data-act="toolHist" data-v="on" aria-pressed="${DB.prefs.toolHist === 'on'}">On</button></div></div>
         <div class="isec"><h4>Recent changes</h4>${DB.log.slice(0, 6).map(l => `<div class="li" style="padding:6px 0"><div class="main2"><b style="font-weight:500;font-size:calc(13.5px * var(--ts,1))">${esc(l.what)}</b></div><span class="end mono">${esc(E.fmtClock(l.at, tz()))}</span></div>`).join('') || '<span class="t3" style="font-size:calc(13.5px * var(--ts,1))">Nothing yet.</span>'}</div></div></section>
       
-      ${storageCard()}
     </div></div></div>`;
 }
 

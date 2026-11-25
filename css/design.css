@@ -3771,10 +3771,17 @@ button.st-w:active{transform:scale(.995)}
 .ps-card h3{margin:0;font-size:calc(14.5px * var(--ts,1));font-weight:620;overflow-wrap:anywhere}
 .ps-card header small{color:var(--text-3);font-size:calc(12.5px * var(--ts,1))}
 .ps-ties{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
-.ps-ties li{display:grid;grid-template-columns:auto auto minmax(0,1fr);gap:8px;align-items:center;font-size:calc(12.5px * var(--ts,1));color:var(--text-2)}
-.ps-ties li span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ps-ties li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 8px;align-items:center;font-size:calc(12.5px * var(--ts,1));color:var(--text-2)}
+.ps-ties li .lnk{justify-self:start;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ps-ties li>span:last-child{grid-column:2;color:var(--text-3);line-height:1.35}
 .ps-names{display:flex;flex-wrap:wrap;gap:6px}
 .ps-card footer{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto}
+.ps-card footer>.btn{flex:none}
+.ps-mk{display:inline-flex;min-width:0;max-width:100%}
+.ps-mk .btn:first-child{min-width:0;flex:0 1 auto}
+.ps-mk-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.qp-log{display:inline-flex;align-items:center;gap:8px;font-size:calc(13px * var(--ts,1));color:var(--text-2);white-space:nowrap}
+.qp-log select{width:auto;max-width:240px;height:36px;padding-top:0;padding-bottom:0}
 .ps-ch{margin:14px 0 4px;font-size:calc(13px * var(--ts,1));color:var(--text-2)}
 @media (max-width:760px){.ps-grid{grid-template-columns:minmax(0,1fr)}}
 /* ---------- Tradecraft — the field guide ---------- */
@@ -4017,3 +4024,32 @@ button.st-w:active{transform:scale(.995)}
 .ds .ce-t .rsmini{display:inline-block;vertical-align:middle;margin-right:6px}
 .ds .ce-t td:has(> .rsmini){white-space:nowrap}
 .rx-f{z-index:6}
+.set-col{display:flex;flex-direction:column;gap:18px;min-width:0}
+.ds .tw-bar{margin:12px 0 8px;align-items:center}
+.ds .tw-tbl tr.tw-r{cursor:pointer}
+.ds .tw-tbl tr.tw-r:hover td,.ds .tw-tbl tr.tw-r:focus-visible td{background:var(--surface-2)}
+.ds .tw-tbl tr.tw-r:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.ds .tw-tbl td.tw-go{width:36px;text-align:center;color:var(--text-3)}
+.ds .tw-tbl tr.tw-r:hover td.tw-go{color:var(--accent)}
+.ds .tw-s{font-weight:650;color:var(--text-2)}.ds .tw-s.md{color:var(--amber)}.ds .tw-s.hi{color:var(--red)}
+.ds .tw-ex{color:var(--text);font-weight:600}
+.ds .tw-wh{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;margin:0 0 6px}.ds .tw-wh b{font-size:calc(13px * var(--ts,1))}.ds .tw-wh .t3{font-size:calc(12.5px * var(--ts,1))}
+.ds .tw-wl{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:4px 16px}
+.ds .tw-wl li{display:flex;align-items:center;gap:8px;min-width:0;padding:3px 0}
+.ds .tw-wl li .lnk{font-size:calc(13px * var(--ts,1));min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ds .tw-wl li.on .lnk{font-weight:650;color:var(--accent)}
+.ds .tw-wl li .t3{font-size:calc(12px * var(--ts,1));white-space:nowrap}
+.ds .tw-wl li .iconbtn{margin-left:auto;opacity:.55}.ds .tw-wl li:hover .iconbtn,.ds .tw-wl li .iconbtn:focus-visible{opacity:1}
+.ds .lab-strip{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:-6px 0 12px;min-height:32px}
+.ds .lab-strip .chip{max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:calc(12px * var(--ts,1))}
+.ds .lab-strip .lnk{font-size:calc(12.5px * var(--ts,1))}
+.ds .lab-strip>.btn:last-child{margin-left:auto}
+.ds .fxs h4.fxs-h{margin:14px 0 6px;font-size:calc(12.5px * var(--ts,1));font-weight:650;color:var(--text-2)}.ds .fxs h4.fxs-h:first-child{margin-top:0}.ds .fxs h4.fxs-h .t3{font-weight:400}
+.ds .fxs-flags{display:flex;flex-direction:column;gap:6px;margin-bottom:6px}
+.ds .fxs-form{padding:8px 10px;border:1px solid var(--border-soft);border-radius:10px;margin-bottom:6px;display:flex;flex-direction:column;gap:6px}.ds .fxs-form code{overflow-wrap:anywhere}
+.ds .fxs-fields{display:flex;flex-wrap:wrap;gap:4px}
+.ds .fxs-t td{padding:5px 8px;vertical-align:top;font-size:calc(12.5px * var(--ts,1))}.ds .fxs-t code{overflow-wrap:anywhere}.ds .fxs-t .nw{white-space:nowrap}
+.ds .fxs-fav{display:inline-flex;align-items:center;gap:10px}.ds .fxs-fav img{width:32px;height:32px;border-radius:6px;border:1px solid var(--border-soft);background:var(--surface-2);flex:none}
+.ds .fxs-loc summary{cursor:pointer;color:var(--text-2)}
+.ds .hdec{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:3px 14px;margin:8px 0 0;padding:8px 10px;border-radius:8px;background:var(--surface-2);font-size:calc(12.5px * var(--ts,1))}
+.ds .hdec dt{color:var(--text-3)}.ds .hdec dd{margin:0;overflow-wrap:anywhere;color:var(--text)}

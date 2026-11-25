@@ -193,7 +193,9 @@ function toolDlg(id){
     <div class="field"><label for="tTags">Tags</label><input id="tTags" value="${esc(t.tags.join(', '))}" placeholder="free, osint, email"></div>
     <div class="field" style="margin:0"><label for="tTpl">Lookup address <span class="t3">optional</span></label><input id="tTpl" value="${esc(t.tpl || '')}" placeholder="https://example.com/search?q={value}" spellcheck="false">
       <span class="hint">Put <span class="mono">{value}</span> where the IP, domain, email or hash goes. The tool then shows up under “Look up” for those entities.</span>
-      <div class="wrap" style="margin-top:8px">${TPL_KINDS.map(([k, l]) => `<label class="chk kchk"><input type="checkbox" name="tKind" value="${k}"${(t.kinds || []).includes(k) ? ' checked' : ''}>${l}</label>`).join('')}</div></div></div>
+      <div class="wrap" style="margin-top:8px">${TPL_KINDS.map(([k, l]) => `<label class="chk kchk"><input type="checkbox" name="tKind" value="${k}"${(t.kinds || []).includes(k) ? ' checked' : ''}>${l}</label>`).join('')}</div>
+      <div class="field" style="margin:12px 0 0"><label for="tKindOther">Something else <span class="t3">optional</span></label><input id="tKindOther" value="${esc(t.kindOther || '')}" maxlength="40" placeholder="e.g. IBAN, Telegram ID, MAC address, licence plate, VIN">
+        <span class="hint">Your own name for what goes in <span class="mono">{value}</span>. When it is something ${esc(BRAND.name)} picks out of evidence (IBAN, Telegram ID, MAC address, ASN…), the tool also shows up under “Look up” for it.</span></div></div></div>
     <footer>${id ? `<button class="btn danger" type="button" data-act="toolDel" data-id="${id}" style="margin-right:auto">${ico('trash-2','sm')}Delete</button>` : ''}<button class="btn" type="button" data-act="dclose">Cancel</button><button class="btn primary" type="submit">${id ? 'Save' : 'Add tool'}</button></footer></form>`,
     false, () => { $('tCat').onchange = () => { t.cat = $('tCat').value; t.sub = ''; $('tSub').innerHTML = subs(); }; });
 }

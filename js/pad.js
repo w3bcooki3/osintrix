@@ -84,7 +84,7 @@ function padRefresh(){
 function padBulkPaint(){
   const el = $('padBulk'); if(!el) return; const n = (UI.padSel || new Set()).size;
   el.hidden = !n; if(!n) return;
-  el.innerHTML = `<b>${n} selected</b><span class="pad-bulk-sp"></span><button class="btn xs" data-act="padCopy">${ico('copy','sm')}Copy</button><button class="btn xs" data-act="padDefang">${ico('shield-alert','sm')}Defang</button>${DB.cases.length ? `<button class="btn xs" data-act="padToCase">${ico('list-plus','sm')}To ${esc(caseNm(theCase() || DB.cases[0]))}</button>` : ''}<button class="iconbtn" data-act="padSelClear" aria-label="Clear selection">${ico('x','sm')}</button>`;
+  el.innerHTML = `<b>${n} selected</b><span class="pad-bulk-sp"></span><button class="btn xs" data-act="padCopy">${ico('copy','sm')}Copy</button><button class="btn xs" data-act="padDefang">${ico('shield-alert','sm')}Defang</button>${DB.cases.length ? `<button class="btn xs" data-act="padToCase">${ico('list-plus','sm')}To ${esc(caseNm(theCase() || DB.cases[0]))}</button>${casePick()}` : ''}<button class="iconbtn" data-act="padSelClear" aria-label="Clear selection">${ico('x','sm')}</button>`;
 }
 
 function bindPad(){

@@ -1,0 +1,308 @@
+{
+  "type": "bundle",
+  "id": "bundle--fc63dada-6fed-4083-b21e-63f0b791746c",
+  "objects": [
+    {
+      "type": "identity",
+      "spec_version": "2.1",
+      "id": "identity--47aca1ab-284a-437c-9d6e-15cd6ab79237",
+      "created": "2026-11-24T18:31:13.415Z",
+      "modified": "2026-11-24T18:31:13.415Z",
+      "name": "WinForensicX",
+      "identity_class": "system"
+    },
+    {
+      "type": "indicator",
+      "spec_version": "2.1",
+      "id": "indicator--f4a8c186-f603-43d9-a96d-4420afbca902",
+      "created": "2026-11-24T18:31:13.415Z",
+      "modified": "2026-11-24T18:31:13.415Z",
+      "created_by_ref": "identity--47aca1ab-284a-437c-9d6e-15cd6ab79237",
+      "name": "WS-APT: Connection to a tunneling service (argotunnel.com)",
+      "description": "Found on WS-APT (WinForensicX case 5a3c9e1f-0d2b-4c7e-9a41-6f2e8b7d1c30) in: Connection to a tunneling service (argotunnel.com)",
+      "pattern": "[ipv4-addr:value = '198.51.100.150']",
+      "pattern_type": "stix",
+      "valid_from": "2026-11-24T18:31:13.415Z",
+      "indicator_types": [
+        "anomalous-activity"
+      ],
+      "labels": [
+        "winforensicx",
+        "host:WS-APT",
+        "severity:high"
+      ],
+      "object_marking_refs": [
+        "marking-definition--f88d31f6-486f-44da-b317-01333bde0b82"
+      ]
+    },
+    {
+      "type": "indicator",
+      "spec_version": "2.1",
+      "id": "indicator--b33c019c-5946-404a-8ce8-36d37c75f9f4",
+      "created": "2026-11-24T18:31:13.415Z",
+      "modified": "2026-11-24T18:31:13.415Z",
+      "created_by_ref": "identity--47aca1ab-284a-437c-9d6e-15cd6ab79237",
+      "name": "WS-APT: Connection to a tunneling service (argotunnel.com)",
+      "description": "Found on WS-APT (WinForensicX case 5a3c9e1f-0d2b-4c7e-9a41-6f2e8b7d1c30) in: Connection to a tunneling service (argotunnel.com); Lookup of a tunneling service: region1.v2.argotunnel.com",
+      "pattern": "[domain-name:value = 'region1.v2.argotunnel.com']",
+      "pattern_type": "stix",
+      "valid_from": "2026-11-24T18:31:13.415Z",
+      "indicator_types": [
+        "anomalous-activity"
+      ],
+      "labels": [
+        "winforensicx",
+        "host:WS-APT",
+        "severity:high"
+      ],
+      "object_marking_refs": [
+        "marking-definition--f88d31f6-486f-44da-b317-01333bde0b82"
+      ]
+    },
+    {
+      "type": "indicator",
+      "spec_version": "2.1",
+      "id": "indicator--63fe3204-37e2-421f-a765-b5fcdd210832",
+      "created": "2026-11-24T18:31:13.415Z",
+      "modified": "2026-11-24T18:31:13.415Z",
+      "created_by_ref": "identity--47aca1ab-284a-437c-9d6e-15cd6ab79237",
+      "name": "WS-APT: Risky download: Invoice_2026.iso",
+      "description": "Found on WS-APT (WinForensicX case 5a3c9e1f-0d2b-4c7e-9a41-6f2e8b7d1c30) in: Risky download: Invoice_2026.iso",
+      "pattern": "[url:value = 'https://203.0.113.50/d/Invoice_2026.iso']",
+      "pattern_type": "stix",
+      "valid_from": "2026-11-13T01:44:07.947Z",
+      "indicator_types": [
+        "anomalous-activity"
+      ],
+      "labels": [
+        "winforensicx",
+        "host:WS-APT",
+        "severity:high"
+      ],
+      "object_marking_refs": [
+        "marking-definition--f88d31f6-486f-44da-b317-01333bde0b82"
+      ]
+    },
+    {
+      "type": "indicator",
+      "spec_version": "2.1",
+      "id": "indicator--2b277ce0-0688-44b1-8f26-ed6b10f2813b",
+      "created": "2026-11-24T18:31:13.415Z",
+      "modified": "2026-11-24T18:31:13.415Z",
+      "created_by_ref": "identity--47aca1ab-284a-437c-9d6e-15cd6ab79237",
+      "name": "WS-APT: Risky download: Invoice_2026.iso",
+      "description": "Found on WS-APT (WinForensicX case 5a3c9e1f-0d2b-4c7e-9a41-6f2e8b7d1c30) in: Risky download: Invoice_2026.iso",
+      "pattern": "[ipv4-addr:value = '203.0.113.50']",
+      "pattern_type": "stix",
+      "valid_from": "2026-11-13T01:44:07.947Z",
+      "indicator_types": [
+        "anomalous-activity"
+      ],
+      "labels": [
+        "winforensicx",
+        "host:WS-APT",
+        "severity:high"
+      ],
+      "object_marking_refs": [
+        "marking-definition--f88d31f6-486f-44da-b317-01333bde0b82"
+      ]
+    },
+    {
+      "type": "indicator",
+      "spec_version": "2.1",
+      "id": "indicator--3c91dd22-c911-4cc4-9c3e-cb4e93ee0bd8",
+      "created": "2026-11-24T18:31:13.415Z",
+      "modified": "2026-11-24T18:31:13.415Z",
+      "created_by_ref": "identity--47aca1ab-284a-437c-9d6e-15cd6ab79237",
+      "name": "WS-APT: Risky download: Invoice_2026.iso",
+      "description": "Found on WS-APT (WinForensicX case 5a3c9e1f-0d2b-4c7e-9a41-6f2e8b7d1c30) in: Risky download: Invoice_2026.iso",
+      "pattern": "[url:value = 'https://mail.example.invalid/']",
+      "pattern_type": "stix",
+      "valid_from": "2026-11-13T01:44:07.947Z",
+      "indicator_types": [
+        "anomalous-activity"
+      ],
+      "labels": [
+        "winforensicx",
+        "host:WS-APT",
+        "severity:high"
+      ],
+      "object_marking_refs": [
+        "marking-definition--f88d31f6-486f-44da-b317-01333bde0b82"
+      ]
+    },
+    {
+      "type": "indicator",
+      "spec_version": "2.1",
+      "id": "indicator--51f35f18-794b-41a1-a9ee-bac6d5bda557",
+      "created": "2026-11-24T18:31:13.415Z",
+      "modified": "2026-11-24T18:31:13.415Z",
+      "created_by_ref": "identity--47aca1ab-284a-437c-9d6e-15cd6ab79237",
+      "name": "WS-APT: System program name in the wrong folder: c:\\users\\analyst\\appdata\\roaming\\microsoft\\svchost.exe",
+      "description": "Found on WS-APT (WinForensicX case 5a3c9e1f-0d2b-4c7e-9a41-6f2e8b7d1c30) in: System program name in the wrong folder: c:\\users\\analyst\\appdata\\roaming\\microsoft\\svchost.exe",
+      "pattern": "[file:hashes.'SHA-1' = '1122334455667788990011223344556677889900']",
+      "pattern_type": "stix",
+      "valid_from": "2026-11-13T02:44:07.947Z",
+      "indicator_types": [
+        "anomalous-activity"
+      ],
+      "labels": [
+        "winforensicx",
+        "host:WS-APT",
+        "severity:high"
+      ],
+      "object_marking_refs": [
+        "marking-definition--f88d31f6-486f-44da-b317-01333bde0b82"
+      ]
+    },
+    {
+      "type": "indicator",
+      "spec_version": "2.1",
+      "id": "indicator--fd0827b1-8fd0-4c93-a770-3490620c1c55",
+      "created": "2026-11-24T18:31:13.415Z",
+      "modified": "2026-11-24T18:31:13.415Z",
+      "created_by_ref": "identity--47aca1ab-284a-437c-9d6e-15cd6ab79237",
+      "name": "WS-APT: Lookup of a tunneling service: trycloudflare.com",
+      "description": "Found on WS-APT (WinForensicX case 5a3c9e1f-0d2b-4c7e-9a41-6f2e8b7d1c30) in: Lookup of a tunneling service: trycloudflare.com",
+      "pattern": "[domain-name:value = 'trycloudflare.com']",
+      "pattern_type": "stix",
+      "valid_from": "2026-11-24T18:31:13.415Z",
+      "indicator_types": [
+        "anomalous-activity"
+      ],
+      "labels": [
+        "winforensicx",
+        "host:WS-APT",
+        "severity:medium"
+      ],
+      "object_marking_refs": [
+        "marking-definition--f88d31f6-486f-44da-b317-01333bde0b82"
+      ]
+    },
+    {
+      "type": "indicator",
+      "spec_version": "2.1",
+      "id": "indicator--30e7d890-a5cf-4952-b81f-b7cb287479c3",
+      "created": "2026-11-24T18:31:13.415Z",
+      "modified": "2026-11-24T18:31:13.415Z",
+      "created_by_ref": "identity--47aca1ab-284a-437c-9d6e-15cd6ab79237",
+      "name": "WS-APT: Program ran from a staging folder: c:\\users\\analyst\\appdata\\local\\temp\\onedriveupdater.exe",
+      "description": "Found on WS-APT (WinForensicX case 5a3c9e1f-0d2b-4c7e-9a41-6f2e8b7d1c30) in: Program ran from a staging folder: c:\\users\\analyst\\appdata\\local\\temp\\onedriveupdater.exe",
+      "pattern": "[file:hashes.'SHA-1' = '9a8b7c6d5e4f30211203f4e5d6c7b8a990817263']",
+      "pattern_type": "stix",
+      "valid_from": "2026-11-13T02:39:07.947Z",
+      "indicator_types": [
+        "anomalous-activity"
+      ],
+      "labels": [
+        "winforensicx",
+        "host:WS-APT",
+        "severity:medium"
+      ],
+      "object_marking_refs": [
+        "marking-definition--f88d31f6-486f-44da-b317-01333bde0b82"
+      ]
+    },
+    {
+      "type": "indicator",
+      "spec_version": "2.1",
+      "id": "indicator--802387d4-15f5-40bc-b37b-d44b11d49eea",
+      "created": "2026-11-24T18:31:13.415Z",
+      "modified": "2026-11-24T18:31:13.415Z",
+      "created_by_ref": "identity--47aca1ab-284a-437c-9d6e-15cd6ab79237",
+      "name": "WS-APT: SSH / plink reverse tunnel",
+      "description": "Found on WS-APT (WinForensicX case 5a3c9e1f-0d2b-4c7e-9a41-6f2e8b7d1c30) in: SSH / plink reverse tunnel",
+      "pattern": "[ipv4-addr:value = '198.51.100.200']",
+      "pattern_type": "stix",
+      "valid_from": "2026-11-14T02:59:07.947Z",
+      "indicator_types": [
+        "anomalous-activity"
+      ],
+      "labels": [
+        "winforensicx",
+        "host:WS-APT",
+        "severity:medium"
+      ],
+      "object_marking_refs": [
+        "marking-definition--f88d31f6-486f-44da-b317-01333bde0b82"
+      ]
+    },
+    {
+      "type": "indicator",
+      "spec_version": "2.1",
+      "id": "indicator--37407764-1ecf-443e-ba55-98c2b64cf062",
+      "created": "2026-11-24T18:31:13.415Z",
+      "modified": "2026-11-24T18:31:13.415Z",
+      "created_by_ref": "identity--47aca1ab-284a-437c-9d6e-15cd6ab79237",
+      "name": "WS-APT: High-entropy domain (possible DGA): kq3x9zmnvbwp7h.top",
+      "description": "Found on WS-APT (WinForensicX case 5a3c9e1f-0d2b-4c7e-9a41-6f2e8b7d1c30) in: High-entropy domain (possible DGA): kq3x9zmnvbwp7h.top; Lookup of a high-risk TLD domain: kq3x9zmnvbwp7h.top",
+      "pattern": "[domain-name:value = 'kq3x9zmnvbwp7h.top']",
+      "pattern_type": "stix",
+      "valid_from": "2026-11-24T18:31:13.416Z",
+      "indicator_types": [
+        "anomalous-activity"
+      ],
+      "labels": [
+        "winforensicx",
+        "host:WS-APT",
+        "severity:medium"
+      ],
+      "object_marking_refs": [
+        "marking-definition--f88d31f6-486f-44da-b317-01333bde0b82"
+      ]
+    },
+    {
+      "type": "indicator",
+      "spec_version": "2.1",
+      "id": "indicator--a7041599-32ed-4d42-87d0-a29ce71cacd3",
+      "created": "2026-11-24T18:31:13.415Z",
+      "modified": "2026-11-24T18:31:13.415Z",
+      "created_by_ref": "identity--47aca1ab-284a-437c-9d6e-15cd6ab79237",
+      "name": "WS-APT: Outbound connection to a port typical of C2 / reverse shells: 203.0.113.99:4444",
+      "description": "Found on WS-APT (WinForensicX case 5a3c9e1f-0d2b-4c7e-9a41-6f2e8b7d1c30) in: Outbound connection to a port typical of C2 / reverse shells: 203.0.113.99:4444",
+      "pattern": "[ipv4-addr:value = '203.0.113.99']",
+      "pattern_type": "stix",
+      "valid_from": "2026-11-14T02:09:07.947Z",
+      "indicator_types": [
+        "anomalous-activity"
+      ],
+      "labels": [
+        "winforensicx",
+        "host:WS-APT",
+        "severity:medium"
+      ],
+      "object_marking_refs": [
+        "marking-definition--f88d31f6-486f-44da-b317-01333bde0b82"
+      ]
+    },
+    {
+      "type": "report",
+      "spec_version": "2.1",
+      "id": "report--ed8c01b4-b582-46aa-a20b-0ee94ef424cf",
+      "created": "2026-11-24T18:31:13.415Z",
+      "modified": "2026-11-24T18:31:13.415Z",
+      "created_by_ref": "identity--47aca1ab-284a-437c-9d6e-15cd6ab79237",
+      "name": "WinForensicX: WS-APT (case 5a3c9e1f)",
+      "published": "2026-11-24T18:31:13.415Z",
+      "report_types": [
+        "indicator"
+      ],
+      "object_refs": [
+        "indicator--f4a8c186-f603-43d9-a96d-4420afbca902",
+        "indicator--b33c019c-5946-404a-8ce8-36d37c75f9f4",
+        "indicator--63fe3204-37e2-421f-a765-b5fcdd210832",
+        "indicator--2b277ce0-0688-44b1-8f26-ed6b10f2813b",
+        "indicator--3c91dd22-c911-4cc4-9c3e-cb4e93ee0bd8",
+        "indicator--51f35f18-794b-41a1-a9ee-bac6d5bda557",
+        "indicator--fd0827b1-8fd0-4c93-a770-3490620c1c55",
+        "indicator--30e7d890-a5cf-4952-b81f-b7cb287479c3",
+        "indicator--802387d4-15f5-40bc-b37b-d44b11d49eea",
+        "indicator--37407764-1ecf-443e-ba55-98c2b64cf062",
+        "indicator--a7041599-32ed-4d42-87d0-a29ce71cacd3"
+      ],
+      "object_marking_refs": [
+        "marking-definition--f88d31f6-486f-44da-b317-01333bde0b82"
+      ]
+    }
+  ]
+}

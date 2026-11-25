@@ -523,6 +523,11 @@ async function fxFavicon(bytes){
   return {kind:'favicon', size:bytes.length, mmh3:mmh3(new TextEncoder().encode(b64Lines(bytes))), md5:md5(bytes), sha256:sha};
 }
 /* a saved page: its own hash, and the IDs and links that tie it to other sites of the same owner */
+/* <link rel="icon"> addresses, honouring whichever quote opens each attribute (a data: URL may hold the other one) */
+function fxLinkIcons(text){ const out = [];
+  for(const m of text.matchAll(/<link\b(?:"[^"]*"|'[^']*'|[^'">])*>/gi)){ const t = m[0], at = n => { const x = new RegExp('\\s' + n + '\\s*=\\s*(?:"([^"]*)"|\'([^\']*)\'|([^\\s>]+))', 'i').exec(t); return x ? (x[1] ?? x[2] ?? x[3] ?? '') : ''; };
+    if(/\bicon\b/i.test(at('rel'))){ const h = at('href').trim(); if(h && !out.includes(h)) out.push(h); } }
+  return out; }
 async function fxPage(text){
   const bytes = new TextEncoder().encode(text), sha = crypto.subtle ? hex(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), 64) : '', uniq = a => [...new Set(a)];
   const all = (re, g = 1) => uniq([...text.matchAll(re)].map(m => m[g]));
@@ -530,13 +535,100 @@ async function fxPage(text){
   const P = {kind:'page', size:bytes.length, mmh3:mmh3(bytes), md5:md5(bytes), sha256:sha, title,
     ga:all(/\b(UA-\d{4,10}-\d{1,4})\b/g), ga4:all(/\b(G-[A-Z0-9]{8,12})\b/g), gtm:all(/\b(GTM-[A-Z0-9]{5,9})\b/g), aw:all(/\b(AW-\d{8,12})\b/g), adsense:all(/\b(ca-pub-\d{10,20}|pub-\d{10,20})\b/g).map(x => x.replace(/^ca-/, '')),
     ym:all(/\bym\(\s*(\d{6,10})\s*,\s*['"]init/g), fbp:all(/fbq\(\s*['"]init['"]\s*,\s*['"](\d{12,20})['"]/g), hj:all(/\bhjid\s*:\s*(\d{5,10})/g),
-    favicons:all(/<link[^>]+rel=["'][^"']*icon[^"']*["'][^>]*href=["']([^"']+)["']|<link[^>]+href=["']([^"']+)["'][^>]+rel=["'][^"']*icon/gi).filter(Boolean),
+    favicons:fxLinkIcons(text),
     scripts:all(/<script[^>]+src=["']([^"']+)["']/gi), forms:all(/<form[^>]+action=["']([^"']+)["']/gi), passwords:(text.match(/type=["']password["']/gi) || []).length,
-    comments:uniq([...text.matchAll(/<!--([\s\S]{3,200}?)-->/g)].map(m => m[1].trim()).filter(c => !/^\[if |^\s*$/.test(c))).slice(0, 12),
+    comments:uniq([...text.matchAll(/<!--([\s\S]{3,200}?)-->/g)].map(m => m[1].trim()).filter(c => !/^\[if |^\s*$|^saved from url=/i.test(c))).slice(0, 12),   // the browser's own "saved from" note can carry a local path: never a comment, never a query
     libs:uniq([...text.matchAll(/(jquery|bootstrap|vue|react|angular|lodash|font-?awesome)[.-]?(\d+\.\d+(?:\.\d+)?)/gi)].map(m => m[1].toLowerCase() + ' ' + m[2])),
     tg:all(/\bt(?:elegram)?\.me\/([A-Za-z][\w]{3,31})/g), ents:typeof E !== 'undefined' ? E.extract(text.slice(0, 400000)).filter(e => /^(btc|eth|xmr|trx|sol|ltc|email|onion|phone)$/.test(e.k)) : []};
-  if(!P.favicons.length){ const m = [...text.matchAll(/<link[^>]+rel=["'][^"']*icon[^"']*["'][^>]*>/gi)].map(x => (x[0].match(/href=["']([^"']+)/) || [])[1]).filter(Boolean); P.favicons = uniq(m); }
+  P.st = fxStatic(text);
+  /* a favicon written into the page (data: URL) is hashed the way Shodan hashes favicons */
+  const inl = P.favicons.find(f => /^data:image\//i.test(f));
+  if(inl){ const m = /^data:([^;,]+)(;base64)?,(.*)$/is.exec(inl.trim()); if(m){ let b = null; try{ b = m[2] ? Uint8Array.from(atob(m[3].replace(/\s+/g, '')), c => c.charCodeAt(0)) : new TextEncoder().encode(decodeURIComponent(m[3])); }catch(e){ b = null; }
+    if(b && b.length){ const F = await fxFavicon(b); P.favInline = {mime:m[1].toLowerCase(), size:b.length, mmh3:F.mmh3, md5:F.md5, src:inl.length < 200000 ? inl : ''}; } } }
   return P;
+}
+/* a saved page read as it stands — no network log, so this is what the HTML and its scripts would load, call and send.
+   Every address is resolved against where the page was saved from, and sorted into what it is (WC_SVC from web captures). */
+function fxStatic(text){
+  const T = text.slice(0, 4e6), uniq = a => [...new Set(a)];
+  const from = ((/<!--\s*saved from url=\(\d+\)(\S+)\s*-->/i.exec(T) || [])[1] || (/<base[^>]+href=["']([^"']+)/i.exec(T) || [])[1] || (/<link[^>]+rel=["']canonical["'][^>]*href=["']([^"']+)/i.exec(T) || [])[1] || (/<meta[^>]+property=["']og:url["'][^>]*content=["']([^"']+)/i.exec(T) || [])[1] || '').trim();
+  const base = /^https?:\/\//i.test(from) ? from : '', host0 = base ? (() => { try{ return new URL(base).hostname.toLowerCase(); }catch(e){ return ''; } })() : '';
+  const reg = h => typeof regDomain === 'function' ? regDomain(h) : h, svc = h => typeof wcSvc === 'function' ? wcSvc(h) : null;
+  const mask = s => typeof wcMaskHook === 'function' ? wcMaskHook(wcMaskTg(s)) : String(s).replace(/(\d{6,12}):([A-Za-z0-9_-]{30,40})/g, (m, id, sec) => id + ':' + sec.slice(0, 3) + '•••• (token hidden)');
+  const abs = u => { u = String(u || '').trim().replace(/&amp;/g, '&'); if(!u || /^(#|javascript:|mailto:|tel:|data:|blob:|about:)/i.test(u)) return null;
+    if(/_files\//.test(u) && !/^(https?:)?\/\//i.test(u)) return {u, h:'', local:true};   // saved next to the page ("Webpage, complete")
+    if(/^\/\//.test(u)) u = 'https:' + u; if(/^https?:\/\//i.test(u)) return {u, h:(() => { try{ return new URL(u).hostname.toLowerCase(); }catch(e){ return ''; } })()};
+    if(base){ try{ const x = new URL(u, base); return {u:x.href, h:x.hostname.toLowerCase()}; }catch(e){} } return {u, h:'', local:true}; };
+  const hosts = new Map(), add = (raw, what) => { const a = abs(raw); if(!a || a.local || !a.h) return a; const H = hosts.get(a.h) || {h:a.h, what:new Set(), n:0, svc:svc(a.h), third:host0 ? reg(a.h) !== reg(host0) : true}; H.what.add(what); H.n++; hosts.set(a.h, H); return a; };
+  const local = [];
+  for(const m of T.matchAll(/<script[^>]+src=["']([^"']+)["']/gi)){ const a = add(m[1], 'scripts'); if(a && a.local) local.push(a.u); }
+  for(const m of T.matchAll(/<link[^>]+>/gi)){ const href = (/href=["']([^"']+)["']/i.exec(m[0]) || [])[1], rel = ((/rel=["']([^"']+)["']/i.exec(m[0]) || [])[1] || '').toLowerCase(); if(!href) continue;
+    const a = add(href, /stylesheet/.test(rel) ? 'styles' : /icon/.test(rel) ? 'icons' : /preconnect|dns-prefetch|preload|prefetch/.test(rel) ? 'preloads' : 'links'); if(a && a.local && /stylesheet/.test(rel)) local.push(a.u); }
+  for(const m of T.matchAll(/<(?:img|source|video|audio)[^>]+src=["']([^"']+)["']/gi)) add(m[1], 'images & media');
+  const frames = uniq([...T.matchAll(/<i?frame[^>]+src=["']([^"']+)["']/gi)].map(m => { const a = add(m[1], 'frames'); return a ? a.u : ''; }).filter(Boolean));
+  for(const m of T.matchAll(/url\(\s*["']?(https?:\/\/[^"')\s]+)/gi)) add(m[1], 'styles');
+  let linksOut = 0; for(const m of T.matchAll(/<a[^>]+href=["'](https?:\/\/[^"']+)["']/gi)){ const a = abs(m[1]); if(a && a.h && (!host0 || reg(a.h) !== reg(host0))){ linksOut++; add(m[1], 'links'); } }
+  /* what the page's scripts call: fetch, XHR, sendBeacon, WebSocket, jQuery and axios, and bare API addresses in strings */
+  const calls = [], call = (method, u, how) => { const a = add(u, 'calls'); if(!a) return; const k = method + ' ' + a.u; if(calls.some(c => c.k === k)) return; const H = a.h ? hosts.get(a.h) : null; calls.push({k, method, url:mask(a.u), host:a.h, how, svc:H ? H.svc : null, third:H ? H.third : false}); };
+  for(const m of T.matchAll(/\bfetch\(\s*["'`]([^"'`]+)["'`]\s*(?:,\s*\{[^}]{0,200}?method\s*:\s*["'`](\w+))?/gi)) call((m[2] || 'GET').toUpperCase(), m[1], 'fetch');
+  for(const m of T.matchAll(/\.open\(\s*["'](GET|POST|PUT|PATCH|DELETE)["']\s*,\s*["'`]([^"'`]+)["'`]/gi)) call(m[1].toUpperCase(), m[2], 'XMLHttpRequest');
+  for(const m of T.matchAll(/sendBeacon\(\s*["'`]([^"'`]+)["'`]/gi)) call('POST', m[1], 'sendBeacon');
+  for(const m of T.matchAll(/new\s+WebSocket\(\s*["'`]([^"'`]+)["'`]/gi)) call('WS', m[1], 'WebSocket');
+  for(const m of T.matchAll(/\$\.(post|get|ajax|getJSON)\(\s*["'`]([^"'`]+)["'`]/gi)) call(/post/i.test(m[1]) ? 'POST' : 'GET', m[2], 'jQuery');
+  for(const m of T.matchAll(/\$\.ajax\(\s*\{[^}]{0,300}?url\s*:\s*["'`]([^"'`]+)["'`][^}]{0,300}?(?:type|method)\s*:\s*["'`](\w+)/gi)) call(m[2].toUpperCase(), m[1], 'jQuery');
+  for(const m of T.matchAll(/axios(?:\.(get|post|put))?\(\s*["'`]([^"'`]+)["'`]/gi)) call((m[1] || 'GET').toUpperCase(), m[2], 'axios');
+  for(const m of T.matchAll(/["'`](https?:\/\/(?:api\.telegram\.org\/bot[^"'`\s]+|(?:discord|discordapp)\.com\/api\/webhooks\/[^"'`\s]+|script\.google\.com\/macros\/[^"'`\s]+|hooks\.slack\.com\/[^"'`\s]+))["'`]/gi)) call('POST', m[1], 'address in a script');
+  /* forms: where each sends, how, and what it asks for */
+  const S = typeof WC_SECRET !== 'undefined' ? WC_SECRET : /pass|pwd|secret|otp|cvv|cvc|card|ssn|pin/i, U = typeof WC_USER !== 'undefined' ? WC_USER : /user|login|email|mail|phone/i;
+  const forms = [];
+  for(const m of T.matchAll(/<form\b([^>]*)>([\s\S]{0,60000}?)<\/form>/gi)){
+    const act = (/action=["']([^"']*)["']/i.exec(m[1]) || [])[1], meth = ((/method=["']?(\w+)/i.exec(m[1]) || [])[1] || 'GET').toUpperCase();
+    const fields = [...m[2].matchAll(/<(input|textarea|select)\b([^>]*)>/gi)].map(x => { const n = (/name=["']?([^"'\s>]+)/i.exec(x[2]) || [])[1] || (/id=["']?([^"'\s>]+)/i.exec(x[2]) || [])[1] || '', ty = ((/type=["']?(\w+)/i.exec(x[2]) || [])[1] || (x[1].toLowerCase() === 'input' ? 'text' : x[1].toLowerCase())).toLowerCase();
+      return {n, ty, secret:ty === 'password' || S.test(n) || /seed|mnemonic|phrase|private.?key|recovery/i.test(n), user:ty === 'email' || U.test(n)}; }).filter(f => !/^(submit|button|reset|image|hidden)$/.test(f.ty) && (f.n || f.ty === 'password'));
+    const a = act ? abs(act) : null; if(a && a.h){ const H = hosts.get(a.h) || {h:a.h, what:new Set(), n:0, svc:svc(a.h), third:host0 ? reg(a.h) !== reg(host0) : true}; H.what.add('form'); H.n++; hosts.set(a.h, H); }
+    forms.push({to:a ? mask(a.u) : act === undefined || act === '' ? '(this same page)' : act, host:a ? a.h : '', method:meth, fields, third:a && a.h ? hosts.get(a.h).third : false, svc:a && a.h ? hosts.get(a.h).svc : null}); if(forms.length >= 12) break; }
+  /* redirects written into the page */
+  const redirects = []; const mr = /<meta[^>]+http-equiv=["']?refresh["']?[^>]+content=["']([^"']*)["']/i.exec(T); if(mr){ const u = (/url\s*=\s*['"]?([^'";]+)/i.exec(mr[1]) || [])[1]; if(u) redirects.push({how:'meta refresh after ' + (parseInt(mr[1], 10) || 0) + ' s', to:mask((abs(u) || {u}).u)}); }
+  for(const m of T.matchAll(/(?:window\.|document\.|top\.|self\.)?location(?:\.href)?\s*=\s*["'`]([^"'`]+)["'`]|location\.(?:replace|assign)\(\s*["'`]([^"'`]+)["'`]/g)){ const u = m[1] || m[2]; if(redirects.length < 6 && !redirects.some(r => r.to === u)) redirects.push({how:'script', to:mask((abs(u) || {u}).u)}); }
+  /* what stands out */
+  const flags = [], hv = [...hosts.values()];
+  const credForms = forms.filter(f => f.fields.some(x => x.secret));
+  for(const f of credForms){ const off = f.third && f.host; const what = uniq(f.fields.filter(x => x.secret).map(x => /card|cc|cvv|cvc/i.test(x.n) ? 'card details' : /seed|mnemonic|phrase|private.?key|recovery/i.test(x.n) ? 'a wallet recovery phrase' : /otp|2fa|mfa|code$|pin/i.test(x.n) && x.ty !== 'password' ? 'a one-time code or PIN' : 'a password'));
+    flags.push([off || (f.svc && /drop/.test(f.svc.k)) ? 'red' : 'amber', `A form asks for ${what.join(' and ')}${off ? ' and sends what is typed to another site: ' + f.host : f.host ? ' and sends what is typed to ' + f.host : ''}${f.svc ? ' (' + f.svc.l + ')' : ''}.`]); }
+  for(const c of calls.filter(c => c.svc && /drop/.test(c.svc.k))) flags.push(['red', `A script sends to a ${c.svc.l} (${c.host}) — kits use these to receive what victims type.`]);
+  const geo = hv.filter(H => H.svc && H.svc.k === 'geo'); if(geo.length) flags.push(['amber', `The page looks up the visitor's IP and location (${geo.map(H => H.h).join(', ')}) — kits do this to hide from researchers and other countries.`]);
+  const anti = []; if(/oncontextmenu\s*=\s*["']?\s*return\s+false|addEventListener\(\s*["']contextmenu["'][^)]*\)[\s\S]{0,80}?preventDefault/i.test(T)) anti.push('right-click blocked');
+  if(/keyCode\s*={2,3}\s*123|key\s*={2,3}\s*["']F12["']/i.test(T)) anti.push('F12 blocked'); if(/devtools|setInterval\([^)]{0,80}debugger|\bdebugger\s*;[\s\S]{0,40}\}\s*,\s*\d+/i.test(T)) anti.push('developer tools detected');
+  if(/navigator\.webdriver|headless|phantom|selenium/i.test(T)) anti.push('automated browsers detected'); if(/(bot|crawl|spider|slurp)[|\\]/i.test(T) && /userAgent/.test(T)) anti.push('bots and crawlers turned away');
+  if(anti.length) flags.push(['amber', 'Anti-analysis: ' + anti.join(', ') + '.']);
+  const obf = []; if(/eval\s*\(\s*(?:atob|unescape|decodeURIComponent)\s*\(/i.test(T)) obf.push('eval of decoded text'); if(/eval\(function\(p,a,c,k,e,[rd]\)/.test(T)) obf.push('packed script (p,a,c,k,e,d)');
+  if(/document\.write\s*\(\s*(?:unescape|atob|decodeURIComponent)\s*\(/i.test(T)) obf.push('page written from encoded text'); if((T.match(/String\.fromCharCode\(/g) || []).length > 5) obf.push('text built from character codes');
+  if(/["'`][A-Za-z0-9+/]{3000,}={0,2}["'`]/.test(T)) obf.push('a large base64 blob'); if(/_0x[0-9a-f]{4,6}\b[\s\S]{0,400}_0x[0-9a-f]{4,6}\b/.test(T)) obf.push('obfuscator.io style names');
+  if(obf.length) flags.push(['amber', 'Hidden code: ' + obf.join(', ') + '.']);
+  if(frames.length) flags.push(['', `${frames.length} frame${frames.length > 1 ? 's' : ''} load${frames.length > 1 ? '' : 's'} another page inside this one: ${frames.slice(0, 3).map(u => typeof wcHost === 'function' ? wcHost(u) || u : u).join(', ')}.`]);
+  const order = H => (H.svc && /drop/.test(H.svc.k) ? 0 : H.what.has('form') || H.what.has('calls') ? 1 : H.svc && H.svc.k === 'geo' ? 2 : H.third ? 3 : 4);
+  return {from, host:host0, hosts:hv.sort((a, b) => order(a) - order(b) || b.n - a.n), calls:calls.slice(0, 30), forms, redirects, frames, flags, linksOut, local:uniq(local).slice(0, 60)};
+}
+/* the page card: what stands out, where it sends data, every site it talks to, redirects, the favicon, scripts and details */
+function fxSendsCard(R){
+  const S = R.st || {hosts:[], calls:[], forms:[], redirects:[], frames:[], flags:[], local:[]}, kv = (k, v) => v ? `<div class="kv"><span>${k}</span><span>${v}</span></div>` : '';
+  const svcTag = x => x && x.svc ? `<span class="chip sq${/drop/.test(x.svc.k) ? ' red' : x.svc.k === 'geo' ? ' amber' : ''}">${esc(x.svc.l)}</span>` : '';
+  const flags = S.flags.length ? `<div class="fxs-flags">${S.flags.map(([c, t]) => `<div class="fx-note${c ? ' ' + c : ''}">${esc(t)}</div>`).join('')}</div>` : '';
+  const forms = S.forms.length ? `<h4 class="fxs-h">Forms${R.passwords ? ` <span class="t3">· ${R.passwords} password field${R.passwords > 1 ? 's' : ''}</span>` : ''}</h4>${S.forms.map(f => `<div class="fxs-form"><div><b class="mono">${esc(f.method)}</b> <code>${esc(f.to)}</code> ${f.third ? '<span class="chip sq amber">another site</span>' : ''}${svcTag(f)}</div>
+      ${f.fields.length ? `<div class="fxs-fields">${f.fields.slice(0, 16).map(x => `<span class="chip sq${x.secret ? ' red' : ''}" title="${esc(x.ty)}">${esc(x.n || x.ty)}</span>`).join('')}${f.fields.length > 16 ? `<span class="t3 small">+${f.fields.length - 16}</span>` : ''}</div>` : '<div class="t3 small">No fields with names.</div>'}</div>`).join('')}` : '';
+  const calls = S.calls.length ? `<h4 class="fxs-h">Calls in its scripts</h4><table class="tbl fxs-t"><tbody>${S.calls.map(c => `<tr><td class="mono nw">${esc(c.method)}</td><td><code>${esc(c.url.length > 140 ? c.url.slice(0, 138) + '…' : c.url)}</code> ${svcTag(c)}</td><td class="t3 nw small">${esc(c.how)}</td></tr>`).join('')}</tbody></table>` : '';
+  const hosts = S.hosts.length ? `<h4 class="fxs-h">Sites it talks to <span class="t3">${S.hosts.length}${S.host ? ' · saved from ' + esc(S.host) : ''}</span></h4><table class="tbl fxs-t"><tbody>${S.hosts.slice(0, 40).map(H => `<tr><td class="mono">${esc(H.h)}${H.third ? '' : ' <span class="t3 small">same site</span>'}</td><td class="t2 small">${esc([...H.what].join(', '))}</td><td>${svcTag(H)}</td></tr>`).join('')}</tbody></table>${S.hosts.length > 40 ? `<p class="t3 small">and ${S.hosts.length - 40} more</p>` : ''}` : '';
+  const redir = S.redirects.length ? kv('Redirects', S.redirects.map(r => `<code>${esc(r.to)}</code> <span class="t3 small">${esc(r.how)}</span>`).join('<br>')) : '';
+  const fi = R.favInline, favs = R.favicons.filter(f => !/^data:/i.test(f));
+  const fav = fi ? kv('Favicon', `<span class="fxs-fav">${fi.src ? `<img src="${esc(fi.src)}" alt="" width="32" height="32">` : ''}<span>Inside the page (${esc(fi.mime)}, ${fi.size.toLocaleString()} bytes) · Shodan hash <code>${esc(String(fi.mmh3))}</code> · MD5 <code>${esc(fi.md5)}</code></span></span>`) : favs.length ? kv('Favicon', favs.slice(0, 4).map(f => `<code>${esc(f)}</code>`).join('<br>')) : '';
+  const remote = R.scripts.filter(u => /^(https?:)?\/\//i.test(u)), loc = R.scripts.filter(u => !/^(https?:)?\/\//i.test(u));
+  const scripts = R.scripts.length ? kv('Scripts', (remote.length ? remote.slice(0, 12).map(x => `<code>${esc(x)}</code>`).join('<br>') : '') + (loc.length ? `${remote.length ? '<br>' : ''}<details class="fxs-loc"><summary>${loc.length} saved with the page</summary>${loc.slice(0, 40).map(x => `<code>${esc(x.split('/').pop())}</code>`).join('<br>')}</details>` : '')) : '';
+  const rest = kv('Libraries', R.libs.length ? `<b>${esc(R.libs.join(', '))}</b>` : '') + kv('Comments', R.comments.map(c => `<code>${esc(c)}</code>`).join('<br>')) + kv('Telegram', R.tg.length ? `<b>${R.tg.map(t => '@' + esc(t)).join(', ')}</b>` : '')
+    + kv('Payment & contact', R.ents.length ? `<span class="wrap">${R.ents.map(e => `<span class="ent">${kindBadge(e.k)}<span class="v">${esc(e.v)}</span></span>`).join('')}</span>` : '') + kv('Links out', S.linksOut ? `${S.linksOut} link${S.linksOut > 1 ? 's' : ''} to other sites` : '');
+  const body = flags + forms + calls + hosts + redir + fav + scripts + rest;
+  return `<section class="card"><header><h3>${ico('code','sm')} What the page loads and sends</h3>${S.from ? `<span class="t3 mono small" title="Where the page was saved from">${esc(S.from.length > 60 ? S.from.slice(0, 58) + '…' : S.from)}</span>` : ''}</header><div class="body fxs">
+    ${body || `<p class="t2" style="margin:0">Nothing to report: no forms, no calls in its scripts, and no other sites, redirects or contact details in this file. A page saved as “Webpage, HTML only” leaves out what it would load later — save it as “Webpage, complete” or capture it with a HAR to see more.</p>`}
+    <p class="t3 small" style="margin:10px 0 0">Read from the saved file: what the page would load and send when opened. Nothing was opened or run.</p></div></section>`;
 }
 /* the queries to run with them (the engines' own syntax) */
 function fxPivots(R){
@@ -546,7 +638,8 @@ function fxPivots(R){
     for(const id of [...R.ga, ...R.ga4, ...R.gtm, ...R.aw, ...R.adsense].slice(0, 6)){ q('publicwww', 'Sites with ' + id, '"' + id + '"'); q('fofa', 'Sites with ' + id, 'body="' + id + '"'); q('google', 'Pages naming ' + id, '"' + id + '"'); }
     for(const id of R.ym.slice(0, 2)) q('publicwww', 'Sites with Yandex Metrica ' + id, '"' + id + '"'); for(const id of R.fbp.slice(0, 2)) q('publicwww', 'Sites with Meta pixel ' + id, '"' + id + '"');
     for(const c of R.comments.filter(c => c.length >= 8).slice(0, 2)) q('fofa', 'Pages with this comment', 'body="' + c.replace(/"/g, '').slice(0, 80) + '"');
-    for(const t of R.tg.slice(0, 3)) q('google', 'Where t.me/' + t + ' is advertised', '"t.me/' + t + '" -site:t.me'); }
+    for(const t of R.tg.slice(0, 3)) q('google', 'Where t.me/' + t + ' is advertised', '"t.me/' + t + '" -site:t.me');
+    if(R.favInline){ q('shodan', 'Same favicon', 'http.favicon.hash:' + R.favInline.mmh3); q('fofa', 'Same favicon', 'icon_hash="' + R.favInline.mmh3 + '"'); } }
   return Q;
 }
 function labFav(){
@@ -561,11 +654,9 @@ function labFav(){
   return `<div class="fi-grid"><div class="fi-side">
     <section class="card"><header><span class="fi-ic">${ico(R.kind === 'favicon' ? 'image' : 'file-code')}</span><div style="min-width:0;flex:1"><h3>${esc(R.name)}</h3><p class="t3">${R.kind === 'favicon' ? 'Favicon' : 'Web page'} · ${fmtBytes(R.size)}</p></div><button class="btn sm" data-act="favClear">${ico('x','sm')}Another</button></header><div class="body">
       ${R.kind === 'favicon' ? row('Shodan / FOFA hash (mmh3)', R.mmh3) + row('MD5 (Censys)', R.md5) + row('SHA-256 (urlscan)', R.sha256) : row('Page hash (Shodan http.html_hash)', R.mmh3) + row('SHA-256 (urlscan)', R.sha256) + row('MD5', R.md5) + row('Title', R.title)}
-      <div class="wrap" style="margin-top:12px"><button class="btn primary" data-act="favSave">${ico('plus','sm')}Save to ${esc(caseNm(theCase()))}</button></div></div></section>
+      <div class="wrap" style="margin-top:12px"><button class="btn primary" data-act="favSave">${ico('plus','sm')}Save to ${esc(caseNm(theCase()))}</button>${casePick()}</div></div></section>
     ${ids.length ? `<section class="card"><header><h3>${ico('fingerprint','sm')} Owner IDs in the page</h3></header><div class="body">${ids.map(([l, L]) => `<div class="kv"><span>${esc(l)}</span><span class="wrap">${L.map(x => `<code class="chip sq">${esc(x)}</code>`).join('')}</span></div>`).join('')}<p class="t3 small" style="margin:8px 0 0">One analytics or ad account usually belongs to one owner. The same ID on another site ties the two; an ID shared by thousands of sites belongs to a theme or kit seller.</p></div></section>` : ''}
-    ${R.kind === 'page' ? `<section class="card"><header><h3>${ico('code','sm')} What the page loads and sends</h3></header><div class="body">${R.forms.length ? `<div class="kv"><span>Forms send to</span><span>${R.forms.map(f => `<code>${esc(f)}</code>`).join('<br>')}</span></div>` : ''}${R.passwords ? `<div class="fx-note amber">${R.passwords} password field${R.passwords > 1 ? 's' : ''} — this page collects credentials.</div>` : ''}
-      ${R.favicons.length ? `<div class="kv"><span>Favicon</span><code>${esc(R.favicons.join(' '))}</code></div>` : ''}${R.scripts.length ? `<div class="kv"><span>Scripts</span><span>${R.scripts.slice(0, 12).map(x => `<code>${esc(x)}</code>`).join('<br>')}</span></div>` : ''}${R.libs.length ? `<div class="kv"><span>Libraries</span><b>${esc(R.libs.join(', '))}</b></div>` : ''}
-      ${R.comments.length ? `<div class="kv"><span>Comments</span><span>${R.comments.map(c => `<code>${esc(c)}</code>`).join('<br>')}</span></div>` : ''}${R.tg.length ? `<div class="kv"><span>Telegram</span><b>${R.tg.map(t => '@' + esc(t)).join(', ')}</b></div>` : ''}${R.ents.length ? `<div class="kv"><span>Payment & contact</span><span class="wrap">${R.ents.map(e => `<span class="ent">${kindBadge(e.k)}<span class="v">${esc(e.v)}</span></span>`).join('')}</span></div>` : ''}</div></section>` : ''}
+    ${R.kind === 'page' ? fxSendsCard(R) : ''}
     </div><div class="fi-side"><section class="card"><header><h3>${ico('search','sm')} Find the same elsewhere</h3><span class="t3">${piv.length} queries</span></header><div class="body flush">${piv.map(([e, l, q, u]) => `<a class="li fx-pv" href="${esc(u)}" target="_blank" rel="noopener noreferrer"><div class="main2"><b>${esc(l)} <span class="t3">· ${esc(e)}</span></b><small class="mono">${esc(q)}</small></div>${ico('arrow-up-right','sm')}</a>`).join('')}</div></section>
     <p class="t3 small">Each link opens the engine with the query filled in, from this browser — use your research environment. Matching icons and IDs are leads: kits and templates are shared, so confirm with a second tie (certificate, hosting, registration).</p></div></div>`;
 }
@@ -661,7 +752,7 @@ function labKit(){
     <section class="card"><header><span class="fi-ic">${ico('skull')}</span><div style="min-width:0;flex:1"><h3>${esc(K.name)}</h3><p class="t3">${K.files} files · ${K.text} read as text${K.encrypted ? ' · some password-protected' : ''}</p></div><button class="btn sm" data-act="kitClear">${ico('x','sm')}Another kit</button></header>
       <div class="body">${K.brandTop.length ? fxKv('Imitates', K.brandTop.map(([b, n]) => `${b} (${n})`).join(', ')) : ''}${K.titles.size ? fxKv('Page titles', [...K.titles].slice(0, 4).join(' · ')) : ''}${stolen.length ? fxKv('Collects', stolen.join(', ')) : ''}
         ${K.zip ? fxKv('Packed on', K.zip.os.join(', ') + (K.zip.uids.length ? ' · user:group ' + K.zip.uids.slice(0, 3).join(', ') : '') + (K.zip.tz ? ' · time zone ' + K.zip.tz.txt : '')) + (K.zip.first ? fxKv('Files last changed', new Date(K.zip.first).toISOString().slice(0, 10) + (K.zip.last > K.zip.first ? ' to ' + new Date(K.zip.last).toISOString().slice(0, 10) : '')) : '') : ''}
-        <div class="wrap" style="margin-top:12px"><button class="btn primary" data-act="kitSave">${ico('plus','sm')}Save to ${esc(caseNm(theCase()))}</button></div></div></section>
+        <div class="wrap" style="margin-top:12px"><button class="btn primary" data-act="kitSave">${ico('plus','sm')}Save to ${esc(caseNm(theCase()))}</button>${casePick()}</div></div></section>
     ${sec('Where the stolen data goes', 'upload', exfil, exfil ? 'warnc' : '') || sec('Where the stolen data goes', 'upload', '<p class="t3" style="margin:0">No bot, webhook, mail recipient or log file found — check obfuscated files below, or a remote panel loaded by JavaScript.</p>')}
     ${sec('Who made it', 'user', K.auth.length ? K.auth.map(([v, f, ctx]) => `<div class="kv"><span>${esc(v)}</span><code>${esc(ctx)}</code><span class="t3 small">${esc(f)}</span></div>`).join('') + '<p class="t3 small" style="margin:6px 0 0">Kit authors sign their work and sell it; the buyer who runs it is often someone else. The author handle leads to the seller, the drop email or bot to the operator.</p>' : '')}
     </div><div class="fi-side">
@@ -752,7 +843,7 @@ function labSteal(){
       ${v.wallets.size || v.tg || v.discord.length ? `<div class="fx-note">${[v.wallets.size && 'Wallet files: ' + [...v.wallets].join(', '), v.tg && 'Telegram session (tdata) — the account can be opened elsewhere', v.discord.length && v.discord.length + ' Discord token' + (v.discord.length > 1 ? 's' : '')].filter(Boolean).map(esc).join(' · ')}</div>` : ''}</div></section>`; }).join('');
   const tot = S.victims.reduce((s, v) => s + v.creds.filter(c => c.mine).length, 0);
   return `${form}<div class="sl-hd"><div><b>${S.victims.length} infected machine${S.victims.length === 1 ? '' : 's'}</b> · ${S.victims.reduce((s, v) => s + v.creds.length, 0)} logins${S.mine.length ? ` · <b style="color:${tot ? 'var(--red)' : 'var(--green)'}">${tot} on your domains</b>` : ' · add your domains above to mark your accounts'}</div>
-    <label class="chk"><input type="checkbox" data-act="slShow" ${UI.slShow ? 'checked' : ''}> Show passwords</label><button class="btn sm" data-act="slSave">${ico('plus','sm')}Save to ${esc(caseNm(theCase()))}</button><button class="btn sm ghost" data-act="slClear">${ico('x','sm')}Another log</button></div>${vic}`;
+    <label class="chk"><input type="checkbox" data-act="slShow" ${UI.slShow ? 'checked' : ''}> Show passwords</label><button class="btn sm" data-act="slSave">${ico('plus','sm')}Save to ${esc(caseNm(theCase()))}</button>${casePick()}<button class="btn sm ghost" data-act="slClear">${ico('x','sm')}Another log</button></div>${vic}`;
 }
 function bindSteal(){ const inp = $('slIn'), d = $('slDrop'), m = $('slMine');
   if(m) m.oninput = () => { clearTimeout(m.__t); m.__t = setTimeout(() => { UI.slMine = m.value; if(UI.fxSteal && UI.fxSteal.items0){ UI.fxSteal = Object.assign(fxStealer(UI.fxSteal.items0, UI.slMine), {items0:UI.fxSteal.items0}); const p = m.selectionStart; renderMain(); const x = $('slMine'); if(x){ x.focus(); x.setSelectionRange(p, p); } } }, 300); };

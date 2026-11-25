@@ -308,13 +308,18 @@ function ctiImportDlg(){
     <div class="frow"><div class="field"><label for="ctiConfIn">Confidence (0–100)</label><input id="ctiConfIn" type="number" min="0" max="100" placeholder="leave empty"></div>
       <div class="field"><label for="ctiDaysIn">Expire after (days)</label><input id="ctiDaysIn" type="number" min="0" max="3650" placeholder="never"></div></div>
     <div class="field"><label for="ctiTagsIn">Tags for all</label><input id="ctiTagsIn" maxlength="200" placeholder="comma separated"></div>
+    ${theCase() ? `<label class="chk"><input type="checkbox" id="ctiToCase"> Also add them to ${esc(caseNm(theCase()))}</label>` : ''}
     </div><footer><button class="btn" data-act="ctiImportFile" style="margin-right:auto">${ico('file-up','sm')}Open a file…</button><button class="btn" data-act="dclose">Cancel</button><button class="btn primary" data-act="ctiImportGo">${ico('upload','sm')}Import</button></footer>`);
 }
 function ctiImportOpts(){ const n = id => { const v = $(id) && $(id).value.trim(); return v === '' ? null : Math.max(0, +v || 0); };
-  return {tlp:$('ctiTlpIn').value, conf:n('ctiConfIn') == null ? null : Math.min(100, n('ctiConfIn')), days:n('ctiDaysIn'), tags:($('ctiTagsIn').value || '').split(',').map(t => cap(t, 64)).filter(Boolean)}; }
+  return {tlp:$('ctiTlpIn').value, conf:n('ctiConfIn') == null ? null : Math.min(100, n('ctiConfIn')), days:n('ctiDaysIn'), tags:($('ctiTagsIn').value || '').split(',').map(t => cap(t, 64)).filter(Boolean), toCase:!!($('ctiToCase') && $('ctiToCase').checked)}; }
 async function ctiDoImport(text, name, opts){
-  try{ const r = await ctiImportText(text, cap(name, 80) || '', opts); closeDlg(); UI.itab = 'iocs'; renderMain();
-    toast(`${r.fmt}: ${r.added} added${r.merged ? ', ' + r.merged + ' merged' : ''}${r.bad ? ', ' + r.bad + ' skipped' : ''}${r.full ? ' — store is full' : ''}`);
+  try{ const r = await ctiImportText(text, cap(name, 80) || '', opts); closeDlg();
+    /* show just this import, so it can be read, exported or added to a case as one batch */
+    UI.itab = 'iocs'; UI.osrc = r.src; UI.oq = ''; UI.ok = ''; UI.otlp = ''; UI.ohits = false; UI.olim = 0;
+    let toC = 0; if(opts && opts.toCase && theCase()){ CTI.iocs.filter(x => x.srcs.includes(r.src) && iocLive(x)).slice(0, 500).forEach(x => { if(ctiAddEntry(x.k, x.v, x.desc || [x.threat, ...x.tags].filter(Boolean).slice(0, 3).join(', ') || r.src)) toC++; }); if(toC) mutate('added ' + toC + ' indicators from ' + r.src); }
+    renderMain();
+    toast(`${r.fmt}: ${r.added} added${r.merged ? ', ' + r.merged + ' merged' : ''}${r.bad ? ', ' + r.bad + ' skipped' : ''}${r.full ? ' — store is full' : ''}${toC ? ' · ' + toC + ' added to ' + caseNm(theCase()) : ''}`);
     const h = ctiIocHits().length; if(h) setTimeout(() => toast(h + ' indicator' + (h > 1 ? 's' : '') + ' from your feeds appear in your cases'), 1600); }
   catch(e){ toast(e.message || 'Could not read that'); }
 }
@@ -322,7 +327,7 @@ function ctiExportDlg(){
   const L = ctiIocList();
   openDlg(dhead('Export indicators') + `<div class="in">
     <div class="field"><label for="ctiExWhat">What</label><select id="ctiExWhat"><option value="list">Indicators shown now (${L.length.toLocaleString()})</option><option value="all">Every live indicator (${CTI.iocs.filter(iocLive).length.toLocaleString()})</option>${DB.cases.map(c => `<option value="case:${c.id}">Case: ${esc(c.name)}</option>`).join('')}</select></div>
-    <div class="frow"><div class="field"><label for="ctiExFmt">Format</label><select id="ctiExFmt"><option value="stix">STIX 2.1 bundle (JSON)</option><option value="misp">MISP event (JSON)</option><option value="csv">CSV</option></select></div>
+    <div class="frow"><div class="field"><label for="ctiExFmt">Format</label><select id="ctiExFmt"><option value="stix">STIX 2.1 bundle (JSON)</option><option value="misp">MISP event (JSON)</option><option value="csv">CSV</option><option value="hunt">Hunt list for WinForensicX (.txt)</option></select></div>
       <div class="field"><label for="ctiExTlp">Marking</label><select id="ctiExTlp">${TLP.map(t => `<option value="${t}"${t === 'amber' ? ' selected' : ''}>TLP:${t.toUpperCase()}</option>`).join('')}</select></div></div>
     <p class="t3 small">Each indicator keeps its own TLP when it has one; the marking applies to the rest and to the report. Share only with people the TLP allows.</p>
     </div><footer><button class="btn" data-act="dclose">Cancel</button><button class="btn primary" data-act="ctiExportGo">${ico('download','sm')}Export</button></footer>`);
@@ -333,6 +338,8 @@ function ctiExportGo(){
   else { items = what === 'all' ? CTI.iocs.filter(iocLive) : ctiIocList(); title = 'OSINTrix indicators ' + new Date().toISOString().slice(0, 10); }
   if(!items.length) return toast('Nothing to export');
   const base = slug(title) || 'indicators';
+  if(fmt === 'hunt'){ const n = ctiHuntList(items).length; if(!n) return toast('None of these can be hunted on a host — CVEs, ASNs and wallets stay here');
+    download(base + '.hunt.txt', ctiHunt(items, title, tlp), 'text/plain'); closeDlg(); return toast(n + ' indicator' + (n > 1 ? 's' : '') + ' in the hunt list · run it with Invoke-WfxHunt -IocFile'); }
   if(fmt === 'csv') download(base + '.csv', ctiCsv(items), 'text/csv');
   else download(base + (fmt === 'stix' ? '.stix.json' : '.misp.json'), JSON.stringify(fmt === 'stix' ? ctiStix(items, title, tlp) : ctiMisp(items, title, tlp), null, 2), 'application/json');
   closeDlg(); toast(items.length + ' indicator' + (items.length > 1 ? 's' : '') + ' exported · TLP:' + tlp.toUpperCase());

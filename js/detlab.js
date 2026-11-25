@@ -140,7 +140,7 @@ function dlTestsPane(r, code){
         <code class="mono">${esc(x.t.text.slice(0, 400))}</code><span class="dl-r">${x.err ? esc(x.err) : x.ok ? ico('check','sm') + 'Pass' : ico('x','sm') + (x.got ? 'Fired' : 'Did not fire')}</span><button type="button" class="iconbtn" data-act="dlTestDel" data-id="${esc(x.t.id)}" aria-label="Remove test">${ico('trash-2','sm')}</button></li>`).join('')}</ul>` : ''}
     <div class="field"><label for="dlTestIn">New test event <span class="t3">— a log line, key=value pairs or JSON</span></label><textarea id="dlTestIn" class="inp mono" rows="3" spellcheck="false" placeholder='Image="C:\\Windows\\System32\\cmd.exe" CommandLine="cmd /c whoami"'></textarea></div>
     <div class="wrap"><button type="button" class="btn sm" data-act="dlTestAdd" data-v="hit">${ico('plus','sm')}Must fire</button><button type="button" class="btn sm" data-act="dlTestAdd" data-v="miss">${ico('plus','sm')}Must not fire</button>
-      ${theCase() ? `<button type="button" class="btn sm ghost" data-act="dlTestFromCase">${ico('folder-open','sm')}Add what it fires on in ${esc(caseNm(theCase()))}</button>` : ''}</div>`;
+      ${theCase() ? `<button type="button" class="btn sm ghost" data-act="dlTestFromCase">${ico('folder-open','sm')}Add what it fires on in ${esc(caseNm(theCase()))}</button>${casePick()}` : ''}</div>`;
 }
 
 /* ---------- evasion check ---------- */

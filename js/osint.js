@@ -75,6 +75,26 @@ function twCaseChips(){
   let ds = []; try { const c = theCase(); if(c) ds = [...derive(c.id).ents.values()].filter(x => x.k === 'domain').sort((a, b) => b.recs.length - a.recs.length).map(x => x.v).slice(0, 6); } catch(e){ ds = []; }
   return ds.length ? `<div class="wrap" style="margin-top:12px;align-items:center"><span class="t3" style="font-size:calc(12.5px * var(--ts,1))">From ${esc(caseNm(theCase()))}:</span>${ds.map(d => `<button class="chip mono" data-act="twTry" data-v="${esc(d)}">${esc(d)}</button>`).join('')}</div>` : '';
 }
+/* the results: the ones that exist (with risk), or every candidate before or after the check. A row opens Investigate. */
+function twTable(T, L, reg, done){
+  if(!L.length) return '';
+  const view = T.view || (done ? 'exist' : 'all'), lim = T.lim || 150;
+  const seg = done ? `<div class="seg sm" role="group" aria-label="Show"><button data-act="twView" data-v="exist" aria-pressed="${view === 'exist'}">Exist <span class="t3">${reg.length}</span></button><button data-act="twView" data-v="all" aria-pressed="${view === 'all'}">All candidates <span class="t3">${L.length}</span></button></div>` : '';
+  const row = (x, cells) => `<tr class="tw-r" data-act="twLook" data-v="${esc(x.d)}" tabindex="0" role="button" aria-label="Investigate ${esc(x.show)}">${cells}<td class="tw-go">${ico('radar','sm')}</td></tr>`;
+  const name = x => `${x.isNew ? '<span class="chip sq red">new</span> ' : ''}<span class="mono">${esc(x.show)}</span>${x.show !== x.d ? `<br><small class="mono t3">${esc(x.d)}</small>` : ''}`;
+  if(view === 'exist'){
+    const head = `<div class="wrap tw-bar"><b>${reg.length} exist</b><span class="t3">${reg.filter(x => x.mx.length).length} can receive mail · ${reg.filter(x => x.created && Date.now() - x.created < 90 * 864e5).length} registered in the last 90 days</span><span class="sp"></span>${seg}
+        ${reg.length ? `<button class="btn sm" data-act="twAdd">${ico('plus','sm')}Add the risky ones to ${esc(caseNm(theCase()))}</button>${casePick()}<button class="btn sm ghost" data-act="twCsv">${ico('download','sm')}CSV</button>` : ''}</div>`;
+    if(!reg.length) return head + (T.running ? '' : `<p class="t2">${ico('check','sm')} None of the ${done} candidates exist${L.some(x => x.err) ? ' (' + L.filter(x => x.err).length + ' could not be checked)' : ''}.</p>`);
+    return head + `<table class="tbl tw-tbl"><thead><tr><th>Domain</th><th>How</th><th class="n">Risk</th><th class="hide-m">Why</th><th class="hide-m">Address · mail</th><th><span class="sr">Investigate</span></th></tr></thead><tbody>
+      ${reg.slice(0, lim).map(x => row(x, `<td>${name(x)}${x.certs ? `<br><small class="t3">${x.certs} certificate${x.certs > 1 ? 's' : ''}${x.certFirst ? ', latest ' + new Date(x.certFirst).toISOString().slice(0, 10) : ''}</small>` : ''}</td><td class="t2">${esc(TW_NAME[x.kind] || x.kind)}</td><td class="n"><b class="tw-s${x.r.s >= 70 ? ' hi' : x.r.s >= 45 ? ' md' : ''}">${x.r.s}</b></td>
+        <td class="hide-m t2">${esc(x.r.why.join(', '))}</td><td class="hide-m mono t3">${esc((x.ips[0] || '—') + (x.mx.length ? ' · MX ' + x.mx[0] : ''))}</td>`)).join('')}</tbody></table>${reg.length > lim ? `<button class="btn sm ghost" data-act="twMore" style="margin-top:8px">Show ${Math.min(150, reg.length - lim)} more</button>` : ''}`;
+  }
+  const st = x => !x.done ? '<span class="t3">not checked</span>' : x.exists ? '<b class="tw-ex">exists</b>' : x.err ? '<span class="t3">could not check</span>' : '<span class="t3">free</span>';
+  return `<div class="wrap tw-bar"><span class="t3">${done ? done + ' of ' + L.length + ' checked · ' : ''}Click a domain to investigate it${done ? '' : ', or check which exist'}.</span><span class="sp"></span>${seg}</div>
+    <table class="tbl tw-tbl"><thead><tr><th>Domain</th><th>How</th><th>Status</th><th><span class="sr">Investigate</span></th></tr></thead><tbody>
+    ${L.slice(0, lim).map(x => row(x, `<td>${name(x)}</td><td class="t2">${esc(TW_NAME[x.kind] || x.kind)}</td><td>${st(x)}</td>`)).join('')}</tbody></table>${L.length > lim ? `<button class="btn sm ghost" data-act="twMore" style="margin-top:8px">Show ${Math.min(150, L.length - lim)} more</button>` : ''}`;
+}
 function labTwist(){
   const T = UI.tw || {}, L = T.list || [], done = L.filter(x => x.done).length, reg = L.filter(x => x.exists).map(x => Object.assign(x, {r:twRisk(x, T.orig)})).sort((a, b) => b.r.s - a.r.s);
   const dnsOn = typeof lkProv === 'function' && lkOn(lkProv('dns')), rdOn = typeof lkProv === 'function' && lkOn(lkProv('rdap'));
@@ -87,14 +107,10 @@ function labTwist(){
     ${L.length ? `<p class="t3" style="margin:4px 0 12px">${L.length} candidates — ${kinds.slice(0, 8).map(([k, n]) => esc(TW_NAME[k] || k) + ' ' + n).join(' · ')}</p>` : `<p class="t3">Enter a domain you want to protect — or one from a case — to see how it could be imitated.</p>${twCaseChips()}`}
     ${(W => { const ks = Object.keys(W).sort((a, b) => W[b].at - W[a].at); if(!ks.length) return ''; const cur = W[T.d];
       return `<div class="tw-watch">${cur && !done ? `<p class="small" style="margin:0 0 6px">${ico('eye','sm')} Checked before on ${esc(new Date(cur.at).toISOString().slice(0, 10))} — ${cur.list.length} existed. <b>Check which exist</b> again and new ones are marked.</p>` : T.since && done && !T.running ? `<p class="small" style="margin:0 0 6px">${ico('eye','sm')} Compared with the check on ${esc(new Date(T.since).toISOString().slice(0, 10))}: <b>${L.filter(x => x.isNew).length} new</b>.</p>` : ''}
-        <div class="wrap"><span class="t3 small">Watched:</span>${ks.slice(0, 12).map(k => `<button class="chip" data-act="twWatch" data-v="${esc(k)}" aria-pressed="${k === T.d}">${esc(k)} <span class="t3">${esc(new Date(W[k].at).toISOString().slice(5, 10))}</span></button>`).join('')}</div></div>`; })(DB.prefs.twSeen && typeof DB.prefs.twSeen === 'object' ? DB.prefs.twSeen : {})}
+        <div class="tw-wh"><b>Watched domains</b><span class="t3">Check one again and any look-alike that was not there last time is marked new.</span></div>
+        <ul class="tw-wl">${ks.map(k => `<li${k === T.d ? ' class="on"' : ''}><button class="lnk mono" data-act="twWatch" data-v="${esc(k)}" title="Open ${esc(k)}">${esc(k)}</button><span class="t3">checked ${esc(new Date(W[k].at).toISOString().slice(0, 10))} · ${(W[k].list || []).length} existed</span><button class="iconbtn" data-act="twUnwatch" data-v="${esc(k)}" aria-label="Stop watching ${esc(k)}" title="Stop watching">${ico('x','sm')}</button></li>`).join('')}</ul></div>`; })(DB.prefs.twSeen && typeof DB.prefs.twSeen === 'object' ? DB.prefs.twSeen : {})}
     ${T.running || done ? `<div class="lk-prog" role="progressbar" aria-label="Checking look-alikes" aria-valuenow="${Math.round(done / Math.max(1, L.length) * 100)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${Math.round(done / Math.max(1, L.length) * 100)}%"></i></div>` : ''}
-    ${reg.length ? `<div class="wrap" style="margin:12px 0 8px"><b>${reg.length} exist</b><span class="t3">${reg.filter(x => x.mx.length).length} can receive mail · ${reg.filter(x => x.created && Date.now() - x.created < 90 * 864e5).length} registered in the last 90 days</span><span class="sp"></span>
-        <button class="btn sm" data-act="twAdd">${ico('plus','sm')}Add the risky ones to ${esc(caseNm(theCase()))}</button>${casePick()}<button class="btn sm ghost" data-act="twCsv">${ico('download','sm')}CSV</button></div>
-      <table class="tbl tw-tbl"><thead><tr><th>Domain</th><th>How</th><th class="n">Risk</th><th class="hide-m">Why</th><th class="hide-m">Address · mail</th><th></th></tr></thead><tbody>
-        ${reg.slice(0, 150).map(x => `<tr><td>${x.isNew ? '<span class="chip sq red">new</span> ' : ''}<span class="mono">${esc(x.show)}</span>${x.show !== x.d ? `<br><small class="mono t3">${esc(x.d)}</small>` : ''}${x.certs ? `<br><small class="t3">${x.certs} certificate${x.certs > 1 ? 's' : ''}${x.certFirst ? ', latest ' + new Date(x.certFirst).toISOString().slice(0, 10) : ''}</small>` : ''}</td><td class="t2">${esc(TW_NAME[x.kind] || x.kind)}</td><td class="n"><b style="color:${x.r.s >= 70 ? 'var(--red)' : x.r.s >= 45 ? 'var(--amber)' : 'var(--text-2)'}">${x.r.s}</b></td>
-          <td class="hide-m t2">${esc(x.r.why.join(', '))}</td><td class="hide-m mono t3">${esc((x.ips[0] || '—') + (x.mx.length ? ' · MX ' + x.mx[0] : ''))}</td><td><button class="iconbtn" data-act="twLook" data-v="${esc(x.d)}" aria-label="Investigate ${esc(x.d)}" title="Investigate">${ico('radar','sm')}</button></td></tr>`).join('')}</tbody></table>`
-      : done && !T.running ? `<p class="t2">${ico('check','sm')} None of the ${done} candidates exist${L.some(x => x.err) ? ' (' + L.filter(x => x.err).length + ' could not be checked)' : ''}.</p>` : ''}
+    ${twTable(T, L, reg, done)}
     </div></section></div>`;
 }
 async function twRun(){
@@ -149,7 +165,7 @@ function labIdent(){
     const vars = [...new Set([u, u.replace(/[._-]/g, ''), u.replace(/\d+$/, ''), u.replace(/_/g, '.'), u.replace(/\./g, '_')].filter(x => x && x !== u))].slice(0, 4);
     body = `<p class="t2">Open each place and mark what you found — there, not there, or private — with a note. Kept with <span class="mono">@${esc(u)}</span> in every case.${vars.length ? ' Also try: ' + vars.map(v => `<button class="chip" data-act="idTry" data-v="${esc(v)}">${esc(v)}</button>`).join(' ') : ''}</p>
       ${ckList('user', u)}
-      <div class="wrap" style="margin-top:12px"><button class="btn sm" data-act="idAdd" data-v="${esc('@' + u)}">${ico('plus','sm')}Add @${esc(u)} to ${esc(caseNm(theCase()))}</button></div>`; }
+      <div class="wrap" style="margin-top:12px"><button class="btn sm" data-act="idAdd" data-v="${esc('@' + u)}">${ico('plus','sm')}Add @${esc(u)} to ${esc(caseNm(theCase()))}</button>${casePick()}</div>`; }
   else if(kind === 'email'){ const E2 = idEmail(q);
     if(!E2) body = '<p class="t3">That does not look like an email address.</p>';
     else { const mx = UI.idmx && UI.idmx.dom === E2.dom ? UI.idmx : null, prov = mx && mx.mx.length ? (ID_PROVIDER.find(([re]) => mx.mx.some(h => re.test(h))) || [, 'Own mail servers'])[1] : '';
@@ -190,6 +206,10 @@ function pivotPlan(k, v){
 }
 const OS_ACTS = {
   twCheck:() => twRun(), twStop:() => { if(UI.tw && UI.tw.sig) UI.tw.sig.stop = true; },
+  twClear:() => { if(UI.tw && UI.tw.sig) UI.tw.sig.stop = true; UI.tw = {}; renderMain(); refocus('twD'); },
+  twView:(id, v) => { if(!UI.tw) return; UI.tw.view = v; UI.tw.lim = 0; renderMain(); },
+  twMore:() => { if(!UI.tw) return; UI.tw.lim = (UI.tw.lim || 150) + 150; renderMain(); },
+  twUnwatch:(id, v) => { const W = DB.prefs.twSeen; if(!W || !W[v]) return; delete W[v]; save(); renderMain(); toast('Stopped watching ' + v); },
   twWatch:(id, v) => { if(UI.tw && UI.tw.sig) UI.tw.sig.stop = true; UI.tw = {d:v, list:twGen(v)}; renderMain(); },
   twDnsOn:() => { const S = lkSettings(); S.on.dns = true; S.on.rdap = true; mutate('turned on Google DNS and RDAP lookups'); renderMain(); },
   twLook:(id, v) => lookGo('domain', v),

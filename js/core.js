@@ -113,6 +113,11 @@ function mutate(what){ rev++; cache = {}; auditAdd(what); DB.log.unshift({at:Dat
 /* ---------- lookups ---------- */
 const tz = () => DB.prefs.tz || 'UTC';
 const theCase = id => DB.cases.find(c => c.id === (id || DB.active)) || null;
+function csNewCase(run){ window.__csRun = run;
+  openDlg(dhead('New case') + `<form data-form="csNew"><div class="in"><div class="field"><label for="csName">Name</label><input id="csName" required autofocus maxlength="120" placeholder="What are you investigating?"></div>
+    <p class="t3 small" style="margin:0">New saves from here go into it; you stay on this page. Scope, colour and the rest can be set on the case later.</p></div>
+    <footer><button type="button" class="btn" data-act="dclose">Cancel</button><button class="btn primary">${ico('folder-plus','sm')}Create case</button></footer></form>`);
+  setTimeout(() => { const i = $('csName'); if(i) i.focus(); }, 30); }
 /* actions that put something into a case, when there is no case at all: offer to make one */
 function needCase(){ toast('Make a case first — everything you collect goes into one'); if(typeof caseDlg === 'function') setTimeout(() => caseDlg(), 60); return null; }
 /* id → object indexes, rebuilt when the workspace changes (rev) or the array is swapped/grown; a miss falls back to a scan */
@@ -133,6 +138,8 @@ function entryKey(e){
   let v = primary(e); if(!v) return null;
   let k = t.kind;
   if(e.type === 'crypto') k = E.cryptoKind(v);
+  /* a file entry holds whichever hash was known: name the kind by its length, so an MD5 or SHA-1 joins the same value found in records */
+  if(e.type === 'file' && k === 'sha256'){ v = v.trim().toLowerCase(); k = v.length === 32 ? 'md5' : v.length === 40 ? 'sha1' : 'sha256'; }
   if(e.type === 'ip' && v.includes(':') && E.validIPv6(v.trim())) k = 'ipv6';
   if(/^(phone|mac|pgp)$/.test(k)) v = E.norm(k, v);
   if(e.type === 'username') v = '@' + v.replace(/^@/, '');
@@ -141,6 +148,12 @@ function entryKey(e){
   if(k === 'cve') v = v.toUpperCase();
   return k + ':' + v;
 }
+/* before 1.76 every file entry was keyed sha256:, whatever the hash: move verdicts, watches and research notes to md5: / sha1: */
+function migrateHashKeys(){ let n = 0;
+  for(const store of [DB.verdicts, DB.verdictAt, DB.watch, DB.research]){ if(!store || typeof store !== 'object') continue;
+    for(const key of Object.keys(store)){ const m = /^sha256:([0-9a-f]{32}|[0-9a-f]{40})$/i.exec(key); if(!m) continue;
+      const nk = (m[1].length === 32 ? 'md5:' : 'sha1:') + m[1].toLowerCase(); if(!(nk in store)) store[nk] = store[key]; delete store[key]; n++; } }
+  return n; }
 const entryVerdict = e => { const k = entryKey(e); return k ? verdictOf(k) : (e.verdict || ''); };
 function setEntryVerdict(e, v){ const k = entryKey(e); if(k){ if(v) DB.verdicts[k] = v; else delete DB.verdicts[k]; } else e.verdict = v; }
 const sortRecs = l => l.slice().sort((a, b) => (a.ts && b.ts) ? a.ts - b.ts : a.ts ? -1 : b.ts ? 1 : a.addedAt - b.addedAt);
