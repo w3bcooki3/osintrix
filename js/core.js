@@ -24,8 +24,8 @@ function seedDB(){
   const verdicts = {...DEMO.verdicts};
   for(const [id,,,, x] of DEMO_ENTRIES) if(x.verdict){ const e = entries.find(z => z.id === id), k = entryKey(e); if(k) verdicts[k] = x.verdict; else e.verdict = x.verdict; }
   const tools = TOOLS_SEED.map(t => ({id:'t' + t.id, name:t.name, url:t.url, cat:t.parentCategory, sub:t.childCategory, desc:t.description, tags:t.tags || [],
-    pinned:!!t.isPinned, starred:!!t.isStarred, added:Date.parse(t.dateAdded) || Date.now(), uses:0, seed:true}));
-  return {v:2, cases, records:recs, entries, links:DEMO_LINKS.map(([a, b, label, conf, src], i) => ({id:'l' + i, caseId:entries.find(e => e.id === a).caseId, a, b, label, conf, src})),
+    pinned:!!t.isPinned, starred:!!t.isStarred, added:Date.parse(t.dateAdded) || Date.now(), uses:0, seed:true, ...(t.lookup ? {tpl:t.lookup[0], kinds:t.lookup[1].slice()} : {})}));
+  return {v:2, toolsV:2, cases, records:recs, entries, links:DEMO_LINKS.map(([a, b, label, conf, src], i) => ({id:'l' + i, caseId:entries.find(e => e.id === a).caseId, a, b, label, conf, src})),
     verdicts, tools, feed:DEMO.feed.map(f => ({...f, ts:Date.parse(f.date)})), archive:JSON.parse(JSON.stringify(DEMO.story.archive)), active:'c-lantern',
     prefs:{theme:'light', size:'m', density:'comfortable', tz:'UTC', navRail:true}, log:[], sample:true};
 }
@@ -246,7 +246,7 @@ function passes(r){
 }
 
 /* ---------- routing ---------- */
-const AREAS = ['today','security','watch','trash','help','ctf','lab','home','cases','case','toolbox','entities','feeds','decoder','reference','settings','detections','playbooks','queries','notes','cloud','whatsnew','pad','notebook','certs','tradecraft','regex'];
+const AREAS = ['today','security','watch','trash','help','ctf','lab','home','cases','case','toolbox','entities','feeds','decoder','reference','settings','detections','playbooks','queries','notes','cloud','whatsnew','pad','notebook','certs','tradecraft','regex','blackbook'];
 const CASE_TABS = [['overview','Overview','layout-dashboard'],['vault','Vault','layers'],['entities','Entities','fingerprint'],['timeline','Timeline','clock'],['graph','Graph','waypoints'],['map','Places','map-pin'],['media','Media','images'],['infra','Infrastructure','network'],['questions','Analysis','scale'],['story','Story','newspaper'],['report','Report','file-chart-column']];
 function parseHash(){
   const p = (location.hash || '#/home').replace(/^#\/?/, '').split('/').map(decodeURIComponent);
@@ -320,10 +320,27 @@ function pageHead(icon, color, title, sub, acts, kpis){
 
 /* pre-added tools: flag them, and add new ones from tools.json after an update — never re-add one the user deleted */
 function ensureTools(){
+  if((DB.toolsV || 0) < 2) toolsCurate();
   const gone = new Set(DB.deletedSeed || []), have = new Set(DB.tools.map(t => t.url)), seedUrls = new Set(TOOLS_SEED.map(t => t.url)); let n = 0;
   for(const t of DB.tools) if(t.seed === undefined) t.seed = seedUrls.has(t.url);
-  for(const t of TOOLS_SEED) if(!have.has(t.url) && !gone.has(t.url)){ DB.tools.push({id:'t' + t.id + '-' + uid('u').slice(-4), name:t.name, url:t.url, cat:t.parentCategory, sub:t.childCategory, desc:t.description, tags:t.tags || [], pinned:false, starred:false, added:Date.now(), uses:0, seed:true}); n++; }
+  for(const t of TOOLS_SEED) if(!have.has(t.url) && !gone.has(t.url)){ const x = {id:'t' + t.id + '-' + uid('u').slice(-4), name:t.name, url:t.url, cat:t.parentCategory, sub:t.childCategory, desc:t.description, tags:t.tags || [], pinned:false, starred:false, added:Date.now(), uses:0, seed:true};
+    if(t.lookup){ x.tpl = t.lookup[0]; x.kinds = t.lookup[1].slice(); } DB.tools.push(x); have.add(t.url); n++; }
   return n;
+}
+/* 1.89: the toolbox was curated. A built-in tool at a new address moves (keeping stars, notes, uses); one that was retired
+   leaves unless you starred, pinned, opened or edited it; built-in tools you never edited get the new descriptions and
+   one-click lookups. Your own tools are never touched. Runs once. */
+function toolsCurate(){
+  const moved = typeof TOOLS_MOVED !== 'undefined' ? TOOLS_MOVED : {}, retired = new Set(typeof TOOLS_RETIRED !== 'undefined' ? TOOLS_RETIRED : []), byUrl = new Map(TOOLS_SEED.map(t => [t.url, t]));
+  const yours = t => t.starred || t.pinned || t.uses || t.last || t.edited, urls = new Set(DB.tools.map(t => t.url));
+  DB.tools = DB.tools.filter(t => { if(!t.seed) return true;
+    if(moved[t.url]){ if(urls.has(moved[t.url])) return !!yours(t); t.url = moved[t.url]; urls.add(t.url); return true; }   // the new address is there already: keep the old copy only if it is yours
+    return !(retired.has(t.url) && !yours(t)); });
+  DB.deletedSeed = (DB.deletedSeed || []).map(u => moved[u] || u);
+  for(const t of DB.tools){ const s = t.seed && !t.edited && byUrl.get(t.url); if(!s) continue;
+    Object.assign(t, {name:s.name, cat:s.parentCategory, sub:s.childCategory, desc:s.description, tags:(s.tags || []).slice()});
+    if(s.lookup && !t.tpl){ t.tpl = s.lookup[0]; t.kinds = s.lookup[1].slice(); } }
+  DB.toolsV = 2;
 }
 
 /* Leaving with a change that is not on disk yet (big or encrypted workspaces write in the background): try once more,

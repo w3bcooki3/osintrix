@@ -42,6 +42,8 @@ function srchIndex(){
   if(DB.sample) acts.push(['Remove sample data','trash-2','sample demo delete remove', () => clickAct('removeSample')]);
   /* saved views open from here too */
   if(typeof svList === 'function') for(const v of svList()){ const c = v.caseId ? theCase(v.caseId) : null; add('action', {id:'sv' + v.id, title:v.name, sub:SV_KIND[v.kind][0] + (c ? ' · ' + caseNm(c) : '') + ' · ' + svDescribe(v), icon:SV_KIND[v.kind][1], text:v.name + ' view saved ' + SV_KIND[v.kind][0] + ' ' + svDescribe(v), run:() => svOpen(v.id), w:4}); }
+  if(DB.prefs.bb){ add('action', {id:'go#/blackbook', title:'Go to Blackbook', sub:'Page', icon:'gem', text:'Blackbook hunt apt underground osint page open go', run:() => go('#/blackbook'), w:2});
+    if(typeof BLACKBOOK !== 'undefined') for(const p of BLACKBOOK.plays) add('action', {id:'bb:' + p.id, title:p.t, sub:'Blackbook · ' + (BLACKBOOK.sections.find(s => s.id === p.sec) || {}).title, icon:'crosshair', text:p.t + ' ' + p.att.join(' ') + ' ' + p.lens + ' blackbook hunt', run:() => { go('#/blackbook'); setTimeout(() => BB_ACTS.bbJump(null, p.id), 60); }, w:1}); }
   for(const [t, i, x, fn] of acts) add('action', {id:'a' + t, title:t, sub:'Action', icon:i, text:t + ' ' + x, run:fn, w:3});
   for(const c of DB.cases) add('case', {id:c.id, title:c.name, sub:({active:'Active', review:'In review', closed:'Archived'}[c.status] || c.status), icon:c.icon, color:c.color, text:c.name + ' ' + c.code + ' ' + (c.scope || ''), body:c.scope, caseId:c.id, w:6});
   for(const e of DB.entries){ const t = TYPES[e.type]; if(!t) continue; const c = theCase(e.caseId);
@@ -115,6 +117,7 @@ function srchRun(){
   /* a saved view whose name starts with what was typed comes before everything else */
   const ql = q.toLowerCase(), svHits = ql.length >= 3 ? S.index.filter(x => x.kind === 'action' && /^sv/.test(x.id) && x.title.toLowerCase().startsWith(ql)).slice(0, 3) : [];
   const ioc = q && !P.tl.length ? E.extract(q).find(e => e.v.toLowerCase() === refang(q).toLowerCase() || e.v.toLowerCase() === q.toLowerCase()) : null;
+  if(/^black\s?book$/.test(ql)) special.push({kind:'action', id:'bb', title:'Open the Blackbook', sub:DB.prefs.bb ? 'Kit' : 'Hidden — found it', icon:'gem', run:() => go('#/blackbook')});
   if(ioc) special.push({kind:'ioc', id:'ioc', title:ioc.v, sub:'Indicator · ' + (E.LABEL[ioc.k] || ioc.k), icon:'crosshair', mono:true, k:ioc.k, v:ioc.v});
   const tlOwn = P.tl.some(x => !SR_F.test(x));   /* host:, source:, after: … only mean something on a timeline */
   if(tlOwn || (q && UI.route.area === 'case' && UI.route.tab === 'timeline')) special.push({kind:'tl', id:'tl', title:'Filter the ' + caseNm(theCase()) + ' timeline', sub:(P.tl.concat(P.terms)).join(' ') || q, icon:'filter', q});

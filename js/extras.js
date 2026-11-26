@@ -109,7 +109,8 @@ function toolKindOf(name){ const n = String(name || '').trim().toLowerCase().rep
   return k ? kindGroup(k) : ''; }
 const kindGroup = k => ({md5:'hash', sha1:'hash', sha256:'hash', sha512:'hash', file:'hash', hostport:'ipv4', ipv6:'ipv4', ip:'ipv4', eth:'btc', sol:'btc', ens:'btc', xmr:'btc', ltc:'btc', trx:'btc', doge:'btc', crypto:'btc', username:'handle', vulnerability:'cve'})[k] || k;
 function toolUrl(t, v){ return t.tpl ? E.safeUrl(t.tpl.replace(/\{value\}/g, encodeURIComponent(v)).replace(/\{raw\}/g, v)) : null; }
-function toolTplLinks(kind, v){ const g = kindGroup(kind); return DB.tools.filter(t => t.tpl && (t.kinds || []).some(k => k === g || k === 'any')).map(t => [t.name, toolUrl(t, v), t.id]).filter(x => x[1]); }
+/* an onion address is never handed to a clear-web lookup from a toolbox shortcut (the Tor search above is the one offered) */
+function toolTplLinks(kind, v){ if(/\.onion$/i.test(String(v || ''))) return []; const g = kindGroup(kind); return DB.tools.filter(t => t.tpl && (t.kinds || []).some(k => k === g || k === 'any')).map(t => [t.name, toolUrl(t, v), t.id]).filter(x => x[1]); }
 const SEED_TPL = {'Shodan':['https://www.shodan.io/host/{value}',['ipv4']], 'MalwareBazaar':['https://bazaar.abuse.ch/browse.php?search={value}',['hash']], 'Have I Been Pwned':['https://haveibeenpwned.com/account/{value}',['email']],
   'DB-IP':['https://db-ip.com/{value}',['ipv4']], 'Knowem':['https://knowem.com/checkusernames.php?u={value}',['handle']], 'Certgrep':['https://certgrep.sh/?q={value}',['domain']]};
 function ensureToolTpl(){ if(DB.tplSeeded) return; for(const t of DB.tools){ const s = SEED_TPL[t.name]; if(s && !t.tpl){ t.tpl = s[0]; t.kinds = s[1]; } } DB.tplSeeded = true; }

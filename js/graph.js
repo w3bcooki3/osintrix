@@ -38,21 +38,21 @@ const nodeIcon = (icon, color) => 'data:image/svg+xml;utf8,' + encodeURIComponen
 function caseGraph(c, D){
   if(!D.entries.length) return `<div class="scroll">${empty('waypoints','No entries to draw', D.recs.length ? `This case has ${D.recs.length} records. Build the graph from what they mention — stated relations are linked for you — or add entries by hand.` : 'The graph is built from the case vault. Add an entry, or capture evidence and build the graph from it.', `${D.recs.length ? `<button class="btn primary" data-act="gBuild">${ico('sparkles','sm')}Build from evidence</button>` : ''}<button class="btn${D.recs.length ? '' : ' primary'}" data-act="addEntry">${ico('plus','sm')}Add entry</button>`)}</div>`;
   const nSugg = suggestLinks(c.id).length, nMiss = missingCount(c.id);
-  const gm = UI.graph, hide = gm.hide || (gm.hide = new Set()), sel = !!(UI.sel && (UI.sel.kind === 'entry' || UI.sel.kind === 'link'));
+  const gm = UI.graph, hide = gm.hide || (gm.hide = new Set()), sel = !!(UI.sel && (UI.sel.kind === 'entry' || UI.sel.kind === 'link')), picks = gPicks(D), np = picks.length;
   const tb = (act, icon, label, extra = '') => `<button class="gbtn" data-act="${act}" title="${label}" aria-label="${label}" ${extra}>${ico(icon,'sm')}<span>${label}</span></button>`;
   return `<div class="gwrap">
     <div class="gtools">
-      <div class="gset">${tb('addEntry','plus','Add node')}${tb('gConnect', 'git-branch', gm.mode === 'connect' ? 'Connecting…' : 'Connect', gm.mode === 'connect' ? 'aria-pressed="true"' : '')}</div>
+      <div class="gset">${tb('addEntry','plus','Add node')}${tb('gConnect', 'git-branch', gm.mode === 'connect' ? 'Connecting…' : 'Connect', gm.mode === 'connect' ? 'aria-pressed="true"' : '')}<button class="gbtn${gm.selMode ? ' on' : ''}" data-act="gSelMode" aria-pressed="${!!gm.selMode}" title="Select several: drag a box around nodes (or Shift+drag any time); Shift or Ctrl+click adds one">${ico('square-dashed-mouse-pointer','sm')}<span>Select</span></button></div>
       <div class="gset g-m"><button class="gbtn" data-act="gFindM" aria-label="Find a node">${ico('search','sm')}</button><button class="gbtn" data-act="gMore" aria-label="More graph actions">${ico('ellipsis','sm')}<span>More</span>${nSugg ? `<b class="gcount">${nSugg}</b>` : ''}</button></div>
-      <div class="gset g-d">${tb('gEdit','pencil','Edit', sel ? '' : 'disabled')}${tb('gDelete','trash-2','Delete', sel ? '' : 'disabled')}</div>
+      <div class="gset g-d">${tb('gEdit','pencil','Edit', sel && !np ? '' : 'disabled')}${np ? tb('vbDel','trash-2','Delete ' + np) : tb('gDelete','trash-2','Delete', sel ? '' : 'disabled')}</div>
       <div class="gset g-d">${tb('gPick','list-plus','Add from evidence')}${tb('gBuild','sparkles','Build from evidence')}<button class="gbtn${gm.panel === 'sugg' ? ' on' : ''}" data-act="gPanel" data-v="${gm.panel === 'sugg' ? '' : 'sugg'}" title="Suggested links" aria-pressed="${gm.panel === 'sugg'}">${ico('link-2','sm')}<span>Suggestions</span>${nSugg ? `<b class="gcount">${nSugg}</b>` : ''}</button><button class="gbtn${gm.panel === 'ins' ? ' on' : ''}" data-act="gPanel" data-v="${gm.panel === 'ins' ? '' : 'ins'}" title="Insights" aria-pressed="${gm.panel === 'ins'}">${ico('radar','sm')}<span>Insights</span></button></div>
       <div class="search-in gfind${gm.findOpen ? ' open' : ''}">${ico('search')}<label class="sr" for="gFind">Find in graph</label><input id="gFind" class="inp" placeholder="Find a node…" value="${esc(gm.find || '')}" autocomplete="off"></div>
       <span style="flex:1"></span>
       <div class="gset g-d"><label class="sr" for="gLayout">Arrange</label><select id="gLayout" class="gsel"><option value="">Arrange…</option><option value="cose">Force-directed</option><option value="concentric">By importance</option><option value="breadthfirst">Hierarchy</option><option value="circle">Circle</option><option value="grid">Grid</option></select>
         ${tb('gCo', gm.co ? 'eye' : 'eye', 'Co-occurrence', `aria-pressed="${!!gm.co}"`)}${tb('gExport','download','Export')}</div>
     </div>
-    <div class="gcanvas${gm.panel ? ' haspanel' : ''}"><div id="cy" role="application" aria-label="Relationship graph for ${esc(c.name)}"></div><p id="gKeysHelp" class="sr">Arrow keys move between entries, Enter opens one, Shift+F10 its menu, plus and minus zoom, 0 fits the graph.</p><p id="gLive" class="sr" aria-live="polite"></p>${typeof gvBar === 'function' ? gvBar(D) : ''}
-      <div id="gpanel"></div>
+    <div class="gcanvas${gm.panel ? ' haspanel' : ''}"><div id="cy" role="application" aria-label="Relationship graph for ${esc(c.name)}"></div><p id="gKeysHelp" class="sr">Arrow keys move between entries, Enter opens one, Shift+F10 its menu, plus and minus zoom, 0 fits the graph. To act on several: Ctrl+A selects all, or select one, then arrow keys and Space add others; Esc clears.</p><p id="gLive" class="sr" aria-live="polite"></p>${typeof gvBar === 'function' ? gvBar(D) : ''}
+      <div id="gpanel"></div>${gBulk(D, picks)}
       ${nMiss && !(gm.noteOff && gm.noteOff.has(c.id)) && !gm.mode && !gm.path ? `<div class="gfloat gmiss">${ico('layers','sm')}<span title="The graph shows vault entries. Adding an entity puts it in the vault and on the graph."><b>${nMiss}</b> <em class="g-dt">${nMiss === 1 ? 'entity' : 'entities'} from the evidence ${nMiss === 1 ? 'is' : 'are'} not on the graph yet</em><em class="g-mt">not on the graph</em></span><button class="btn xs primary" data-act="gPick">Choose…</button><button class="btn xs g-d" data-act="gBuild">Add by rule…</button><button class="iconbtn" data-act="gNoteOff" aria-label="Hide">${ico('x','sm')}</button></div>` : ''}
       ${gm.mode === 'path' ? `<div class="gfloat gmode">${ico('route','sm')}<span>Now click the entry to find a path to</span><button class="btn xs" data-act="gPathOff">Cancel</button></div>` : ''}
       ${gm.path ? `<div class="gfloat gmode">${ico('route','sm')}<span>${gm.path.len ? `${gm.path.len} step${gm.path.len > 1 ? 's' : ''} from <b>${esc(gm.path.a)}</b> to <b>${esc(gm.path.b)}</b>` : `No path between <b>${esc(gm.path.a)}</b> and <b>${esc(gm.path.b)}</b>`}</span><button class="btn xs" data-act="gPathOff">Clear</button></div>` : ''}
@@ -101,7 +101,7 @@ function mountGraph(){
   if(cy && CY_SIG === sig && cy.container() && !cy.container().isConnected && !cyDead()){ const old = cy.container(); cyKeep(); el.replaceWith(old); cy.resize(); graphAfter(old, focused); return; }
   if(cy){ if(CTX && CTX.graph) hideMenu(); cy.destroy(); cy = null; }   /* a menu on the old graph points at what may no longer be there */
   CY_SIG = sig;
-  cy = cytoscape({container:el, elements:els, minZoom:big ? .05 : .2, maxZoom:3, boxSelectionEnabled:false, hideEdgesOnViewport:big, textureOnViewport:big, pixelRatio:big ? 1 : 'auto',
+  cy = cytoscape({container:el, elements:els, minZoom:big ? .05 : .2, maxZoom:3, boxSelectionEnabled:true, hideEdgesOnViewport:big, textureOnViewport:big, pixelRatio:big ? 1 : 'auto',
     layout:focused ? gvLayout(D) : hasPos ? {name:'preset'} : {name:'cose', animate:false, nodeRepulsion:() => 14000, idealEdgeLength:() => 95, nodeOverlap:20, padding:40, randomize:false, numIter:1500},
     style:[
       {selector:'node', style:{width:'data(w)', height:'data(w)', 'background-color':surface, 'background-image':'data(icon)', 'background-width':'62%', 'background-height':'62%',
@@ -125,6 +125,7 @@ function mountGraph(){
       {selector:'node.rk2', style:{'underlay-color':cssVar('--amber'), 'underlay-opacity':.45, 'underlay-padding':11, 'underlay-shape':'ellipse'}},
       {selector:'node.rk3', style:{'underlay-color':cssVar('--red'), 'underlay-opacity':.45, 'underlay-padding':13, 'underlay-shape':'ellipse'}},
       {selector:'node.gvfocus', style:{'underlay-color':accent, 'underlay-opacity':.28, 'underlay-padding':12, 'underlay-shape':'ellipse', 'border-width':4}},
+      {selector:'node.kfocus', style:{'outline-width':3, 'outline-color':accent, 'outline-offset':6, 'outline-opacity':.9}},
       {selector:'node.hit', style:{'underlay-color':cssVar('--amber'), 'underlay-opacity':.4, 'underlay-padding':10, 'underlay-shape':'ellipse'}},
     ]});
   cyKeep();
@@ -136,7 +137,12 @@ function mountGraph(){
   cy.on('viewport', () => { radialHide(); if(!ready || cy !== me) return; (UI.graph.views || (UI.graph.views = {}))[DB.active] = {z:cy.zoom(), p:{...cy.pan()}}; });
   cy.on('grab', 'node', radialHide);
   cy.on('grab viewport', () => { if(CTX && CTX.graph) hideMenu(); });   /* a menu opened on the graph does not outlive a drag, pan or zoom */
-  cy.on('dragfree', 'node', ev => { if(focused) return;   /* a focused view's places are its own; the whole graph keeps its layout */ const e = entryById(ev.target.id()); if(e){ e.pos = {...ev.target.position()}; save(); } });
+  cy.on('dragfree', 'node', ev => { if(focused) return;   /* a focused view's places are its own; the whole graph keeps its layout */ const moved = ev.target.selected() ? cy.nodes(':selected') : ev.target; moved.forEach(n => { const e = entryById(n.id()); if(e) e.pos = {...n.position()}; }); save(); });
+  /* a box drawn around nodes adds them to the selection */
+  let boxT = 0; const boxHit = new Set(), boxFlush = () => { if(cy !== me) return; const P = UI.vPick || (UI.vPick = new Set()); cy.nodes(':selected').forEach(n => boxHit.add(n.id())); if(!boxHit.size) return;
+    for(const id of boxHit) P.add(id); boxHit.clear(); if(UI.sel && UI.sel.kind === 'entry'){ P.add(UI.sel.id); UI.sel = null; UI.inspOpen = false; renderInsp(); } gKeep(renderMain); };
+  cy.on('boxselect', 'node', ev => { boxHit.add(ev.target.id()); clearTimeout(boxT); boxT = setTimeout(boxFlush, 40); });
+  cy.on('boxend', () => { clearTimeout(boxT); boxT = setTimeout(boxFlush, 40); });
   cy.on('tap', 'node', ev => {
     const id = ev.target.id();
     if(UI.graph.mode === 'path'){ const a = UI.graph.first; if(!a || a === id) return; UI.graph.mode = null; UI.graph.first = null; return findPath(a, id); }
@@ -145,16 +151,20 @@ function mountGraph(){
       if(UI.graph.first === id) return;
       const a = UI.graph.first; UI.graph.first = null; UI.graph.mode = null; return linkDlg({a, b:id});
     }
+    const oe = ev.originalEvent || {};
+    if(oe.shiftKey || oe.ctrlKey || oe.metaKey || UI.graph.selMode) return gPickToggle(id);
+    if(UI.vPick && UI.vPick.size){ UI.vPick = new Set(); selectEntry(id, true); renderMain(); return; }   /* a plain click picks one entry again */
     selectEntry(id, true); radialFor(id);
   });
   cy.on('tap', 'edge', ev => { const id = ev.target.id(); if(id.startsWith('co-')) return; UI.sel = {kind:'link', id}; UI.inspOpen = true; renderInsp(); refreshGraphTools(); });
-  cy.on('tap', ev => { if(ev.target === cy){ radialHide(); if(UI.sel){ UI.sel = null; renderInsp(); refreshGraphTools(); } cy.elements().removeClass('faded'); } });
+  cy.on('tap', ev => { if(ev.target === cy){ radialHide(); const oe = ev.originalEvent || {}; if(UI.vPick && UI.vPick.size && !UI.graph.selMode && !oe.shiftKey && !oe.ctrlKey && !oe.metaKey){ UI.vPick = new Set(); renderMain(); }
+    if(UI.sel){ UI.sel = null; renderInsp(); refreshGraphTools(); } cy.elements().removeClass('faded'); } });
   cy.on('dbltap', ev => { if(ev.target === cy){ UI.graph.newPos = {...ev.position}; entryDlg(); } });
   /* holding a node is how a touch screen opens its menu; with a mouse it is how a drag starts (the right button opens
      the menu), so a mouse hold no longer opens it and then leaves it behind when the node is dragged */
   const menuAt = (ev, fn) => { const oe = ev.originalEvent || {}; if(ev.type === 'taphold' && !/^touch/.test(oe.type || '')) return; const r = el.getBoundingClientRect(), rp = ev.renderedPosition || (ev.target.renderedPosition && ev.target.renderedPosition()) || {x:0, y:0};
     fn((oe.clientX != null ? oe.clientX : r.left + rp.x), (oe.clientY != null ? oe.clientY : r.top + rp.y)); if(CTX) CTX.graph = true; };
-  cy.on('cxttap taphold', 'node', ev => menuAt(ev, (x, y) => nodeMenu(ev.target.id(), x, y)));
+  cy.on('cxttap taphold', 'node', ev => menuAt(ev, (x, y) => UI.vPick && UI.vPick.size > 1 && UI.vPick.has(ev.target.id()) ? gPickMenu(x, y) : nodeMenu(ev.target.id(), x, y)));
   cy.on('cxttap taphold', 'edge', ev => { if(!ev.target.id().startsWith('co-')) menuAt(ev, (x, y) => edgeMenu(ev.target.id(), x, y)); });
   cy.on('cxttap taphold', ev => { if(ev.target === cy) menuAt(ev, (x, y) => canvasMenu({...ev.position}, x, y)); });
   el.oncontextmenu = e => e.preventDefault();
@@ -162,12 +172,18 @@ function mountGraph(){
      or the menu key opens its menu; + and − zoom, 0 fits it to the screen, Esc lets go. A live line says where you are. */
   el.tabIndex = 0; el.setAttribute('aria-describedby', 'gKeysHelp');
   const say = t => { const l = $('gLive'); if(l) l.textContent = t; };
-  const goTo = n => { cy.elements().unselect(); n.select(); selectEntry(n.id(), true); const r = el.getBoundingClientRect(), p = n.renderedPosition();
+  const goTo = n => { UI.gKeyAt = n.id(); if(UI.vPick && UI.vPick.size){ cy.nodes('.kfocus').removeClass('kfocus'); n.addClass('kfocus'); const r0 = el.getBoundingClientRect(), p0 = n.renderedPosition(); if(p0.x < 40 || p0.y < 40 || p0.x > r0.width - 40 || p0.y > r0.height - 40) cy.animate({center:{eles:n}}, {duration:160}); say(`${n.data('label') || n.id()}${UI.vPick.has(n.id()) ? ', selected' : ''} — Space to ${UI.vPick.has(n.id()) ? 'remove' : 'add'}`); return; }
+    cy.elements().unselect(); n.select(); selectEntry(n.id(), true); const r = el.getBoundingClientRect(), p = n.renderedPosition();
     if(p.x < 40 || p.y < 40 || p.x > r.width - 40 || p.y > r.height - 40) cy.animate({center:{eles:n}}, {duration:160});
     const t = TYPES[(entryById(n.id()) || {}).type]; say(`${n.data('label') || n.id()}${t ? ', ' + t.name : ''}, ${n.connectedEdges().length} connection${n.connectedEdges().length === 1 ? '' : 's'}`); };
   el.onkeydown = e => {
     if(e.target !== el) return;
-    const cur = UI.sel && UI.sel.kind === 'entry' ? cy.getElementById(UI.sel.id) : null, has = cur && cur.length;
+    const P = UI.vPick || (UI.vPick = new Set());
+    if(e.key === 'Escape' && P.size){ e.preventDefault(); e.stopPropagation(); return GSEL_ACTS.gSelNone(); }
+    if((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')){ e.preventDefault(); GSEL_ACTS.gSelAll(); say(cy.nodes(':visible').length + ' selected'); return; }
+    if((e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) && P.size > 1){ e.preventDefault(); const r = el.getBoundingClientRect(); return gPickMenu(r.left + 40, r.top + 40); }
+    if(e.key === ' ' && UI.gKeyAt){ e.preventDefault(); const id = UI.gKeyAt, on = !P.has(id); gPickToggle(id); say((on ? 'Added, ' : 'Removed, ') + P.size + ' selected'); return; }
+    const cur = UI.sel && UI.sel.kind === 'entry' ? cy.getElementById(UI.sel.id) : (UI.gKeyAt ? cy.getElementById(UI.gKeyAt) : null), has = cur && cur.length;
     if((e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) && has){ e.preventDefault(); const r = el.getBoundingClientRect(), p = cur.renderedPosition(); return nodeMenu(UI.sel.id, r.left + p.x, r.top + p.y); }
     const D = {ArrowRight:[1, 0], ArrowLeft:[-1, 0], ArrowDown:[0, 1], ArrowUp:[0, -1]}[e.key];
     if(D){ e.preventDefault(); const ns = cy.nodes(':visible'); if(!ns.length) return;
@@ -203,7 +219,10 @@ function graphAfter(el, focused){
     /* hovering a node fades the rest; the graph only undoes that when the mouse moves over its own canvas, so going
        straight from a node onto the zoom or fit buttons (which sit beside it) left everything faded */
     el.addEventListener('mouseleave', () => { if(cy && cy.container() === el && !$('radial') && cy.elements('.faded').length){ cy.elements().removeClass('faded'); if(typeof applyFind === 'function') applyFind(); } }); }
-  cy.elements().unselect().removeClass('src gvfocus faded');
+  cy.elements().unselect().removeClass('src gvfocus faded kfocus');
+  if(UI.vPick && UI.vPick.size){ cy.nodes().filter(n => UI.vPick.has(n.id())).select(); if(UI.gKeyAt){ const k = cy.getElementById(UI.gKeyAt); if(k.length) k.addClass('kfocus'); } }
+  cy.userPanningEnabled(!UI.graph.selMode);
+  if(UI.gRefocus){ UI.gRefocus = false; el.focus({preventScroll:true}); }   /* the graph was put back after a redraw the keyboard started */
   if(UI.sel && UI.sel.kind === 'entry'){ const n = cy.getElementById(UI.sel.id); if(n.length){ n.select(); if(UI.gFocus === UI.sel.id){ UI.gFocus = null; cy.animate({center:{eles:n}, zoom:Math.max(cy.zoom(), 1.1)}, {duration:280}); } } }
   if(UI.graph.first){ const n = cy.getElementById(UI.graph.first); if(n.length) n.addClass('src'); }
   if(focused){ const n = cy.getElementById(gvS().focus); if(n.length) n.addClass('gvfocus'); }
@@ -365,3 +384,46 @@ function exportGraph(fmt){
   for(const l of D.links) L.push(`<edge id="${X(l.id)}" source="${X(l.a)}" target="${X(l.b)}"><data key="rel">${X(l.label)}</data><data key="conf">${l.conf}</data></edge>`);
   L.push('</graph>', '</graphml>'); download(name + '.graphml', L.join('\n'), 'application/xml');
 }
+
+/* ==========================================================================
+   Many nodes at once: Shift or Ctrl+click adds a node, Shift+drag on the background draws a box (or turn on Select and
+   just drag), Space adds the node in focus from the keyboard, Ctrl+A takes every node shown, Esc lets go. The picked
+   nodes are the Vault's own selection, so the same bar acts on them: verdict, priority, tags, star, watch, CSV, delete —
+   each with one undo — plus arranging them and dragging them together.
+   ========================================================================== */
+function gPicks(D){ const P = UI.vPick || (UI.vPick = new Set()), ok = new Set(D.entries.map(e => e.id)); for(const id of [...P]) if(!ok.has(id)) P.delete(id); return [...P]; }
+function gBulk(D, picks){
+  const n = picks.length;
+  if(!n) return UI.graph.selMode ? `<div class="gfloat gbulk gbulk-hint">${ico('square-dashed-mouse-pointer','sm')}<span>Drag a box around nodes, or click them one by one</span><button class="btn xs" data-act="gSelMode">Done</button></div>` : '';
+  const shown = typeof cy !== 'undefined' && cy && !cyDead() ? cy.nodes(':visible').length : D.entries.length;
+  return `<div class="gfloat gbulk tbulk" role="toolbar" aria-label="${n} selected on the graph"><b>${n.toLocaleString()} selected</b>${n < shown ? `<button class="btn xs ghost" data-act="gSelAll">All ${shown.toLocaleString()}</button>` : ''}<span class="sp"></span>
+    <button class="btn xs" data-act="vbVerdict">${ico('shield','sm')}Verdict</button><button class="btn xs" data-act="vbPrio">${ico('flag','sm')}Priority</button><button class="btn xs" data-act="vbTag">${ico('tag','sm')}Tag…</button>
+    <button class="btn xs" data-act="vbStar">${ico('star','sm')}Star</button><button class="btn xs" data-act="vbWatch">${ico('eye','sm')}Watch</button><button class="btn xs" data-act="gArrange">${ico('layout-grid','sm')}Arrange</button>
+    <button class="btn xs" data-act="vbCsv">${ico('download','sm')}CSV</button><button class="btn xs dangerbtn" data-act="vbDel">${ico('trash-2','sm')}Delete</button><button class="iconbtn" data-act="gSelNone" aria-label="Clear the selection" title="Clear the selection (Esc)">${ico('x','sm')}</button></div>`;
+}
+/* redraws keep the keyboard on the graph when it was there */
+function gKeep(fn){ const had = document.activeElement && document.activeElement.id === 'cy'; if(had) UI.gRefocus = true; fn(); if(had){ const c = $('cy'); if(c && c.isConnected) c.focus({preventScroll:true}); } }
+function gPickToggle(id){ gKeep(() => { const P = UI.vPick || (UI.vPick = new Set()); if(P.has(id)) P.delete(id); else P.add(id); if(UI.sel && UI.sel.kind === 'entry' && P.size){ P.add(UI.sel.id); UI.sel = null; UI.inspOpen = false; renderInsp(); } renderMain(); }); }
+function gPickMenu(x, y){
+  const n = (UI.vPick || new Set()).size, ch = (label, fn) => () => vbChange(label, fn);
+  showMenu(x, y, [
+    {seg:[['malicious', 'Malicious'], ['suspicious', 'Suspicious'], ['benign', 'Benign'], ['', 'None']].map(([k, l]) => ({label:l, cls:k ? 'vd-' + k : '', fn:ch(k ? 'marked ' + k : 'cleared the verdict', es => { for(const e of es) setEntryVerdict(e, k); })})), label:'Verdict'},
+    {seg:['critical', 'high', 'medium', 'low'].map(p => ({label:p[0].toUpperCase() + p.slice(1), fn:ch('priority ' + p, es => { for(const e of es) e.priority = p; })})), label:'Priority'},
+    {label:'Tag…', icon:'tag', fn:() => VB_ACTS.vbTag()}, {label:'Star or unstar', icon:'star', fn:() => VB_ACTS.vbStar()},
+    {label:'Arrange in a circle', icon:'circle-dot', fn:() => gArrangeAs('circle')}, {label:'Arrange in a grid', icon:'layout-grid', fn:() => gArrangeAs('grid')},
+    {sep:true}, {label:'Delete ' + n, icon:'trash-2', danger:true, fn:() => VB_ACTS.vbDel()}, {label:'Clear the selection', icon:'x', kbd:'Esc', fn:() => GSEL_ACTS.gSelNone()}], n + ' selected');
+  if(CTX) CTX.graph = true;
+}
+function gArrangeAs(name){
+  if(!cy || cyDead()) return; const ns = cy.nodes().filter(x => UI.vPick.has(x.id())); if(ns.length < 2) return;
+  const bb = ns.boundingBox(), side = Math.max(bb.w, bb.h, ns.length * 40), cx = bb.x1 + bb.w / 2, cyy = bb.y1 + bb.h / 2;
+  const l = ns.layout({name, animate:true, animationDuration:300, fit:false, avoidOverlap:true, boundingBox:{x1:cx - side / 2, y1:cyy - side / 2, w:side, h:side}});
+  l.on('layoutstop', () => { ns.forEach(x => { const e = entryById(x.id()); if(e) e.pos = {...x.position()}; }); mutate('arranged ' + ns.length + ' nodes'); });
+  l.run();
+}
+const GSEL_ACTS = {
+  gSelMode:() => { UI.graph.selMode = !UI.graph.selMode; renderMain(); if(UI.graph.selMode) toast('Drag a box around nodes to select them. Shift+drag works any time, without this.'); },
+  gSelAll:() => { if(!cy || cyDead()) return; UI.vPick = new Set(cy.nodes(':visible').map(x => x.id())); UI.sel = null; gKeep(() => { renderMain(); renderInsp(); }); },
+  gSelNone:() => { UI.vPick = new Set(); UI.graph.selMode = false; renderMain(); const el = $('cy'); if(el) el.focus({preventScroll:true}); },
+  gArrange:(id, v, t) => { const r = t.getBoundingClientRect(); showMenu(r.left, r.bottom + 6, [{label:'In a circle', icon:'circle-dot', fn:() => gArrangeAs('circle')}, {label:'In a grid', icon:'layout-grid', fn:() => gArrangeAs('grid')}], 'Arrange the selected nodes'); },
+};
