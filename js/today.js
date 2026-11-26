@@ -38,6 +38,9 @@ function todayItems(){
   for(const c of cases){ const Q = DB.records.filter(r => r.caseId === c.id && r.type === 'lead' && !r.answer).sort((a, b) => (a.addedAt || 0) - (b.addedAt || 0)); if(!Q.length) continue;
     const age = Math.floor((now - (Q[0].addedAt || now)) / 864e5);
     add(age > 7 ? 2 : 1, 'circle-help', `${caseNm(c)}: ${Q.length} open question${Q.length > 1 ? 's' : ''}`, `Oldest${age ? ' (' + age + ' day' + (age > 1 ? 's' : '') + ')' : ''}: ${Q[0].title}`, {go:caseHash(c.id, 'analysis'), l:'Answer them'}); }
+  /* right of reply: deadlines in the next two days, so a story is not held up waiting or published too early */
+  for(const c of cases){ const R = (c.replies || []).filter(x => typeof stReplyState === 'function' && stReplyState(x).k === 'waiting' && x.due && x.due - now < 2 * 864e5); if(!R.length) continue;
+    R.sort((a, b) => a.due - b.due); add(1, 'calendar-clock', `${caseNm(c)}: right of reply ${R.length > 1 ? R.length + ' deadlines' : 'deadline'} ${E.fmtDate(R[0].due, tz())}`, R.slice(0, 3).map(x => stWho(x)).join(' · '), {go:caseHash(c.id, 'story'), l:'Open the story'}); }
   /* cases gone quiet */
   for(const c of cases){ if(c.status !== 'active') continue; const last = Math.max(c.updated || 0, c.created || 0, ...DB.records.filter(r => r.caseId === c.id).map(r => r.addedAt || 0), ...DB.entries.filter(e => e.caseId === c.id).map(e => e.created || 0), ...(DB.notes || []).filter(n => n.caseId === c.id).map(n => n.updated || 0));
     const days = Math.floor((now - last) / 864e5); if(days >= 7) add(1, 'hourglass', `${caseNm(c)} has been quiet for ${days} days`, c.name.split(' — ')[0] + ' is still marked active. Close it, or pick it back up.', {go:caseHash(c.id, 'overview'), l:'Open the case'}); }

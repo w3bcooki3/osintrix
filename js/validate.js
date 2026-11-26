@@ -46,10 +46,14 @@ const CHECK = {
   hash:v => /^([a-f0-9]{32}|[a-f0-9]{40}|[a-f0-9]{64}|[a-f0-9]{128})$/i.test(v) ? '' : 'Enter an MD5, SHA-1, SHA-256 or SHA-512 hash (hex).',
   coords:v => { const m = v.match(/^\s*(-?\d+(?:\.\d+)?)\s*[,; ]\s*(-?\d+(?:\.\d+)?)\s*$/); return m && Math.abs(+m[1]) <= 90 && Math.abs(+m[2]) <= 180 ? '' : 'Enter latitude, longitude — e.g. 60.3929, 5.3241.'; },
   date:v => /^\d{4}(-\d{2}(-\d{2})?)?([ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})?)?$/.test(v) && !isNaN(Date.parse(v.length === 4 ? v + '-01-01' : v.length === 7 ? v + '-01' : v)) ? '' : 'Use a date like 2026-09-21 (year-month-day).',
-  count:v => /^[\d\s.,]+[kmb]?\+?$/i.test(v) ? '' : 'Enter a number, e.g. 1200 or 1.2k.'
+  count:v => /^[\d\s.,]+[kmb]?\+?$/i.test(v) ? '' : 'Enter a number, e.g. 1200 or 1.2k.',
+  vin:v => TRANSPORT.vinShape(v.replace(/\s+/g, '').toUpperCase()) ? '' : 'A VIN is 17 letters and digits, without I, O or Q.',
+  imo:v => TRANSPORT.imoCheck(v.replace(/^IMO\s*/i, '').trim()) ? '' : 'An IMO number is 7 digits whose last digit checks the rest, e.g. 9074729. Check for a typo.',
+  mmsi:v => /^\d{9}$/.test(v.replace(/\s+/g, '')) ? '' : 'An MMSI is 9 digits, e.g. 636019825.',
+  icao24:v => /^[0-9a-f]{6}$/i.test(v.trim()) ? '' : 'An ICAO address is 6 hex characters, e.g. a835af.'
 };
 /* vault field key → check */
-const FIELD_CHECK = {email:'email', domain:'domain', ip:'ip', url:'url', website:'url', mac:'mac', number:'phone', phone:'phone', cve:'cve', cvss:'cvss', hash:'hash', coordinates:'coords', date:'date', created:'date', dob:'date', firstSeen:'date', followers:'count', members:'count', records:'count'};
+const FIELD_CHECK = {vin:'vin', imo:'imo', mmsi:'mmsi', icao24:'icao24', email:'email', domain:'domain', ip:'ip', url:'url', website:'url', mac:'mac', number:'phone', phone:'phone', cve:'cve', cvss:'cvss', hash:'hash', coordinates:'coords', date:'date', created:'date', dob:'date', firstSeen:'date', followers:'count', members:'count', records:'count'};
 const LIMITS = {name:120, title:160, short:300, desc:2000, body:20000};
 function checkLen(id, v, n, label){ return v.length > n ? fieldErr(id, `${label} is too long — ${v.length} characters, the limit is ${n}.`) : true; }
 function checkRegex(id, re, flags){ try{ new RegExp(re, flags); return true; }catch(e){ return fieldErr(id, 'This regular expression has an error: ' + String(e.message).replace(/^Invalid regular expression: /, '')); } }

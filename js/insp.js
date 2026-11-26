@@ -72,7 +72,7 @@ function inspRecord(r){
       <dt>Source</dt><dd>${esc(r.source || '—')}</dd><dt>Host</dt><dd>${esc(r.host || '—')}</dd><dt>Case</dt><dd>${esc(c.name)}</dd>
       <dt>Added</dt><dd>${esc(r.addedBy)} · ${esc(E.fmtFull(r.addedAt, tz()).slice(0, 16))}</dd><dt>SHA-256</dt><dd class="mono" title="Fingerprint of the captured text">${esc((r.hash || '…').slice(0, 24))}…</dd></dl>
       ${r.ts ? `<button class="btn sm" data-act="setT0" data-id="${r.id}" style="margin-top:12px">${ico('crosshair','sm')}${c.t0 === r.id ? 'Clear T0' : 'Make this T0'}</button>` : ''}</div>
-    ${typeof cxInRecord === 'function' ? (x => x ? `<div class="isec"><h4>Decoded</h4>${x}</div>` : '')(cxInRecord(r)) : ''}${typeof metaHtml === 'function' && (r.att || []).length ? `<div class="isec"><h4>What the file says about itself</h4>${(r.att || []).slice(0, 6).map(a => ((r.att || []).length > 1 ? `<div class="t3 small mono">${esc(a.name)}</div>` : '') + metaHtml(a, r.id)).join('')}</div>` : ''}${typeof srcRecSection === 'function' ? srcRecSection(r) : ''}${typeof geoSection === 'function' ? geoSection(r) : ''}${typeof picSameSection === 'function' ? picSameSection(r) : ''}${typeof decodedHtml === 'function' ? (x => x ? `<div class="isec"><h4>Command line, decoded</h4>${x}</div>` : '')(decodedHtml(r)) : ''}
+    ${typeof cxInRecord === 'function' ? (x => x ? `<div class="isec"><h4>Decoded</h4>${x}</div>` : '')(cxInRecord(r)) : ''}${typeof metaHtml === 'function' && (r.att || []).length ? `<div class="isec"><h4>What the file says about itself</h4>${(r.att || []).slice(0, 6).map(a => ((r.att || []).length > 1 ? `<div class="t3 small mono">${esc(a.name)}</div>` : '') + metaHtml(a, r.id)).join('')}</div>` : ''}${typeof srcRecSection === 'function' ? srcRecSection(r) : ''}${typeof stRecSection === 'function' ? stRecSection(r) : ''}${typeof geoSection === 'function' ? geoSection(r) : ''}${typeof picSameSection === 'function' ? picSameSection(r) : ''}${typeof decodedHtml === 'function' ? (x => x ? `<div class="isec"><h4>Command line, decoded</h4>${x}</div>` : '')(decodedHtml(r)) : ''}
     ${r.body ? `<div class="isec"><h4 class="ih-acts">Captured text<span class="sp"></span><button class="btn xs ghost" data-act="recCopyBody" data-id="${r.id}">${ico('copy','sm')}Copy</button><button class="btn xs ghost" data-act="recCopyMasked" data-id="${r.id}" title="Copy with IPs, domains, emails, user and host names replaced by placeholders — safe to paste into an online tool or show someone">${ico('eye-off','sm')}Copy masked</button></h4><pre class="rawbox">${esc(r.body)}</pre></div>` : ''}
     ${r.body ? fieldsSection(r) : ''}
     ${typeof ipfRecSection === 'function' ? ipfRecSection(r) : ''}
@@ -131,9 +131,11 @@ function paintEntryDlg(){
       ${GROUPS.map(([g, l,, col]) => `<div class="caps" style="margin:14px 0 8px">${l}</div><div class="typegrid">${TYPE_LIST.filter(x => x[3] === g).map(([id, lab]) => `<button type="button" data-act="pickType" data-v="${id}">${tbadge(id,'sm')}${esc(lab)}</button>`).join('')}</div>`).join('')}</div>`, true);
     return;
   }
-  const f = ([n, l, inp, opts], i) => `<div class="field"><label for="ef-${n}">${esc(l)}${i === 0 ? ' <span class="t3">required</span>' : ''}</label>${inp === 'select'
+  /* a ship or an aircraft may be known by either of its first two numbers */
+  const either = d.type === 'vessel' || d.type === 'aircraft' || d.type === 'sshkey';
+  const f = ([n, l, inp, opts], i) => `<div class="field"><label for="ef-${n}">${esc(l)}${i === 0 && !either ? ' <span class="t3">required</span>' : i < 2 && either ? ' <span class="t3">' + (i ? 'or this' : 'this') + '</span>' : ''}</label>${inp === 'select'
     ? `<select id="ef-${n}" data-f="${n}"><option value=""></option>${opts.map(o => `<option${d.fields[n] === o ? ' selected' : ''}>${esc(o)}</option>`).join('')}</select>`
-    : `<input id="ef-${n}" data-f="${n}" type="${inp === 'number' ? 'text' : inp}" value="${esc(d.fields[n] || '')}" ${i === 0 ? 'required autofocus' : ''} ${inp === 'number' ? 'inputmode="numeric"' : ''} autocomplete="off">`}</div>`;
+    : `<input id="ef-${n}" data-f="${n}" type="${inp === 'number' ? 'text' : inp}" value="${esc(d.fields[n] || '')}" ${i === 0 ? (either ? 'autofocus' : 'required autofocus') : ''} ${inp === 'number' ? 'inputmode="numeric"' : ''} autocomplete="off">`}</div>`;
   openDlg(dhead((d.id ? 'Edit ' : 'New ') + t.label.toLowerCase()) + `<form data-form="entry"><div class="in">
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:18px">${tbadge(d.type)}<div><b>${esc(t.label)}</b><div class="t3" style="font-size:calc(13px * var(--ts,1))">${esc(GROUPS.find(g => g[0] === t.group)[1])}</div></div>${d.id ? '' : `<button type="button" class="btn sm ghost" data-act="pickType" data-v="" style="margin-left:auto">Change type</button>`}</div>
     <div class="frow">${t.fields.map(f).join('')}</div>
@@ -157,18 +159,22 @@ function entFileWire(){
   zone.ondrop = ev => { ev.preventDefault(); ev.stopPropagation(); zone.classList.remove('on'); take(ev.dataTransfer.files[0]); };
 }
 
-function caseDlg(edit){
-  const c = edit ? theCase() : null, st = {color:c ? c.color : CASE_COLORS[0], icon:c ? c.icon : CASE_ICONS[0]};
+function caseDlg(edit, tplId){
+  /* a plain “New case” starts by choosing a template; the quick one from Capture (edit === false) goes straight to the form */
+  if(edit === undefined && typeof ctPickDlg === 'function') return ctPickDlg();
+  const T = !edit && tplId && typeof ctGet === 'function' ? ctGet(tplId) : null;
+  const c = edit ? theCase() : null, st = {color:c ? c.color : T ? T.color : CASE_COLORS[0], icon:c ? c.icon : T ? T.icon : CASE_ICONS[0]};
   window.__caseDraft = st;
-  openDlg(dhead(c ? 'Edit case' : 'New case') + `<form data-form="case" data-edit="${c ? 1 : ''}"><div class="in">
+  openDlg(dhead(c ? 'Edit case' : 'New case') + `<form data-form="case" data-edit="${c ? 1 : ''}" data-tpl="${T ? esc(T.id) : ''}"><div class="in">
     <div class="field"><label for="cName">Name</label><input id="cName" value="${esc(c ? c.name : '')}" required autofocus placeholder="What are you investigating?"></div>
-    <div class="field"><label for="cScope">Scope</label><textarea id="cScope" rows="3" placeholder="What is in and out of scope, and what authorises the work">${esc(c ? c.scope : '')}</textarea></div>
+    <div class="field"><label for="cScope">Scope</label><textarea id="cScope" rows="3" placeholder="${T && T.scope ? esc(T.scope) : 'What is in and out of scope, and what authorises the work'}">${esc(c ? c.scope : '')}</textarea></div>
     <div class="field"><span class="label">Colour</span><div class="swatches" id="sw">${CASE_COLORS.map(x => `<button type="button" data-act="pickColor" data-v="${x}" style="--c:${x}" aria-pressed="${st.color === x}" aria-label="Colour ${x}"></button>`).join('')}</div></div>
     <div class="field"><span class="label">Icon</span><div class="icopick" id="ip">${CASE_ICONS.map(x => `<button type="button" data-act="pickIcon" data-v="${x}" aria-pressed="${st.icon === x}" aria-label="${x}">${ico(x)}</button>`).join('')}</div></div>
     ${c ? `<div class="field" style="margin:0"><label for="cStatus">Status</label><select id="cStatus">${['active','review','closed'].map(s => `<option value="${s}"${c.status === s ? ' selected' : ''}>${{active:'Active', review:'In review', closed:'Archived'}[s]}</option>`).join('')}</select></div>` : ''}
     ${c ? `<div class="dzone"><div><b>Danger zone</b><span>Archiving hides the case from the sidebar but keeps everything. Deleting removes it for good.</span></div>
       <div class="wrap"><button class="btn sm" type="button" data-act="archiveCase">${ico('lock','sm')}${c.status === 'closed' ? 'Reopen' : 'Archive'}</button><button class="btn sm dangerbtn" type="button" data-act="deleteCaseDlg">${ico('trash-2','sm')}Delete case…</button></div></div>` : ''}
-  </div><footer><button class="btn" type="button" data-act="dclose">Cancel</button><button class="btn primary" type="submit">${c ? 'Save' : 'Create case'}</button></footer></form>`);
+    ${T && typeof ctFormHTML === 'function' ? ctFormHTML(T) : ''}
+  </div><footer><button class="btn" type="button" data-act="dclose">Cancel</button><button class="btn primary" type="submit">${c ? 'Save' : 'Create case'}</button></footer></form>`, !!T && T.id !== 'blank');
 }
 function deleteCaseDlg(id){
   const c = theCase(id), D = derive(c.id), notes = (DB.notes || []).filter(n => n.caseId === c.id).length;

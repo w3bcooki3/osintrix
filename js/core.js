@@ -129,11 +129,13 @@ function entryById(id){ if(!id) return null; if(IX.er !== rev || IX.ea !== DB.en
 const entKey = e => e.k + ':' + e.v;
 const entSplit = id => { const i = id.indexOf(':'); return {k:id.slice(0, i), v:id.slice(i + 1)}; };
 const verdictOf = id => DB.verdicts[id] || '';
-const primary = e => { const t = TYPES[e.type]; if(e.type === 'social' && e.fields.url){ const s = E.normSocial(e.fields.url); if(s) return s.v; } return (e.fields[t.fields[0][0]] || '').trim(); };
+const primary = e => { const t = TYPES[e.type]; if(e.type === 'social' && e.fields.url){ const s = E.normSocial(e.fields.url); if(s) return s.v; } const v = (e.fields[t.fields[0][0]] || '').trim();
+  /* a ship known only by its MMSI, an aircraft only by its address */ return v || (e.type === 'vessel' || e.type === 'aircraft' ? (e.fields[t.fields[1][0]] || '').trim() : ''); };
 function entryKey(e){
   const t = TYPES[e.type]; if(!t) return null;
   if(e.type === 'location'){ const co = (e.fields.coordinates || '').trim(); return /-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?/.test(co) ? 'coords:' + E.norm('coords', co) : null; }
   if(e.type === 'social'){ const u = (e.fields.url || '').trim(), s = u && E.normSocial(u); if(s) return 'social:' + s.v; return null; }
+  if(e.type === 'sshkey'){ const f = idSshFp(e); return f ? 'sshkey:' + f : null; }   /* a pasted public key alone is enough */
   if(!t.kind) return null;
   let v = primary(e); if(!v) return null;
   let k = t.kind;
@@ -141,9 +143,13 @@ function entryKey(e){
   /* a file entry holds whichever hash was known: name the kind by its length, so an MD5 or SHA-1 joins the same value found in records */
   if(e.type === 'file' && k === 'sha256'){ v = v.trim().toLowerCase(); k = v.length === 32 ? 'md5' : v.length === 40 ? 'sha1' : 'sha256'; }
   if(e.type === 'ip' && v.includes(':') && E.validIPv6(v.trim())) k = 'ipv6';
+  if(e.type === 'daccount'){ const a = idAccount(v); if(!a) return null; k = a.k; v = a.v; }
+  if(e.type === 'vessel' && !(e.fields.imo || '').trim()) k = 'mmsi';
+  if(e.type === 'aircraft' && !(e.fields.registration || '').trim()) k = 'icao24';
+  if(/^(vin|tail|icao24|imo|mmsi)$/.test(k)) v = E.norm(k, v);
   if(/^(phone|mac|pgp)$/.test(k)) v = E.norm(k, v);
   if(e.type === 'username') v = '@' + v.replace(/^@/, '');
-  if(/^(ipv4|ipv6|domain|url|email|sha256|handle)$/.test(k)) v = v.toLowerCase();
+  if(k === 'url') v = E.normUrl(v.trim()); else if(/^(ipv4|ipv6|domain|email|sha256|handle)$/.test(k)) v = v.toLowerCase();
   v = v.trim();
   if(k === 'cve') v = v.toUpperCase();
   return k + ':' + v;
@@ -154,6 +160,34 @@ function migrateHashKeys(){ let n = 0;
     for(const key of Object.keys(store)){ const m = /^sha256:([0-9a-f]{32}|[0-9a-f]{40})$/i.exec(key); if(!m) continue;
       const nk = (m[1].length === 32 ? 'md5:' : 'sha1:') + m[1].toLowerCase(); if(!(nk in store)) store[nk] = store[key]; delete store[key]; n++; } }
   return n; }
+/* Before 1.78 a URL was stored lowercased whole. Its case comes back from the record's own text, and verdicts, watches
+   and notes saved under the old key move to the new one. A URL that cannot be found in its text (defanged, say) is
+   left as it is and the record is marked so it is not searched again. Returns how many values or keys changed. */
+function migrateUrlCase(){ let n = 0; const lc = new Map();
+  for(const r of DB.records){ const U = (r.ents || []).filter(e => e.k === 'url'); if(!U.length) continue;
+    if(!r.uc){ const text = [r.title, r.body, r.answer].filter(Boolean).join('\n'); let low = null;
+      for(const e of U){ if(text.includes(e.v)) continue; if(low === null) low = text.toLowerCase(); if(low.length !== text.length) break;
+        const i = low.indexOf(e.v); if(i < 0) continue; const v = E.normUrl(text.substr(i, e.v.length)); if(v !== e.v && v.toLowerCase() === e.v){ e.v = v; n++; } }
+      if(low !== null) r.uc = 1; }
+    for(const e of U) if(!lc.has('url:' + e.v.toLowerCase())) lc.set('url:' + e.v.toLowerCase(), 'url:' + e.v); }
+  for(const e of DB.entries){ const k = e.type === 'url' ? entryKey(e) : null; if(k && !lc.has(k.toLowerCase())) lc.set(k.toLowerCase(), k); }
+  for(const store of [DB.verdicts, DB.verdictAt, DB.watch, DB.research]){ if(!store || typeof store !== 'object') continue;
+    for(const key of Object.keys(store)){ if(!key.startsWith('url:')) continue; const nk = lc.get(key.toLowerCase()); if(!nk || nk === key || key !== key.toLowerCase()) continue;
+      if(!(nk in store)) store[nk] = store[key]; delete store[key]; n++; } }
+  return n; }
+/* what a typed account is: fediverse, Matrix, Nostr or an AT Protocol ID, by its shape */
+function idAccount(v){ v = String(v || '').trim(); let m;
+  if((m = /^@?([A-Za-z0-9_][A-Za-z0-9_.-]*)@((?:[a-z0-9-]+\.)+[a-z]{2,24})$/i.exec(v))) return {k:'fedi', v:('@' + m[1] + '@' + m[2]).toLowerCase()};
+  if((m = /^@?([a-z0-9._=\/+-]+):((?:[a-z0-9-]+\.)+[a-z]{2,24}(?::\d{1,5})?)$/i.exec(v))) return {k:'matrix', v:('@' + m[1] + ':' + m[2]).toLowerCase()};
+  if(/^npub1/i.test(v) && typeof IDKEYS !== 'undefined' && IDKEYS.npubHex(v)) return {k:'npub', v:v.toLowerCase()};
+  if(/^nprofile1/i.test(v) && typeof IDKEYS !== 'undefined'){ const P = IDKEYS.nprofile(v); if(P) return {k:'npub', v:P.npub}; }
+  if(/^[0-9a-f]{64}$/i.test(v) && typeof IDKEYS !== 'undefined') return {k:'npub', v:IDKEYS.hexNpub(v)};
+  if(/^did:(plc:[a-z2-7]{24}|web:(?:[a-z0-9-]+\.)+[a-z]{2,24})$/i.test(v)) return {k:'did', v:v.toLowerCase()};
+  return null; }
+/* an SSH key entry by its fingerprint: from the public key when there is one, so it joins the key wherever it was seen */
+function idSshFp(e){ const key = String(e.fields.key || '').trim(), m = /^(\S+)\s+(AAAA[A-Za-z0-9+/]+={0,3})/.exec(key), k = m && typeof IDKEYS !== 'undefined' ? IDKEYS.sshParse(m[2], m[1]) : null; if(k) return k.sha256;
+  const f = String(e.fields.fingerprint || '').trim(); if(/^SHA256:[A-Za-z0-9+/]{43}$/.test(f)) return f; if(/^(?:MD5:)?(?:[0-9a-f]{2}:){15}[0-9a-f]{2}$/i.test(f)) return 'MD5:' + f.replace(/^MD5:/i, '').toLowerCase();
+  if(/^[0-9a-f]{64}$/i.test(f) && typeof IDKEYS !== 'undefined') return IDKEYS.sshHexToFp(f); return null; }
 const entryVerdict = e => { const k = entryKey(e); return k ? verdictOf(k) : (e.verdict || ''); };
 function setEntryVerdict(e, v){ const k = entryKey(e); if(k){ if(v) DB.verdicts[k] = v; else delete DB.verdicts[k]; } else e.verdict = v; }
 const sortRecs = l => l.slice().sort((a, b) => (a.ts && b.ts) ? a.ts - b.ts : a.ts ? -1 : b.ts ? 1 : a.addedAt - b.addedAt);
@@ -212,7 +246,7 @@ function passes(r){
 
 /* ---------- routing ---------- */
 const AREAS = ['today','security','watch','trash','help','ctf','lab','home','cases','case','toolbox','entities','feeds','decoder','reference','settings','detections','playbooks','queries','notes','cloud','whatsnew','pad','notebook','certs','tradecraft','regex'];
-const CASE_TABS = [['overview','Overview','layout-dashboard'],['vault','Vault','layers'],['entities','Entities','fingerprint'],['timeline','Timeline','clock'],['graph','Graph','waypoints'],['map','Places','map-pin'],['media','Media','images'],['infra','Infrastructure','network'],['questions','Analysis','scale'],['report','Report','file-chart-column']];
+const CASE_TABS = [['overview','Overview','layout-dashboard'],['vault','Vault','layers'],['entities','Entities','fingerprint'],['timeline','Timeline','clock'],['graph','Graph','waypoints'],['map','Places','map-pin'],['media','Media','images'],['infra','Infrastructure','network'],['questions','Analysis','scale'],['story','Story','newspaper'],['report','Report','file-chart-column']];
 function parseHash(){
   const p = (location.hash || '#/home').replace(/^#\/?/, '').split('/').map(decodeURIComponent);
   if(p[0] === 'case' && DB.cases.some(c => c.id === p[1])){ DB.active = p[1]; return {area:'case', tab:CASE_TABS.some(t => t[0] === p[2]) ? p[2] : SHELL_HOME}; }
@@ -308,3 +342,18 @@ async function decompressCapped(bytes, kind, max = INFLATE_MAX){
     parts.push(value); }
   const out = new Uint8Array(n); let o = 0; for(const p of parts){ out.set(p, o); o += p.length; } return out;
 }
+
+/* ---------- something broke: say so, and keep what is needed to fix it ----------
+   An error in one view (the graph, say) can leave it unresponsive while the rest of the app works. The last 20 are kept in
+   memory only — message, where in the code, the page and the last actions — never case data, and nothing is sent anywhere. */
+const ERRS = [];
+let errLastToast = 0;
+function errNote(msg, where){
+  const e = {at:new Date().toISOString(), msg:String(msg || 'Unknown error').slice(0, 400), where:String(where || '').split('\n').slice(0, 6).join('\n').slice(0, 1200),
+    page:(typeof UI !== 'undefined' && UI.route) ? (UI.route.area + (UI.route.tab ? '/' + UI.route.tab : '')) : '', ver:typeof BRAND !== 'undefined' ? BRAND.version : '',
+    did:(typeof DB !== 'undefined' && DB && Array.isArray(DB.log)) ? DB.log.slice(0, 4).map(x => x.what) : []};
+  ERRS.unshift(e); ERRS.length = Math.min(ERRS.length, 20);
+  if(Date.now() - errLastToast > 8000 && typeof toast === 'function'){ errLastToast = Date.now(); try{ toast('Something went wrong on this page', 'Copy details', () => copyText(ERRS.map(x => JSON.stringify(x, null, 1)).join('\n\n'), 'Details copied — paste them into your bug report')); }catch(x){} }
+}
+window.addEventListener('error', ev => { if(ev && ev.error === undefined && !ev.message) return; errNote(ev.message || (ev.error && ev.error.message), ev.error && ev.error.stack || (ev.filename ? ev.filename.split('/').pop() + ':' + ev.lineno : '')); });
+window.addEventListener('unhandledrejection', ev => { const r = ev && ev.reason; if(r && (r.name === 'AbortError' || r.name === 'NotAllowedError')) return; errNote(r && r.message || String(r), r && r.stack); });

@@ -138,13 +138,15 @@ function fxSunFacts(lat, lon, U, dir){
 }
 /* ---------- Windows shortcut (LNK) ---------- */
 const FX_FT = (b, o) => { const lo = u32le(b, o), hi = u32le(b, o + 4); if(!lo && !hi) return null; const ms = (hi * 4294967296 + lo) / 1e4 - 11644473600000; return ms > 0 && ms < 4e12 ? ms : null; };
-const FX_GUID = (b, o) => { const h = x => x.toString(16).padStart(2, '0'); const d1 = u32le(b, o).toString(16).padStart(8, '0'), d2 = u16le(b, o + 4).toString(16).padStart(4, '0'), d3 = u16le(b, o + 6).toString(16).padStart(4, '0'); return `${d1}-${d2}-${d3}-${h(b[o + 8])}${h(b[o + 9])}-${[...b.subarray(o + 10, o + 16)].map(h).join('')}`; };
+const FX_GUID = (b, o) => { if(o < 0 || o + 16 > b.length) return ''; const h = x => x.toString(16).padStart(2, '0'); const d1 = u32le(b, o).toString(16).padStart(8, '0'), d2 = u16le(b, o + 4).toString(16).padStart(4, '0'), d3 = u16le(b, o + 6).toString(16).padStart(4, '0'); return `${d1}-${d2}-${d3}-${h(b[o + 8])}${h(b[o + 9])}-${[...b.subarray(o + 10, o + 16)].map(h).join('')}`; };
 /* a version-1 GUID carries the time it was made and the network card (MAC) of the machine */
 function fxUuid1(b, o){ const ver = b[o + 7] >> 4; if(ver !== 1) return null; const lo = u32le(b, o), mid = u16le(b, o + 4), hi = u16le(b, o + 6) & 0x0fff;
   const ticks = (hi * 2 ** 48) + (mid * 2 ** 32) + lo, ms = ticks / 1e4 - 12219292800000; const mac = [...b.subarray(o + 10, o + 16)].map(x => x.toString(16).padStart(2, '0')).join(':');
   return {time:ms > 0 && ms < 4e12 ? ms : null, mac, seq:((b[o + 8] & 0x3f) << 8) | b[o + 9], multicast:!!(b[o + 10] & 1)}; }
 const FX_DRIVE = ['Unknown', 'No root directory', 'Removable (USB stick, card)', 'Fixed disk', 'Network drive', 'CD/DVD', 'RAM disk'];
 function fxLnk(b){
+  /* every read inside the file: a cut-off or crafted shortcut gives 0 past its end, never undefined */
+  const u32le = (x, o) => o >= 0 && o + 4 <= x.length ? (x[o] | x[o + 1] << 8 | x[o + 2] << 16 | x[o + 3] << 24) >>> 0 : 0, u16le = (x, o) => o >= 0 && o + 2 <= x.length ? x[o] | x[o + 1] << 8 : 0;
   if(b.length < 0x4c || u32le(b, 0) !== 0x4c || hex(b.subarray(4, 20), 16) !== '0114020000000000c000000000000046') return null;
   const fl = u32le(b, 0x14), R = {flags:fl, attrs:u32le(b, 0x18), created:FX_FT(b, 0x1c), accessed:FX_FT(b, 0x24), written:FX_FT(b, 0x2c), size:u32le(b, 0x34), show:({1:'normal', 3:'maximised', 7:'minimised'})[u32le(b, 0x3c)] || u32le(b, 0x3c), extra:[]};
   let o = 0x4c; const U = !!(fl & 0x80), cstr = (p, max = 1024) => { let e = p; while(e < b.length && b[e] && e - p < max) e++; return latin1(b, p, e); }, wstr = p => { let e = p; while(e + 1 < b.length && (b[e] || b[e + 1]) && e - p < 2048) e += 2; return new TextDecoder('utf-16le').decode(b.subarray(p, e)); };

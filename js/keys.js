@@ -8,7 +8,7 @@ const KBD_LIST = [
   ['Search (Ctrl K)', [[['↑', '↓'], 'Move through the results'], [['Enter'], 'Open the result'], [['Tab'], 'Finish a filter being typed (verdict:, type:, tag:, is:, case:) — or the next scope'], [['Alt', '1–9'], 'Act on the highlighted result: copy, watch, open a lookup…']]],
   ['Vault and graph', [[['Shift', 'click'], 'Select a range of entries'], [['Esc'], 'Clear the selection'], [['Shift', 'F10'], 'Graph menu for the selected node'], [['Right-click'], 'Copy, defang, look up or mask any indicator or selected text — Shift+right-click for the browser’s own menu']]],
   ['Notes', [[['@'], 'Link a vault entry — ↑ ↓ to pick, Enter or Tab to insert']]],
-  ['Regex builder', [[['↑', '↓'], 'Move between lines (also j and k)'], [['M'], 'Next line the pattern misses'], [['/'], 'Edit the pattern'], [['Ctrl', 'Z'], 'Undo (Ctrl+Shift+Z redo)']]],
+  ['Patterns — Build a pattern', [[['↑', '↓'], 'Move between lines (also j and k)'], [['M'], 'Next line the pattern misses'], [['/'], 'Edit the pattern'], [['Ctrl', 'Z'], 'Undo (Ctrl+Shift+Z redo)']]],
   ['Detections', [[['Ctrl', 'S'], 'Save the rule you are editing']]],
 ];
 const keysHtml = () => KBD_LIST.map(([g, L]) => `<div class="keys-g"><h3>${esc(g)}</h3>${L.map(([k, t]) => `<div class="keys-r"><span class="keys-k">${k.map(x => /^[–]$/.test(x) ? x : `<kbd>${esc(x)}</kbd>`).join(' ')}</span><span>${esc(t)}</span></div>`).join('')}</div>`).join('');

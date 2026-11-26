@@ -243,34 +243,36 @@ function carve(b){ const sig = [['504b0304','ZIP'],['25504446','PDF'],['89504e47
     const h = hex(b.slice(i, i + 4), 4); for(const [m, name] of sig) if(h.startsWith(m.slice(0, Math.min(8, m.length)))){ if(name === 'JPEG' && !(b[i + 1] === 0xd8)) continue; out.push([i, name]); break; } if(out.length >= 30) break; }
   return out; }
 async function analyseFile(file){
-  const buf = new Uint8Array(await file.arrayBuffer()), t = sniff(buf), ext = (file.name.split('.').pop() || '').toLowerCase();
+  /* each reader on its own: a damaged part drops only its own section, named in the result, and the rest is still shown */
+  const broken = [], part = (name, f, d = null) => { try{ return f(); }catch(e){ broken.push(name); return d; } };
+  const buf = new Uint8Array(await file.arrayBuffer()), t = part('file type', () => sniff(buf), {ext:'', name:'Unknown'}), ext = (file.name.split('.').pop() || '').toLowerCase();
   const [s256, s1] = await Promise.all(['SHA-256', 'SHA-1'].map(a => crypto.subtle ? crypto.subtle.digest(a, buf).then(h => hex(new Uint8Array(h), 64)) : Promise.resolve('')));
-  const noise = noiseRanges(buf, t.ext), inNoise = o => noise.some(([a, b]) => o >= a && o < b), textFile = t.ext === 'txt' || t.ext === 'xml' || t.ext === 'html' || t.ext === 'sh' || t.ext === 'pem';
-  const st = strings(buf).map(([o, s, u]) => [o, s, u, textFile || (!inNoise(o) && (wordy(s) || (s.length >= 16 && /[a-z]{3}/i.test(s))))]);
+  const noise = part('noise map', () => noiseRanges(buf, t.ext), []), inNoise = o => noise.some(([a, b]) => o >= a && o < b), textFile = t.ext === 'txt' || t.ext === 'xml' || t.ext === 'html' || t.ext === 'sh' || t.ext === 'pem';
+  const st = part('strings', () => strings(buf), []).map(([o, s, u]) => [o, s, u, textFile || (!inNoise(o) && (wordy(s) || (s.length >= 16 && /[a-z]{3}/i.test(s))))]);
   const good = st.filter(x => x[3]), txt = good.map(x => x[1]).join('\n');
-  const tr = trailing(buf, t.ext), trTxt = tr ? new TextDecoder('latin1').decode(buf.slice(tr, tr + 8000)) : '';
+  const tr = part('appended data', () => trailing(buf, t.ext)), trTxt = tr ? new TextDecoder('latin1').decode(buf.slice(tr, tr + 8000)) : '';
   const zip0 = t.ext === 'zip' ? await zipInfo(buf).catch(() => null) : null, zip = zip0;
   if(zip && zip.office){ t.name = 'Microsoft Office document (Open XML' + (zip.macros.length ? ', with macros' : '') + ')'; }
-  const _z = 0, pdf = t.ext === 'pdf' ? pdfInfo(buf) : null, pe = t.ext === 'exe' ? peInfo(buf) : null, elf = t.ext === 'elf' ? elfInfo(buf) : null;
+  const _z = 0, pdf = t.ext === 'pdf' ? part('PDF', () => pdfInfo(buf)) : null, pe = t.ext === 'exe' ? part('program header', () => peInfo(buf)) : null, elf = t.ext === 'elf' ? part('ELF header', () => elfInfo(buf)) : null;
   let iocs = E.extract((txt + '\n' + trTxt).slice(0, 600000)); if(!textFile) iocs = iocs.filter(fileIocOK);
   if(zip && zip.external) iocs = iocs.concat(E.extract(zip.external.map(x => x[1]).join('\n')));
   if(pdf) iocs = iocs.concat(E.extract(pdf.uris.join('\n')));
   /* the deeper reads (js/forensic.js): every metadata format, how a picture was written, shortcuts, build fingerprints, who packed an archive */
   const fx = typeof fxJpeg === 'function', meta = typeof metaRead === 'function' ? await metaRead(buf, file.name, file.type).catch(() => null) : null;
-  const jpg = fx && t.ext === 'jpg' ? fxJpeg(buf) : null, thumbB = jpg ? fxExifThumb(buf) : null, lnk = fx && t.ext === 'lnk' ? fxLnk(buf) : null;
-  const pem = fx && pe ? fxPeMore(buf) : null, elfm = fx && elf ? fxElfMore(buf) : null, zipx = fx && t.ext === 'zip' ? fxZip(buf) : null;
-  if(pem) pem.imphash = fxImphash(pe.imports);
+  const jpg = fx && t.ext === 'jpg' ? part('JPEG structure', () => fxJpeg(buf)) : null, thumbB = jpg ? part('embedded thumbnail', () => fxExifThumb(buf)) : null, lnk = fx && t.ext === 'lnk' ? part('shortcut', () => fxLnk(buf)) : null;
+  const pem = fx && pe ? part('program details', () => fxPeMore(buf)) : null, elfm = fx && elf ? part('ELF details', () => fxElfMore(buf)) : null, zipx = fx && t.ext === 'zip' ? part('archive details', () => fxZip(buf)) : null;
+  if(pem) pem.imphash = part('imphash', () => fxImphash(pe.imports), '');
   let thumb = null; if(thumbB) thumb = await fxThumbCompare(thumbB, new Blob([buf], {type:'image/jpeg'})).catch(() => null);
   if(lnk) iocs = iocs.concat(E.extract([lnk.target, lnk.args, lnk.workdir, lnk.share, lnk.machine].filter(Boolean).join('\n')));
   let sig = null; if(pe && typeof X5 !== 'undefined'){ try{ const P = X5.pe(buf), sd = P && P.sigs && P.sigs[0], sg = sd && sd.signers[0];
     if(sd){ await X5.peCheck(P, buf); const who = sg && sg.cert ? (sg.cert.subject.map.O || sg.cert.subject.map.CN || [sg.cert.title])[0] : 'an unknown signer'; sig = sd.fileOk === false ? {ok:false, t:`Signed by ${who}, but the file was changed after signing — the signature no longer covers it.`} : {ok:true, t:`Signed by ${who}${sd.fileOk ? ' — the file matches its signature' : ''}. Open it in Certificates for the whole chain.`}; }
     else sig = {ok:false, t:'Not signed (no Authenticode signature).'}; }catch(e){} }
-  const nameHint = fx ? fxNameHint(file.name) : null, sun = fx && meta && meta.gps ? fxSunFacts(meta.gps.lat, meta.gps.lon, fxUtcMoment(meta), meta.gps.dir) : null;
-  const strKinds = fx ? fxStrKinds(st) : {};
+  const nameHint = fx ? fxNameHint(file.name) : null, sun = fx && meta && meta.gps ? part('sun position', () => fxSunFacts(meta.gps.lat, meta.gps.lon, fxUtcMoment(meta), meta.gps.dir)) : null;
+  const strKinds = fx ? part('string kinds', () => fxStrKinds(st), {}) : {};
   /* documents (js/docfx.js): earlier PDF versions and removed text, tracked changes and hidden content, e-mail attachments */
   const dx = typeof dxPdf === 'function', pdfx = dx && pdf ? await dxPdf(buf).catch(() => null) : null, officex = dx && zip && zip.office ? await dxOffice(buf).catch(() => null) : null;
-  const mail = dx && (textFile || /\.eml$/i.test(file.name)) && buf.length < 50e6 ? dxEml(new TextDecoder('latin1').decode(buf)) : dx && t.ext === 'doc' ? dxMsg(buf) : null;
-  const iso = dx ? dxIso(buf) : null, one = dx && !iso ? dxOne(buf) : null, rar = dx && t.ext === 'rar' ? dxRar(buf) : null;
+  const mail = dx && (textFile || /\.eml$/i.test(file.name)) && buf.length < 50e6 ? part('e-mail', () => dxEml(new TextDecoder('latin1').decode(buf))) : dx && t.ext === 'doc' ? part('Outlook message', () => dxMsg(buf)) : null;
+  const iso = dx ? part('disk image', () => dxIso(buf)) : null, one = dx && !iso ? part('OneNote', () => dxOne(buf)) : null, rar = dx && t.ext === 'rar' ? part('RAR archive', () => dxRar(buf)) : null;
   if(iso){ t.name = 'Disk image (ISO 9660' + (iso.udf ? ' / UDF' : '') + ')'; t.ext = 'iso'; } if(one){ t.name = 'OneNote notebook'; t.ext = 'one'; }
   if(iso || rar) iocs = iocs.concat(E.extract([...(iso ? iso.files : rar.files).map(f => f.name), iso ? iso.app + ' ' + iso.prep : ''].join('\n')).filter(e => e.k !== 'domain' || !/\.(lnk|exe|dll|js|bat|cmd)$/i.test(e.v)));
   if(mail) iocs = iocs.concat(E.extract([mail.from, mail.reply, mail.ret, mail.origIp, ...mail.ips, ...mail.links].join('\n')));
@@ -280,10 +282,10 @@ async function analyseFile(file){
   const web = typeof wcRead === 'function' && !iso && !one ? await wcRead(buf, file.name).then(C => C && wcAnalyse(C)).catch(() => null) : null;
   if(web){ t.name = {HAR:'Web capture (HAR)', WARC:'Web archive (WARC)', WACZ:'Web archive (WACZ)', MHTML:'Saved web page (MHTML)'}[web.fmt]; t.ext = web.fmt.toLowerCase(); iocs = web.iocs; }
   const seen = new Set(); iocs = iocs.filter(e => { const k = e.k + ':' + e.v; if(seen.has(k)) return false; seen.add(k); return true; });
-  return {name:file.name, size:file.size, lastModified:file.lastModified, type:t, ext, file, bytes:buf,
+  return {broken, name:file.name, size:file.size, lastModified:file.lastModified, type:t, ext, file, bytes:buf,
     mismatch:t.ext && ext && !(t.ext === ext || (t.ext === 'jpg' && /jpe?g/.test(ext)) || (t.ext === 'zip' && /docx|xlsx|pptx|docm|xlsm|pptm|apk|jar|odt|ods|epub|vsix|nupkg|ipa/.test(ext)) || (t.ext === 'tif' && /tiff?/.test(ext)) || (t.ext === 'riff' && /wav|avi|webp/.test(ext)) || (t.ext === 'doc' && /xls|ppt|msi|msg|dot/.test(ext)) || (t.ext === 'exe' && /dll|sys|scr|ocx|cpl|efi/.test(ext)) || (t.ext === 'elf' && /so|ko|o|bin|out/.test(ext)) || t.ext === 'txt' || (t.ext === 'mp4' && /m4a|mov|m4v/.test(ext)) || (t.ext === 'iso' && /^(iso|img)$/.test(ext)) || (t.ext === 'one' && /^one(toc2)?$/.test(ext)) || /^(har|warc|wacz|mhtml)$/.test(t.ext)),
-    md5:buf.length <= 200e6 ? md5(buf) : '', sha1:s1, sha256:s256, entropy:entropy(buf), exif:exif(buf), png:pngInfo(buf), trailing:tr, trailPreview:trTxt.slice(0, 400),
-    c2pa:/c2pa\./.test(txt) ? ((txt.match(/claim_generator[^\n]{0,80}/) || [''])[0].replace(/[^\x20-\x7e]/g, ' ') || 'present') : '',     carve:t.ext === 'zip' ? [] : carve(buf).filter(([o]) => o > 0), strings:st, pdfx, officex, mail:web ? null : mail, web, iso, one, rar, meta, jpg, thumb, lnk, pem, elfm, zipx, sig, nameHint, sun, strKinds, good:good.length, iocs, flags:findFlags(txt + '\n' + trTxt), head:buf.slice(0, 256), zip, pdf, pe, elf, noise:noise.length > 0};
+    md5:buf.length <= 200e6 ? md5(buf) : '', sha1:s1, sha256:s256, entropy:part('entropy', () => entropy(buf), 0), exif:part('EXIF', () => exif(buf)), png:part('PNG', () => pngInfo(buf)), trailing:tr, trailPreview:trTxt.slice(0, 400),
+    c2pa:/c2pa\./.test(txt) ? ((txt.match(/claim_generator[^\n]{0,80}/) || [''])[0].replace(/[^\x20-\x7e]/g, ' ') || 'present') : '',     carve:t.ext === 'zip' ? [] : part('embedded files', () => carve(buf), []).filter(([o]) => o > 0), strings:st, pdfx, officex, mail:web ? null : mail, web, iso, one, rar, meta, jpg, thumb, lnk, pem, elfm, zipx, sig, nameHint, sun, strKinds, good:good.length, iocs, flags:findFlags(txt + '\n' + trTxt), head:buf.slice(0, 256), zip, pdf, pe, elf, noise:noise.length > 0};
 }
 const fmtBytes = n => { n = +n || 0; const t = (v, d) => String(+v.toFixed(d)); return n < 1024 ? n + ' B' : n < 1048576 ? t(n / 1024, 1) + ' KB' : n < 1073741824 ? t(n / 1048576, 2) + ' MB' : t(n / 1073741824, 2) + ' GB'; };
 function hexdump(b){ const L = []; for(let o = 0; o < b.length; o += 16){ const row = b.slice(o, o + 16); L.push(o.toString(16).padStart(8, '0') + '  ' + [...row].map(x => x.toString(16).padStart(2, '0')).join(' ').padEnd(48) + '  ' + [...row].map(x => x >= 32 && x < 127 ? String.fromCharCode(x) : '.').join('')); } return L.join('\n'); }
@@ -339,6 +341,7 @@ function labFile(){
       <button class="btn sm ghost" data-act="rcShow" data-v="labFile">${ico('history','sm')}History<span class="crt-cnt">${recentN('labFile')}</span></button><button class="btn sm" data-act="labClear">${ico('x','sm')}Another file</button></header>
       <div class="body">
         <div class="kv"><span>Detected type</span><b>${esc(r.type.name)}</b></div>
+        ${(r.broken || []).length ? `<div class="note amber" style="margin:6px 0 10px"><span class="ic">${ico('triangle-alert','sm')}</span><div>Part of this file is damaged or unusual and could not be read: <b>${esc(r.broken.join(', '))}</b>. Everything else below was read as normal. A damaged part can be the interesting part: look at it in the bytes view.</div></div>` : ''}
         ${r.mismatch ? `<div class="note amber" style="margin:6px 0 10px"><span class="ic">${ico('triangle-alert','sm')}</span><div>Extension <b>.${esc(r.ext)}</b> does not match the content (${esc(r.type.name)}). Classic trick — rename it and look again.</div></div>` : ''}
         ${hashRow('MD5', r.md5)}${hashRow('SHA-1', r.sha1)}${hashRow('SHA-256', r.sha256)}
         <div class="kv"><span>Entropy</span><b style="color:${ehl[1]}">${eh.toFixed(2)} / 8</b><span class="t3">${ehl[0]}</span></div>
@@ -378,7 +381,7 @@ function bindLab(){
     d.ondragover = e => { e.preventDefault(); d.classList.add('over'); }; d.ondragleave = () => d.classList.remove('over');
     d.ondrop = e => { e.preventDefault(); d.classList.remove('over'); const f = e.dataTransfer.files[0]; if(f) labLoad(f); };
     d.onkeydown = e => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); inp.click(); } }; }
-  const deb = (id, fn, ms = 120) => { const x = $(id); if(x) x.oninput = () => { clearTimeout(x.__t); x.__t = setTimeout(() => fn(x.value), ms); }; };
+  const deb = (id, fn, ms = 120) => { const x = $(id); if(x) x.oninput = () => { clearTimeout(x.__t); x.__t = setTimeout(() => { if(x.isConnected) fn(x.value); }, ms); }; };   // skipped if the page was redrawn meanwhile
   deb('tsIn', v => { UI.tsIn = v; $('tsOut').innerHTML = tsTable(v); $('idOut').innerHTML = idTable(v); });
   deb('hashIn', v => { UI.hashIn = v; $('hashOut').innerHTML = hashTable(v); }, 60);
   deb('geoIn', v => { UI.geoIn = v; $('geoOut').innerHTML = geoOut(v); }, 60);
@@ -716,24 +719,28 @@ const LAB_IN = {
   corp:{ids:['fpD'], run:v => { const i = $('fpD'); if(i){ i.value = v; i.focus(); } }, clear:() => { if(UI.fp && UI.fp.sig) UI.fp.sig.stop = true; UI.fp = null; UI.fpD = ''; renderMain(); refocus('fpD'); }},
   geo:{keys:['geoIn']}, net:{keys:['cidrIn', 'macIn', 'uaIn']}, gen:{keys:['genName', 'genNums', 'genDom']},
   time:{keys:['tsIn']}, hash:{keys:['hashIn']}, email:{keys:['emlIn'], noHist:true},
-  fav:{clear:() => { UI.fxFav = null; renderMain(); }, noHist:true}, clean:{clear:() => clickAct('clClear'), noHist:true}};
+  fav:{clear:() => { UI.fxFav = null; renderMain(); }, noHist:true}, clean:{clear:() => clickAct('clClear'), noHist:true},
+  /* pages outside the kit that already have their own Clear: only the recent list is added */
+  decoder:{keys:['decIn'], ownClear:true},
+  certs:{ids:['cxCtDom', 'cxHost'], ownClear:true, run:(v, h) => { const S = cxS(); if(h.k === 'cxCtDom'){ S.tab = 'ct'; S.ctDom = v; } else { S.host = v; } renderMain(); refocus(h.k); }},
+  cloud:{ids:['cgQ'], ownClear:true, run:v => { UI.cloudTab = 'guide'; UI.cgQ = v; renderMain(); refocus('cgQ'); }}};
 const LAB_HIST_ID = {}; for(const [t, C] of Object.entries(LAB_IN)) if(!C.noHist) for(const id of (C.ids || C.keys)) LAB_HIST_ID[id] = t;
 const labHistOn = () => !!(DB.prefs && DB.prefs.toolHist === 'on');
 const labHistOf = t => (labHistOn() && DB.work && DB.work.hist && Array.isArray(DB.work.hist[t])) ? DB.work.hist[t] : [];
 function labHistAdd(id, v){
-  const t = LAB_HIST_ID[id]; v = String(v || '').trim(); if(!t || !labHistOn() || v.length < 2 || v.length > 300) return;
+  const t = LAB_HIST_ID[id]; v = String(v || '').trim(); if(!t || !labHistOn() || v.length < 2 || v.length > (id === 'decIn' ? 4000 : 300)) return;
   DB.work = DB.work || {}; const H = DB.work.hist = DB.work.hist && typeof DB.work.hist === 'object' ? DB.work.hist : {};
   const L = (H[t] || []).filter(h => !(h.k === id && h.v === v)); L.unshift({k:id, v, at:Date.now()}); H[t] = L.slice(0, 10); save();
 }
 document.addEventListener('change', ev => { const el = ev.target; if(el && LAB_HIST_ID[el.id]) labHistAdd(el.id, el.value); });
 function labStrip(t){
-  const C = LAB_IN[t]; if(!C) return '';
+  const C = LAB_IN[t]; if(!C || (C.ownClear && !labHistOn())) return '';
   const H = C.noHist ? [] : labHistOf(t), cut = s => s.length > 42 ? s.slice(0, 40) + '…' : s;
   const rec = !C.noHist && labHistOn() ? (H.length ? `<span class="t3 small">Recent</span>${H.map((h, i) => `<button class="chip mono" data-act="labHist" data-id="${t}" data-v="${i}" title="${esc(h.v)}">${esc(cut(h.v.replace(/\s+/g, ' ')))}</button>`).join('')}<button class="lnk small" data-act="labHistDel" data-v="${t}">Forget these</button>` : '<span class="t3 small">What you look up here will be listed (last 10).</span>') : '';
-  return `<div class="lab-strip">${rec}<span class="sp"></span><button class="btn sm ghost" data-act="labToolClear" data-v="${t}" title="Clear this tool">${ico('eraser','sm')}Clear</button></div>`;
+  return `<div class="lab-strip">${rec}${C.ownClear ? '' : `<span class="sp"></span><button class="btn sm ghost" data-act="labToolClear" data-v="${t}" title="Clear this tool">${ico('eraser','sm')}Clear</button>`}</div>`;
 }
 const LAB_HIST_ACTS = {
   labToolClear:(id, v) => { const C = LAB_IN[v]; if(!C) return; if(C.clear) C.clear(); else { C.keys.forEach(k => { UI[k] = ''; }); renderMain(); } if(typeof workSync === 'function') workSync(); },
-  labHist:(id, v) => { const C = LAB_IN[id], h = labHistOf(id)[+v]; if(!C || !h) return; if(C.run) C.run(h.v); else { UI[h.k] = h.v; renderMain(); refocus(h.k); } if(typeof workSync === 'function') workSync(); },
+  labHist:(id, v) => { const C = LAB_IN[id], h = labHistOf(id)[+v]; if(!C || !h) return; if(C.run) C.run(h.v, h); else { UI[h.k] = h.v; renderMain(); refocus(h.k); } if(typeof workSync === 'function') workSync(); },
   labHistDel:(id, v) => { if(DB.work && DB.work.hist) delete DB.work.hist[v]; save(); renderMain(); toast('Forgotten'); },
   toolHist:(id, v) => { DB.prefs.toolHist = v === 'on' ? 'on' : 'off'; if(v !== 'on' && DB.work) delete DB.work.hist; save(); renderMain(); toast(v === 'on' ? 'Tools remember your last 10 searches' : 'Tool history off — and forgotten'); }};

@@ -28,7 +28,7 @@ function viewCloud(){
   return `<div class="scroll"><div class="cld">
     <header class="cld-h"><div><span class="ix">Lab</span><h1>Cloud</h1><p>A field guide for cloud, bug bounty and CTF work, a misconfiguration scanner and cloud log hunting — all offline, in this browser.</p></div></header>
     <nav class="cld-tabs" aria-label="Cloud tools">${tabs}</nav>
-    ${body}</div></div>`;
+    ${tab === 'guide' ? labStrip('cloud') : ''}${body}</div></div>`;
 }
 
 /* ---------------- Scanner ---------------- */
@@ -75,7 +75,7 @@ function cloudLogsView(){
   const actors = R.topActors.map(a => `<div><span>${esc(a.v)}</span><b>${a.n}</b></div>`).join('');
   const ips = R.topIps.map(a => `<div><span class="mono">${esc(a.v)}</span><b>${a.n}</b></div>`).join('');
   return `<section class="cld-pane"><div class="cld-res-h"><div><h2>${esc(R.name || 'Pasted log')}</h2><p class="t3">${esc(R.fmtLabel)} · ${R.total} event${R.total === 1 ? '' : 's'} · ${R.flagged.length} flagged · ${R.errors} error${R.errors === 1 ? '' : 's'}</p></div>
-    <div class="cld-res-a"><button class="btn" data-act="cloudLogReset">${ico('arrow-left','sm')}New</button><button class="btn ghost" data-act="cloudHist" data-v="cloudLogs">${ico('history','sm')}History<span class="crt-cnt">${typeof recentOf === 'function' ? recentOf('cloudLogs').length : 0}</span></button>${R.total ? `<button class="btn" data-act="cloudLogCase">${ico('list-plus','sm')}Send to timeline</button>` : ''}</div></div>
+    <div class="cld-res-a"><button class="btn" data-act="cloudLogReset">${ico('arrow-left','sm')}New</button><button class="btn ghost" data-act="cloudHist" data-v="cloudLogs">${ico('history','sm')}History<span class="crt-cnt">${typeof recentOf === 'function' ? recentOf('cloudLogs').length : 0}</span></button>${R.total ? `<button class="btn" data-act="cloudLogCase">${ico('list-plus','sm')}Send to timeline</button>${DB.active ? casePick() : ''}` : ''}</div></div>
     ${R.flagged.length ? `<div class="cld-sevbar">${chips}</div>` : ''}
     <div class="cld-loggrid">
       <div class="cld-logmain">${R.flagged.length ? flag : `<div class="cld-clean">${ico('shield-check')}<b>No notable events</b><p>None of the ${R.total} events matched a high-signal rule. You can still send them all to a case timeline.</p></div>`}</div>

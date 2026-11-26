@@ -244,7 +244,7 @@ test('regex builder: select fields in SSH log lines, the pattern is built and tr
   const errors = await open(page, '#/home');
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   // its own entry in the sidebar, and "regex" in search goes straight to it
-  await page.click('#side a[href="#/regex"]'); await expect(page.locator('.lhd h1')).toHaveText('Regex builder');
+  await page.click('#side a[href="#/regex"]'); await expect(page.locator('.lhd h1')).toHaveText('Patterns');
   await page.evaluate(() => go('#/home')); await page.evaluate(() => srchOpen()); await page.fill('#srQ', 'regex'); await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/#\/regex$/); await expect(page.locator('[data-act=rxDemo]:not([data-v])')).toBeVisible();
   await page.click('[data-act=rxDemo]:not([data-v])');
@@ -1226,7 +1226,7 @@ test('a new user can start empty from the welcome screen, and the first real cas
   await page.getByRole('button', { name: 'Start with an empty workspace' }).click();
   await page.click('[data-act=confirmOk]');
   expect(await page.evaluate(() => DB.cases.map(c => [c.name, !!c.placeholder]))).toEqual([['My first case', true]]);
-  await page.locator('#main').getByRole('button', { name: /New case/ }).first().click(); await page.fill('#cName', 'Harbourline phishing'); await page.click('#dlg button[type=submit]');
+  await page.locator('#main').getByRole('button', { name: /New case/ }).first().click(); await page.click('[data-act=ctPick][data-v=blank]'); await page.fill('#cName', 'Harbourline phishing'); await page.click('#dlg button[type=submit]');
   expect(await page.evaluate(() => DB.cases.map(c => c.code + ' ' + c.name))).toEqual([await page.evaluate(() => 'TN-' + new Date().getFullYear() + '-001') + ' Harbourline phishing']);
   // the vault's empty state points to what the evidence already found
   await page.keyboard.press('n'); await page.locator('#dlg textarea').first().fill('Mail from billing@harbourline-support.com via 185.220.101.7'); await page.click('#dlg .btn.primary');
@@ -1235,7 +1235,7 @@ test('a new user can start empty from the welcome screen, and the first real cas
   await page.click('[data-act=vbJumpAuto]'); await expect(page.locator('#vAuto')).toBeInViewport();
   // a placeholder with something in it, or renamed, stays
   await page.evaluate(() => { DB.cases.push({ id: 'c-ph', name: 'My first case', placeholder: true, code: 'TN-X', status: 'active', owner: 'You', created: 1, updated: 1, scope: '', color: '#5470f5', icon: 'briefcase' }); DB.records.push({ id: 'r-ph', caseId: 'c-ph', type: 'evidence', title: 'x', body: 'x', tsRaw: '', tsZone: 'explicit', ts: 0, source: '', host: '', tags: [], ents: [], answer: '', addedBy: 'You', addedAt: 1, hash: '' }); mutate('x'); });
-  await page.evaluate(() => caseDlg()); await page.fill('#cName', 'Second'); await page.click('#dlg button[type=submit]');
+  await page.evaluate(() => caseDlg()); await page.click('[data-act=ctPick][data-v=blank]'); await page.fill('#cName', 'Second'); await page.click('#dlg button[type=submit]');
   expect(await page.evaluate(() => DB.cases.some(c => c.id === 'c-ph'))).toBe(true);
   expect(errors).toEqual([]);
 });

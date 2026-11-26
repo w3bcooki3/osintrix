@@ -116,6 +116,9 @@ function norm(k, v){
     case 'coords': { const m = v.match(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/); return m ? (+m[1]).toFixed(5) + ',' + (+m[2]).toFixed(5) : v; }
     case 'iban': return v.replace(/\s+/g, '').toUpperCase();
     case 'asn': return 'AS' + v.replace(/\D/g, '');
+    case 'vin': case 'tail': return v.replace(/\s+/g, '').toUpperCase();
+    case 'icao24': return v.toLowerCase();
+    case 'imo': case 'mmsi': return v.replace(/\D/g, '');
     case 'ttp': case 'cve': return v.toUpperCase();
     default: return v;
   }
@@ -125,11 +128,28 @@ function cryptoKind(v){ v = String(v).trim();
   if(/^[1-9A-HJ-NP-Za-km-z]{43,44}$/.test(v) && b58Bytes(v) === 32) return 'sol'; if(/^4[0-9AB][1-9A-HJ-NP-Za-km-z]{93}$/.test(v)) return 'xmr'; if(/^(ltc1|[LM][a-km-zA-HJ-NP-Z1-9]{26,33}$)/.test(v)) return 'ltc';
   if(/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(v)) return 'trx'; if(/^D[5-9A-HJ-NP-U][1-9A-HJ-NP-Za-km-z]{32}$/.test(v)) return 'doge'; return 'btc'; }
 const PATTERNS = [
+  /* SSH keys first, so their base64 and colon-hex fingerprints are not read as other things; every form is named by its SHA-256 fingerprint */
+  ['sshhex',/\b(?:fingerprint_sha256|host_key_fingerprint|ssh[._ ]?fingerprint[._ ]?sha256)["'\s:=]+([0-9a-f]{64})\b/gi,1],
+  ['sshfp',/(?<![\w+\/])SHA256:([A-Za-z0-9+\/]{43})(?![\w+\/=])/g,1],
+  ['sshmd5',/(?:\bMD5:|\b(?:key fingerprint is|fingerprint:?|Fingerprint:)[ \t]*)((?:[0-9a-f]{2}:){15}[0-9a-f]{2})\b/gi,1],
+  /* decentralised accounts: before e-mail addresses and handles, which would take parts of them */
+  ['nprofile',/\b(nprofile1[02-9ac-hj-np-z]{50,600})\b/g],
+  ['npub',/\b(npub1[02-9ac-hj-np-z]{58})\b/g],
+  ['nostrhex',/"pubkey"\s*:\s*"([0-9a-f]{64})"/g,1],
+  ['did',/\bdid:(?:plc:[a-z2-7]{24}|web:(?:[a-z0-9-]+\.)+[a-z]{2,24})\b/g],
+  ['matrix',/(?<![\w@.\/])@[a-z0-9._=\/+-]{1,100}:(?:[a-z0-9-]+\.)+[a-z]{2,24}(?::\d{1,5})?(?![\w.-]*@)/gi],
+  ['fedi',/(?<![\w@.\/])@[A-Za-z0-9_](?:[A-Za-z0-9_.-]{0,62}[A-Za-z0-9_])?@(?:[a-z0-9-]+\.)+[a-z]{2,24}\b/gi],
   ['sha512',/\b[a-f0-9]{128}\b/gi],
   /* private messengers dark-web vendors list as contacts: a Session ID is 05 + 32 bytes, a Tox ID 38 bytes, both hex */
   /* chat accounts' permanent numbers, where a text names them (an imported chat export writes them this way) */
   ['tgid',/\bTelegram (?:user )?ID:?\s*(\d{5,15})\b/gi,1],
   ['dcid',/\bDiscord (?:user |server |channel )?ID:?\s*(\d{17,20})\b/gi,1],
+  /* vehicles, ships and aircraft: a ship or aircraft number only where the text names it, a VIN where its check digit holds or it is called a VIN */
+  ['imo',/\bIMO(?:\s*(?:no\.?|number|#))?\s*[:#]?\s*(\d{7})\b/g,1],
+  ['mmsi',/\bMMSI(?:\s*(?:no\.?|number|#))?\s*[:#]?\s*(\d{9})\b/gi,1],
+  ['icao24',/\b(?:ICAO\s*24(?:-bit)?(?:\s*address)?|ICAO\s*(?:hex|address|code)|Mode[\s-]?S(?:\s*(?:code|hex|address))?|transponder\s*(?:code|hex|address))\s*[:=#]?\s*([0-9A-F]{6})\b/gi,1],
+  ['tail',/\b(?:tail(?:\s*(?:number|no\.?|#))?|registration(?:\s*(?:mark|number|no\.?))?|reg\.|registered\s+as|aircraft|airframe|plane|jet|helicopter|callsign)\s*[:#]?\s*([A-Z0-9]{1,3}-[A-Z0-9]{1,5}|N[1-9][0-9]{0,4}[A-Z]{0,2}|JA[0-9A-Z]{4}|HL\d{4})\b/gi,1],
+  ['vin',/\b[A-HJ-NPR-Z0-9]{17}\b/g],
   ['session',/\b05[0-9a-f]{64}\b/gi],
   ['tox',/\b[0-9A-F]{76}\b/gi],
   ['pgp',/\b[0-9A-F]{4}(?: [0-9A-F]{4}){4} {1,2}[0-9A-F]{4}(?: [0-9A-F]{4}){4}\b/gi],
@@ -174,14 +194,16 @@ const PATTERNS = [
   ['domain',/\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:[a-z]{2,24})\b/gi],
 ];
 const KINDS = ['ipv4','ipv6','hostport','domain','url','email','handle','social','phone','btc','eth','xmr','ltc','trx','doge','sol','ens','btctx','ethtx','soltx','pgp','session','tox','tgid','dcid','iban','md5','sha1','sha256','sha512',
-  'mac','asn','coords','file','path','regkey','account','sid','eventid','cve','ttp','custom'];
-const GROUP = {tgid:'id',dcid:'id',session:'id',tox:'id',pgp:'id',sol:'id',ens:'id',btctx:'id',ethtx:'id',soltx:'id',ipv6:'net',mac:'net',asn:'net',social:'id',phone:'id',xmr:'id',ltc:'id',trx:'id',doge:'id',iban:'id',sha512:'hash',coords:'place',ttp:'vuln',ipv4:'net',hostport:'net',domain:'net',url:'net',email:'id',handle:'id',btc:'id',eth:'id',
+  'mac','asn','coords','sshkey','fedi','matrix','npub','did','vin','tail','icao24','imo','mmsi','file','path','regkey','account','sid','eventid','cve','ttp','custom'];
+const GROUP = {sshkey:'net',fedi:'id',matrix:'id',npub:'id',did:'id',vin:'transport',tail:'transport',icao24:'transport',imo:'transport',mmsi:'transport',tgid:'id',dcid:'id',session:'id',tox:'id',pgp:'id',sol:'id',ens:'id',btctx:'id',ethtx:'id',soltx:'id',ipv6:'net',mac:'net',asn:'net',social:'id',phone:'id',xmr:'id',ltc:'id',trx:'id',doge:'id',iban:'id',sha512:'hash',coords:'place',ttp:'vuln',ipv4:'net',hostport:'net',domain:'net',url:'net',email:'id',handle:'id',btc:'id',eth:'id',
   md5:'hash',sha1:'hash',sha256:'hash',file:'host',path:'host',regkey:'host',account:'id',sid:'id',
   eventid:'host',cve:'vuln',custom:'hash'};
-const LABEL = {tgid:'Telegram ID',dcid:'Discord ID',session:'Session ID',tox:'Tox ID',pgp:'PGP key',sol:'SOL wallet',ens:'ENS name',btctx:'BTC transaction',ethtx:'ETH transaction',soltx:'SOL transaction',ipv6:'IPv6',mac:'MAC address',asn:'ASN',social:'Social profile',phone:'Phone',xmr:'XMR wallet',ltc:'LTC wallet',trx:'TRON wallet',doge:'DOGE wallet',iban:'IBAN',sha512:'SHA-512',coords:'Coordinates',ttp:'ATT&CK technique',ipv4:'IP',hostport:'IP:port',domain:'Domain',url:'URL',email:'Email',handle:'Handle',
+const LABEL = {sshkey:'SSH key',fedi:'Fediverse account',matrix:'Matrix account',npub:'Nostr account',did:'Bluesky / AT Protocol ID',vin:'VIN',tail:'Aircraft registration',icao24:'Aircraft address (ICAO)',imo:'IMO number',mmsi:'MMSI',tgid:'Telegram ID',dcid:'Discord ID',session:'Session ID',tox:'Tox ID',pgp:'PGP key',sol:'SOL wallet',ens:'ENS name',btctx:'BTC transaction',ethtx:'ETH transaction',soltx:'SOL transaction',ipv6:'IPv6',mac:'MAC address',asn:'ASN',social:'Social profile',phone:'Phone',xmr:'XMR wallet',ltc:'LTC wallet',trx:'TRON wallet',doge:'DOGE wallet',iban:'IBAN',sha512:'SHA-512',coords:'Coordinates',ttp:'ATT&CK technique',ipv4:'IP',hostport:'IP:port',domain:'Domain',url:'URL',email:'Email',handle:'Handle',
   btc:'BTC wallet',eth:'ETH wallet',md5:'MD5',sha1:'SHA-1',sha256:'SHA-256',file:'File',path:'Path',
   regkey:'Reg key',account:'Account',sid:'SID',eventid:'Event ID',cve:'CVE',custom:'Custom'};
-const LOWER = /^(ipv4|ipv6|hostport|domain|url|email|md5|sha1|sha256|sha512|file|handle|ens|btctx|ethtx|session)$/;
+/* a URL's path and query can be case-sensitive (tokens, file names, share links), so only the scheme and host are lowercased */
+const normUrl = u => String(u).replace(/^([a-z][a-z0-9+.-]*:\/\/)([^\/?#]*)/i, (m, a, b) => a.toLowerCase() + b.toLowerCase());
+const LOWER = /^(fedi|matrix|npub|did|ipv4|ipv6|hostport|domain|email|md5|sha1|sha256|sha512|file|handle|ens|btctx|ethtx|session)$/;
 const validIP = s => s.split('.').every(o => o.length < 4 && +o <= 255);
 /* punctuation around a value is not part of it — but a closing bracket that closes one opened inside it is */
 const trimEdge = s => { let v = String(s).replace(/^[('"[{]+/,''), p;
@@ -196,13 +218,31 @@ const NOT_TLD = new Set(['sh','py','ps','md','js','cs','rb','pl','so','go','db',
 const plausibleTLD = d => { const t = d.slice(d.lastIndexOf('.') + 1).toLowerCase(); return (t.length === 2 && !NOT_TLD.has(t)) || GTLDS.has(t); };
 const FILE_EXT_TLD = /\.(exe|dll|sys|ps1|bat|cmd|vbs|js|hta|scr|jar|lnk|iso|zip|rar|msi|pdf|docm|xlsm|evtx|pcap|log|txt)$/i;
 
+/* an SSH key or Nostr form to the one entity it names: "sshkey:SHA256:…" or "npub:npub1…"; null when it does not check out */
+function idkTo(kind, m){
+  if(typeof IDKEYS === 'undefined') return null;
+  if(kind === 'sshhex'){ const f = IDKEYS.sshHexToFp(m[1]); return f ? 'sshkey:' + f : null; }
+  if(kind === 'sshfp') return 'sshkey:SHA256:' + m[1];
+  if(kind === 'sshmd5') return 'sshkey:MD5:' + m[1].toLowerCase();
+  if(kind === 'npub') return IDKEYS.npubHex(m[1]) ? 'npub:' + m[1].toLowerCase() : null;
+  if(kind === 'nprofile'){ const P = IDKEYS.nprofile(m[1]); return P ? 'npub:' + P.npub : null; }
+  if(kind === 'nostrhex'){ const n = IDKEYS.hexNpub(m[1]); return n ? 'npub:' + n : null; }
+  return null;
+}
 function extract(text){
   if(!text) return [];
   if(text.length > 400000) text = text.slice(0, 400000);
   // Very long runs without whitespace (minified blobs, base64, crafted "a.a.a…" strings) make the domain, email and
   // host:port patterns retry from every position, which is quadratic. Real indicators are far shorter than 400
   // characters, so such runs are cut into 256-character pieces before matching.
-  let work = refang(text).replace(/\S{400,}/g, run => run.replace(/(.{256})/g, '$1 '));
+  /* SSH public keys are read before long runs are cut (an RSA key is longer than the cut); the key and its comment, a user@host and not an e-mail address, are then set aside */
+  const sshKeys = [];
+  let work = refang(text).replace(/\b(ssh-(?:ed25519|rsa|dss)|ecdsa-sha2-nistp(?:256|384|521)|sk-(?:ssh-ed25519|ecdsa-sha2-nistp256)@openssh\.com)[ \t]+(AAAA[A-Za-z0-9+\/]{40,4000}={0,3})(?:[ \t]+[^\s"'<>]{1,120})?/g, (m0, t, b) => {
+    const k = typeof IDKEYS !== 'undefined' ? IDKEYS.sshParse(b, t) : null; if(!k) return m0; sshKeys.push(k.sha256); return m0.replace(/[^\n]/g, '\u0000'); })
+    /* a scanner banner (Shodan) puts the type and the key on separate lines */
+    .replace(/\bKey type:[ \t]*(ssh-(?:ed25519|rsa|dss)|ecdsa-sha2-nistp(?:256|384|521))[ \t]*\r?\n[ \t]*Key:[ \t]*(AAAA[A-Za-z0-9+\/]{40,4000}={0,3})/g, (m0, t, b) => {
+      const k = typeof IDKEYS !== 'undefined' ? IDKEYS.sshParse(b, t) : null; if(!k) return m0; sshKeys.push(k.sha256); return m0.replace(/[^\n]/g, '\u0000'); })
+    .replace(/\S{400,}/g, run => run.replace(/(.{256})/g, '$1 '));
   const out = [], seen = new Set();
   /* an armoured public key: its fingerprints and the names and emails it carries are read, then the block is set aside so its base64 yields nothing else */
   const pgpKeys = [];
@@ -210,13 +250,13 @@ function extract(text){
   const orig = work;   // masking keeps lengths, so a URL that held a hash is read back whole from orig
   const push = (k, raw) => {
     let v = trimEdge(String(raw).trim()); if(!v) return;
-    if(k === 'cve') v = v.toUpperCase(); else if(LOWER.test(k)) v = v.toLowerCase(); else v = norm(k, v);
+    if(k === 'cve') v = v.toUpperCase(); else if(k === 'url') v = normUrl(v); else if(LOWER.test(k)) v = v.toLowerCase(); else v = norm(k, v);
     if(k === 'handle') v = '@' + v.replace(/^@/,'');
     const id = k + ':' + v; if(seen.has(id)) return; seen.add(id); out.push({k, v});
   };
   for(const [kind, re, cap] of PATTERNS){
     /* cheap tests first: most text holds none of these */
-    if((kind === 'ens' && !/\.eth\b/i.test(work)) || (kind === 'tgid' && !/telegram/i.test(work)) || (kind === 'dcid' && !/discord/i.test(work)) || ((kind === 'session' || kind === 'tox' || kind === 'ethtx') && !/[0-9a-f]{60}/i.test(work))) continue;
+    if((kind === 'ens' && !/\.eth\b/i.test(work)) || (kind === 'tgid' && !/telegram/i.test(work)) || (kind === 'imo' && !/IMO/.test(work)) || (/^ssh/.test(kind) && !/ssh-|ecdsa-|SHA256:|MD5:|fingerprint/i.test(work)) || ((kind === 'npub' || kind === 'nprofile') && !/npub1|nprofile1/.test(work)) || (kind === 'nostrhex' && !/"sig"\s*:\s*"[0-9a-f]{128}"/.test(work)) || (kind === 'did' && !/did:/.test(work)) || ((kind === 'matrix' || kind === 'fedi') && !/(?:^|[^\w@.\/])@[\w.-]+[:@][a-z0-9-]+\./i.test(work)) || (kind === 'mmsi' && !/mmsi/i.test(work)) || (kind === 'icao24' && !/icao|mode[\s-]?s|transponder/i.test(work)) || (kind === 'tail' && !/tail|regist|reg\.|aircraft|airframe|plane|jet\b|helicopter|callsign/i.test(work)) || (kind === 'vin' && !/[A-HJ-NPR-Z0-9]{17}/.test(work)) || (kind === 'dcid' && !/discord/i.test(work)) || ((kind === 'session' || kind === 'tox' || kind === 'ethtx') && !/[0-9a-f]{60}/i.test(work))) continue;
     re.lastIndex = 0; const hits = []; let m;
     while((m = re.exec(work)) !== null){
       if(!m[0].length){ re.lastIndex++; continue; }
@@ -227,10 +267,16 @@ function extract(text){
       if(kind === 'phone'){ const d = v.replace(/\D/g, ''); if(d.length < 8 || d.length > 15 || /^(19|20)\d{6}$/.test(d)) continue; }
       if(kind === 'coords' && (Math.abs(+m[1]) > 90 || Math.abs(+m[2]) > 180 || (+m[1] === 0 && +m[2] === 0))) continue;
       if(kind === 'iban' && !ibanOK(v)) continue;
+      if(/^(sshhex|sshfp|sshmd5|nprofile|npub|nostrhex)$/.test(kind)){ const to = idkTo(kind, m); if(!to) continue; const i = to.indexOf(':'); hits.push([m.index, m[0].length, to.slice(i + 1), to.slice(0, i)]); continue; }
+      if(kind === 'vin' && !(TRANSPORT.vinShape(v) && (TRANSPORT.vinCheck(v) || /\b(?:VIN|chassis(?:\s*(?:no\.?|number))?|vehicle identification(?:\s*number)?)\b[^\n]{0,24}$/i.test(work.slice(Math.max(0, m.index - 48), m.index))))) continue;
+      if(kind === 'imo' && !TRANSPORT.imoCheck(v)) continue;
+      if(kind === 'icao24' && /^(0{6}|f{6})$/i.test(v)) continue;
+      if(kind === 'tail' && (v !== v.toUpperCase() || !TRANSPORT.tailOK(v))) continue;
       if(/^(btc|ltc|trx|doge|xmr|sol|soltx)$/.test(kind) && !/^(bc1|ltc1)/.test(v) && !mixedB58(v)) continue;
       if(kind === 'sol' && b58Bytes(v) !== 32) continue;
       if(kind === 'soltx' && b58Bytes(v) !== 64) continue;
       if(kind === 'sha1' && /\b(?:pgp|gpg|openpgp|fingerprint|fpr)\b(?:\s+key)?(?:\s+(?:id|fingerprint))?[^\n\w]{0,6}$/i.test(work.slice(Math.max(0, m.index - 40), m.index))){ hits.push([m.index, m[0].length, v, 'pgp']); continue; }
+      if((kind === 'sha256' || kind === 'sha512') && /"(?:id|sig)"\s*:\s*"$/.test(orig.slice(Math.max(0, m.index - 12), m.index)) && /"sig"\s*:\s*"[0-9a-f]{128}"/.test(orig) && /"pubkey"\s*:\s*"[0-9a-f]{64}"/.test(orig)) continue;   // a Nostr event's ID and signature, not files
       if(kind === 'sha256' && BTC_TX_CTX.test(work.slice(Math.max(0, m.index - 80), m.index))){ hits.push([m.index, m[0].length, v, 'btctx']); continue; }
       if(kind === 'uname' && /^(name|password|id|agent|none|null|admin|root|unknown|required|here|the|and|for|with|from)$/i.test(v)) continue;
       if(kind === 'domain' && (/^\d+\./.test(v) || FILE_EXT_TLD.test(v) || !plausibleTLD(v))) continue;
@@ -253,10 +299,12 @@ function extract(text){
       if(kind === 'url'){
         const v6 = v.match(/^https?:\/\/\[([0-9a-f:.]+)\]/i); if(v6 && validIPv6(v6[1])) push('ipv6', v6[1]);
         const u = v.match(/^https?:\/\/(?:[^/@\s]*@)?([^/:?#\s]+)/i);
-        if(u){ const h = u[1]; if(/^(?:\d{1,3}\.){3}\d{1,3}$/.test(h)){ if(validIP(h)) push('ipv4', h); } else if(plausibleTLD(h)) push('domain', h); }
+        if(u){ const h = u[1]; if(/^(?:\d{1,3}\.){3}\d{1,3}$/.test(h)){ if(validIP(h)) push('ipv4', h); } else if(plausibleTLD(h)) push('domain', h);
+          /* a profile on a known fediverse server is that account */ const fu = typeof IDKEYS !== 'undefined' && IDKEYS.FEDI_BIG.has(h.toLowerCase()) && /^https?:\/\/[^/]+\/(?:@|users\/)([A-Za-z0-9_](?:[A-Za-z0-9_.-]{0,62}[A-Za-z0-9_])?)\/?$/i.exec(v); if(fu) push('fedi', '@' + fu[1] + '@' + h); }
       }
     }
   }
+  for(const fp of sshKeys){ const id = 'sshkey:' + fp; if(!seen.has(id)){ seen.add(id); out.push({k:'sshkey', v:fp}); } }
   for(const k of pgpKeys){ if(!k.fp || k.sub) continue; const id = 'pgp:' + k.fp; if(!seen.has(id)){ seen.add(id); out.push({k:'pgp', v:k.fp}); }
     for(const u of k.uids){ const em = /<([^<>\s]+@[^<>\s]+\.[a-z]{2,24})>/i.exec(u) || /\b([\w.+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+)\b/i.exec(u); if(em && !seen.has('email:' + em[1].toLowerCase())){ seen.add('email:' + em[1].toLowerCase()); out.push({k:'email', v:em[1].toLowerCase()}); } } }
   return out.sort((a, b) => KINDS.indexOf(a.k) - KINDS.indexOf(b.k));
@@ -493,7 +541,7 @@ function parseQuery(q){
 }
 
 const REF = {EVENTIDS, SYSMON, EVIL_PORTS, PORTS, LOLBINS};
-return {REF, esc, safeUrl, refang, extract, pgpParse, onionInfo, sha1, sha3_256, norm, normSocial, normPhone, normMac, cryptoKind, validIPv6, KINDS, GROUP, LABEL, parseTime, carriesZone, lineTime, zoneAbbr,
+return {REF, esc, safeUrl, refang, extract, normUrl, pgpParse, onionInfo, sha1, sha3_256, norm, normSocial, normPhone, normMac, cryptoKind, validIPv6, KINDS, GROUP, LABEL, parseTime, carriesZone, lineTime, zoneAbbr,
   fmtClock, fmtFull, fmtDate, fmtDay, fmtGap, fmtAgo, relClock, meaning, observations, ipClass, beaconOf,
   chapters, parseQuery};
 })();

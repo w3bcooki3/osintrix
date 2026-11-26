@@ -16,10 +16,12 @@ async function crawler(page, texts = true){
     expect(r, where).toEqual({ x: undefined, pwn: [], on: [], js: [] });
   };
   const areas = ['home', 'today', 'cases', 'notes', 'notebook', 'pad', 'toolbox', 'queries', 'detections', 'playbooks', 'feeds', 'decoder', 'reference', 'lab', 'certs', 'cloud', 'ctf', 'security', 'settings', 'trash', 'whatsnew', 'help', 'library'];
-  const tabs = ['overview', 'vault', 'entities', 'timeline', 'graph', 'map', 'media', 'infra', 'questions', 'report'];
+  const tabs = ['overview', 'vault', 'entities', 'timeline', 'graph', 'map', 'media', 'infra', 'questions', 'story', 'report'];
   const crawl = async label => {
     for(const a of areas){ await page.evaluate(a => { location.hash = '#/' + a; }, a); await page.waitForTimeout(120); await check(label + ' #/' + a); }
     for(const t of tabs){ await page.evaluate(t => go(caseHash(DB.active, t)), t); await page.waitForTimeout(200); await check(label + ' tab ' + t);
+      if(t === 'story') for(const v of ['claims', 'sources', 'reply', 'archive']){ await page.evaluate(v => { UI.stView = v; renderAll(); }, v); await page.waitForTimeout(150); await check(label + ' story ' + v);
+        if(texts && v === 'claims') expect(await page.evaluate(() => document.querySelector('#main').textContent), 'a hostile claim is shown as text').toContain('claim <img src=x onerror=window.__x=1>'); }
       if(t === 'infra') for(const v of ['dom', 'money', 'acc']){ await page.evaluate(v => { UI.ivView = v; renderAll(); }, v); await page.waitForTimeout(150); await check(label + ' infra ' + v);
         if(texts && v === 'acc') expect(await page.evaluate(() => document.querySelector('#main').textContent), 'the hostile profile name is shown as text').toContain('<img src=x onerror=window.__x=11>');
         if(texts && v === 'dom') expect(await page.evaluate(() => document.querySelector('#main').textContent), 'the hostile WHOIS organisation is shown as text').toContain('<b id=pwn5>'); } }
@@ -60,11 +62,18 @@ test('hostile text in every field stays text on every page, panel and dialog —
     const add = (title, body) => DB.records.push({id:'hx' + Math.random().toString(36).slice(2), caseId:DB.active, type:'note', title, body, ts:Date.now(), tsRaw:'', tsZone:'', host:'<b id=pwn3>h</b>', source:'"><b id=pwn4>', tags:['<i id=pwn6>t</i>'], ents:extractRich(body), addedBy:'You', addedAt:Date.now(), hash:''});
     add('profile' + H, JSON.stringify(prof)); add('whois' + H, whois);
     add('ioc' + H, 'contact <img src=x onerror=window.__x=6>@evil.test and http://evil.test/"><svg/onload=window.__x=7> and javascript:alert(1) +44 7700 900123 bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq 10.0.0.1"><b id=pwn7>');
+    /* the story: claims, a protected source, a reply, archived pages */
+    const R = DB.records.filter(r => r.caseId === DB.active), E1 = DB.entries.find(e => e.caseId === DB.active);
+    c.claims = [{id:'clx', t:'claim' + H, st:'confirmed', for:R.slice(0, 2).map(r => 'r:' + r.id).concat(['s:srx']), against:[], about:E1 ? [E1.id] : [], note:'note' + H, at:1}];
+    c.replies = [{id:'rrx', who:'', name:'who' + H, via:'Email' + H, at:Date.now() - 864e5, due:Date.now() + 864e5, claims:['clx'], st:'answered', resp:'resp' + H, respAt:Date.now()}];
+    DB.sources = [{id:'srx', caseId:DB.active, alias:'alias' + H, rel:'A', sealed:'{}', created:1}];
+    add('cited' + H, 'see https://evil.test/a?b="><b id=pwn8>x</b> for more');
+    DB.archive = {'https://evil.test/a?b="><b': {snap:'https://web.archive.org/web/2026/x"><b id=pwn9>', at:Date.now(), req:Date.now()}};
     mutate('hostile'); }, { prof, whois });
   const crawl = await crawler(page);
   await crawl('before refresh');
   await page.reload(); await expect.poll(() => page.evaluate(() => typeof DB !== 'undefined' && !!document.querySelector('#sidenav .nv'))).toBe(true);
-  expect(await page.evaluate(() => DB.records.filter(r => /^hx/.test(r.id)).length)).toBe(3);
+  expect(await page.evaluate(() => DB.records.filter(r => /^hx/.test(r.id)).length)).toBe(4);
   await crawl('after refresh');
   noErrors(errs);
 });

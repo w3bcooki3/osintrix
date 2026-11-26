@@ -216,7 +216,15 @@ function iocNorm(v, hint){
   const whole = ex.find(e => e.v.toLowerCase() === s.toLowerCase().replace(/\[\.\]|\(\.\)/g, '.').replace(/^hxxp/i, 'http')) || (ex.length === 1 ? ex[0] : null);
   return whole ? {k:whole.k, v:whole.v} : null;
 }
-function ctiIocIndex(){ const m = new Map(); for(const x of CTI.iocs || []) m.set(x.k + ':' + x.v, x); CTI.iocIx = m; CTI.iocHitsAt = null; }
+/* URLs keep their path's case since 1.78, and feeds saved before that hold them lowercased, so a URL is looked up
+   exactly first and then ignoring case */
+class IocIx extends Map {
+  get(k){ const x = super.get(k); return x === undefined && typeof k === 'string' && k.startsWith('url:') && this.lc ? this.lc.get(k.toLowerCase()) : x; }
+  has(k){ return this.get(k) !== undefined; }
+}
+function ctiIocIndex(){ const m = new IocIx(); m.lc = new Map();
+  for(const x of CTI.iocs || []){ const key = x.k + ':' + x.v; m.set(key, x); if(x.k === 'url' && !m.lc.has(key.toLowerCase())) m.lc.set(key.toLowerCase(), x); }
+  CTI.iocIx = m; CTI.iocHitsAt = null; }
 const ctiTlp = t => { const s = String(t || '').toLowerCase().replace(/^tlp[:\s-]*/, '').replace('white', 'clear').trim(); return TLP.includes(s) ? s : ''; };
 /* add or merge; returns counts */
 function ctiAddIocs(list, src){
@@ -233,14 +241,16 @@ function ctiAddIocs(list, src){
     if(CTI.iocs.length >= CTI_IOC_MAX){ out.full = true; break; }
     const x = {id:uid('ioc'), k:n.k, v:n.v, srcs:Array.isArray(it.srcs) && it.srcs.length ? it.srcs.map(z => cap(z, 80)).filter(Boolean).slice(0, 10) : [cap(src, 80)], tlp:ctiTlp(it.tlp) || 'clear', conf:it.conf == null ? null : Math.min(100, Math.max(0, +it.conf || 0)), first, last, exp, tags,
       threat:cap(it.threat, 120), desc:cap(it.desc, 500), ref:E.safeUrl(it.ref) || '', added:now};
-    CTI.iocs.push(x); CTI.iocIx.set(key, x); out.added++;
+    CTI.iocs.push(x); CTI.iocIx.set(key, x); if(x.k === 'url' && CTI.iocIx.lc && !CTI.iocIx.lc.has(key.toLowerCase())) CTI.iocIx.lc.set(key.toLowerCase(), x); out.added++;
   }
   CTI.iocHitsAt = null; return out;
 }
 /* indicators from your feeds that also appear in your cases */
 function ctiIocHits(){
   if(CTI.iocHitsAt === rev && CTI.iocHits) return CTI.iocHits;
-  const g = globalEnts(), hits = []; if(CTI.iocIx) for(const [k, x] of CTI.iocIx) if(g.has(k) && !(x.exp && x.exp < Date.now())) hits.push({ioc:x, ent:g.get(k)});
+  const g = globalEnts(), hits = []; let gl = null;
+  const urlEnt = k => { if(!gl){ gl = new Map(); for(const [gk, e] of g) if(gk.startsWith('url:') && !gl.has(gk.toLowerCase())) gl.set(gk.toLowerCase(), e); } return gl.get(k.toLowerCase()); };
+  if(CTI.iocIx) for(const [k, x] of CTI.iocIx){ if(x.exp && x.exp < Date.now()) continue; const ent = g.get(k) || (x.k === 'url' ? urlEnt(k) : null); if(ent) hits.push({ioc:x, ent}); }
   CTI.iocHitsAt = rev; return (CTI.iocHits = hits);
 }
 const iocLive = x => !(x.exp && x.exp < Date.now());

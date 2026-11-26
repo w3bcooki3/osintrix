@@ -24,22 +24,29 @@ def js(src):
     return '<script>' + code + '</script>'
 
 html = re.sub(r'<link rel="stylesheet" href="([^"]+)">', lambda m: css(m.group(1).split('?')[0]), html)
-html = re.sub(r'<link rel="(?:prefetch" as="script|x-on-demand)" href="([^"]+)" data-lazy>', r'<script src="\1"></script>', html)   # in the single file everything is inline
+# the big data files and libraries few screens need are packed (gzip, then base64) and not run at start: js/lazy.js
+# unpacks one the first time something asks for it, so the file opens without parsing several megabytes of data
+PACKS = []
+def pack(m): PACKS.append(m.group(1).split('?')[0]); return ''
+html = re.sub(r'<link rel="(?:prefetch" as="script|x-on-demand)" href="([^"]+)" data-lazy>\n?', pack, html)
 html = re.sub(r'<script src="([^"]+)"></script>', lambda m: js(m.group(1).split('?')[0]), html)
 # welcome-screen pictures become data: URIs so the one-file copy has no loose files
 for n in ('dashboard-dark', 'dashboard-light', 'graph-dark', 'graph-light', 'phone-dark', 'phone-light', 'timeline-dark', 'timeline-light'):
-    f = root / 'assets' / 'welcome' / (n + '.jpg')
-    if f.exists(): html = html.replace('assets/welcome/' + n + '.jpg', 'data:image/jpeg;base64,' + base64.b64encode(f.read_bytes()).decode())
+    f = root / 'assets' / 'welcome' / (n + '.webp')
+    if f.exists(): html = html.replace('assets/welcome/' + n + '.webp', 'data:image/webp;base64,' + base64.b64encode(f.read_bytes()).decode())
 # engines loaded on demand (the SQLite viewer) ride along as inert text and are started from it when needed
 LAZY = ['js/vendor/sql-wasm.js', 'js/vendor/sql-wasm-b64.js']
 i = html.rfind('</body>')   # the page's own closing tag, not one inside a script's text
-html = html[:i] + ''.join('<script type="text/plain" id="lazy:' + p + '">' + (root / p).read_text(encoding='utf-8') + '</script>' for p in LAZY) + html[i:]
+import gzip
+def packed(p): return base64.b64encode(gzip.compress((root / p).read_text(encoding='utf-8').encode('utf-8'), 9, mtime=0)).decode()
+html = html[:i] + ''.join('<script type="text/plain" id="lazy:' + p + '">' + (root / p).read_text(encoding='utf-8') + '</script>' for p in LAZY) \
+    + ''.join('<script type="text/plain" id="lazy:' + p + '" data-gz>' + packed(p) + '</script>' for p in PACKS) + html[i:]
 # The policy allows exactly the scripts in this file, by hash: no 'unsafe-inline', so markup that
 # ends up in the page (an imported name, a saved web page) can never run as script.
 import hashlib
 def sha(code): return "'sha256-" + base64.b64encode(hashlib.sha256(code.encode('utf-8')).digest()).decode() + "'"
 hashes = [sha(m.group(1)) for m in re.finditer(r'<script>(.*?)</script>', html, flags=re.S)]
-hashes += [sha((root / p).read_text(encoding='utf-8')) for p in LAZY]          # started later from their text
+hashes += [sha((root / p).read_text(encoding='utf-8')) for p in LAZY + PACKS]  # started later from their text
 csp = ("default-src 'none'; script-src " + ' '.join(dict.fromkeys(hashes)) + " 'wasm-unsafe-eval'; style-src 'unsafe-inline'; "
        "img-src data: blob:; media-src blob:; font-src data:; "
        "connect-src https://api.rss2json.com https://raw.githubusercontent.com https://api.first.org https://cveawg.mitre.org https://internetdb.shodan.io https://api.shodan.io https://dns.google https://rdap.org https://rdap.arin.net https://rdap.db.ripe.net https://rdap.apnic.net https://rdap.afrinic.net https://rdap.lacnic.net https://rdap.verisign.com https://tld-rdap.verisign.com https://rdap.identitydigital.services https://pubapi.registry.google https://rdap.registry.cloud https://rdap.nixiregistry.in https://rdap.publicinterestregistry.org https://rdap.radix.host https://rdap.gmoregistry.net https://rdap.zdnsgtld.com https://rdap.nominet.uk https://rdap.centralnic.com https://ipinfo.io https://stat.ripe.net https://onionoo.torproject.org https://mempool.space https://eth.blockscout.com https://api.certspotter.com https://api.hackertarget.com https://archive.org https://otx.alienvault.com https://haveibeenpwned.com https://*.workers.dev; form-action 'none'; base-uri 'none'; object-src 'none'")

@@ -34,12 +34,24 @@ function lazyNeed(k){
   return L.p || (L.p = new Promise(res => {
     const pre = [...document.querySelectorAll('link[data-lazy]')].find(l => (l.getAttribute('href') || '').split('?')[0].endsWith('/' + L.f));
     const old = [...document.scripts].find(s => (s.getAttribute('src') || '').split('?')[0].endsWith('/' + L.f));
-    if(!pre && !old) return res(false);
+    if(!pre && !old){
+      /* the one-file copy carries these as packed text that is not run at start; unpack and run it now */
+      const box = [...document.querySelectorAll('script[type="text/plain"][id^="lazy:"]')].find(x => x.id.endsWith('/' + L.f));
+      if(!box) return res(false);
+      return lzUnpack(box).then(code => { const s = document.createElement('script'); s.textContent = code; document.head.appendChild(s); res(lzHas(k) || !L.has); })
+        .catch(e => { console.warn('could not unpack ' + L.f, e); L.failed = true; res(false); });
+    }
     const el = old || document.createElement('script');
     el.addEventListener('load', () => res(true), {once:true}); el.addEventListener('error', () => { L.failed = true; res(false); }, {once:true});
     if(!old){ el.src = pre.getAttribute('href'); el.async = true; document.head.appendChild(el); }
     if(lzHas(k)) res(true);                                   // it ran between the check above and here
   }));
+}
+/* packed text: gzip, then base64 (data-gz), or the code itself */
+async function lzUnpack(box){
+  if(!box.hasAttribute('data-gz')) return box.textContent;
+  const bytes = Uint8Array.from(atob(box.textContent.trim()), c => c.charCodeAt(0));
+  return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
 }
 const lazyPending = () => Object.keys(LZ).filter(k => !lzHas(k) && !LZ[k].failed && !LZ[k].only).length;
 let LZ_REDRAW = false;

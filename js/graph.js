@@ -161,6 +161,11 @@ function mountGraph(){
 let CY_SIG = '';
 /* what is redone on every render, whether the graph was rebuilt or kept: selection, highlights, the controls around it */
 function graphAfter(el, focused){
+  /* Cytoscape remembers where its canvas is on the page and ignores any press or wheel outside that spot. When the page
+     moves the graph without resizing it (a note or bar appearing above it after entities are added), the spot it
+     remembers is stale and the graph stops taking the mouse. Have it measure again at the start of every press. */
+  if(!el.__bbFresh){ el.__bbFresh = true; const fresh = () => { const r = cy && cy.container() === el && cy.renderer(); if(r && r.invalidateContainerClientCoordsCache) r.invalidateContainerClientCoordsCache(); };
+    for(const t of ['mousedown', 'touchstart', 'wheel', 'mouseover']) el.addEventListener(t, fresh, {capture:true, passive:true}); }
   cy.elements().unselect().removeClass('src gvfocus faded');
   if(UI.sel && UI.sel.kind === 'entry'){ const n = cy.getElementById(UI.sel.id); if(n.length){ n.select(); if(UI.gFocus === UI.sel.id){ UI.gFocus = null; cy.animate({center:{eles:n}, zoom:Math.max(cy.zoom(), 1.1)}, {duration:280}); } } }
   if(UI.graph.first){ const n = cy.getElementById(UI.graph.first); if(n.length) n.addClass('src'); }

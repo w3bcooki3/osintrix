@@ -481,9 +481,12 @@ function labRegex(){
 /* redraw without losing your place in the lines */
 function rxRender(){ const a = $('rxLines'), y = a ? a.scrollTop : 0; renderMain(); const b = $('rxLines'); if(b) b.scrollTop = y; }
 /* its own page in the sidebar (Kit → Regex builder) */
-function viewRegex(){ return `<div class="scroll"><div class="page wide">
-    <header class="lhd rx-lhd"><div><h1>Regex builder</h1><p>Tested, explained, fast patterns for Splunk, KQL, Grok, Python, JavaScript and PCRE — your lines never leave this browser.</p></div></header>
-    ${labRegex()}</div></div>`; }
+/* Patterns: build a pattern from your own lines, and the parsers that read evidence into fields — one place for both */
+function viewRegex(){ const t = UI.patTab === 'logs' ? 'logs' : 'build', np = (DB.parsers || []).length;
+  return `<div class="scroll"><div class="page wide">
+    <header class="lhd rx-lhd"><div><h1>Patterns</h1><p>${t === 'logs' ? 'How evidence is read into fields: try a log line, keep your own parsers, and tell the parser what a vendor’s field names mean.' : 'Tested, explained, fast patterns for Splunk, KQL, Grok, Python, JavaScript and PCRE — your lines never leave this browser.'}</p></div></header>
+    <div class="seg pat-tabs" role="tablist" aria-label="Patterns"><button role="tab" data-act="patTab" data-v="build" aria-selected="${t === 'build'}">${ico('regex','sm')}Build a pattern</button><button role="tab" data-act="patTab" data-v="logs" aria-selected="${t === 'logs'}">${ico('scan-text','sm')}Log parsers${np ? ` <span class="t3">${np}</span>` : ''}</button></div>
+    ${t === 'logs' ? labParse() : labRegex()}</div></div>`; }
 function rxLibHtml(){ return `<div class="rx-libl">${RX_LIB.map(([n, p], i) => `<div class="rx-libi"><span>${esc(n)}</span><code class="mono">${esc(p)}</code><button class="iconbtn xs" data-act="rxLib" data-v="${i}" aria-label="Copy the pattern for ${esc(n)}">${ico('copy','sm')}</button></div>`).join('')}</div>`; }
 /* selecting text in a line → a field to name */
 function rxFromSel(quiet){
@@ -600,7 +603,7 @@ const RX_ACTS = {
   rxTestNone:() => rxTestAdd('none'),
   rxToCase:(id, v) => { const S = RX(), C = rxCurrent(), V = rxView(); if(!C.ok) return; if(!DB.active || !theCase()) return toast('Open a case first');
     let re; try{ re = new RegExp(C.src); }catch(e){ return; } const vals = new Map(); for(const i of V.idx){ const m = re.exec(S.lines[i]); const x = m && m.groups && m.groups[v]; if(x != null) vals.set(x, (vals.get(x) || 0) + 1); }
-    if(!vals.size) return; const list = [...vals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2000), body = `Regex builder: values of ${v} in ${V.idx.length.toLocaleString()} log ${V.idx.length === 1 ? 'line' : 'lines'}${V.F ? ' (format ' + V.F.name + ')' : ''}\nPattern: ${C.src}\n\n` + list.map(([x, c]) => `${x}\t${c}`).join('\n');
+    if(!vals.size) return; const list = [...vals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2000), body = `Patterns: values of ${v} in ${V.idx.length.toLocaleString()} log ${V.idx.length === 1 ? 'line' : 'lines'}${V.F ? ' (format ' + V.F.name + ')' : ''}\nPattern: ${C.src}\n\n` + list.map(([x, c]) => `${x}\t${c}`).join('\n');
     DB.records.push({id:uid('r'), caseId:DB.active, type:'evidence', title:`Log values: ${v} (${vals.size.toLocaleString()})`, body, tsRaw:'', tsZone:'explicit', ts:Date.now(), source:'regex-builder', host:'', tags:['log', 'regex'], ents:E.extract(body), answer:'', addedBy:'You', addedAt:Date.now(), hash:''});
     mutate('saved log values'); hashRecords(); { const r0 = DB.records[DB.records.length - 1]; afterCapture(DB.active, [r0.id]); watchNotify([r0]); } renderNav(); toast(`${vals.size.toLocaleString()} values of ${v} saved to ${caseNm(theCase())}`, 'Open', () => go(caseHash(DB.active, 'timeline'))); },
   rxFull:() => { const S = RX(); S.fullPat = !S.fullPat; rxRender(); },
@@ -621,5 +624,6 @@ const RX_ACTS = {
   rxAuto:() => { RX().manual = null; rxRender(); },
   rxCopy:() => { const el = $('rxOut'); if(el) copyText(el.textContent); },
   rxLib:(id, v) => { const x = RX_LIB[+v]; if(x) copyText(x[1]); },
+  patTab:(id, v) => { UI.patTab = v === 'logs' ? 'logs' : 'build'; renderMain(); },
   rxSave:() => { const C = rxCurrent(); if(!C.ok) return; if(typeof parserDlg === 'function') parserDlg(null, {name:'Built: ' + C.groups.map(g => g.name).slice(0, 4).join(', '), re:C.src}); },
 };

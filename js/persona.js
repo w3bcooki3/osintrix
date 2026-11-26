@@ -11,9 +11,9 @@
      · a persona is shown when its ties were seen in two or more records
    Nothing is looked up; it reads what you have already captured.
    ========================================================================== */
-const PS_STRONG = new Set(['tgid', 'dcid', 'pgp', 'email', 'phone', 'session', 'tox', 'btc', 'eth', 'xmr', 'sol', 'ltc', 'trx', 'doge', 'ens']);
+const PS_STRONG = new Set(['tgid', 'dcid', 'pgp', 'email', 'phone', 'session', 'tox', 'btc', 'eth', 'xmr', 'sol', 'ltc', 'trx', 'doge', 'ens', 'npub', 'matrix', 'fedi', 'did', 'sshkey']);
 const PS_NAME = new Set(['handle', 'social']);
-const PS_TIE = {tgid:'Telegram account', dcid:'Discord account', pgp:'PGP key', email:'email', phone:'phone number', session:'Session ID', tox:'Tox ID', btc:'Bitcoin wallet', eth:'Ethereum wallet', xmr:'Monero wallet', sol:'Solana wallet', ltc:'Litecoin wallet', trx:'TRON wallet', doge:'Dogecoin wallet', ens:'ENS name'};
+const PS_TIE = {npub:'Nostr account', matrix:'Matrix account', fedi:'fediverse account', did:'Bluesky ID', sshkey:'SSH key', tgid:'Telegram account', dcid:'Discord account', pgp:'PGP key', email:'email', phone:'phone number', session:'Session ID', tox:'Tox ID', btc:'Bitcoin wallet', eth:'Ethereum wallet', xmr:'Monero wallet', sol:'Solana wallet', ltc:'Litecoin wallet', trx:'TRON wallet', doge:'Dogecoin wallet', ens:'ENS name'};
 const PS = {key:'', v:null};
 function personas(){
   const key = rev + ':' + DB.records.length; if(PS.key === key) return PS.v;

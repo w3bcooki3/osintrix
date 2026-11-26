@@ -12,8 +12,8 @@
       seen together, near in time on one host, look-alike identities,
       shared IP or registrant. Nothing is guessed silently.
    ========================================================================== */
-const GRAPH_KINDS = ['ipv4','ipv6','domain','url','email','handle','social','phone','btc','eth','xmr','ltc','trx','doge','sol','ens','btctx','ethtx','soltx','pgp','session','tox','tgid','dcid','md5','sha1','sha256','cve','mac','coords'];
-const KIND_GROUP_LABEL = [['net','Network','ipv4 ipv6 domain url mac'], ['id','Identity','email handle social phone pgp session tox tgid dcid'], ['fin','Wallets','btc eth xmr ltc trx doge sol ens btctx ethtx soltx'], ['hash','File hashes','md5 sha1 sha256'], ['other','Other','cve coords']];
+const GRAPH_KINDS = ['ipv4','ipv6','domain','url','email','handle','social','phone','btc','eth','xmr','ltc','trx','doge','sol','ens','btctx','ethtx','soltx','pgp','session','tox','tgid','dcid','md5','sha1','sha256','cve','mac','coords','vin','tail','icao24','imo','mmsi','sshkey','fedi','matrix','npub','did'];
+const KIND_GROUP_LABEL = [['net','Network','ipv4 ipv6 domain url mac sshkey'], ['id','Identity','email handle social phone pgp session tox tgid dcid fedi matrix npub did'], ['fin','Wallets','btc eth xmr ltc trx doge sol ens btctx ethtx soltx'], ['hash','File hashes','md5 sha1 sha256'], ['transport','Vehicles & transport','vin tail icao24 imo mmsi'], ['other','Other','cve coords']];
 const isPrivIP = v => /private|loopback|link-local|reserved|carrier|multicast|benchmark|this network/i.test(E.ipClass(v) || '');
 /* graph key of an extracted entity: host:port collapses to its host */
 function gkey(e){ if(e.k === 'hostport'){ const h = e.v.slice(0, e.v.lastIndexOf(':')); return (/^[\d.]+$/.test(h) ? 'ipv4:' : 'domain:') + h; } return GRAPH_KINDS.includes(e.k) ? e.k + ':' + e.v : null; }
@@ -34,7 +34,7 @@ const REL_VERBS = [
   [/\blinked\s+(?:to|with)\b|\bassociated\s+with\b|\brelated\s+to\b|\btied\s+to\b|\bconnected\s+with\b|\bshares?\b/i, 'associated with'],
 ];
 const REL_STOP = new Set('is was are were be been being the a an to at on by of and or then which that it its also has have had now later currently still same this these those new old main his her their our my your domain domains ip ips address addresses server servers host hosts email emails mail wallet wallets account accounts handle user username url urls link site website via through from with into as for -> → => - — – : |'.split(' '));
-const NET = new Set(['ipv4','ipv6','domain','url']), IDK = new Set(['email','handle','social','phone','pgp','session','tox','tgid','dcid']), WAL = new Set(['btc','eth','xmr','ltc','trx','doge','sol','ens','btctx','ethtx','soltx']), IPK = new Set(['ipv4','ipv6']);
+const NET = new Set(['ipv4','ipv6','domain','url']), IDK = new Set(['email','handle','social','phone','pgp','session','tox','tgid','dcid','fedi','matrix','npub','did']), WAL = new Set(['btc','eth','xmr','ltc','trx','doge','sol','ens','btctx','ethtx','soltx']), IPK = new Set(['ipv4','ipv6']);
 function relOK(label, ka, kb){
   switch(label){
     case 'resolves to': return (ka === 'domain' || ka === 'url') && IPK.has(kb) ? 1 : IPK.has(ka) && kb === 'domain' ? -1 : 0;
@@ -108,6 +108,10 @@ function entryFor(key){ const i = key.indexOf(':'), k = key.slice(0, i), v = key
     case 'location': f.address = 'Coordinates from evidence'; f.coordinates = v; break;
     case 'crypto': f.address = v; f.currency = {btc:'Bitcoin', eth:'Ethereum', ens:'Ethereum', sol:'Solana', xmr:'Monero', ltc:'Litecoin'}[k] || 'Other'; break;
     case 'username': f.username = v.replace(/^@/, ''); break;
+    case 'vessel': f[k === 'mmsi' ? 'mmsi' : 'imo'] = v; break;
+    case 'aircraft': f[k === 'icao24' ? 'icao24' : 'registration'] = v; break;
+    case 'daccount': f.id = v; f.network = {fedi:'Fediverse (Mastodon…)', matrix:'Matrix', npub:'Nostr', did:'Bluesky / AT Protocol'}[k]; break;
+    case 'sshkey': f.fingerprint = v; break;
     default: f[TYPES[type].fields[0][0]] = v;
   }
   return {type, fields:f};

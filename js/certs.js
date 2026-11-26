@@ -158,7 +158,7 @@ function viewCerts(){
 function cxBodyHtml(){
   const S = cxS(); if(S.tab === 'guide') return cxGuide();
   const main = S.tab === 'decoder' ? cxDecoder() : S.tab === 'chain' ? cxChain() : S.tab === 'csr' ? cxCsr() : S.tab === 'compare' ? cxCompare() : cxCt();
-  return `<div class="crt-main">${cxBar()}<div class="crt-g${(S.tab === 'decoder' && S.R && S.R.certs.length) || (S.tab === 'ct' && S.ct) ? '' : ' two'}">${main}</div></div>`;
+  return `<div class="crt-main">${cxBar()}${S.tab === 'ct' || S.tab === 'decoder' ? labStrip('certs') : ''}<div class="crt-g${(S.tab === 'decoder' && S.R && S.R.certs.length) || (S.tab === 'ct' && S.ct) ? '' : ' two'}">${main}</div></div>`;
 }
 function cxPaint(){ const b = $('cxBody'); if(!b) return; const S = cxS(), ae = document.activeElement, fid = ae && b.contains(ae) && ae.id, sc = (b.querySelector('.crt-c') || {}).scrollTop || 0;
   b.innerHTML = cxBodyHtml(); b.setAttribute('aria-labelledby', 'cxt-' + S.tab);
@@ -612,7 +612,7 @@ function cxCt(){
   const stat = (v, l, d) => `<div class="crt-st"><b>${v}</b><span>${l}</span>${d ? `<small>${d}</small>` : ''}</div>`;
   return `<div class="crt-c">
     <section class="card crt-hero crt-cth"><span class="crt-big inf">${ico('radar')}</span><div class="crt-hm"><h1>${esc(A.dom || 'Transparency results')}</h1><p>${A.rows} log entries · ${A.certs.length} distinct certificates (precertificate and final copies merged) · ${esc(cxYmd(A.first))} to ${esc(cxYmd(A.last))}</p></div>
-      <div class="crt-ha">${S.ctRec ? `<span class="crt-pill green">${ico('check','sm')}Saved</span>` : `<button class="btn sm primary" data-act="cxCtSave">${ico('plus','sm')}Add ${A.names.length} names to case</button>`}<button class="btn sm" data-act="cxCtCopy">${ico('copy','sm')}Copy names</button><button class="btn sm ghost" data-act="cxCtCsv">${ico('download','sm')}CSV</button></div></section>
+      <div class="crt-ha">${S.ctRec ? `<span class="crt-pill green">${ico('check','sm')}Saved</span>` : `<button class="btn sm primary" data-act="cxCtSave">${ico('plus','sm')}Add ${A.names.length} names to case</button>${DB.active ? casePick() : ''}`}<button class="btn sm" data-act="cxCtCopy">${ico('copy','sm')}Copy names</button><button class="btn sm ghost" data-act="cxCtCsv">${ico('download','sm')}CSV</button></div></section>
     <div class="crt-sts">${stat(A.names.length, 'unique names', A.doms.length > 1 ? A.doms.length + ' registered domains' : '')}${stat(A.live, 'certificates valid now', A.certs.length - A.live + ' expired')}${stat(wild, 'wildcard names', wild ? 'hide which hosts exist' : '')}${stat(A.issuers.length, 'issuing CAs', esc(A.issuers[0][0]) + ' most')}</div>
     <section class="card crt-s"><h3>${ico('chart-column','sm')}Certificates issued per ${A.q === 3 ? 'quarter' : 'month'}</h3>
       <div class="crt-tl" role="img" aria-label="Issuance over time: ${A.bins.filter(b => b.n).length} active ${A.q === 3 ? 'quarters' : 'months'}, busiest ${esc(A.bins.reduce((m, b) => b.n > m.n ? b : m, A.bins[0]).label)} with ${max}">${A.bins.map(b => `<i style="height:${Math.max(b.n ? 6 : 1, b.n / max * 100)}%" title="${esc(b.label)}: ${b.n}"></i>`).join('')}</div>

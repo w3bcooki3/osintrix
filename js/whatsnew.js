@@ -26,16 +26,16 @@ function wnMatches(){
   return wnData().map(v => ({v, ch:v.changes.filter(c => (!f || c.type === f) && (!q || (c.text + ' ' + v.name + ' v' + v.version).toLowerCase().includes(q)))})).filter(x => x.ch.length);
 }
 function viewWhatsNew(){
-  const data = wnData(), latest = data[0], tally = {}, total = data.reduce((n, v) => n + v.changes.length, 0);
+  const data = wnData(), latest = data[0], tally = {}, total = data.reduce((n, v) => n + v.changes.length, 0), releases = data.reduce((n, v) => n + (+v.releases || 1), 0);
   data.forEach(v => v.changes.forEach(c => tally[c.type] = (tally[c.type] || 0) + 1));
   const first = data.slice().reverse().find(v => /^\d{4}-/.test(v.date || '')), cur = UI.wnType || '';
   const tile = (t, label, n, icon, cls) => `<button class="wn2-f ${cls}" data-act="wnType" data-v="${t}" aria-pressed="${cur === t}"><span class="wn2-fi">${ico(icon,'sm')}</span><span class="wn2-fl"><b>${n}</b>${label}</span></button>`;
   return `<div class="scroll" id="wnScroll"><div class="wn2">
     <header class="wn2-hero"><div class="wn2-hin">
       <div class="wn2-ht"><div><p class="wn2-k">${esc(BRAND.name)} · release history</p><h1>What’s new</h1>
-        <p class="wn2-sub">Every change, newest first. Everything runs offline in your browser.</p></div>
+        <p class="wn2-sub">What changed, newest first. Older releases are grouped.</p></div>
         ${latest ? `<a class="wn2-now" href="#/whatsnew" data-act="wnJump" data-v="${esc(latest.version)}"><span class="wn2-pulse"></span><span><small>You’re on</small><b>v${esc(latest.version)} · ${esc(latest.name)}</b><small>${wnDate(latest.date)}</small></span></a>` : ''}</div>
-      <div class="wn2-stats"><div><b>${data.length}</b><span>releases</span></div><div><b>${total}</b><span>changes</span></div>${first ? `<div><b>${esc(wnDate(first.date))}</b><span>first dated release</span></div>` : ''}
+      <div class="wn2-stats"><div><b>${releases}</b><span>releases</span></div><div><b>${total}</b><span>changes</span></div>${first ? `<div><b>${esc(wnDate(first.date))}</b><span>first dated release</span></div>` : ''}
         <div class="wn2-dist" role="img" aria-label="${WN_ORDER.filter(t => tally[t]).map(t => tally[t] + ' ' + WN_TYPES[t].label.toLowerCase()).join(', ')}">${WN_ORDER.filter(t => tally[t]).map(t => `<i class="${WN_TYPES[t].cls}" style="flex:${tally[t]}"></i>`).join('')}</div></div>
       <div class="wn2-bar"><div class="wn2-fs" role="group" aria-label="Show changes of type">${tile('', 'All', total, 'layers', 'all')}${WN_ORDER.filter(t => tally[t]).map(t => tile(t, WN_TYPES[t].label, tally[t], WN_TYPES[t].icon, WN_TYPES[t].cls)).join('')}</div>
         <div class="wn2-q">${ico('search')}<label class="sr" for="wnQ">Search the history</label><input id="wnQ" type="search" placeholder="Search the history — graph, encryption, certificates…" value="${esc(UI.wnQ || '')}" autocomplete="off" spellcheck="false"></div></div>

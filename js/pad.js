@@ -5,15 +5,16 @@
    case. Text is saved in this browser. Uses the app's extraction engine.
    ========================================================================== */
 const PAD_LANES = [
-  {id: 'net',   name: 'Network',         icon: 'network',         kinds: ['ipv4', 'ipv6', 'domain', 'url', 'mac', 'asn']},
+  {id: 'net',   name: 'Network',         icon: 'network',         kinds: ['ipv4', 'ipv6', 'domain', 'url', 'mac', 'asn', 'sshkey']},
   {id: 'ports', name: 'Ports',           icon: 'binary',          custom: 'port'},
   {id: 'proto', name: 'Protocols',       icon: 'arrow-right-left', custom: 'proto'},
   {id: 'time',  name: 'Timeline',        icon: 'clock',           custom: 'time'},
-  {id: 'id',    name: 'Identity',        icon: 'user',            kinds: ['email', 'handle', 'social', 'phone', 'account', 'sid', 'btc', 'eth', 'xmr', 'ltc', 'trx', 'doge', 'sol', 'ens', 'btctx', 'ethtx', 'soltx', 'pgp', 'session', 'tox', 'tgid', 'dcid', 'iban']},
+  {id: 'id',    name: 'Identity',        icon: 'user',            kinds: ['email', 'handle', 'social', 'phone', 'account', 'sid', 'btc', 'eth', 'xmr', 'ltc', 'trx', 'doge', 'sol', 'ens', 'btctx', 'ethtx', 'soltx', 'pgp', 'session', 'tox', 'tgid', 'dcid', 'iban', 'fedi', 'matrix', 'npub', 'did']},
   {id: 'hash',  name: 'Hashes',          icon: 'file-digit',      kinds: ['md5', 'sha1', 'sha256', 'sha512']},
   {id: 'vuln',  name: 'Vulnerabilities', icon: 'shield-alert',    kinds: ['cve', 'ttp']},
   {id: 'host',  name: 'Files & hosts',   icon: 'file-text',       kinds: ['file', 'path', 'regkey', 'eventid']},
-  {id: 'place', name: 'Locations',       icon: 'map-pin',         kinds: ['coords']}
+  {id: 'place', name: 'Locations',       icon: 'map-pin',         kinds: ['coords']},
+  {id: 'transport', name: 'Vehicles & transport', icon: 'car',  kinds: ['vin', 'tail', 'icao24', 'imo', 'mmsi']}
 ];
 const PAD_KIND2LANE = (() => { const m = {}; PAD_LANES.forEach(L => (L.kinds || []).forEach(k => m[k] = L.id)); return m; })();
 const PROTO_RE = /\b(TCP|UDP|ICMP|HTTPS?|DNS|TLS|SSL|SSH|FTP|SFTP|SMTP|IMAP|POP3|RDP|SMB|LDAPS?|SNMP|NTP|DHCP|TELNET|VNC|MQTT|QUIC|KERBEROS|WINRM|SIP|RADIUS)\b/gi;

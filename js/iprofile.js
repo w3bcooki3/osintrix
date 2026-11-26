@@ -245,6 +245,50 @@ function ipfMisc(k, v, F, out){
   else if(k === 'ens'){ const parts = low.split('.'); F.push(['Type', 'ENS name — a readable name for an Ethereum wallet']); if(parts.length > 2) F.push(['Parent', parts.slice(1).join('.')]);
     if(/[^\x00-\x7f]/.test(v) || /xn--/.test(low)) out.push({lvl:'warn', t:'Non-Latin characters', why:'A name can look like a known one and point somewhere else — check the address it resolves to.'});
     if(/^0x[0-9a-f]{6,}/.test(parts[0])) out.push({lvl:'warn', t:'Made to look like an address', why:'A name starting with 0x… is chosen to be mistaken for a wallet address.'}); }
+  else if(k === 'sshkey' && typeof IDKEYS !== 'undefined'){
+    /* the full key, if any record has it: type, size, comments, the other fingerprint forms */
+    const g = typeof globalEnts === 'function' ? globalEnts().get('sshkey:' + v) : null, recs = g ? g.recs : [], re = /\b(ssh-(?:ed25519|rsa|dss)|ecdsa-sha2-nistp(?:256|384|521)|sk-(?:ssh-ed25519|ecdsa-sha2-nistp256)@openssh\.com)[ \t]+(AAAA[A-Za-z0-9+\/]{40,4000}={0,3})(?:[ \t]+([^\s"'<>]{1,120}))?/g;
+    let K = null; const comments = new Set();
+    const scan = L => { for(const r of L){ if(!/ssh-|ecdsa-/.test(r.body || '')) continue; re.lastIndex = 0; let m; while((m = re.exec(r.body || ''))){ const x = IDKEYS.sshParse(m[2], m[1]); if(x && (x.sha256 === v || x.md5 === v)){ K = x; if(m[3]) comments.add(m[3]); } } } };
+    scan(recs.slice(0, 400)); if(!K && /^MD5:/.test(v)) scan(DB.records.slice(-5000));   /* an MD5 fingerprint (Shodan, old tools): the full key may be in another record */
+    if(K && /^MD5:/.test(v)) out.push({lvl:'info', t:'Same key as ' + K.sha256, why:'This MD5 fingerprint belongs to a public key in your evidence. Both name one key.'});
+    if(K){ const I = IDKEYS.sshInfo(K); F.push(['Type', I.label + (K.bits && !/ed25519/.test(K.type) ? ' · ' + K.bits + ' bits' : '')]); if(I.warn) out.push({lvl:'warn', t:'Weak or outdated key', why:I.warn});
+      if(K.sk) out.push({lvl:'info', t:'Kept on a hardware security key', why:'Signing needs the physical key (YubiKey or similar) to be present; the private key cannot be copied off it.'});
+      F.push(['SHA-256', K.sha256]); if(K.md5) F.push(['MD5 (older tools, Shodan)', K.md5.slice(4)]); F.push(['Hex SHA-256 (Censys)', K.hex]);
+      if(comments.size) F.push(['Comment', [...comments].slice(0, 4).join(', ') + ' — the user and machine it was made on, unless changed']); }
+    else { F.push(['Fingerprint', /^MD5:/.test(v) ? 'MD5 only (older tools and Shodan). Paste the public key to see its type and SHA-256 form' : 'Only the fingerprint is in your evidence — paste the public key to see its type and size']); const hx = IDKEYS.sshFpToHex(v); if(hx) F.push(['Hex SHA-256 (Censys)', hx]); }
+    /* where it was seen: a server key on several machines, or a login key used against several, points at one operator */
+    const hosts = new Set(), users = new Set(); for(const r of recs) for(const e of r.ents || []){ if(e.k === 'ipv4' || e.k === 'ipv6' || e.k === 'domain') hosts.add(e.v); if(e.k === 'handle' || e.k === 'account') users.add(e.v); }
+    if(hosts.size) F.push(['Seen with', [...hosts].slice(0, 8).join(', ') + (hosts.size > 8 ? ' +' + (hosts.size - 8) : '')]);
+    const ips = [...hosts].filter(h => /^[\d.]+$|:/.test(h)).length, machines = ips || hosts.size;   /* an address and its host name are one machine */
+    if(machines >= 2) out.push({lvl:'info', t:'One key, ' + machines + ' machines', why:'The same SSH key turns up with several hosts. A server key copied between machines, or one login key used on all of them, usually means one operator set them up.'});
+    if(g && g.cases && g.cases.size > 1) out.push({lvl:'info', t:'In ' + g.cases.size + ' cases', why:'The same key links these investigations.'}); }
+  else if(k === 'fedi' && typeof IDKEYS !== 'undefined'){ const P = IDKEYS.fediParts(v); if(P){ F.push(['User', P.user]); F.push(['Server', P.host]); F.push(['Profile', P.url]);
+    if(!P.big) out.push({lvl:'info', t:'A small or personal server', why:P.host + ' is not one of the large public servers. Whoever runs it may be the account’s owner: look up the domain.'});
+    F.push(['Note', 'The same name on another server can be someone else; a moved account says so on its old profile']); } }
+  else if(k === 'matrix' && typeof IDKEYS !== 'undefined'){ const P = IDKEYS.matrixParts(v); if(P){ F.push(['User', P.user]); F.push(['Homeserver', P.host]);
+    if(!P.big) out.push({lvl:'info', t:'A self-hosted homeserver', why:P.host + ' is not a large public server; its owner may be the account’s owner, or close to them.'});
+    F.push(['Note', 'Messages are often end-to-end encrypted; what is public is the account and the rooms it joins']); } }
+  else if(k === 'npub' && typeof IDKEYS !== 'undefined'){ const h = IDKEYS.npubHex(v); F.push(['Type', 'Nostr public key: the account itself, kept for life; names and pictures are just profile data']); if(h) F.push(['Hex form', h + ' — how it appears in events and on relays']);
+    F.push(['Checksum', h ? 'Valid' : 'Fails']); }
+  else if(k === 'did' && typeof IDKEYS !== 'undefined'){ const P = IDKEYS.didParts(v); if(P){ F.push(['Method', P.method === 'plc' ? 'did:plc: Bluesky’s directory keeps every handle and server this account has had' : 'did:web: the identity is the domain ' + P.id]);
+    if(P.method === 'plc') F.push(['History', 'The PLC directory link below lists each handle change with its date']);
+    if(P.method === 'web') out.push({lvl:'info', t:'Tied to a domain', why:'Whoever controls ' + P.id + ' controls this identity. Look the domain up.'}); } }
+  else if(k === 'vin'){ const I = TRANSPORT.vinInfo(v);
+    F.push(['Maker', I.maker || 'Not in the built-in list (maker code ' + I.wmi + ')']); if(I.where) F.push(['Made in', I.where]); if(I.year) F.push(['Model year', I.year]);
+    F.push(['Check digit', I.check ? 'Valid' : 'Does not match']); F.push(['Plant · serial', I.plant + ' · ' + I.serial]);
+    if(!I.check && I.na) out.push({lvl:'bad', t:'Check digit fails', why:'Every North American VIN carries one. This is a typo, a misread photo, or a made-up number.'});
+    else if(!I.check) out.push({lvl:'info', t:'No check digit', why:'Makers outside North America and China may leave it out, so this alone does not mean the VIN is wrong.'}); }
+  else if(k === 'tail'){ const c = TRANSPORT.tailCountry(v); if(c) F.push(['Registered in', c]);
+    if(/^N\d/.test(v)){ const h = TRANSPORT.nToIcao(v); if(h) F.push(['Aircraft address', h + ' (worked out from the N-number)']); F.push(['Owner', 'US registrations are public: the FAA registry link below shows the owner']); }
+    F.push(['Note', 'A registration moves with the aircraft only while it stays in one country; the address and the serial number are what follow it']); }
+  else if(k === 'icao24'){ const c = TRANSPORT.icaoCountry(v); F.push(['Registered in', c || 'Not in the built-in list of address blocks']);
+    const n = TRANSPORT.icaoToN(v); if(n) F.push(['Registration', n + ' (worked out from the address)']);
+    F.push(['Type', 'The 24-bit address the transponder sends (Mode S, ADS-B); it stays with the airframe while its country does not change']); }
+  else if(k === 'imo'){ F.push(['Type', 'IMO ship number: given once and kept for the ship’s life, through new names, owners and flags']); F.push(['Check digit', 'Valid']); }
+  else if(k === 'mmsi'){ const I = TRANSPORT.mmsiInfo(v); F.push(['Type', I.kind]); if(I.flag) F.push(['Flag', I.flag]); else if(I.mid) F.push(['Flag', 'Unknown country code ' + I.mid]);
+    F.push(['Note', 'A ship gets a new MMSI when it changes flag; its IMO number stays the same']);
+    if(I.open) out.push({lvl:'info', t:'Open-registry flag', why:I.flag + ' registers ships owned abroad, so the flag says little about who runs this one. Look for the owner and the manager instead.'}); }
   else if(k === 'tgid'){ F.push(['Type', 'Telegram account number — permanent; the name and username can change, this does not']); F.push(['Where it shows', 'from_id in a Telegram Desktop export (user' + v + ')']); }
   else if(k === 'dcid'){ const ms = Number(BigInt(String(v)) >> 22n) + 1420070400000; F.push(['Type', 'Discord ID (snowflake) — permanent']); if(ms > 1420070400000 && ms < Date.now() + 864e5){ F.push(['Created', new Date(ms).toISOString().slice(0, 19).replace('T', ' ') + ' UTC']); if(Date.now() - ms < 30 * 864e5) out.push({lvl:'warn', t:'Made in the last 30 days', why:'A new account or server — common for scams that are set up, used and abandoned.'}); } }
   else if(k === 'session'){ F.push(['Type', 'Session messenger ID — an ed25519 key; no phone number or email behind it']); F.push(['Note', 'Anyone who has it can message the owner; it never changes unless they make a new account']); }
@@ -313,6 +357,7 @@ const IPF_SECRETS = [
   ['sendgrid', 'SendGrid key', /\b(SG\.[\w-]{22}\.[\w-]{43})\b/g, 'Sends email as its owner — phishing from a trusted sender.'],
   ['mailgun', 'Mailgun key', /\b(key-[0-9a-f]{32})\b/g, 'Sends email as its owner.'],
   ['azure', 'Azure storage key', /AccountKey=([A-Za-z0-9+/]{86}==)/g, 'Full access to an Azure storage account.'],
+  ['nsec', 'Nostr private key', /\b(nsec1[02-9ac-hj-np-z]{58})\b/g, 'Whoever holds it is this Nostr account: posts, messages and zaps in its name. It can never be changed; the owner can only abandon the account.'],
   ['pkey', 'Private key', /(-----BEGIN (?:RSA |EC |DSA |OPENSSH |ENCRYPTED |PGP )?PRIVATE KEY(?: BLOCK)?-----)/g, 'Whoever holds it can be its owner — sign, decrypt, log in.'],
   ['jwt', 'JSON Web Token', /\b(eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{0,})/g, 'A login session or API credential while it is valid.'],
   ['urlpass', 'Password in a link', /\b((?:https?|ftp|smb|mysql|postgres(?:ql)?|mongodb(?:\+srv)?|redis|amqp):\/\/[^\s:@/]{1,64}:[^\s@/]{1,64}@[^\s/]+)/gi, 'A user name and password written into an address.']];

@@ -156,7 +156,7 @@ test('opens a Chrome history database with decoded times and deleted-row recover
 
 test('validates input inline and refuses duplicate names', async ({ page }) => {
   const errors = await open(page, '#/cases');
-  await page.evaluate(() => clickAct('newCase'));
+  await page.evaluate(() => clickAct('newCase')); await page.click('[data-act=ctPick][data-v=blank]');
   await page.click('#dlg button[type=submit]');
   await expect(page.locator('#dlg .ferr')).toHaveText(/required/);
   const name = await page.evaluate(() => DB.cases[0].name);
@@ -698,10 +698,10 @@ test('what\'s new: filters and search repaint only the timeline, matches are mar
   await page.evaluate(() => { document.querySelector('.wn2-hero').dataset.keep = '1'; });
   await page.click('.wn2-f.fix'); await expect(page.locator('.wn2-g h3')).toHaveCount(await page.locator('.wn2-v').count());
   await expect(page.locator('.wn2-g h3').first()).toContainText('Fixed');
-  await page.fill('#wnQ', 'certificate');
-  await expect(page.locator('.wn2-res')).toContainText('for “certificate”'); await expect(page.locator('.wn2-tl mark').first()).toBeVisible();
+  await page.fill('#wnQ', 'storage');
+  await expect(page.locator('.wn2-res')).toContainText('for “storage”'); await expect(page.locator('.wn2-tl mark').first()).toBeVisible();
   await page.click('[data-act=wnClear]'); await expect(page.locator('#wnQ')).toHaveValue('');
-  await page.click('.wn2-ni:has-text("v1.10")'); await expect(page.locator('#v1\\.10 .wn2-gs')).toBeVisible();
+  await page.click('.wn2-ni:has-text("v0.x")'); await expect(page.locator('[id="v0.x–1.11"] .wn2-gs')).toBeVisible();
   expect(await page.evaluate(() => document.querySelector('.wn2-hero').dataset.keep)).toBe('1');   // the header was never redrawn
   noErrors(errors);
 });

@@ -180,7 +180,7 @@ function sqlGrid(R, console){
     <tbody>${R.rows.map(r => `<tr>${r.map((v, i) => `<td>${how && R.cols[i] === 'how' && how[v] ? esc(how[v]) : sqlCell(v, R.ts && R.ts[R.cols[i]])}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${R.cols.length || 1}" class="t3" style="text-align:center;padding:20px">No rows.</td></tr>`}</tbody></table></div>
     <div class="sq-foot"><span class="t3 small">${R.total.toLocaleString()} row${R.total === 1 ? '' : 's'}${console ? '' : pages > 1 ? ` · page ${page + 1} of ${pages.toLocaleString()}` : ''}</span>
       ${!console && pages > 1 ? `<button class="btn xs" data-act="sqPage" data-v="${page - 1}" ${page ? '' : 'disabled'}>${ico('chevron-left','sm')}Previous</button><button class="btn xs" data-act="sqPage" data-v="${page + 1}" ${page + 1 < pages ? '' : 'disabled'}>Next${ico('chevron-right','sm')}</button>` : ''}
-      <span style="flex:1"></span><button class="btn xs" data-act="sqCsv" ${R.total ? '' : 'disabled'}>${ico('download','sm')}CSV</button><button class="btn xs" data-act="sqSend" ${R.total ? '' : 'disabled'}>${ico('list-plus','sm')}Send to timeline</button></div>`;
+      <span style="flex:1"></span><button class="btn xs" data-act="sqCsv" ${R.total ? '' : 'disabled'}>${ico('download','sm')}CSV</button><button class="btn xs" data-act="sqSend" ${R.total ? '' : 'disabled'}>${ico('list-plus','sm')}Send to timeline</button>${DB.active ? casePick() : ''}</div>`;
 }
 function sqlAll(){ /* every row of the current view, times converted */
   const V = UI.sqlView || {}; if(V.kind === 'sql') return UI.sqlRes;

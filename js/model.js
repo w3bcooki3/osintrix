@@ -13,6 +13,7 @@ const GROUPS = [
   ['files','Media & files','file-text','--t-file'],
   ['intel','Intelligence','shield-alert','--t-threat'],
   ['places','Places','map-pin','--t-place'],
+  ['transport','Vehicles & transport','car','--t-place'],
 ];
 /* [type, label, icon, group, colourVar, extractorKind, fields]  — field: [name, label, input, options] ; first field is the primary value */
 const TYPE_LIST = [
@@ -23,6 +24,7 @@ const TYPE_LIST = [
   ['social','Social profile','users','identity','--t-identity','social',[['username','Username','text'],['platform','Platform','select',['Facebook','X / Twitter','Instagram','LinkedIn','TikTok','YouTube','Telegram','Other']],['url','Profile URL','url'],['followers','Followers','number']]],
   ['email','Email address','mail','identity','--t-contact','email',[['email','Email address','email'],['provider','Provider','text'],['verified','Verified','select',['Unverified','Verified','Bounced']]]],
   ['phone','Phone number','phone','identity','--t-contact','phone',[['number','Phone number','tel'],['country','Country code','text'],['carrier','Carrier','text'],['type','Line type','select',['Mobile','Landline','VoIP','Unknown']]]],
+  ['daccount','Decentralised account','at-sign','identity','--t-identity','fedi',[['id','Account (@user@server, @user:server, npub… or did:…)','text'],['network','Network','select',['Fediverse (Mastodon…)','Matrix','Nostr','Bluesky / AT Protocol']],['name','Display name','text']]],
   ['pgpkey','PGP key','key-round','identity','--t-identity','pgp',[['fingerprint','Fingerprint','text'],['uids','Names and emails on the key','text'],['created','Key created','date']]],
   ['forum','Forum / market','message-square','comms','--t-contact',null,[['name','Site','text'],['url','URL','url'],['section','Section / thread','text']]],
   ['messaging','Messaging channel','message-square','comms','--t-contact',null,[['handle','Channel or handle','text'],['app','App','select',['Telegram','Signal','WhatsApp','Discord','Jabber','Other']],['members','Members','number']]],
@@ -33,20 +35,24 @@ const TYPE_LIST = [
   ['domain','Domain','globe','tech','--t-infra','domain',[['domain','Domain','text'],['registrar','Registrar','text'],['created','Created','date'],['nameservers','Name servers','text']]],
   ['ip','IP address','server','tech','--t-infra','ipv4',[['ip','IP address','text'],['asn','ASN','text'],['country','Country','text'],['ports','Open ports','text']]],
   ['device','Device / MAC','cpu','tech','--t-infra','mac',[['mac','MAC address','text'],['vendor','Vendor','text'],['hostname','Host name','text']]],
+  ['sshkey','SSH key','key-round','tech','--t-infra','sshkey',[['fingerprint','Fingerprint (SHA256:… or MD5:…)','text'],['key','Public key','text'],['comment','Comment (user@host)','text'],['hosts','Seen on','text']]],
   ['url','URL','link-2','tech','--t-infra','url',[['url','URL','text'],['status','Status','select',['Live','Down','Unknown']]]],
   ['document','Document','file-text','files','--t-file',null,[['title','Title','text'],['type','Type','select',['PDF','DOC','XLS','TXT','Other']],['url','Source URL','url'],['hash','SHA-256','text']]],
   ['media','Image / video','image','files','--t-file',null,[['title','Title','text'],['type','Media type','select',['Image','Video','Audio','Web page']],['url','Source URL','url'],['resolution','Resolution','text']]],
   ['file','File / hash','hash','files','--t-file','sha256',[['hash','SHA-256','text'],['filename','File name','text'],['size','Size','text'],['type','Type','text']]],
   ['threat','Threat / campaign','shield-alert','intel','--t-threat',null,[['name','Name','text'],['kind','Kind','select',['Malware family','Campaign','Actor','Technique']],['severity','Severity','select',['Low','Medium','High','Critical']],['confidence','Confidence','select',['Low','Medium','High']]]],
   ['vulnerability','Vulnerability','bug','intel','--t-threat','cve',[['cve','CVE','text'],['product','Product','text'],['cvss','CVSS','text']]],
+  ['vehicle','Vehicle','car','transport','--t-place','vin',[['vin','VIN','text'],['plate','Number plate','text'],['make','Make','text'],['model','Model','text'],['year','Year','text']]],
+  ['vessel','Ship / vessel','ship','transport','--t-place','imo',[['imo','IMO number','text'],['mmsi','MMSI','text'],['name','Ship name','text'],['flag','Flag','text']]],
+  ['aircraft','Aircraft','plane','transport','--t-place','tail',[['registration','Registration (tail number)','text'],['icao24','ICAO address (Mode S hex)','text'],['type','Aircraft type','text'],['operator','Operator','text']]],
   ['location','Location','map-pin','places','--t-place',null,[['address','Address','text'],['city','City','text'],['country','Country','text'],['coordinates','Coordinates','text']]],
 ];
 const TYPES = Object.fromEntries(TYPE_LIST.map(([id, label, icon, group, color, kind, fields]) => [id, {id, label, icon, group, color, kind, fields}]));
-const KIND_TO_TYPE = {ipv4:'ip', ipv6:'ip', domain:'domain', url:'url', email:'email', handle:'username', social:'social', phone:'phone', mac:'device', coords:'location', btc:'crypto', eth:'crypto', sol:'crypto', ens:'crypto', pgp:'pgpkey', xmr:'crypto', ltc:'crypto', trx:'crypto', doge:'crypto', sha256:'file', md5:'file', sha1:'file', cve:'vulnerability', hostport:'ip'};
+const KIND_TO_TYPE = {ipv4:'ip', ipv6:'ip', domain:'domain', url:'url', email:'email', handle:'username', social:'social', phone:'phone', mac:'device', coords:'location', btc:'crypto', eth:'crypto', sol:'crypto', ens:'crypto', pgp:'pgpkey', xmr:'crypto', ltc:'crypto', trx:'crypto', doge:'crypto', sha256:'file', md5:'file', sha1:'file', cve:'vulnerability', hostport:'ip', sshkey:'sshkey', fedi:'daccount', matrix:'daccount', npub:'daccount', did:'daccount', vin:'vehicle', imo:'vessel', mmsi:'vessel', tail:'aircraft', icao24:'aircraft'};
 const MONO_TYPES = new Set(['email','domain','ip','url','crypto','file','username','phone','transaction','vulnerability','link','device','social']);
 
 const CASE_COLORS = ['#5470f5','#8b5cf6','#0ea5a4','#e8590c','#d6336c','#2f9e44','#e0a800','#64748b'];
-const CASE_ICONS = ['briefcase','shield-alert','crosshair','radar','bug','users','bitcoin','globe','skull','microscope'];
+const CASE_ICONS = ['briefcase','shield-alert','crosshair','radar','bug','users','bitcoin','globe','skull','microscope','newspaper','user-search','building-2','mail','map-pin'];
 
 const TOOL_CATS = {
   general:{name:'General', icon:'layout-dashboard', children:{'all-tools':'All tools'}},

@@ -261,5 +261,7 @@ function normStored(d){
   if(d.autoDone != null && !isObj(d.autoDone)) d.autoDone = {}; if(d.autoLog != null && !Array.isArray(d.autoLog)) d.autoLog = [];
   if(d.rxlib != null) d.rxlib = Array.isArray(d.rxlib) && typeof rxlClean === 'function' ? d.rxlib.map(rxlClean).filter(Boolean).slice(0, 300) : [];
   if(d.verdicts != null && !isObj(d.verdicts)) d.verdicts = {}; if(d.prefs != null && !isObj(d.prefs)) d.prefs = {};
+  if(typeof stClean === 'function') stClean(d);
+  if(typeof ctClean === 'function') ctClean(d);
   return d;
 }

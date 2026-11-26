@@ -32,8 +32,56 @@ const PIV = {
   soltx:[['Solscan','https://solscan.io/tx/%s'],['Solana Explorer','https://explorer.solana.com/tx/%s']],
   session:[['Google','https://www.google.com/search?q=%22%s%22']], tox:[['Google','https://www.google.com/search?q=%22%s%22']],
   pgp:[['keys.openpgp.org','https://keys.openpgp.org/search?q=%s'],['Ubuntu keyserver','https://keyserver.ubuntu.com/pks/lookup?search=0x%s&fingerprint=on&op=index'],['Google','https://www.google.com/search?q=%22%s%22']],
+  sshkey:[['Censys hosts','https://search.censys.io/search?resource=hosts&q=services.ssh.server_host_key.fingerprint_sha256%3A%h'],['Shodan','https://www.shodan.io/search?query=%22%m%22'],['GitHub code','https://github.com/search?type=code&q=%22%s%22']],
+  fedi:[['Profile','%p'],['Fediverse search (Mastodon)','https://mastodon.social/search?q=%e'],['FediDB server','https://fedidb.org/network/instance?domain=%o']],
+  matrix:[['matrix.to','https://matrix.to/#/%s']],
+  npub:[['njump','https://njump.me/%s'],['Primal','https://primal.net/p/%s'],['nostr.band','https://nostr.band/%s']],
+  did:[['Bluesky profile','https://bsky.app/profile/%s'],['PLC directory (handle history)','%p']],
+  vin:[['NHTSA decoder','https://vpic.nhtsa.dot.gov/decoder/Decoder?VIN=%s'],['Google','https://www.google.com/search?q=%22%s%22']],
+  imo:[['MarineTraffic','https://www.marinetraffic.com/en/ais/index/search/all/keyword:%s'],['VesselFinder','https://www.vesselfinder.com/vessels?name=%s'],['Google','https://www.google.com/search?q=%22IMO+%s%22']],
+  mmsi:[['MarineTraffic','https://www.marinetraffic.com/en/ais/index/search/all/keyword:%s'],['VesselFinder','https://www.vesselfinder.com/vessels?name=%s'],['Google','https://www.google.com/search?q=%22%s%22+MMSI']],
+  icao24:[['ADS-B Exchange','https://globe.adsbexchange.com/?icao=%s'],['airplanes.live','https://globe.airplanes.live/?icao=%s']],
+  tail:[['FlightAware','https://www.flightaware.com/resources/registration/%s'],['ADS-B Exchange','https://globe.adsbexchange.com/?reg=%s'],['Google','https://www.google.com/search?q=%22%s%22']],
 };
 PIV.hostport = PIV.ipv4;
+/* ---------- web search: every common way a value is written, not only the exact form saved ----------
+   A quoted value finds only that exact spelling. A phone number is written many ways (+47 912 34 567, 912 34 567,
+   +4791234567), a name both ways round, an email address also as "name at domain", a company with and without
+   "Ltd"; so the search asks for each form, as exact phrases joined by OR. A domain is searched for where it is
+   mentioned on other sites. */
+const WEB_ENGINES = [['Google', 'https://www.google.com/search?q=', ' OR '], ['Bing', 'https://www.bing.com/search?q=', ' OR '], ['DuckDuckGo', 'https://duckduckgo.com/?q=', ' OR '], ['Yandex', 'https://yandex.com/search/?text=', ' | ']];
+const WEB_NONE = /^(coords|ttp|eventid|path|regkey|custom|file)$/;
+const LEGAL = /[\s,]+(inc|incorporated|ltd|limited|llc|l\.l\.c|plc|corp|corporation|co|company|gmbh|ag|sa|sas|sarl|srl|spa|bv|nv|as|asa|ab|oy|oyj|aps|pty|pvt|kk|llp|lp|sp\. z o\.o)\.?$/i;
+function phoneForms(v){
+  const raw = String(v).trim(), info = typeof phoneInfo === 'function' ? phoneInfo(raw) : null;
+  if(!info || !info.ok){ const d = raw.replace(/[^\d]/g, ''); return [raw, raw.startsWith('+') ? '+' + d : '', d]; }
+  const nat = info.natFmt || '', natDigits = nat.replace(/\D/g, ''), sig = info.e164.slice(info.code.length);
+  return [info.e164, info.intlFmt, nat, nat.replace(/[()]/g, '').trim().replace(/[\s.]+/g, '-'), natDigits, sig !== natDigits ? sig : ''];
+}
+function webTerms(kind, v){
+  v = String(v || '').trim().replace(/"/g, ''); if(!v || WEB_NONE.test(kind)) return null;
+  switch(kind){
+    case 'phone': return {any:phoneForms(v)};
+    case 'email': { const i = v.lastIndexOf('@'), u = v.slice(0, i), d = v.slice(i + 1); return {any:[v, u + ' at ' + d, u + ' at ' + d.replace(/\./g, ' dot ')]}; }
+    case 'handle': case 'username': { const u = v.replace(/^@/, ''); return {any:[u]}; }
+    case 'social': { const s = E.normSocial(/^https?:/i.test(v) ? v : 'https://' + v); return {any:[v.replace(/^https?:\/\/(www\.)?/i, ''), s && s.user && s.user.length >= 4 ? s.user : '']}; }
+    case 'person': case 'alias': { const w = v.replace(/\s+/g, ' ').split(' '); if(w.length < 2) return {any:[v]}; const first = w[0], last = w[w.length - 1];
+      return {any:[v, w.length > 2 ? first + ' ' + last : '', last + ', ' + first, last + ' ' + first]}; }
+    case 'organization': { const base = v.replace(LEGAL, '').trim(); return {any:[v, base.length >= 3 && base !== v ? base : '']}; }
+    case 'domain': { const d = v.toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, ''); return {any:[d], not:d}; }
+    case 'imo': return {any:['IMO ' + v, v]};
+    case 'tail': return {any:[v, v.includes('-') ? v.replace('-', '') : '']};
+    case 'icao24': return {any:[v.toLowerCase()]};
+    case 'hostport': return {any:[v, v.split(':')[0]]};
+    default: return {any:[v]};
+  }
+}
+function webQuery(kind, v, or = ' OR '){
+  const T = webTerms(kind, v); if(!T) return null;
+  const L = [...new Set(T.any.filter(x => x && String(x).trim()))].slice(0, 6); if(!L.length) return null;
+  return L.map(x => '"' + x + '"').join(or) + (T.not ? ' -site:' + T.not : '');
+}
+function webLinks(kind, v){ return WEB_ENGINES.map(([n, base, or]) => { const q = webQuery(kind, v, or); return q ? [n, base + encodeURIComponent(q)] : null; }).filter(Boolean); }
 function pivotLinks(kind, value){
   let v = String(value || '').trim(); if(!v) return [];
   if(kind === 'hostport') v = v.split(':')[0];
@@ -41,8 +89,16 @@ function pivotLinks(kind, value){
   if(kind === 'handle') v = v.replace(/^@/, '');
   const [la, lo] = kind === 'coords' ? v.split(',') : ['', ''], tt = kind === 'ttp' ? v.replace('.', '/') : '';
   const list = kind === 'domain' && /\.onion$/i.test(v) ? [['Ahmia (Tor search)','https://ahmia.fi/search/?q=%e']] : PIV[kind] || [];
-  const base = list.map(([n, t]) => [n, E.safeUrl(t.replace(/%s/g, v).replace(/%e/g, encodeURIComponent(v)).replace(/%a/g, la).replace(/%o/g, lo).replace(/%t/g, tt))]).filter(x => x[1]);
-  return base.concat(toolTplLinks(kind, v).filter(x => !base.some(b => b[0].toLowerCase() === x[0].toLowerCase())));
+  const faa = kind === 'tail' && /^N[1-9]/.test(v) ? [['FAA registry','https://registry.faa.gov/AircraftInquiry/Search/NNumberResult?nNumberTxt=' + encodeURIComponent(v.slice(1))]] : [];
+  /* forms some links need: a key's hex fingerprint (Censys) or MD5 one (Shodan), an account's own profile address and its server */
+  const idk = typeof IDKEYS !== 'undefined', hx = kind === 'sshkey' && idk ? IDKEYS.sshFpToHex(v) : '', md = kind === 'sshkey' && /^MD5:/.test(v) ? v.slice(4) : '';
+  const fp = kind === 'fedi' && idk ? IDKEYS.fediParts(v) : null, dp = kind === 'did' && idk ? IDKEYS.didParts(v) : null;
+  const prof = fp ? fp.url : dp ? (dp.method === 'plc' ? 'https://plc.directory/' + v + '/log/audit' : 'https://' + dp.id + '/.well-known/did.json') : '';
+  const lst = list.filter(([, t]) => (!/%h/.test(t) || hx) && (!/%m/.test(t) || md) && (!/%p/.test(t) || prof));
+  const base = faa.concat(lst).map(([n, t]) => [n, E.safeUrl(t.replace(/%s/g, v).replace(/%e/g, encodeURIComponent(v)).replace(/%a/g, la).replace(/%o/g, fp ? fp.host : lo).replace(/%t/g, tt).replace(/%h/g, hx).replace(/%m/g, encodeURIComponent(md)).replace(/%p/g, prof))]).filter(x => x[1]);
+  /* the services first, then one search per engine with every form of the value (in place of a bare quoted Google link) */
+  const own = base.filter(([n]) => !/^(google|bing|duckduckgo|yandex)$/i.test(n)), web = webLinks(kind, String(value || '').trim()), all = own.concat(web);
+  return all.concat(toolTplLinks(kind, v).filter(x => !all.some(b => b[0].toLowerCase() === x[0].toLowerCase())));
 }
 /* your own lookup tools: any toolbox entry with a URL template such as https://example.com/search?q={value} */
 const TPL_KINDS = [['ipv4','IP address'],['domain','Domain'],['url','URL'],['email','Email'],['handle','Username'],['hash','File hash'],['phone','Phone'],['person','Person name'],['btc','Wallet'],['cve','CVE'],['any','Anything']];
@@ -253,6 +309,7 @@ function viewDecoder(){
   const op = UI.txOp || 'auto';
   return `<div class="scroll"><div class="page wide">
     ${libHead('Decoder', 'Decode, encode, defang, hash and pull indicators out of anything — entirely in this browser.', `<button class="btn" data-act="decSample">${ico('play','sm')}Try a sample</button>`, '')}
+    ${labStrip('decoder')}
     <div class="mpick"><label for="txSel" class="ix">Operation</label><select id="txSel" class="gsel bord">${Object.entries(TX_GROUPS).map(([g, ks]) => `<optgroup label="${g}">${ks.filter(k => TX[k]).map(k => `<option value="${k}"${op === k ? ' selected' : ''}>${esc(TX[k][0])}</option>`).join('')}</optgroup>`).join('')}</select><p class="t3 small">${esc(op === 'auto' ? 'Detects the encoding for you and peels layers until the text is readable.' : '')}</p></div>
     ${txBar(op)}
     <div id="txFlags"></div>
