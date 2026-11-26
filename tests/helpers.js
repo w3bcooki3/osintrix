@@ -7,8 +7,10 @@ const fixture = name => path.resolve(__dirname, 'fixtures', name);
 async function open(page, hash = '#/home', opt = {}) {
   const errors = [];
   page.on('pageerror', e => errors.push('pageerror: ' + e.message));
-  page.on('console', m => { if (m.type() === 'error' && !/localStorage.*sandboxed|Blocked script execution in 'about:(srcdoc|blank)'|Refused to load the image 'https:|Loading the image 'https:[^']*' violates/.test(m.text())) errors.push('console: ' + m.text()); });
+  page.on('console', m => { if (m.type() === 'error' && !/localStorage.*sandboxed|Blocked script execution in 'about:(srcdoc|blank)'|Refused to load the image 'https:|Loading the image 'https:[^']*' violates|^Executing inline event handler violates the following Content Security Policy directive 'script-src /.test(m.text())) errors.push('console: ' + m.text()); });
   await page.addInitScript(() => { try { localStorage.setItem('osintrix:welcomed', '1'); } catch (e) {} });
+  // newer Chromium also reports an inline handler (onerror=…) when hostile HTML is only parsed with DOMParser, where nothing
+  // loads or runs; the hostile-input tests check separately that nothing runs and that the handler never reaches the page
   // most tests are written against the original demo cases; the OSINT sample case is added only where a test asks for it
   if (!opt.osintSample) await page.context().addInitScript(() => { window.__noOsintSample = true; });
   await page.goto(APP + hash);

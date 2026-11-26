@@ -97,7 +97,8 @@ function mountGraph(){
   /* the same graph as last time (a re-render after a verdict, a note, a panel opening): keep the drawn graph and put it back,
      instead of building a big one again — rebuilding 2,000 nodes takes over a second */
   const els = graphElements(D), sig = [DB.active, focused, big, text, accent, bg, JSON.stringify(els)].join('|');
-  if(cy && CY_SIG === sig && cy.container() && !cy.container().isConnected){ const old = cy.container(); el.replaceWith(old); cy.resize(); graphAfter(old, focused); return; }
+  if(cy && CY_SIG === sig && cy.container() === el && !cyDead()){ graphAfter(el, focused); return; }   /* two re-renders in one frame: the first already put it back */
+  if(cy && CY_SIG === sig && cy.container() && !cy.container().isConnected && !cyDead()){ const old = cy.container(); cyKeep(); el.replaceWith(old); cy.resize(); graphAfter(old, focused); return; }
   if(cy){ cy.destroy(); cy = null; }
   CY_SIG = sig;
   cy = cytoscape({container:el, elements:els, minZoom:big ? .05 : .2, maxZoom:3, boxSelectionEnabled:false, hideEdgesOnViewport:big, textureOnViewport:big, pixelRatio:big ? 1 : 'auto',
@@ -126,6 +127,7 @@ function mountGraph(){
       {selector:'node.gvfocus', style:{'underlay-color':accent, 'underlay-opacity':.28, 'underlay-padding':12, 'underlay-shape':'ellipse', 'border-width':4}},
       {selector:'node.hit', style:{'underlay-color':cssVar('--amber'), 'underlay-opacity':.4, 'underlay-padding':10, 'underlay-shape':'ellipse'}},
     ]});
+  cyKeep();
   if(!hasPos && !focused){ cy.nodes().forEach(n => { const e = entryById(n.id()); if(e) e.pos = {...n.position()}; }); save(); }
   const fitNice = () => { cy.resize(); cy.fit(undefined, 56); if(cy.zoom() > 1.25) { cy.zoom(1.25); cy.center(); } if(cy.zoom() < .7 && !big){ cy.zoom(.7); cy.center(); }   /* a big graph fits whole; names appear as you zoom in */ if(!UI.graph.legendMin && cy.width() > 900) cy.panBy({x:100, y:0}); };
   const view = UI.graph.views && UI.graph.views[DB.active];
@@ -159,6 +161,13 @@ function mountGraph(){
   graphAfter(el, focused);
 }
 let CY_SIG = '';
+/* Cytoscape watches the element its graph was first put in, and when the graph's box is taken out of it, it assumes the
+   graph is gone and switches off all its mouse and touch handling. The graph stays drawn but no longer takes a click,
+   drag or wheel. Putting the kept graph back after a re-render (a panel opening, a note, a verdict) moves the box out of
+   that first element, so the first such re-render froze the graph until something rebuilt it. Its life is handled here
+   instead: it is destroyed only when it is rebuilt. */
+function cyKeep(){ const r = cy && cy.renderer(); if(r && r.removeObserver){ r.removeObserver.disconnect(); r.removeObserver = {disconnect(){}}; } }
+function cyDead(){ const r = cy && cy.renderer(); return !r || !!r.destroyed; }
 /* what is redone on every render, whether the graph was rebuilt or kept: selection, highlights, the controls around it */
 function graphAfter(el, focused){
   /* Cytoscape remembers where its canvas is on the page and ignores any press or wheel outside that spot. When the page

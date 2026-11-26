@@ -4,6 +4,22 @@
    Each change has a type: "added" | "changed" | "fixed" | "removed". */
 const CHANGELOG_DATA = [
 {
+  "version": "1.84",
+  "name": "Graph freeze fixed",
+  "date": "2026-11-26",
+  "summary": "The graph no longer stops responding after you click a node.",
+  "changes": [
+    {
+      "type": "fixed",
+      "text": "After clicking a node (or anything else that redrew the page around the graph), the graph could stop taking clicks, drags and zoom until a legend filter was changed. The graph library switched itself off when the graph was put back after a redraw; it now stays live."
+    },
+    {
+      "type": "changed",
+      "text": "Two redraws in quick succession no longer rebuild the graph from scratch."
+    }
+  ]
+},
+{
   "version": "1.83",
   "name": "Case templates",
   "date": "2026-11-25",
