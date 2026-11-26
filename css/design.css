@@ -3856,6 +3856,20 @@ button.st-w:active{transform:scale(.995)}
 .gcanvas.haspanel .gfloat.gbulk{left:calc(50% - 174px)}
 @media (max-width:760px){.gfloat.gbulk{left:12px;right:12px;transform:none;width:auto}}
 /* ---------- Blackbook — the hidden hunter's book ---------- */
+.bb-lock{display:flex;justify-content:center;padding-top:10vh}
+.bb-lockbox{width:min(380px,100%);text-align:center}
+.bb-lockbox>svg{width:28px;height:28px;color:var(--text-3)}
+.bb-lockbox h1{margin:10px 0 4px;font-size:calc(22px * var(--ts,1))}
+.bb-lockbox form{display:flex;flex-direction:column;gap:8px;margin-top:18px;text-align:left}
+.bb-rem{display:flex;align-items:center;gap:8px;font-size:calc(13px * var(--ts,1));color:var(--text-2)}
+.bb-err{min-height:1.4em;margin:0;color:var(--red);font-size:calc(13px * var(--ts,1))}
+.bb-hd .bb-lockbtn{align-self:flex-start}
+.tc-door{display:flex;align-items:center;gap:12px;margin-top:6px;padding:12px 14px;border:1px solid var(--border-soft);border-radius:12px;background:var(--surface);color:var(--text-2);text-decoration:none;font-size:calc(13px * var(--ts,1));line-height:1.5}
+.tc-door:hover{border-color:var(--border);background:var(--hover)}
+.tc-door b{color:var(--text);font-weight:600;margin-right:6px}
+.tc-door span{flex:1}
+.tc-door svg{flex:none;color:var(--text-3)}
+
 .bb .tc-ix{display:inline-flex;align-items:center;gap:6px}
 .bb-tabs{margin:0 0 14px}
 .bb-stack{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 18px}

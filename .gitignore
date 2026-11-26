@@ -4,3 +4,8 @@ _old-single-file/
 node_modules/
 playwright-report/
 test-results/
+# the Blackbook is published encrypted (js/data/blackbook-sealed.js); its readable source never leaves this machine
+js/data/blackbook-pack.js
+tools/blackbook/
+tools/make_blackbook.py
+tests/blackbook.local.spec.js

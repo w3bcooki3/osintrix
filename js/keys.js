@@ -4,9 +4,9 @@
    ========================================================================== */
 const KBD_LIST = [
   ['Everywhere', [[['Ctrl', 'K'], 'Search everything — cases, indicators, tools, notes, actions'], [['/'], 'Search everything (or this page, where it has its own search)'], [['N'], 'Capture evidence'], [['E'], 'Add a vault entry'],
-    [['?'], 'This list'], [['Esc'], 'Close a panel, dialog or menu'], [['←', '→'], 'Move between tabs, and open the one reached'], [['1', '–', '8'], 'Switch case tabs'], [['Ctrl', 'Enter'], 'Save a capture or note']]],
+    [['?'], 'This list'], [['Esc'], 'Close a panel, dialog or menu'], [['←', '→'], 'Move between tabs, and open the one reached'], [['1', '–', '8'], 'Switch case tabs'], [['Ctrl', 'Enter'], 'Save a capture or note'], [['Ctrl', 'K'], 'then type blackbook — the locked Blackbook (also at the foot of Tradecraft)']]],
   ['Search (Ctrl K)', [[['↑', '↓'], 'Move through the results'], [['Enter'], 'Open the result'], [['Tab'], 'Finish a filter being typed (verdict:, type:, tag:, is:, case:) — or the next scope'], [['Alt', '1–9'], 'Act on the highlighted result: copy, watch, open a lookup…']]],
-  ['Vault and graph', [[['Shift', 'click'], 'Select a range of entries'], [['Esc'], 'Clear the selection'], [['Shift', 'F10'], 'Graph menu for the selected node'], [['Right-click'], 'Copy, defang, look up or mask any indicator or selected text — Shift+right-click for the browser’s own menu']]],
+  ['Vault and graph', [[['Shift', 'click'], 'Select a range of entries'], [['Esc'], 'Clear the selection'], [['Shift', 'F10'], 'Graph menu for the selected node'], [['Shift', 'drag'], 'Graph: select the nodes inside a box'], [['Ctrl', 'click'], 'Graph: add or remove one node'], [['Space'], 'Graph: add the node in focus to the selection'], [['Ctrl', 'A'], 'Graph: select every node shown'], [['Right-click'], 'Copy, defang, look up or mask any indicator or selected text — Shift+right-click for the browser’s own menu']]],
   ['Notes', [[['@'], 'Link a vault entry — ↑ ↓ to pick, Enter or Tab to insert']]],
   ['Regex — Build a pattern', [[['↑', '↓'], 'Move between lines (also j and k)'], [['M'], 'Next line the pattern misses'], [['/'], 'Edit the pattern'], [['Ctrl', 'Z'], 'Undo (Ctrl+Shift+Z redo)']]],
   ['Detections', [[['Ctrl', 'S'], 'Save the rule you are editing']]],

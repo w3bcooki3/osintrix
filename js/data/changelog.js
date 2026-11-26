@@ -4,30 +4,34 @@
    Each change has a type: "added" | "changed" | "fixed" | "removed". */
 const CHANGELOG_DATA = [
 {
-  "version": "1.89",
-  "name": "The Blackbook, a curated toolbox, and many nodes at once",
+  "version": "1.90",
+  "name": "The Blackbook, locked",
   "date": "2026-11-26",
-  "summary": "A hidden hunter's book for defenders and investigators, a toolbox cut down to what practitioners use, and selecting several graph nodes to act on together.",
+  "summary": "The Blackbook's contents are now encrypted with the owner's passphrase, so the public code reveals nothing of them.",
+  "changes": [
+    {
+      "type": "changed",
+      "text": "The Blackbook asks for a passphrase and decrypts in the browser (AES-256-GCM, key from PBKDF2-SHA256 with 600,000 iterations). Only the encrypted file is published; the readable source stays on the owner's machine."
+    },
+    {
+      "type": "added",
+      "text": "“Remember on this device” keeps the derived key in this browser as a key that can be used but not read back; Lock forgets it."
+    },
+    {
+      "type": "added",
+      "text": "Keyboard shortcuts list the graph's selection keys: Shift+drag, Ctrl+click, Space and Ctrl+A."
+    }
+  ]
+},
+{
+  "version": "1.89",
+  "name": "A curated toolbox, many nodes at once, and the Blackbook",
+  "date": "2026-11-26",
+  "summary": "A toolbox cut down to what practitioners use, selecting several graph nodes to act on together, and a private page for the owner.",
   "changes": [
     {
       "type": "added",
-      "text": "The Blackbook — hidden until you type its name in search, then in the Kit menu. 49 plays across the attack chain, each with how an operator sees it, what it leaves in the logs, the logs you need, hunts in KQL, SPL, Sigma, EQL and osquery (141 in all), what else looks like it, and what closes it. Detection and investigation only — no exploit code."
-    },
-    {
-      "type": "added",
-      "text": "Every Blackbook Sigma rule is proven on an event it must match and one it must not, through OSINTrix's own engine; one click adds it to Detections and runs it as a saved hunt over your evidence. Choose your stack and the other query languages stay out of the way."
-    },
-    {
-      "type": "added",
-      "text": "Blackbook APT casebook: Volt Typhoon, Midnight Blizzard, Scattered Spider, Storm-1811, Storm-0558, the DPRK clusters, Salt Typhoon and Sandworm — what they did, their tells, and the plays that catch them, from public advisories."
-    },
-    {
-      "type": "added",
-      "text": "Blackbook Underground: working cybercrime forums, markets and Telegram as an authorised investigator — rules of engagement, the map, what to look for, profiling an actor, pivots from one handle, evidence — and how ten cybercriminals were actually identified, from court filings (Silk Road, AlphaBay, Sabu, Raccoon, pompompurin, IntelBroker, Scattered Spider, LockBit, USDoD, the Conti leaks)."
-    },
-    {
-      "type": "added",
-      "text": "Blackbook OSINT: infrastructure pivots with exact syntax (favicon hash, certificates, JARM, analytics IDs, SSH keys), archives and the CDX API, people behind infrastructure, verification and geolocation, and your own exposure while you work."
+      "text": "The Blackbook — a private page for the owner, reached by typing its name in search or from the foot of Tradecraft."
     },
     {
       "type": "added",
@@ -44,13 +48,10 @@ const CHANGELOG_DATA = [
     {
       "type": "removed",
       "text": "From the toolbox: US people-search and data-broker sites, dead and retired services, and paid-only enterprise products. Tools you starred, pinned, used or edited stay; tools that moved address keep your stars and notes."
-    },
-    {
-      "type": "changed",
-      "text": "ATT&CK technique ids follow the current matrix, where Defense Evasion is split into Stealth and Defense Impairment."
     }
   ]
 },
+
 {
   "version": "1.88",
   "name": "Privacy, undo, keyboard and the tour",

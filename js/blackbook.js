@@ -1,5 +1,5 @@
 /* ==========================================================================
-   The Blackbook — a hidden part of the Kit (data: js/data/blackbook-pack.js).
+   The Blackbook — a hidden part of the Kit (contents: js/data/blackbook-sealed.js, encrypted).
    Opened by typing "blackbook" in search (Ctrl K) or at #/blackbook; once
    opened it stays in the side menu. Four parts:
    · Hunt — doctrine, the attacker's first checks mirrored for defenders, and
@@ -22,8 +22,43 @@ function bbGoBtn(where){ const g = BB_GO[where]; return g ? `<button class="tc-g
 function bbTech(id){ const t = typeof ATTACK !== 'undefined' ? ATTACK.tech.find(x => x[0] === id) : null; return `<a class="bb-att" href="https://attack.mitre.org/techniques/${esc(id.replace('.', '/'))}/" target="_blank" rel="noopener noreferrer"${t ? ` title="${esc(t[1])}"` : ''}>${esc(id)}</a>`; }
 function bbRuleOf(p){ return (DB.rules || []).find(r => r.bb === p.id); }
 
+/* The contents ship encrypted (js/data/blackbook-sealed.js, made by tools/seal_blackbook.mjs from a pack that is never
+   committed): the page asks for the passphrase and decrypts here, in the browser. "Remember on this device" keeps the derived
+   key — not the passphrase — in this browser's storage as a key that cannot be read back out, only used. */
+const bbB64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+async function bbDerive(pass, S){
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2', salt:bbB64(S.salt), iterations:S.iter, hash:'SHA-256'}, base, {name:'AES-GCM', length:256}, false, ['decrypt']);
+}
+async function bbOpenWith(key){
+  const S = BLACKBOOK_SEALED, pt = await crypto.subtle.decrypt({name:'AES-GCM', iv:bbB64(S.iv)}, key, bbB64(S.ct));
+  const txt = S.z === 'gzip' ? await new Response(new Blob([pt]).stream().pipeThrough(new DecompressionStream('gzip'))).text() : new TextDecoder().decode(pt);
+  window.BLACKBOOK = JSON.parse(txt);
+}
+async function bbTry(){
+  const i = $('bbPass'), err = $('bbErr'), btn = document.querySelector('[data-form=bbUnlock] button[type=submit]'); if(!i || !i.value) return;
+  if(btn){ btn.disabled = true; btn.textContent = 'Opening…'; } if(err) err.textContent = '';
+  try{ const key = await bbDerive(i.value, BLACKBOOK_SEALED); await bbOpenWith(key); i.value = '';
+    if($('bbRemember') && $('bbRemember').checked) await IDB.set('bb:key', key);
+    renderMain(); if(typeof renderNav === 'function') renderNav(); }
+  catch(e){ if(btn){ btn.disabled = false; btn.textContent = 'Open'; } if(err) err.textContent = 'That passphrase does not open it.'; if(i){ i.select(); i.focus(); } }
+}
+function bbLockView(){
+  if(!UI.bbAuto){ UI.bbAuto = 'trying'; IDB.get('bb:key').then(async k => { if(k){ try{ await bbOpenWith(k); UI.bbAuto = 'done'; return UI.route.area === 'blackbook' && renderMain(); }catch(e){ IDB.setMany([], ['bb:key']); } } UI.bbAuto = 'done'; if(UI.route.area === 'blackbook') renderMain(); }); }
+  if(UI.bbAuto === 'trying') return `<div class="scroll"><div class="page"><p class="t3">Opening…</p></div></div>`;
+  return `<div class="scroll"><div class="page bb-lock"><div class="bb-lockbox">${ico('gem')}<h1>Blackbook</h1><p class="t2">Locked. The contents are encrypted; enter the passphrase to open them in this browser.</p>
+    <form data-form="bbUnlock" autocomplete="off"><label class="lbl" for="bbPass">Passphrase</label><input id="bbPass" class="inp" type="password" autocomplete="off" spellcheck="false" required>
+      <label class="bb-rem"><input type="checkbox" id="bbRemember"> Remember on this device</label><button class="btn" type="submit">Open</button><p class="bb-err" id="bbErr" role="alert" aria-live="assertive"></p></form></div></div></div>`;
+}
+document.addEventListener('submit', ev => { if(ev.target && ev.target.dataset && ev.target.dataset.form === 'bbUnlock'){ ev.preventDefault(); ev.stopImmediatePropagation(); bbTry(); } }, true);
+
 function viewBlackbook(){
-  if(typeof BLACKBOOK === 'undefined'){ if(typeof lazyNeed === 'function') lazyNeed('bb').then(ok => ok && UI.route.area === 'blackbook' && renderMain()); return `<div class="scroll"><div class="page"><p class="t3">Opening the Blackbook…</p></div></div>`; }
+  if(typeof BLACKBOOK === 'undefined'){
+    if(typeof BLACKBOOK_SEALED === 'undefined'){
+      if(UI.bbMissing) return `<div class="scroll"><div class="page bb-lock"><div class="bb-lockbox">${ico('gem')}<h1>Blackbook</h1><p class="t2">Not sealed on this copy yet. In the project folder run <code>node tools/seal_blackbook.mjs</code>, then <code>python tools/stamp.py</code>.</p></div></div></div>`;
+      if(typeof lazyNeed === 'function') lazyNeed('bb').then(ok => { if(!ok) UI.bbMissing = true; if(UI.route.area === 'blackbook') renderMain(); }); return `<div class="scroll"><div class="page"><p class="t3">Opening…</p></div></div>`; }
+    bbUnlock(); return bbLockView();
+  }
   bbUnlock();
   const B = BLACKBOOK, tab = BB_TABS.some(t => t[0] === UI.bbTab) ? UI.bbTab : 'hunt', q = (UI.bbQ || '').trim().toLowerCase(), words = q.split(/\s+/).filter(Boolean);
   const hit = (...s) => !words.length || words.every(w => s.join(' ').toLowerCase().includes(w));
@@ -63,7 +98,7 @@ function viewBlackbook(){
   const stack = bbStack(), counts = {plays:B.plays.length, hunts:B.plays.reduce((n, p) => n + Object.keys(p.q).length, 0)};
   return `<div class="scroll"><div class="page tc bb">
     <header class="tc-hd bb-hd"><div><span class="tc-ix">${ico('gem', 'sm')}Hidden · works offline</span><h1>Blackbook</h1><p>Think like the intruder, hunt like the defender: ${counts.plays} plays across the attack chain with ${counts.hunts} hunts, the APT casebook, the cybercrime underground, and the OSINT that moves an investigation. Detection and investigation only — no exploit code.</p></div>
-      <div class="search-in tc-q">${ico('search')}<label class="sr" for="bbQ">Search the Blackbook</label><input id="bbQ" class="inp" placeholder="Kerberoast, rclone, Telegram, favicon…" value="${esc(UI.bbQ || '')}"></div></header>
+      ${typeof BLACKBOOK_SEALED !== 'undefined' ? `<button class="btn sm ghost bb-lockbtn" data-act="bbLock" title="Lock it again on this device">${ico('lock', 'sm')}Lock</button>` : ''}<div class="search-in tc-q">${ico('search')}<label class="sr" for="bbQ">Search the Blackbook</label><input id="bbQ" class="inp" placeholder="Kerberoast, rclone, Telegram, favicon…" value="${esc(UI.bbQ || '')}"></div></header>
     <nav class="tabs bb-tabs" role="tablist" aria-label="Parts of the Blackbook">${BB_TABS.map(([k, l, i]) => `<button role="tab" aria-selected="${k === tab}" class="${k === tab ? 'on' : ''}" data-act="bbTab" data-v="${k}">${ico(i, 'sm')}${l}</button>`).join('')}</nav>
     ${tab === 'hunt' ? `<div class="bb-stack" role="group" aria-label="Query languages to show"><span class="t3">Your stack</span>${Object.entries(B.langs).map(([k, l]) => `<button class="chip${stack.includes(k) ? ' on' : ''}" aria-pressed="${stack.includes(k)}" data-act="bbStack" data-v="${k}" title="${esc(l)}">${esc(l.split(' — ')[0])}</button>`).join('')}</div>` : ''}
     <div class="tc-grid"><nav class="tc-toc" aria-label="Contents">${toc}</nav>
@@ -113,5 +148,6 @@ const BB_ACTS = {
     if(!h){ h = {id:uid('h'), name:nextName('Blackbook — ' + r.title, huntList().map(x => x.name)).slice(0, 120), kind:'rule', ruleId:r.id, created:Date.now(), lastAt:Date.now(), seen:[]}; DB.hunts = [...huntList(), h]; mutate('saved hunt ' + h.name); }
     const res = huntRun(h), n = res.matches.length; renderMain();
     toast(n ? `${n} event${n === 1 ? '' : 's'} in your evidence match — the hunt keeps watching` : 'Nothing in your evidence matches yet — the hunt keeps watching new evidence', 'Open', () => { UI.dview = 'hunts'; go('#/detections'); }); },
+  bbLock:() => { try{ delete window.BLACKBOOK; }catch(e){ window.BLACKBOOK = undefined; } UI.bbAuto = 'done'; UI.bbOpen = new Set(); IDB.setMany([], ['bb:key']); renderMain(); toast('Locked — the passphrase is needed again on this device'); },
   bbGo:(id, v) => { if(v.startsWith('case:')){ if(!theCase()) return toast('Open a case first'); return go(caseHash(DB.active, v.slice(5))); } go('#/' + v); },
 };

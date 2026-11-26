@@ -36,6 +36,7 @@ function viewTradecraft(){
         ${chapters || empty('search', 'Nothing in the guide matches', 'Try another word.')}
         ${words.length && shown ? `<p class="t3 small">${shown} point${shown === 1 ? '' : 's'} match “${esc(UI.tcQ)}”.</p>` : ''}
         <p class="t3 small tc-foot">Playbooks turns the same ground into checklists you can run on a case: <button class="lnk" data-act="tcPb" data-v="pb-opsec-env">Investigation environment</button>, <button class="lnk" data-act="tcPb" data-v="pb-persona">Research persona</button>, <button class="lnk" data-act="tcPb" data-v="pb-apt-seed">Actor investigation from one indicator</button>, <button class="lnk" data-act="tcPb" data-v="pb-operator">Finding the operator</button>, <button class="lnk" data-act="tcPb" data-v="pb-chat-scam">Scammer on Telegram, Discord or WhatsApp</button>, <button class="lnk" data-act="tcPb" data-v="pb-discord">Discord server and user</button>, <button class="lnk" data-act="tcPb" data-v="pb-chat-actor">Threat actor on chat platforms</button>, <button class="lnk" data-act="tcPb" data-v="pb-bot-c2">Bot or webhook found in malware</button>.</p>
+        <a class="tc-door" href="#/blackbook">${ico('gem', 'sm')}<span><b>Blackbook</b> Locked</span>${ico('lock', 'sm')}</a>
       </div></div></div></div>`;
 }
 document.addEventListener('change', ev => { const t = ev.target; if(!t || !t.dataset || !t.dataset.tc) return; const R = tcReady(); if(t.checked) R[t.dataset.tc] = Date.now(); else delete R[t.dataset.tc]; save(); renderMain(); });
