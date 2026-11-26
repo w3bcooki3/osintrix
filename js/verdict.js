@@ -156,7 +156,7 @@ async function watchCheck(keys, opts = {}){
       lkHist(k, v, V);
     }
   }finally{ MON.busy = false; }
-  if(keys.length){ save(); if(UI.route && UI.route.area === 'watch') renderMain(); }
+  if(keys.length){ save(); if(UI.route && UI.route.area === 'watch') bgRender(); }
   return changed;
 }
 /* runs while the app is open: anything not checked within the chosen interval is re-checked, a few at a time */

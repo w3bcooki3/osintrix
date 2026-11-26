@@ -122,7 +122,7 @@ function noteRemindCheck(){
     n.reminded = now; fired++; const late = now - at > 10 * 6e4, label = noteLabel(n).slice(0, 90);
     toast(`${late ? 'Missed reminder' : 'Reminder'}: ${label}${late ? ' — was due ' + noteDueText(n) : ''}`, 'Open', () => { go('#/notes'); setTimeout(() => noteDlg(n.id), 60); });
     try{ if(typeof Notification !== 'undefined' && Notification.permission === 'granted') new Notification('OSINTrix reminder', {body:label, tag:'note-' + n.id}); }catch(e){} }
-  if(fired){ save(); if(UI.route && (UI.route.area === 'notes' || UI.route.area === 'today' || UI.route.area === 'home')) renderMain(); }
+  if(fired){ save(); if(UI.route && (UI.route.area === 'notes' || UI.route.area === 'today' || UI.route.area === 'home')) bgRender(); }
 }
 /* the next one is due soon: check every 20 seconds, and when the tab comes back */
 setInterval(noteRemindCheck, 20000);

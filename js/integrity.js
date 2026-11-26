@@ -207,7 +207,7 @@ function paintReadOnly(){
 function tabSaved(){ try{ TABS.ch && TABS.ch.postMessage({t:'saved', at:Date.now()}); }catch(e){} }
 if(TABS.ch) TABS.ch.onmessage = async ev => {
   if(TABS.writer || !ev.data || ev.data.t !== 'saved' || !DB || SEC.key || SEC.locked) return;
-  clearTimeout(TABS.rt); TABS.rt = setTimeout(async () => { const d = await loadAll(); if(d && !d.__locked && !d.__bad && usable(d)){ const prefs = DB.prefs; DB = normStored(d); DB.prefs = prefs; cache = {}; renderAll(); } }, 300);
+  clearTimeout(TABS.rt); TABS.rt = setTimeout(async () => { const d = await loadAll(); if(d && !d.__locked && !d.__bad && usable(d)){ const prefs = DB.prefs; DB = normStored(d); DB.prefs = prefs; cache = {}; bgRender(true); } }, 300);
 };
 
 /* automations from a backup arrive switched off and checked field by field: a file must never start acting on its own */

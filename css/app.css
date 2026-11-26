@@ -1887,6 +1887,8 @@ html.modal, html.modal body{overflow:hidden}
 .gmiss{top:12px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;padding:8px 8px 8px 14px;border-radius:12px;background:var(--surface);border:1px solid var(--accent-line);box-shadow:var(--shadow);font-size:calc(13.5px * var(--ts,1));max-width:calc(100% - 24px);flex-wrap:wrap}
 .gmiss>span{flex:1 1 220px}
 .gcanvas.haspanel .gmiss{left:calc(50% - 180px)}
+/* the side panel runs the full height on the right: the zoom buttons and the time slider sit beside it, not under it */
+@media (min-width:761px){ .gcanvas.haspanel .gzoom{right:364px} .gcanvas.haspanel .gtime{left:calc(50% - 176px)} .ds .gcanvas.haspanel .gtime{left:16px;right:364px} }
 .pklist{max-height:52vh;overflow:auto;border:1px solid var(--border-soft);border-radius:12px;overscroll-behavior:contain}
 .pk{display:flex;align-items:center;gap:10px;padding:9px 12px;border-top:1px solid var(--border-soft);cursor:pointer}
 .pk:first-child{border-top:0}

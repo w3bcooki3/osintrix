@@ -63,7 +63,7 @@ function placeInsp(){ const t = document.querySelector('.gtools') || document.qu
 window.addEventListener('resize', () => { clearTimeout(placeInsp.t); placeInsp.t = setTimeout(placeInsp, 120); });
 const TITLES = {today:'Today', security:'Security', watch:'Watchlist', trash:'Trash', ctf:'CTF', lab:'Forensics kit', help:'Help', home:'Dashboard', cases:'Cases', toolbox:'Toolbox', entities:'Entities', feeds:'Threat Intel', decoder:'Decoder', reference:'Reference', settings:'Settings', detections:'Detections', queries:'Query library', notes:'Notes', playbooks:'Playbooks', library:'Library', cloud:'Cloud', whatsnew:"What's new", pad:"Scratchpad", notebook:'Notebook', certs:'Certificates', tradecraft:'Tradecraft', regex:'Patterns'};
 function onRoute(){
-  UI.route = parseHash(); $('side').classList.remove('open');
+  UI.route = parseHash(); $('side').classList.remove('open'); if(typeof hideMenu === 'function') hideMenu(); if(typeof menClose === 'function') menClose(); if(typeof S !== 'undefined' && S.open && S.from !== location.hash && typeof srchClose === 'function') srchClose();   /* menus, the @ list and search belong to the page they were opened on (Back, a link) */
   document.title = (UI.route.area === 'case' ? theCase().name.split(' — ')[0] + ' · ' + CASE_TABS.find(t => t[0] === UI.route.tab)[1] : TITLES[UI.route.area] || 'OSINTrix') + ' — OSINTrix';
   const m = $('main'); m.classList.add('enter'); clearTimeout(onRoute.t); onRoute.t = setTimeout(() => m.classList.remove('enter'), 320);
   if(UI.route.area !== 'case' || UI.route.tab !== 'graph'){ UI.graph.mode = null; UI.graph.first = null; }

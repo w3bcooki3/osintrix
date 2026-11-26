@@ -99,7 +99,7 @@ function mountGraph(){
   const els = graphElements(D), sig = [DB.active, focused, big, text, accent, bg, JSON.stringify(els)].join('|');
   if(cy && CY_SIG === sig && cy.container() === el && !cyDead()){ graphAfter(el, focused); return; }   /* two re-renders in one frame: the first already put it back */
   if(cy && CY_SIG === sig && cy.container() && !cy.container().isConnected && !cyDead()){ const old = cy.container(); cyKeep(); el.replaceWith(old); cy.resize(); graphAfter(old, focused); return; }
-  if(cy){ cy.destroy(); cy = null; }
+  if(cy){ if(CTX && CTX.graph) hideMenu(); cy.destroy(); cy = null; }   /* a menu on the old graph points at what may no longer be there */
   CY_SIG = sig;
   cy = cytoscape({container:el, elements:els, minZoom:big ? .05 : .2, maxZoom:3, boxSelectionEnabled:false, hideEdgesOnViewport:big, textureOnViewport:big, pixelRatio:big ? 1 : 'auto',
     layout:focused ? gvLayout(D) : hasPos ? {name:'preset'} : {name:'cose', animate:false, nodeRepulsion:() => 14000, idealEdgeLength:() => 95, nodeOverlap:20, padding:40, randomize:false, numIter:1500},
@@ -135,6 +135,7 @@ function mountGraph(){
   if(view){ cy.zoom(view.z); cy.pan(view.p); } else { fitNice(); setTimeout(() => { if(cy === me){ fitNice(); ready = true; } }, 90); }
   cy.on('viewport', () => { radialHide(); if(!ready || cy !== me) return; (UI.graph.views || (UI.graph.views = {}))[DB.active] = {z:cy.zoom(), p:{...cy.pan()}}; });
   cy.on('grab', 'node', radialHide);
+  cy.on('grab viewport', () => { if(CTX && CTX.graph) hideMenu(); });   /* a menu opened on the graph does not outlive a drag, pan or zoom */
   cy.on('dragfree', 'node', ev => { if(focused) return;   /* a focused view's places are its own; the whole graph keeps its layout */ const e = entryById(ev.target.id()); if(e){ e.pos = {...ev.target.position()}; save(); } });
   cy.on('tap', 'node', ev => {
     const id = ev.target.id();
@@ -149,8 +150,10 @@ function mountGraph(){
   cy.on('tap', 'edge', ev => { const id = ev.target.id(); if(id.startsWith('co-')) return; UI.sel = {kind:'link', id}; UI.inspOpen = true; renderInsp(); refreshGraphTools(); });
   cy.on('tap', ev => { if(ev.target === cy){ radialHide(); if(UI.sel){ UI.sel = null; renderInsp(); refreshGraphTools(); } cy.elements().removeClass('faded'); } });
   cy.on('dbltap', ev => { if(ev.target === cy){ UI.graph.newPos = {...ev.position}; entryDlg(); } });
-  const menuAt = (ev, fn) => { const oe = ev.originalEvent || {}, r = el.getBoundingClientRect(), rp = ev.renderedPosition || (ev.target.renderedPosition && ev.target.renderedPosition()) || {x:0, y:0};
-    fn((oe.clientX != null ? oe.clientX : r.left + rp.x), (oe.clientY != null ? oe.clientY : r.top + rp.y)); };
+  /* holding a node is how a touch screen opens its menu; with a mouse it is how a drag starts (the right button opens
+     the menu), so a mouse hold no longer opens it and then leaves it behind when the node is dragged */
+  const menuAt = (ev, fn) => { const oe = ev.originalEvent || {}; if(ev.type === 'taphold' && !/^touch/.test(oe.type || '')) return; const r = el.getBoundingClientRect(), rp = ev.renderedPosition || (ev.target.renderedPosition && ev.target.renderedPosition()) || {x:0, y:0};
+    fn((oe.clientX != null ? oe.clientX : r.left + rp.x), (oe.clientY != null ? oe.clientY : r.top + rp.y)); if(CTX) CTX.graph = true; };
   cy.on('cxttap taphold', 'node', ev => menuAt(ev, (x, y) => nodeMenu(ev.target.id(), x, y)));
   cy.on('cxttap taphold', 'edge', ev => { if(!ev.target.id().startsWith('co-')) menuAt(ev, (x, y) => edgeMenu(ev.target.id(), x, y)); });
   cy.on('cxttap taphold', ev => { if(ev.target === cy) menuAt(ev, (x, y) => canvasMenu({...ev.position}, x, y)); });
@@ -174,7 +177,10 @@ function graphAfter(el, focused){
      moves the graph without resizing it (a note or bar appearing above it after entities are added), the spot it
      remembers is stale and the graph stops taking the mouse. Have it measure again at the start of every press. */
   if(!el.__bbFresh){ el.__bbFresh = true; const fresh = () => { const r = cy && cy.container() === el && cy.renderer(); if(r && r.invalidateContainerClientCoordsCache) r.invalidateContainerClientCoordsCache(); };
-    for(const t of ['mousedown', 'touchstart', 'wheel', 'mouseover']) el.addEventListener(t, fresh, {capture:true, passive:true}); }
+    for(const t of ['mousedown', 'touchstart', 'wheel', 'mouseover']) el.addEventListener(t, fresh, {capture:true, passive:true});
+    /* hovering a node fades the rest; the graph only undoes that when the mouse moves over its own canvas, so going
+       straight from a node onto the zoom or fit buttons (which sit beside it) left everything faded */
+    el.addEventListener('mouseleave', () => { if(cy && cy.container() === el && !$('radial') && cy.elements('.faded').length){ cy.elements().removeClass('faded'); if(typeof applyFind === 'function') applyFind(); } }); }
   cy.elements().unselect().removeClass('src gvfocus faded');
   if(UI.sel && UI.sel.kind === 'entry'){ const n = cy.getElementById(UI.sel.id); if(n.length){ n.select(); if(UI.gFocus === UI.sel.id){ UI.gFocus = null; cy.animate({center:{eles:n}, zoom:Math.max(cy.zoom(), 1.1)}, {duration:280}); } } }
   if(UI.graph.first){ const n = cy.getElementById(UI.graph.first); if(n.length) n.addClass('src'); }

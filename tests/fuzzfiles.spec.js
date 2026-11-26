@@ -12,7 +12,7 @@ const FX = p => fs.readFileSync(path.join(__dirname, 'fixtures', p)).toString('b
 /* the ways a file enters the app, and the fixtures each is fed */
 const ENTRIES = {
   lab:   ['docs/redacted-invoice.pdf', 'meta/libreoffice.pdf', 'docs/board-memo.docx', 'docs/payouts.xlsx', 'docs/remittance.msg', 'docs/parcel-notice.eml', 'docs/invoice.iso', 'docs/click-to-view.one', 'docs/scan.rar',
-          'office/invoice.doc', 'office/invoice.odt', 'forensic/office365-kit.zip', 'forensic/invoice.pdf.lnk', 'forensic/launcher-w32.exe', 'pics/p01.jpg', 'meta/iphone6-gps.jpg', 'meta/exif-chunk.png',
+          'office/invoice.doc', 'office/invoice.odt', 'forensic/office365-kit.zip', 'forensic/invoice.pdf.lnk.sample', 'forensic/launcher-w32.exe', 'pics/p01.jpg', 'meta/iphone6-gps.jpg', 'meta/exif-chunk.png',
           'meta/iphone11pro.heic', 'meta/gps.mp4', 'meta/id3.mp3', 'web/shop-capture.warc.gz', 'web/shop-capture.wacz', 'web/claim-airdrop.mhtml', 'web/phish-visit.har', 'sample.pcap'],
   clean: ['clean/persona-photo.jpg', 'clean/screenshot.png', 'clean/sticker.webp', 'clean/statement.pdf', 'clean/notes.docx', 'clean/payments.xlsx'],
   evtx:  ['security-sample.evtx', 'sysmon-sample.evtx'],

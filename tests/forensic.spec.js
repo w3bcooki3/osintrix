@@ -46,7 +46,7 @@ test('an edited photo: encoder, cropped-thumbnail, Photoshop, time zone and wher
 
 test('a malicious shortcut gives up the machine that made it', async ({ page }) => {
   const errors = await open(page, '#/lab');
-  await inspect(page, 'forensic/invoice.pdf.lnk');
+  await inspect(page, 'forensic/invoice.pdf.lnk.sample');
   const c = page.locator('section.card:has(h3:has-text("Windows shortcut (LNK)"))');
   await expect(c).toContainText('Runs a command, not a document');
   await expect(c).toContainText('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe');

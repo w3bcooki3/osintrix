@@ -232,7 +232,7 @@ async function stArchFind(url){
     return false; }
   catch(e){ x.checked = Date.now(); throw e; }
 }
-async function stArchFindMany(urls){ let found = 0, err = null; for(const u of urls){ try{ if(await stArchFind(u)) found++; }catch(e){ err = e; } } mutate('checked archived copies'); renderMain(); return {found, err}; }
+async function stArchFindMany(urls){ let found = 0, err = null; for(const u of urls){ try{ if(await stArchFind(u)) found++; }catch(e){ err = e; } } mutate('checked archived copies'); bgRender(); return {found, err}; }
 /* back from the archive's tab: look for copies just requested */
 window.addEventListener('focus', () => { const A = DB && DB.archive; if(!A || !(UI.route && UI.route.tab === 'story')) return;
   const L = Object.entries(A).filter(([, x]) => x.req && !x.snap && Date.now() - x.req < 15 * 60000).map(([u]) => u); if(L.length) setTimeout(() => stArchFindMany(L).catch(() => {}), 1500); });

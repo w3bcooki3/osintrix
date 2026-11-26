@@ -247,7 +247,7 @@ function srchPreview(){
     <div class="sp-f"><span><kbd>Enter</kbd> ${it.kind === 'tool' ? 'open site' : 'open'}</span>${it.kind === 'tool' ? '<span><kbd>Shift</kbd> <kbd>Enter</kbd> show in Toolbox</span>' : ''}</div>`;
 }
 function srchOpen(prefill){ setTimeout(() => scrollHints(), 80);
-  S.index = srchIndex(); S.open = true; S.at = 0; S.scope = 'all'; S.q = prefill || '';
+  S.index = srchIndex(); S.open = true; S.from = location.hash; S.at = 0; S.scope = 'all'; S.q = prefill || '';
   let w = $('srch'); if(!w){ w = document.createElement('div'); w.id = 'srch'; document.body.appendChild(w); }
   w.hidden = false;
   w.innerHTML = `<div class="sr-scrim" data-act="srClose"></div><div class="sr-box" role="dialog" aria-modal="true" aria-label="Search everything">

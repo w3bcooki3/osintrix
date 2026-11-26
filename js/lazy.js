@@ -56,11 +56,30 @@ async function lzUnpack(box){
 const lazyPending = () => Object.keys(LZ).filter(k => !lzHas(k) && !LZ[k].failed && !LZ[k].only).length;
 let LZ_REDRAW = false;
 const lzBusy = () => { const a = document.activeElement; return !!(a && a.closest && a.closest('#main') && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) && !(a.type === 'checkbox' || a.type === 'radio')); };
-function lzRedraw(){
-  if(LZ_REDRAW) return; LZ_REDRAW = true;
-  const go = () => { LZ_REDRAW = false; if(lzBusy()){ document.addEventListener('focusout', () => setTimeout(lzRedraw, 0), {once:true}); return; } if(typeof renderMain === 'function') renderMain(); if(typeof renderNav === 'function') renderNav(); };
-  requestAnimationFrame(go);
+/* A redraw that nobody asked for (data arriving, a reminder, another tab's save, a background check) waits until the
+   person is free: not typing in a box on the page, and not halfway through a click. Redrawing in either moment throws
+   away what they typed, or replaces the button between its press and its release so the click never lands. One
+   pending redraw per kind; a full redraw covers a page redraw. */
+let LZ_PRESS = false;
+document.addEventListener('pointerdown', () => { LZ_PRESS = true; }, true);
+for(const t of ['pointerup', 'pointercancel']) document.addEventListener(t, () => setTimeout(() => { LZ_PRESS = false; }, 0), true);
+const BG_DUE = new Map();
+/* busy means there is something to lose: a box on the page holding text that is not saved yet (an empty box, or one
+   still showing what it was drawn with, loses nothing) */
+const bgBusy = () => { if(!lzBusy()) return false; const a = document.activeElement; if(a.isContentEditable) return true;
+  if(a.tagName === 'SELECT') return false; return a.value !== '' && a.value !== a.defaultValue; };
+function whenFree(key, fn){
+  if(BG_DUE.has(key)){ BG_DUE.set(key, fn); return; } BG_DUE.set(key, fn);
+  const run = () => { if(bgBusy()){ document.addEventListener('focusout', () => setTimeout(run, 0), {once:true}); return; }
+    if(LZ_PRESS){ document.addEventListener('pointerup', () => setTimeout(run, 30), {once:true, capture:true}); return; }
+    const f = BG_DUE.get(key); BG_DUE.delete(key); if(key === 'main' && BG_DUE.has('all')) return;
+    const a = document.activeElement, id = a && a.id && a !== document.body ? a.id : '';
+    try{ f(); }catch(e){ console.error(e); }
+    if(id && document.activeElement !== a){ const b = document.getElementById(id); if(b && b.focus) b.focus({preventScroll:true}); }   /* the cursor stays where it was */ };
+  requestAnimationFrame(run);
 }
+const bgRender = all => whenFree(all ? 'all' : 'main', () => { if(all){ if(typeof renderAll === 'function') renderAll(); } else { if(typeof renderMain === 'function') renderMain(); if(typeof renderNav === 'function') renderNav(); } });
+function lzRedraw(){ bgRender(false); }
 /* called once the app has started: after the first screen is drawn, add every file in the background, with its follow-up.
    Files marked "only" (the MAC vendor list, the world map, enrichment data, the QR reader) are fetched only by the tool that needs them. */
 function lazyWatch(){

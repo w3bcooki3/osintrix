@@ -4,6 +4,42 @@
    Each change has a type: "added" | "changed" | "fixed" | "removed". */
 const CHANGELOG_DATA = [
 {
+  "version": "1.85",
+  "name": "Real-mouse fixes",
+  "date": "2026-11-26",
+  "summary": "A sweep of every screen with real mouse timing: slow clicks, holds, drags that leave the window, redraws mid-action.",
+  "changes": [
+    {
+      "type": "fixed",
+      "text": "Graph: holding the mouse on a node before dragging it no longer opens the node menu and leaves it behind. The right button opens the menu; a long press still does on a touch screen."
+    },
+    {
+      "type": "fixed",
+      "text": "Graph: a node menu now closes when you drag, pan or zoom, when you go to another page, and when the graph is rebuilt, instead of staying on screen pointing at old data."
+    },
+    {
+      "type": "fixed",
+      "text": "Graph: hovering a node and then moving straight onto the zoom buttons no longer leaves the whole graph faded."
+    },
+    {
+      "type": "fixed",
+      "text": "Graph: with Suggestions or Insights open, the zoom and fit buttons and the time slider were hidden under the panel. They now sit beside it."
+    },
+    {
+      "type": "fixed",
+      "text": "Notebook page graph: a press whose release never arrived (the browser took it for a drag) left the view panning whenever the mouse moved over it."
+    },
+    {
+      "type": "fixed",
+      "text": "Background redraws (a reminder falling due, another tab saving, monitoring results, archived copies found) now wait until you finish typing and until a click is complete. Before, they could wipe a half-typed note or swallow a click."
+    },
+    {
+      "type": "fixed",
+      "text": "Search, the @ list and menus close when you leave the page, including with the browser's Back button."
+    }
+  ]
+},
+{
   "version": "1.84",
   "name": "Graph freeze fixed",
   "date": "2026-11-26",

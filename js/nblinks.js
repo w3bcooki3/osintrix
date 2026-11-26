@@ -249,9 +249,12 @@ function nbwGraphBind(){
   svg.addEventListener('focusin', ev => { const g = ev.target.closest('.nbg-n'); hi(g ? g.dataset.id : null); });
   let drag = null;
   svg.addEventListener('pointerdown', ev => { if(ev.button) return; drag = {x:ev.clientX, y:ev.clientY, vb:vb.slice(), moved:false, node:ev.target.closest('.nbg-n')}; });
-  svg.addEventListener('pointermove', ev => { if(!drag) return; const dx = ev.clientX - drag.x, dy = ev.clientY - drag.y; if(!drag.moved && Math.hypot(dx, dy) < 4) return;
+  /* a press whose release never arrives (the browser took it for a native drag, the pointer was lost) must not leave
+     the view panning on plain hover: with no button down the press is over */
+  svg.addEventListener('pointermove', ev => { if(!drag) return; if(!(ev.buttons & 1)){ drag = null; return; } const dx = ev.clientX - drag.x, dy = ev.clientY - drag.y; if(!drag.moved && Math.hypot(dx, dy) < 4) return;
     if(!drag.moved){ drag.moved = true; try{ svg.setPointerCapture(ev.pointerId); }catch(e){} } const r = svg.getBoundingClientRect(), k = Math.max(vb[2] / r.width, vb[3] / r.height);
     UI.nbgVB.set([drag.vb[0] - dx * k, drag.vb[1] - dy * k, vb[2], vb[3]]); });
+  svg.addEventListener('pointercancel', () => { drag = null; });
   svg.addEventListener('pointerup', () => { const d = drag; drag = null; if(!d || d.moved || !d.node) return; nbwGraphOpen(d.node.dataset.id); });
   svg.addEventListener('keydown', ev => { const g = ev.target.closest('.nbg-n'); if(g && (ev.key === 'Enter' || ev.key === ' ')){ ev.preventDefault(); nbwGraphOpen(g.dataset.id); } });
   svg.addEventListener('wheel', ev => { ev.preventDefault(); const r = svg.getBoundingClientRect(), f = ev.deltaY > 0 ? 1.12 : 1 / 1.12; nbwZoomAt(f, (ev.clientX - r.left) / r.width, (ev.clientY - r.top) / r.height); }, {passive:false});
