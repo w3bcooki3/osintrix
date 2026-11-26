@@ -51,7 +51,7 @@ function caseGraph(c, D){
       <div class="gset g-d"><label class="sr" for="gLayout">Arrange</label><select id="gLayout" class="gsel"><option value="">Arrange…</option><option value="cose">Force-directed</option><option value="concentric">By importance</option><option value="breadthfirst">Hierarchy</option><option value="circle">Circle</option><option value="grid">Grid</option></select>
         ${tb('gCo', gm.co ? 'eye' : 'eye', 'Co-occurrence', `aria-pressed="${!!gm.co}"`)}${tb('gExport','download','Export')}</div>
     </div>
-    <div class="gcanvas${gm.panel ? ' haspanel' : ''}"><div id="cy" role="application" aria-label="Relationship graph for ${esc(c.name)}"></div>${typeof gvBar === 'function' ? gvBar(D) : ''}
+    <div class="gcanvas${gm.panel ? ' haspanel' : ''}"><div id="cy" role="application" aria-label="Relationship graph for ${esc(c.name)}"></div><p id="gKeysHelp" class="sr">Arrow keys move between entries, Enter opens one, Shift+F10 its menu, plus and minus zoom, 0 fits the graph.</p><p id="gLive" class="sr" aria-live="polite"></p>${typeof gvBar === 'function' ? gvBar(D) : ''}
       <div id="gpanel"></div>
       ${nMiss && !(gm.noteOff && gm.noteOff.has(c.id)) && !gm.mode && !gm.path ? `<div class="gfloat gmiss">${ico('layers','sm')}<span title="The graph shows vault entries. Adding an entity puts it in the vault and on the graph."><b>${nMiss}</b> <em class="g-dt">${nMiss === 1 ? 'entity' : 'entities'} from the evidence ${nMiss === 1 ? 'is' : 'are'} not on the graph yet</em><em class="g-mt">not on the graph</em></span><button class="btn xs primary" data-act="gPick">Choose…</button><button class="btn xs g-d" data-act="gBuild">Add by rule…</button><button class="iconbtn" data-act="gNoteOff" aria-label="Hide">${ico('x','sm')}</button></div>` : ''}
       ${gm.mode === 'path' ? `<div class="gfloat gmode">${ico('route','sm')}<span>Now click the entry to find a path to</span><button class="btn xs" data-act="gPathOff">Cancel</button></div>` : ''}
@@ -158,7 +158,29 @@ function mountGraph(){
   cy.on('cxttap taphold', 'edge', ev => { if(!ev.target.id().startsWith('co-')) menuAt(ev, (x, y) => edgeMenu(ev.target.id(), x, y)); });
   cy.on('cxttap taphold', ev => { if(ev.target === cy) menuAt(ev, (x, y) => canvasMenu({...ev.position}, x, y)); });
   el.oncontextmenu = e => e.preventDefault();
-  el.onkeydown = e => { if((e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) && UI.sel && UI.sel.kind === 'entry'){ e.preventDefault(); const n = cy.getElementById(UI.sel.id), r = el.getBoundingClientRect(), p = n.renderedPosition(); nodeMenu(UI.sel.id, r.left + p.x, r.top + p.y); } };
+  /* the keyboard: Tab reaches the graph; the arrow keys move to the nearest entry that way, and its details follow; Shift+F10
+     or the menu key opens its menu; + and − zoom, 0 fits it to the screen, Esc lets go. A live line says where you are. */
+  el.tabIndex = 0; el.setAttribute('aria-describedby', 'gKeysHelp');
+  const say = t => { const l = $('gLive'); if(l) l.textContent = t; };
+  const goTo = n => { cy.elements().unselect(); n.select(); selectEntry(n.id(), true); const r = el.getBoundingClientRect(), p = n.renderedPosition();
+    if(p.x < 40 || p.y < 40 || p.x > r.width - 40 || p.y > r.height - 40) cy.animate({center:{eles:n}}, {duration:160});
+    const t = TYPES[(entryById(n.id()) || {}).type]; say(`${n.data('label') || n.id()}${t ? ', ' + t.name : ''}, ${n.connectedEdges().length} connection${n.connectedEdges().length === 1 ? '' : 's'}`); };
+  el.onkeydown = e => {
+    if(e.target !== el) return;
+    const cur = UI.sel && UI.sel.kind === 'entry' ? cy.getElementById(UI.sel.id) : null, has = cur && cur.length;
+    if((e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) && has){ e.preventDefault(); const r = el.getBoundingClientRect(), p = cur.renderedPosition(); return nodeMenu(UI.sel.id, r.left + p.x, r.top + p.y); }
+    const D = {ArrowRight:[1, 0], ArrowLeft:[-1, 0], ArrowDown:[0, 1], ArrowUp:[0, -1]}[e.key];
+    if(D){ e.preventDefault(); const ns = cy.nodes(':visible'); if(!ns.length) return;
+      if(!has){ const c = {x:el.clientWidth / 2, y:el.clientHeight / 2}; return goTo(ns.min(n => Math.hypot(n.renderedPosition().x - c.x, n.renderedPosition().y - c.y)).ele); }
+      const a = cur.renderedPosition(); let best = null, bd = Infinity;
+      ns.forEach(n => { if(n === cur || n.same(cur)) return; const b = n.renderedPosition(), dx = b.x - a.x, dy = b.y - a.y, along = dx * D[0] + dy * D[1]; if(along <= 0) return;
+        const across = Math.abs(dx * D[1] - dy * D[0]), d = along + across * 2; if(d < bd){ bd = d; best = n; } });
+      if(best) goTo(best); else say('Nothing further that way'); return; }
+    if(e.key === 'Enter' && has){ e.preventDefault(); UI.inspOpen = true; renderInsp(); const f = document.querySelector('#insp button, #insp [tabindex="0"]'); if(f) f.focus(); return; }
+    if(e.key === '+' || e.key === '='){ e.preventDefault(); return cy.zoom({level:Math.min(cy.maxZoom(), cy.zoom() * 1.2), renderedPosition:{x:el.clientWidth / 2, y:el.clientHeight / 2}}); }
+    if(e.key === '-' || e.key === '_'){ e.preventDefault(); return cy.zoom({level:Math.max(cy.minZoom(), cy.zoom() / 1.2), renderedPosition:{x:el.clientWidth / 2, y:el.clientHeight / 2}}); }
+    if(e.key === '0'){ e.preventDefault(); return cy.fit(undefined, 56); }
+  };
   cy.on('mouseover', 'node', ev => { const n = ev.target, nb = n.closedNeighborhood(); cy.elements().not(nb).addClass('faded'); });
   cy.on('mouseout', 'node', () => { cy.elements().removeClass('faded'); applyFind(); });
   graphAfter(el, focused);

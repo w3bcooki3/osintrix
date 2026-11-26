@@ -170,7 +170,10 @@ function inspFeed(f){
     <div class="st-foot"><button class="btn primary" data-act="feedToCase" data-id="${f.id}">${ico('plus','sm')}Add to ${esc(caseNm(theCase()))}</button>${casePick()}<span class="sp"></span>${u ? `<a class="btn" href="${esc(u)}" target="_blank" rel="noopener noreferrer">Read original ${ico('external-link','sm')}</a>` : '<span class="t3 small" title="Sample stories carry no link">No link to the original</span>'}</div>`;
 }
 /* the panel is wider for a story, and knows it is one */
-{ const ri = renderInsp; renderInsp = function(){ const r = ri.apply(this, arguments), el = $('insp'), on = !!(UI.inspOpen && UI.sel && UI.sel.kind === 'feed'); el.classList.toggle('story', on); return r; }; }
+{ const ri = renderInsp; renderInsp = function(){ const r = ri.apply(this, arguments), el = $('insp'), on = !!(UI.inspOpen && UI.sel && UI.sel.kind === 'feed'); el.classList.toggle('story', on);
+  /* an open story gets the page behind it blurred and dimmed, so it reads on its own; a click there closes it */
+  let sc = $('stScrim'); if(on && !sc){ sc = document.createElement('div'); sc.id = 'stScrim'; sc.className = 'st-scrim'; sc.dataset.act = 'closeInsp'; sc.setAttribute('aria-hidden', 'true'); el.parentNode.insertBefore(sc, el); } else if(!on && sc) sc.remove();
+  return r; }; }
 
 function tioNavGo(d){
   const s = UI.sel; if(!s || s.kind !== 'feed') return;

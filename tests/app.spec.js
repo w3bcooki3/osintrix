@@ -506,7 +506,7 @@ test('an improved built-in rule replaces an unedited old copy, but never one you
 test('notebook: write, paste a picture, flashcards, review, export to Word and Markdown, import back', async ({ page }) => {
   const fs = require('fs');
   const errors = await open(page, '#/notebook');
-  await expect(page.locator('.nbk')).toHaveCount(3);
+  await expect(page.locator('.nbk')).toHaveCount(4);   // three study notebooks and Case notes
   await page.evaluate(() => NB_ACTS.nbPageNew(DB.nb.sections.find(s => s.name === 'Kerberos attacks').id));
   await page.keyboard.type('Delegation abuse'); await page.keyboard.press('Enter');
   await page.keyboard.type('## Unconstrained'); await page.keyboard.press('Enter');
@@ -708,14 +708,14 @@ test('what\'s new: filters and search repaint only the timeline, matches are mar
 
 test('cases: board cards by default, a list view that is remembered, search, sort and status filters', async ({ page }) => {
   const errors = await open(page, '#/cases');
-  await expect(page.locator('.cs2-card')).toHaveCount(3);
+  await expect(page.locator('.cs2-card')).toHaveCount(4);
   await expect(page.locator('.cs2-card:has-text("Op Lantern") .cs2-map .nd.m').first()).toBeVisible();   // its own graph, malicious nodes marked
   await expect(page.locator('.cs2-card:has-text("Op Lantern") .cs2-ov .r')).toContainText('malicious');
   await page.fill('#cs2Q', 'portal'); await expect(page.locator('.cs2-card')).toHaveCount(1);
   await page.fill('#cs2Q', 'zzzz'); await expect(page.locator('.cs2-empty')).toBeVisible();
-  await page.click('[data-act=caseFindClear]'); await expect(page.locator('.cs2-card')).toHaveCount(3);
+  await page.click('[data-act=caseFindClear]'); await expect(page.locator('.cs2-card')).toHaveCount(4);
   await page.click('[data-act=casesView][data-v=ledger]');
-  await expect(page.locator('.cs2-r')).toHaveCount(3); await expect(page.locator('.cs2-card')).toHaveCount(0);
+  await expect(page.locator('.cs2-r')).toHaveCount(4); await expect(page.locator('.cs2-card')).toHaveCount(0);
   await page.selectOption('#cs2Sort', 'name');
   await expect(page.locator('.cs2-r b').first()).toContainText('Harbour photo');             // sorted by name inside each status group
   await page.click('[data-act=cf][data-v=review]'); await expect(page.locator('.cs2-r')).toHaveCount(1);
@@ -724,7 +724,7 @@ test('cases: board cards by default, a list view that is remembered, search, sor
   await expect(page.locator('.cs2-g').first()).toContainText('Pinned');
   await expect.poll(() => page.evaluate(() => (localStorage.getItem(STORE_KEY) || '').includes('"casesView":"ledger"'))).toBe(true);
   await page.reload(); await page.evaluate(() => { if (typeof closeWelcome === 'function') closeWelcome(); });
-  await expect(page.locator('.cs2-r')).toHaveCount(3);                                   // the list view was remembered
+  await expect(page.locator('.cs2-r')).toHaveCount(4);                                   // the list view was remembered
   await page.click('.cs2-r:has-text("Customer portal") .case-hit'); await expect(page).toHaveURL(/#\/case\//);
   noErrors(errors);
 });
@@ -1618,8 +1618,8 @@ test('data safety: restore points keep their files; a damaged restore-point list
   expect(o.notes.length).toBeGreaterThan(0); expect(Object.keys(o.verdicts).length).toBeGreaterThan(0);
   await page.evaluate(() => { delete DB.verdicts['ipv4:203.0.113.47']; mutate('v'); });
   page.once('filechooser', fc => fc.setFiles({ name: 'c.json', mimeType: 'application/json', buffer: Buffer.from(txt) }));
-  await page.evaluate(() => clickAct('importCase'));
-  await expect.poll(() => page.evaluate(() => DB.cases.length)).toBeGreaterThan(3);
+  const nC = await page.evaluate(() => DB.cases.length); await page.evaluate(() => clickAct('importCase'));
+  await expect.poll(() => page.evaluate(() => DB.cases.length)).toBeGreaterThan(nC);
   const ic = await page.evaluate(() => { const c = DB.cases[DB.cases.length - 1], recs = new Set(DB.records.filter(r => r.caseId === c.id).map(r => r.id));
     return { sample: c.sample, notes: DB.notes.filter(n => n.caseId === c.id).length, v: DB.verdicts['ipv4:203.0.113.47'], ach: !c.ach || c.ach.ev.every(e => !e.rec || recs.has(e.rec)), achN: c.ach ? c.ach.ev.length : 0 }; });
   expect(ic).toEqual({ sample: undefined, notes: o.notes.length, v: 'malicious', ach: true, achN: o.case.ach ? o.case.ach.ev.length : 0 });
@@ -1820,8 +1820,9 @@ test('backup reminders: due after a week of own work, shown on the dashboard and
 test('guided tour walks through the demo case and can be left with Escape', async ({ page }) => {
   const errors = await open(page, '#/help');
   await page.click('[data-act=tourStart]');
-  for (let i = 0; i < 10; i++) { await expect(page.locator('#tourCard .tour-n')).toHaveText(`${i + 1} of 11`); await expect(page.locator('#tourRing')).toBeVisible(); await page.click('[data-act=tourNext]'); }
-  await expect(page.locator('#tourCard')).toContainText('Now your own case');
+  // Op Lantern for cybercrime and OSINT, Kestrel Dawn for journalism: every step finds what it points at
+  for (let i = 0; i < 12; i++) { await expect(page.locator('#tourCard .tour-n')).toHaveText(`${i + 1} of 13`); await expect(page.locator('#tourRing'), await page.locator('#tourT').textContent()).toBeVisible(); await page.click('[data-act=tourNext]'); }
+  await expect(page.locator('#tourCard .tour-n')).toHaveText('13 of 13'); await expect(page.locator('#tourCard')).toContainText('Now your own case'); await expect(page.locator('#tourCard')).toContainText('template');
   await page.keyboard.press('Escape'); await expect(page.locator('#tourCard')).toHaveCount(0);
   noErrors(errors);
 });

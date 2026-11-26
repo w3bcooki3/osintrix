@@ -5,40 +5,79 @@
    ========================================================================== */
 
 /* ---------- sample data ---------- */
-const SAMPLE_CASES = ['c-lantern', 'c-portal', 'c-lab', 'c-empty', 'c-harbour'];
+const SAMPLE_CASES = ['c-lantern', 'c-story'];
+/* sample cases from before 1.87, and what each held, so a copy nobody added to can be told from one somebody used */
+const OLD_SAMPLE = {'c-portal':{rec:/^p[1-5]$/, ent:/^p-(ip2?|acct)$/}, 'c-lab':{rec:/^(lab[1-5]|lq[1-3])$/, ent:/^lab-/}, 'c-empty':{rec:/^$/, ent:/^$/}, 'c-harbour':{rec:null, ent:/^sp-/}};
+const SAMPLE_NOTE = /^n[1-8]$/;
 function ensureSample(){
-  if(DB.sample === undefined) DB.sample = DB.cases.some(c => SAMPLE_CASES.includes(c.id));
-  for(const c of DB.cases) if(SAMPLE_CASES.includes(c.id)) c.sample = true;
-  for(const n of DB.notes || []) if(/^n[1-5]$/.test(n.id)) n.sample = true;
+  if(DB.sample === undefined) DB.sample = DB.cases.some(c => SAMPLE_CASES.includes(c.id) || OLD_SAMPLE[c.id]);
+  for(const c of DB.cases) if(SAMPLE_CASES.includes(c.id) || OLD_SAMPLE[c.id]) c.sample = true;
+  for(const n of DB.notes || []) if(SAMPLE_NOTE.test(n.id)) n.sample = true;
   for(const f of DB.feed) if(!f.live) f.sample = true;
-  /* older saves had an empty “Untitled case” — swap in the lab case once */
-  if(DB.sample && !DB.labAdded){
-    DB.labAdded = true;
-    const e = DB.cases.find(c => c.id === 'c-empty'); if(e && !DB.entries.some(x => x.caseId === 'c-empty') && !DB.records.some(x => x.caseId === 'c-empty')) DB.cases = DB.cases.filter(c => c !== e);
-    if(!DB.cases.some(c => c.id === 'c-lab')){ const s = seedDB();
-      DB.cases.push(...s.cases.filter(c => c.id === 'c-lab').map(c => ({...c, sample:true})));
-      DB.entries.push(...s.entries.filter(x => x.caseId === 'c-lab')); DB.records.push(...s.records.filter(x => x.caseId === 'c-lab')); DB.links.push(...s.links.filter(x => x.caseId === 'c-lab').map(l => ({...l, id:uid('l')})));
-      if(!DB.cases.some(c => c.id === DB.active)) DB.active = DB.cases[0].id; }
-  }
+  if(DB.sample && (DB.sampleV || 1) < 2) sampleRefresh();
 }
-/* the OSINT sample case — infrastructure, money, accounts, page changes, active hours and identities on one
-   made-up refund scam; added once to workspaces that keep the sample data, from a file loaded only for this */
+/* 1.87: the sample cases became two — Op Lantern (intrusion and the crew behind it) and Kestrel Dawn (a journalism
+   case). An older workspace still holding the sample data gets the new set once: a restore point first, then the old
+   sample cases go only if nothing of yours was added to them; your own cases, notes and data are never touched. */
+function sampleRefresh(){
+  DB.sampleV = 2;
+  const theirs = id => { const O = OLD_SAMPLE[id], c = DB.cases.find(x => x.id === id); if(!c) return false;
+    const recs = DB.records.filter(r => r.caseId === id), ents = DB.entries.filter(e => e.caseId === id);
+    if(id === 'c-harbour' ? recs.length > 35 : recs.some(r => !O.rec.test(r.id))) return false;   /* the Harbourline sample had 34 pieces of evidence */
+    if(ents.some(e => !O.ent.test(e.id))) return false;
+    if((DB.notes || []).some(n => n.caseId === id && !SAMPLE_NOTE.test(n.id))) return false;
+    if((c.claims || []).length || (c.replies || []).length || (DB.sources || []).some(s => s.caseId === id)) return false;
+    return true; };
+  const gone = new Set(Object.keys(OLD_SAMPLE).filter(theirs)), S = seedDB(), had = DB.cases.some(c => c.id === 'c-story');
+  if(!gone.size && had) return;
+  if(typeof snapshot === 'function') snapshot('Before the sample cases were refreshed');
+  DB.cases = DB.cases.filter(c => !gone.has(c.id)); DB.records = DB.records.filter(r => !gone.has(r.caseId)); DB.entries = DB.entries.filter(e => !gone.has(e.caseId));
+  DB.links = DB.links.filter(l => !gone.has(l.caseId)); DB.notes = (DB.notes || []).filter(n => !gone.has(n.caseId));
+  if(DB.ctf) for(const ch of DB.ctf.chals || []) if(gone.has(ch.caseId)) ch.caseId = null;
+  if(gone.has('c-harbour')) DB.osintSample = 0;   /* its material joins Op Lantern instead */
+  if(!had){ const id = 'c-story';
+    DB.cases.push(...S.cases.filter(c => c.id === id).map(c => ({...c, sample:true})));
+    DB.records.push(...S.records.filter(r => r.caseId === id)); DB.entries.push(...S.entries.filter(e => e.caseId === id)); DB.links.push(...S.links.filter(l => l.caseId === id).map(l => ({...l, id:uid('l')})));
+    DB.archive = Object.assign({}, S.archive, DB.archive || {}); }
+  if(Array.isArray(DB.notes)) for(const n of SAMPLE_NOTES()) if(!DB.notes.some(x => x.id === n.id) && (!n.caseId || DB.cases.some(c => c.id === n.caseId))) DB.notes.push({...n, sample:true});
+  if(DB.nb && typeof nbCaseNotesSeed === 'function' && !DB.nb.books.some(b => b.caseNotes || (b.sample && b.name === 'Case notes'))) nbCaseNotesSeed();
+  if(!DB.cases.some(c => c.id === DB.active)) DB.active = DB.cases[0].id;
+  if(typeof hashRecords === 'function') hashRecords();
+  DB.sampleFresh = 1;   /* the first screen says so, once */
+}
+/* The OSINT half of Op Lantern — who is behind the intrusion: infrastructure, money, accounts, page changes, active
+   hours and identities from a made-up refund scam run by the same crew. It joins the case once, in workspaces that keep
+   the sample data, from a file loaded only for this. The join is the evidence's own: the scam's refund portal sat on
+   198.51.100.23, the server that later served Lantern's second stage. */
+const LANTERN = 'c-lantern';
 async function sampleOsintAdd(){
-  if(!DB || !DB.sample || DB.osintSample || window.__noOsintSample || DB.cases.some(c => c.id === 'c-harbour')) return;   /* (the test suite turns it off where tests expect only the original demo cases) */
+  if(!DB || !DB.sample || DB.osintSample >= 2 || window.__noOsintSample || !DB.cases.some(c => c.id === LANTERN)) return;   /* (the test suite turns it off where tests expect only the intrusion) */
   if(typeof lazyNeed !== 'function' || !(await lazyNeed('sample')) || typeof SAMPLE_OSINT === 'undefined') return;
-  if(DB.osintSample || DB.cases.some(c => c.id === 'c-harbour')) return;
-  const S = SAMPLE_OSINT, cid = S.case.id, iso = t => new Date(t).toISOString();
-  const R = (o, extra) => Object.assign({id:uid('r'), caseId:cid, type:'evidence', title:o.title, body:o.body, ts:o.ts, tsRaw:iso(o.ts), tsZone:'explicit', source:o.source, host:'', tags:o.tags || [], ents:extractRich(String(o.body).slice(0, 200000)).slice(0, 2000), answer:'', addedBy:'You', addedAt:o.ts, hash:''}, extra || {});
+  if(DB.osintSample >= 2 || DB.entries.some(e => e.id === 'sp-jan') || !DB.cases.some(c => c.id === LANTERN)) return;
+  const S = SAMPLE_OSINT, cid = LANTERN, iso = t => new Date(t).toISOString();
+  const R = (o, extra) => Object.assign({id:uid('r'), caseId:cid, type:o.type || 'evidence', title:o.title, body:o.body, ts:o.ts, tsRaw:iso(o.ts), tsZone:'explicit', source:o.source, host:'', tags:o.tags || [], ents:extractRich(String(o.body).slice(0, 200000)).slice(0, 2000), answer:'', addedBy:'You', addedAt:Date.now(), hash:''}, extra || {});
   const recs = S.records.map(o => R(o));
   for(const p of S.pages){ const P = typeof parseWebPage === 'function' ? parseWebPage(p.html) : null; if(!P) continue;
     recs.push(R({title:'Web page: ' + (P.title || P.host || p.name).slice(0, 90), body:webPageBody(P, p.saved, null), ts:p.saved, source:'web page' + (P.host ? ' · ' + P.host : ''), tags:['web', 'archived']}, {page:{url:P.url, links:P.links, images:P.images}})); }
-  for(const h of S.hours){ const n = h.t.length, ts = Date.parse(h.ts); recs.push(R({title:h.title, body:`${h.fmt}: ${n.toLocaleString()} post times (UTC).\n` + h.who.join('\n'), ts, source:'posts:' + h.fmt, tags:['post-times']}, {hours:{fmt:h.fmt, who:h.who, t:h.t, unzoned:0}})); }
-  const ent = (caseId, [id, type, fields]) => ({id, caseId, type, fields, tags:[], notes:'', priority:type === 'person' ? 'high' : 'medium', starred:type === 'person', created:S.case.created, src:''});
-  const link = (caseId, [a, b, conf, label]) => ({id:uid('l'), caseId, a, b, conf, label, src:''});
-  DB.cases.push({...S.case, status:'active', owner:'You', updated:Date.now(), sample:true});
-  DB.records.push(...recs); DB.entries.push(...S.entries.map(e => ent(cid, e))); DB.links.push(...S.links.map(l => link(cid, l)));
-  const O = S.elsewhere; if(O && DB.cases.some(c => c.id === O.case) && !DB.entries.some(e => e.id === O.entries[0][0])){ DB.entries.push(...O.entries.map(e => ent(O.case, e))); DB.links.push(...O.links.map(l => link(O.case, l))); }
-  DB.osintSample = 1; mutate('added the OSINT sample case'); if(typeof hashRecords === 'function') hashRecords(); if(typeof ensurePositions === 'function') ensurePositions(); renderAll();
+  for(const h of S.hours){ const n = h.t.length, ts = Date.parse(h.ts); recs.push(R({title:h.title, body:`${h.fmt}: ${n.toLocaleString()} post times (UTC).\n` + h.who.join('\n'), ts, source:'posts:' + h.fmt, tags:['post-times']}, {hours:{fmt:h.fmt, who:h.who, t:h.t}})); }
+  /* the bridge between the intrusion and the scam */
+  const bridge = R({type:'finding', title:'The refund scam ran on the server that later served the LNK\'s second stage', ts:Date.parse('2026-09-16T09:00:00Z'), source:'analyst', tags:['osint', 'infrastructure', 'attribution'],
+    body:'Passive DNS puts harbour-line-portal.test, the refund scam\'s portal, on 198.51.100.23 from 2024-02-27 to 2024-03-09. The same address served update-lamp.test and /s.ps1 in this intrusion. The scam\'s kit author and @n1ghtlamp sell to the same buyers and post in the same hours. A strong lead, not proof: shared and resold hosting is common.'});
+  recs.push(bridge);
+  const ent = ([id, type, fields]) => ({id, caseId:cid, type, fields, tags:['scam'], notes:'', priority:type === 'person' ? 'high' : 'medium', starred:type === 'person', created:S.case.created, src:''});
+  const link = ([a, b, conf, label]) => ({id:uid('l'), caseId:cid, a, b, conf, label, src:''});
+  DB.records.push(...recs); DB.entries.push(...S.entries.map(ent), ent(['sp-portal', 'domain', {domain:'harbour-line-portal.test', registrar:'—', created:'2024-02-27'}]));
+  DB.links.push(...S.links.map(link), {...link(['sp-portal', 'v-ip2', 3, 'resolved to']), src:bridge.id}, {...link(['v-actor', 'sp-jan', 1, 'possibly the same person as']), src:bridge.id}, {...link(['sp-org', 'sp-portal', 2, 'runs']), src:bridge.id});
+  sampleOsintElsewhere();
+  const c = DB.cases.find(x => x.id === cid); if(c && !/refund scam/.test(c.scope || '')) c.scope = (c.scope || '').replace(/\s*$/, '') + ' The crew behind it also runs a refund scam: infrastructure, money, accounts and working hours are in this case too.';
+  DB.osintSample = 2; mutate('added the OSINT half of Op Lantern'); if(typeof hashRecords === 'function') hashRecords(); if(typeof ensurePositions === 'function') ensurePositions(); renderAll();
+}
+/* the scam's subject under another name in another case, when that case is there (it is not among the sample cases
+   since 1.87; the test suite keeps one) — for the identity profile's cross-case matches and conflicts */
+function sampleOsintElsewhere(){
+  const O = typeof SAMPLE_OSINT !== 'undefined' && SAMPLE_OSINT.elsewhere; if(!O || !DB.cases.some(x => x.id === O.case) || DB.entries.some(e => e.id === O.entries[0][0])) return false;
+  DB.entries.push(...O.entries.map(([id, type, fields]) => ({id, caseId:O.case, type, fields, tags:['scam'], notes:'', priority:type === 'person' ? 'high' : 'medium', starred:type === 'person', created:SAMPLE_OSINT.case.created, src:''})));
+  DB.links.push(...O.links.map(([a, b, conf, label]) => ({id:uid('l'), caseId:O.case, a, b, conf, label, src:''}))); return true;
 }
 function removeSample(){
   const ids = new Set(DB.cases.filter(c => c.sample).map(c => c.id));
@@ -78,7 +117,7 @@ function ensureCTF(){
   const ev = {id:'ev-sample', name:'Sample CTF 2026', flagRe:'FLAG\\{[^}]+\\}', url:'', sample:true, created:Date.now()};
   const mk = (name, cat, points, status, extra) => ({id:uid('ch'), eventId:ev.id, name, cat, points, status, flag:'', notes:'', caseId:null, created:Date.now(), solvedAt:status === 'solved' ? Date.now() - 3600e3 : 0, sample:true, ...extra});
   DB.ctf = {events:[ev], chals:[
-    mk('Harbour lights', 'osint', 300, 'working', {caseId:'c-lab', notes:'Photo → EXIF GPS → Oslo harbour. Uploader @k3lpie_sails.\nTrailing base64 after the JPEG end marker — decode it for the flag.'}),
+    mk('Harbour lights', 'osint', 300, 'working', {caseId:null, notes:'Photo → EXIF GPS → Oslo harbour. Uploader @k3lpie_sails.\nTrailing base64 after the JPEG end marker — decode it for the flag.'}),
     mk('Who registered it?', 'osint', 150, 'solved', {flag:'FLAG{wh01s_n3v3r_f0rg3ts}', notes:'Historic WHOIS on the phishing domain showed the registrant email before privacy was turned on.'}),
     mk('Memory lane', 'forensics', 400, 'todo', {notes:'Volatility: check pslist, netscan and cmdline for the odd process.'}),
     mk('Packet whisper', 'network', 250, 'todo', {notes:'DNS queries with long base32 subdomains — exfil over DNS?'}),
@@ -137,9 +176,9 @@ function ctfWriteups(){
 }
 
 /* ---------- forensics kit ---------- */
-const LAB_TABS = [['file','File inspector','file-search'], ['logs','Log parser','scan-text'], ['pcap','PCAP','network'], ['sqlite','SQLite','database'], ['brow','Browser profile','app-window'], ['image','Image','image'], ['email','Email headers','mail'], ['time','Time & IDs','clock-3'], ['hash','Hashes','fingerprint'], ['geo','Coordinates','compass'], ['net','Network','network'], ['gen','Generators','users'], ['twist','Look-alikes','copy'], ['ident','Identity','user'], ['fav','Favicon & page hash','scan-search'], ['kit','Phishing kit','skull'], ['steal','Stealer log','key-round'], ['corp','Company footprint','building-2'], ['clean','Clean before sending','eraser']];
+const LAB_TABS = [['file','File inspector','file-search'], ['pcap','PCAP','network'], ['sqlite','SQLite','database'], ['brow','Browser profile','app-window'], ['image','Image','image'], ['email','Email headers','mail'], ['time','Time & IDs','clock-3'], ['hash','Hashes','fingerprint'], ['geo','Coordinates','compass'], ['net','Network','network'], ['gen','Generators','users'], ['twist','Look-alikes','copy'], ['ident','Identity','user'], ['fav','Favicon & page hash','scan-search'], ['kit','Phishing kit','skull'], ['steal','Stealer log','key-round'], ['corp','Company footprint','building-2'], ['clean','Clean before sending','eraser']];
 /* the tools in three groups, all visible at any width (the bar wraps instead of hiding tools off to the side) */
-const LAB_GROUPS = [['Analyse files', ['file', 'image', 'kit', 'steal', 'brow', 'logs', 'pcap', 'sqlite']], ['Decode', ['email', 'time', 'hash']], ['Investigate', ['corp', 'fav', 'geo', 'net', 'gen', 'twist', 'ident', 'clean']]];
+const LAB_GROUPS = [['Analyse files', ['file', 'image', 'kit', 'steal', 'brow', 'pcap', 'sqlite']], ['Decode', ['email', 'time', 'hash']], ['Investigate', ['corp', 'fav', 'geo', 'net', 'gen', 'twist', 'ident', 'clean']]];
 /* one line: a button per group showing the tool in use; its tools drop down under it */
 document.addEventListener('click', ev => { if(UI.ltOpen == null || ev.target.closest('.lt-c')) return; UI.ltOpen = null; document.querySelectorAll('.lt-pop').forEach(x => x.hidden = true); document.querySelectorAll('.lt-cat').forEach(b => b.setAttribute('aria-expanded', 'false')); });
 document.addEventListener('keydown', ev => { if(ev.key === 'Escape' && UI.ltOpen != null){ const b = document.querySelector(`.lt-cat[data-v="${UI.ltOpen}"]`); UI.ltOpen = null; document.querySelectorAll('.lt-pop').forEach(x => x.hidden = true); if(b){ b.setAttribute('aria-expanded', 'false'); b.focus(); } } });

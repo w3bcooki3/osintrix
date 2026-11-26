@@ -3,16 +3,22 @@
    to a case. Lines starting with "[ ]" or "- [ ]" become tickable tasks.
    ========================================================================== */
 const NOTE_COLORS = [['yellow','#f5c451'],['pink','#f472b6'],['blue','#60a5fa'],['green','#4ade80'],['purple','#a78bfa'],['gray','#94a3b8']];
+/* the sample notes: for each sample case a checklist and a written note, and two general ones */
+function SAMPLE_NOTES(){
+  const T = Date.parse('2026-09-15T12:00:00Z'), S = Date.parse('2026-09-24T12:00:00Z');
+  return [
+    {id:'n1', caseId:'c-lantern', color:'yellow', pinned:true, title:'Before handoff', text:'[x] Isolate WS-FIN-07\n[ ] Image DC01 memory\n[ ] Pull proxy logs 14:00–15:00\n[ ] Ask finance who else got Invoice 4471\n[ ] Block 203.0.113.47 and update-lamp.test at the edge', due:'2026-09-17', created:T - 7200e3, updated:T - 3600e3},
+    {id:'n2', caseId:'c-lantern', color:'blue', pinned:false, title:'Who is @n1ghtlamp?', text:'## What we have\n- Joined forum.example **2025-11**, sells the "lamp loader" builder\n- Registered the phishing domain with n1ghtlamp@mail.example\n- Paid in BTC to one advertised address\n## Next\n- Archive the forum profile before it changes\n- Compare posting hours with the refund-scam accounts', due:'', created:T - 5400e3, updated:T - 5400e3},
+    {id:'n3', caseId:'c-lantern', color:'pink', pinned:false, title:'', text:'Beacon interval ~60 s ± 8%. The 6 KB beacon at 09:02 is the odd one — tasking or exfil?', due:'', created:T - 9000e3, updated:T - 9000e3},
+    {id:'n4', caseId:null, color:'green', pinned:true, title:'This week', text:'[ ] Write up Op Lantern for the client\n[ ] Chase the right-of-reply deadlines on Kestrel Dawn\n[ ] Update the Sigma rule for Lamp loader C2\n[x] Import new dork templates', due:'2026-09-26', created:S - 86400e3, updated:S - 3600e3},
+    {id:'n6', caseId:'c-story', color:'green', pinned:true, title:'Before publication', text:'[x] Two independent sources for the 40% shareholding\n[x] Archive the company\'s About page before it changes again\n[ ] Councillor Lund\'s reply (deadline 27 Sep, 12:00)\n[ ] Henrik Lund\'s reply\n[ ] Second satellite image or port call record for Port Varan\n[ ] Legal read of the draft', due:'2026-09-27', created:S - 7200e3, updated:S - 1800e3},
+    {id:'n7', caseId:'c-story', color:'purple', pinned:false, title:'Keeping the source safe', text:'## Rules for this story\n- Talk to the tipster only through the secure drop\n- Never name their department, even in drafts\n- **Do not** quote the tip word for word — the wording could identify them\n- Their name lives only in *Protected sources*, never in a note or the evidence', due:'', created:S - 9000e3, updated:S - 9000e3},
+    {id:'n8', caseId:null, color:'blue', pinned:false, title:'Habits that save a case', text:'# Every time\n- Archive a page **before** you cite it\n- Write down *where* a fact came from as you capture it\n- Keep times in `UTC`; convert only in the write-up\n- One claim, two independent sources', due:'', created:T - 180000e3, updated:T - 180000e3},
+  ];
+}
 function ensureNotes(){
   if(DB.notes) return;
-  const T = Date.parse('2026-09-15T12:00:00Z');
-  DB.notes = [
-    {id:'n1', caseId:'c-lantern', color:'yellow', pinned:true, text:'Before handoff\n[x] Isolate WS-FIN-07\n[ ] Image DC01 memory\n[ ] Pull proxy logs 14:00–15:00\n[ ] Ask finance who else got Invoice 4471', due:'2026-09-17', created:T - 7200e3, updated:T - 3600e3},
-    {id:'n2', caseId:'c-lantern', color:'blue', pinned:false, text:'@n1ghtlamp joined forum.example 2025-11. Check archive.org snapshots of the profile — was the email ever different?', due:'', created:T - 5400e3, updated:T - 5400e3},
-    {id:'n3', caseId:'c-lantern', color:'pink', pinned:false, text:'Beacon interval ~60 s ± 8%. The 6 KB beacon at 09:02 is the odd one — tasking or exfil?', due:'', created:T - 9000e3, updated:T - 9000e3},
-    {id:'n4', caseId:null, color:'green', pinned:true, text:'This week\n[ ] Write up Op Lantern for the client\n[ ] Update Sigma rule for Lamp loader C2\n[x] Import new dork templates', due:'2026-09-19', created:T - 86400e3, updated:T - 3600e3},
-    {id:'n5', caseId:'c-portal', color:'purple', pinned:false, text:'203.0.113.47 is also the Lantern C2. Same actor, or shared hosting? Compare timing.', due:'', created:T - 180000e3, updated:T - 180000e3},
-  ];
+  DB.notes = SAMPLE_NOTES().filter(n => DB.cases.some(c => c.id === n.caseId) || !n.caseId);
 }
 /* A note's title: optional, shown at the top of the card. Cleaned the same way everywhere it is set —
    hidden and direction-changing characters out, spaces collapsed, at most 120 characters — and always
@@ -121,7 +127,7 @@ function noteRemindCheck(){
   for(const n of DB.notes){ if(!n.remind || n.reminded) continue; const at = noteDueAt(n); if(at == null || at > now) continue;
     n.reminded = now; fired++; const late = now - at > 10 * 6e4, label = noteLabel(n).slice(0, 90);
     toast(`${late ? 'Missed reminder' : 'Reminder'}: ${label}${late ? ' — was due ' + noteDueText(n) : ''}`, 'Open', () => { go('#/notes'); setTimeout(() => noteDlg(n.id), 60); });
-    try{ if(typeof Notification !== 'undefined' && Notification.permission === 'granted') new Notification('OSINTrix reminder', {body:label, tag:'note-' + n.id}); }catch(e){} }
+    try{ if(typeof Notification !== 'undefined' && Notification.permission === 'granted') new Notification('OSINTrix reminder', DB.prefs.discreet ? {body:'A reminder is due', tag:'osintrix-reminder'} : {body:label, tag:'note-' + n.id});   /* discreet: nothing from the note on the lock screen */ }catch(e){} }
   if(fired){ save(); if(UI.route && (UI.route.area === 'notes' || UI.route.area === 'today' || UI.route.area === 'home')) bgRender(); }
 }
 /* the next one is due soon: check every 20 seconds, and when the tab comes back */

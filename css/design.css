@@ -3302,6 +3302,11 @@ button.rsum-i:hover{background:var(--hover);color:var(--text)}
 .ds ::-webkit-scrollbar-thumb:hover{background-color:color-mix(in srgb,var(--text-3) 60%,transparent)}
 .ds ::-webkit-scrollbar-corner{background:transparent}
 .ds,.ds *{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--text-3) 38%,transparent) transparent}
+/* strips that scroll sideways (tab rows, toolbars) hide their bar, as their own rules say; the rule above is more
+   specific and later, so it brought the bar back, and the case tabs (1px taller inside than out, from the tab
+   underline sitting over the row's border) showed a vertical one on Windows */
+.ds .tabs,.ds .gtools,.ds .iv-tabs,.ds .labtabs,.ds .sr-scopes,.ds .rf3-areas,.ds .dock-i,.ds .txops,.ds .vcats,.ds .tcats{scrollbar-width:none}
+.ds .tabs,.ds .iv-tabs,.ds .labtabs,.ds .rf3-areas{overflow-y:hidden}
 /* a strip of tabs or buttons wider than the screen scrolls sideways, with a soft edge that shows there is more */
 .ds .x-more{overflow-x:auto;scrollbar-width:none;-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 36px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 36px),transparent)}
 .ds .x-more::-webkit-scrollbar{display:none}
@@ -3696,6 +3701,15 @@ button.rsum-i:hover{background:var(--hover);color:var(--text)}
 
 /* ---------- the story panel ---------- */
 @media (min-width:761px){html.ds .insp.story{width:480px}}
+/* a story's panel is as tall as the story: short ones no longer leave the panel running empty to the bottom of the
+   window; long ones stop at the window's edge and scroll inside, with the buttons still at the foot */
+@media (min-width:761px){html.ds .insp.story{bottom:auto;max-height:calc(100vh - var(--top) - 32px)} html.ds .insp.story .st-b{flex:0 1 auto;min-height:0}}
+/* behind an open story, and behind the Query library, Detections and CTF drawers: the page blurred and dimmed */
+.st-scrim{position:fixed;inset:var(--top) 0 0 0;z-index:59;background:color-mix(in srgb,var(--bg) 40%,transparent);-webkit-backdrop-filter:blur(6px) saturate(.9);backdrop-filter:blur(6px) saturate(.9);animation:fadeIn .18s}
+html.ds .drw-scrim{background:color-mix(in srgb,var(--bg) 40%,transparent);-webkit-backdrop-filter:blur(6px) saturate(.9);backdrop-filter:blur(6px) saturate(.9)}
+/* the drawers float and are as tall as what is in them; long ones stop at the window's edge and scroll inside */
+@media (min-width:761px){html.ds .drw{top:calc(var(--top) + 16px);right:16px;bottom:auto;max-width:calc(100vw - 32px);max-height:calc(100vh - var(--top) - 32px);border:1px solid var(--border-soft);border-radius:14px} html.ds .drw-b{flex:0 1 auto}}
+@media (prefers-reduced-motion:reduce){.st-scrim{animation:none}}
 @media (min-width:1760px){html.ds:has(#insp.story) #main .scroll{padding-right:500px}}
 .insp.story.enter{animation:stIn .42s cubic-bezier(.16,1,.3,1)}
 @keyframes stIn{from{opacity:0;transform:translateX(36px) scale(.985)}}
@@ -4116,3 +4130,9 @@ button.st-w:active{transform:scale(.995)}
 .ds .ct-head{display:flex;gap:10px;align-items:center;margin-bottom:8px} .ds .ct-head>div{flex:1;display:flex;flex-direction:column}
 .ds .ct-what fieldset{border:0;padding:0;margin:10px 0 0} .ds .ct-what legend{font-weight:600;margin-bottom:4px}
 .ds .ct-what .chk{display:flex;gap:8px;align-items:flex-start;padding:4px 0}
+
+/* the graph takes the keyboard: show where focus is */
+#cy:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;border-radius:12px}
+/* a place's name is the button that picks it on the map (the header around it holds other buttons) */
+.ph-sel{all:unset;cursor:pointer;font:inherit;color:inherit;border-radius:6px}
+.ph-sel:focus-visible{outline:2px solid var(--accent);outline-offset:2px}

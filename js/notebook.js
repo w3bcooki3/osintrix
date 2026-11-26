@@ -698,8 +698,33 @@ http://169.254.169.254/latest/meta-data/iam/security-credentials/&lt;role&gt;</p
   const df = nbNewBook({name:'DFIR study', kind:'Study', color:'#ea580c', sample:true, created:T0 - 20 * NB_DAY}), wa = nbNewSec(df.id, 'Windows artefacts');
   mk(df, wa, 'Prefetch and Amcache', `<p>Two places that show programs ran — or at least existed — on a Windows host.</p><table><tr><th>Artefact</th><th>Where</th><th>Tells you</th></tr><tr><td>Prefetch</td><td>C:\\Windows\\Prefetch\\*.pf</td><td>Run count, last 8 run times (Windows 8 and later), files loaded</td></tr><tr><td>Amcache</td><td>C:\\Windows\\appcompat\\Programs\\Amcache.hve</td><td>Path, SHA-1 and first-seen time of programs</td></tr></table><pre>PECmd.exe -d C:\\Windows\\Prefetch --csv out
 AmcacheParser.exe -f Amcache.hve --csv out</pre><div class="nb-call"><p><b>Careful:</b> an Amcache entry alone does not prove a program ran. Back it up with Prefetch, ShimCache or event logs.</p></div><p>Q: How many last-run times does a Windows 10 prefetch file keep?</p><p>A: Eight.</p><p>Q: Which hash does Amcache record for a file?</p><p>A: SHA-1</p>`, {tags:['dfir', 'windows', 'execution'], src:'FOR500 notes', updated:T0 - 1 * NB_DAY});
+  nbCaseNotesSeed();
   // some cards already reviewed, so progress shows
   for(const p of N.pages) nbInfo(p).cards.forEach((k, i) => { if(p.id !== kr.id && i % 2 === 0) N.cards[k.key] = {reps:2, ivl:6, ease:2.5, lapses:0, due:T0 + (3 + i) * NB_DAY}; });
+}
+
+/* Case notes: working pages written the way people keep notes in Obsidian — linked with [[ ]] to the cases, the
+   vault entries they are about and each other, tagged, with checklists — so the links panel and the page graph have
+   something to show. One page for each sample case, and one general page both of them point to. */
+function nbCaseNotesSeed(){
+  const N = DB.nb, T0 = Date.now(), has = id => DB.cases.some(c => c.id === id);
+  const wl = (v, t) => `<a class="nb-wl" data-wl="${v}" contenteditable="false">${t}</a>`;
+  const bk = nbNewBook({name:'Case notes', kind:'Other', color:'#0f766e', sample:true, caseNotes:true, created:T0 - 9 * NB_DAY}), sec = nbNewSec(bk.id, 'Working notes');
+  const mk = (title, html, o) => nbNewPage(sec.id, {title, html, sample:true, ...o});
+  const reply = mk('Right of reply — how we do it', `<p>Everyone a story names gets a fair chance to answer <b>before</b> it runs. Linked from ${has('c-story') ? wl('case:c-story', 'Kestrel Dawn') : 'the story case'} and every other story case.</p>
+<h2>The letter</h2><ul><li>Each claim about them, specifically — not "the story says you did wrong".</li><li>The evidence in outline, without exposing a source.</li><li>A real deadline: at least two working days, longer for complex questions.</li></ul>
+<h2>Checklist</h2><ul class="nb-check"><li class="done">Send in writing, keep a copy</li><li class="done">Log the date and the deadline in Story → Right of reply</li><li>Chase once by phone before the deadline</li><li>Quote the answer fairly, or say they declined</li></ul>
+<div class="nb-call"><p><b>Remember:</b> "did not reply by the deadline" is a fact you can print; "refused to comment" is only true if they said so.</p></div>`, {tags:['method', 'right-of-reply'], src:'House style'});
+  if(has('c-story')) mk('Kestrel Dawn — story plan', `<p>Case: ${wl('case:c-story', 'Kestrel Dawn — a port contract and a ship that went dark')}. Who it is about: ${wl('entry:st-cllr', 'Peter Lund')}, ${wl('entry:st-bro', 'Henrik Lund')}, ${wl('entry:st-co', 'Grey Gull Marine Ltd')}, and the tanker ${wl('entry:st-ship', 'KESTREL DAWN')}.</p>
+<h2>What we can say</h2><ul><li>The company was <b>three weeks old</b> when the tender closed.</li><li>The award was a single tender, proposed by the councillor.</li><li>The councillor's brother owns <b>40%</b>.</li></ul>
+<h2>What we cannot say yet</h2><ul><li>That the tanker loaded at Port Varan — the satellite match is likely, not certain.</li><li>That the councillor steered the award.</li></ul>
+<h2>Still to do</h2><ul class="nb-check"><li class="done">Archive the About page (it changed in September)</li><li>Replies from both Lunds — see ${wl('page:' + reply.id, 'Right of reply — how we do it')}</li><li>Port call records or a second image</li></ul>`, {tags:['kestrel-dawn', 'shipping', 'procurement'], src:'Case notes'});
+  const study = [['Pass-the-hash', 'how svc_backup could reach DC01 without its password'], ['Prefetch and Amcache', 'proving the fake svchost.exe ran on WS-FIN-07']].map(([t, why]) => [N.pages.find(p => p.title === t), why]).filter(([p]) => p);
+  if(has('c-lantern')) mk('Op Lantern — working notes', `<p>Case: ${wl('case:c-lantern', 'Op Lantern — invoice LNK intrusion')}. The operator is ${wl('entry:v-handle', '@n1ghtlamp')}; the C2 is ${wl('entry:v-ip1', '203.0.113.47')}.</p>
+<h2>Timeline in one line</h2><p>Invoice LNK opened 08:57 → PowerShell pulls /s.ps1 → fake svchost.exe beacons every ~60 s → <code>svc_backup</code> reaches DC01 at 14:31 → security log cleared 14:40.</p>
+<h2>Who is behind it</h2><ul><li>Same server (198.51.100.23) served the second stage and, earlier, a refund-scam portal.</li><li>Posting hours of @n1ghtlamp and the scam accounts overlap — check the hours chart before saying more.</li></ul>
+<h2>Open</h2><ul class="nb-check"><li class="done">Isolate WS-FIN-07</li><li>Image DC01 memory</li><li>Was anything taken in the 6 KB beacon?</li></ul>${study.length ? `<h2>Study notes this case uses</h2><ul>${study.map(([p, why]) => `<li>${wl('page:' + p.id, esc(p.title))} — ${why}</li>`).join('')}</ul>` : ''}
+<div class="nb-call"><p><b>For the report:</b> keep the attribution as a lead with its evidence; shared hosting alone proves nothing.</p></div>`, {tags:['op-lantern', 'intrusion', 'attribution'], src:'Case notes'});
 }
 
 /* ---------- backups, encryption and imported data ---------- */

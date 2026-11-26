@@ -4,17 +4,14 @@
    person, handle, wallet and hash is invented. Nothing here is real.
    ========================================================================== */
 const DEMO = (() => {
-const C1 = 'c-lantern', C2 = 'c-portal', C3 = 'c-lab';
+const C1 = 'c-lantern', C2 = 'c-story';
 const cases = [
   {id:C1, name:'Op Lantern — invoice LNK intrusion', code:'TN-2026-014', status:'active', owner:'You',
    created:'2026-09-14T09:30:00Z', updated:'2026-09-15T11:20:00Z', t0:'r-lnk',
    scope:'Phishing LNK on WS-FIN-07, beaconing implant, lateral movement to DC01. OSINT on the sender infrastructure.'},
-  {id:C2, name:'Customer portal — credential stuffing', code:'TN-2026-011', status:'review', owner:'You',
-   created:'2026-09-09T13:00:00Z', updated:'2026-09-12T16:05:00Z',
-   scope:'Burst of failed logins against portal.corp.example; check overlap with other cases.'},
-  {id:C3, name:'Harbour photo — OSINT & forensics CTF lab', code:'LAB-2026-01', status:'active', owner:'You',
-   created:'2026-09-20T18:00:00Z', updated:'2026-09-21T09:30:00Z', t0:'lab2',
-   scope:'Practice challenge: work out where harbour.jpg was taken, who posted it, and recover the hidden flag. Flag format FLAG{...}.'}
+  {id:C2, name:'Kestrel Dawn — a port contract and a ship that went dark', code:'ST-2026-007', status:'active', owner:'You', tpl:'story',
+   created:'2026-09-18T08:00:00Z', updated:'2026-09-24T17:00:00Z',
+   scope:'A tip says the Northmouth harbour fuel contract went to a company set up weeks before the tender closed, part-owned by a councillor\'s brother, whose tanker switched off its transponder near a sanctioned terminal. Check every claim, keep the source safe, and give everyone named a fair chance to reply before publication.'}
 ];
 /* [id, case, type, time, host, source, title, body, tags] */
 const R = [
@@ -62,34 +59,41 @@ const R = [
  ['q4',C1,'lead',null,'','checklist','Who operates @n1ghtlamp?','',['question']],
  ['q5',C1,'lead',null,'','checklist','Was anything exfiltrated in the 6 KB beacon?','',['question']],
  ['r-scope',C1,'note',null,'','analyst','Scope so far: WS-FIN-07 and DC01','Finance team notified 2026-09-14 10:05. WS-FIN-07 isolated 10:40. DC01 pending image.',['scope']],
- // case 2 — credential stuffing, shares 203.0.113.47 with case 1
- ['p1',C2,'evidence','2026-09-10T02:11:04Z','WEB02','access.log','Burst of failed logins from 203.0.113.47',
-  '203.0.113.47 - - [10/Sep/2026:02:11:04 +0000] "POST /login HTTP/1.1" 401 512 "-" "python-requests/2.31"',['auth']],
- ['p2',C2,'evidence','2026-09-10T02:11:05Z','WEB02','access.log','Failed login from 203.0.113.47',
-  '203.0.113.47 - - [10/Sep/2026:02:11:05 +0000] "POST /login HTTP/1.1" 401 512 "-" "python-requests/2.31"',['auth']],
- ['p3',C2,'evidence','2026-09-10T02:14:40Z','WEB02','access.log','Successful login after 212 failures',
-  '203.0.113.47 - - [10/Sep/2026:02:14:40 +0000] "POST /login HTTP/1.1" 302 0 "-" "python-requests/2.31" user=m.silva@corp.example',['auth']],
- ['p4',C2,'evidence','2026-09-10T03:02:12Z','WEB02','access.log','Second source 192.0.2.66 tries the same list',
-  '192.0.2.66 - - [10/Sep/2026:03:02:12 +0000] "POST /login HTTP/1.1" 401 512 "-" "python-requests/2.31"',['auth']],
- ['p5',C2,'finding','2026-09-12T16:00:00Z','','analyst','One account compromised; password reset done',
-  'm.silva@corp.example reset 2026-09-12. 203.0.113.47 blocked at WAF.',['auth']],
-
- // case 3 — CTF-style lab
- ['lab1',C3,'note','2026-09-20T18:00:00Z','','ctf:brief','Challenge brief — "Harbour lights" (OSINT, 300 pts)',
-  'A user posted harbour.jpg with the caption "golden hour at the old docks". Find the city, the uploader, and the flag hidden in the file. Flag format: FLAG{...}',['ctf','brief']],
- ['lab2',C3,'evidence','2026-09-20T18:12:00Z','','exiftool','EXIF from harbour.jpg — GPS present',
-  'File: harbour.jpg  SHA256=4be1c0d9a8f7e6d5c4b3a2918070605040302010f0e0d0c0b0a09080706050  Make: ExampleCam  Model: X100  DateTimeOriginal: 2026:08:21 18:42:07  Software: GIMP 2.10  GPSLatitude: 59 deg 54\' 38.00" N  GPSLongitude: 10 deg 44\' 25.00" E',['exif','geolocation']],
- ['lab3',C3,'evidence','2026-09-20T18:20:00Z','','strings','strings -n 8 harbour.jpg — odd base64 after the JPEG end marker',
-  'Trailing data after FFD9 at offset 0x2A41F: RkxBR3toYXJib3VyX2xpZ2h0c181OU59  (appended with cat, not steganography)',['strings','flag']],
- ['lab4',C3,'evidence','2026-09-20T18:34:00Z','','osint:photo-site','Original upload by @k3lpie_sails on photos.example',
-  'Reverse image search finds the same photo posted 2026-08-21 by @k3lpie_sails on photos.example, caption "golden hour at the old docks". Profile links to k3lpie@mail.example.',['osint']],
- ['lab5',C3,'finding','2026-09-21T09:20:00Z','','analyst','GPS resolves to Oslo harbour front (59.9106 N, 10.7403 E)',
-  'Converted DMS 59°54\'38"N 10°44\'25"E → 59.910556, 10.740278. Matches the skyline in the photo. Try Lab → Coordinates to check.',['geolocation']],
- ['lq1',C3,'lead',null,'','checklist','Where was the photo taken?','',['question']],
- ['lq2',C3,'lead',null,'','checklist','What does the trailing base64 decode to?','Try the Decoder — it is the flag.',['question']],
- ['lq3',C3,'lead',null,'','checklist','Is @k3lpie_sails active on other platforms?','',['question']],
+ // case 2 — journalism: a contract, a family link and a tanker that went dark
+ ['s-tip',C2,'note','2026-09-18T08:10:00Z','','tip','Tip received through the secure drop',
+  'A council employee says the Northmouth harbour fuel contract (about EUR 4.2m a year) went to Grey Gull Marine Ltd, registered only weeks before the tender closed, and that the company\'s tanker "goes dark" near Port Varan. Who the tipster is stays in Protected sources, never here.',['tip']],
+ ['s-reg',C2,'evidence','2026-09-18T10:30:00Z','','company registry','Registry extract — Grey Gull Marine Ltd',
+  'Grey Gull Marine Ltd, company no. 14552019, incorporated 2026-06-02. Registered office: 4 Quay Lane, Northmouth. Director: Mara Velden (appointed 2026-06-02). Website https://greygull-marine.example — press contact press@greygull-marine.example',['company','registry']],
+ ['s-tender',C2,'evidence','2026-09-18T11:05:00Z','','council minutes','Harbour Board minutes — fuel contract awarded without competition',
+  'Northmouth Harbour Board, 2026-07-14, item 6: the fuel supply contract is awarded to Grey Gull Marine Ltd under a single-tender procedure, "for reasons of urgency". Proposed by councillor Peter Lund, seconded, carried 5–2. The tender window closed 2026-06-20.',['contract']],
+ ['s-whois',C2,'evidence','2026-09-18T13:40:00Z','','osint:whois','WHOIS — greygull-marine.example registered before the company',
+  'greygull-marine.example registered 2026-05-29 via Example Registrar Inc. Registrant organisation: Velden Consulting. Registrant email m.velden@mail.example. Name servers ns1.example-host.test',['osint','infrastructure']],
+ ['s-ais1',C2,'evidence','2026-08-03T21:14:00Z','','ais:export','AIS — Kestrel Dawn stops transmitting',
+  'MMSI 636019825, IMO 9074729, KESTREL DAWN (tanker, 183 m). Last message 2026-08-03 21:14 UTC at 57.412, 4.318 heading 078 at 11.2 kn, draught 6.1 m. Nothing received for the next 52 hours.',['vessel','ais']],
+ ['s-sat',C2,'evidence','2026-08-04T10:20:00Z','','satellite','Satellite image: a tanker of the same length at the Port Varan terminal',
+  'Commercial satellite image, 2026-08-04 10:20 UTC: a tanker about 183 m long moored at the Port Varan oil terminal (57.903, 5.087). The hull markings cannot be read: a likely match, not a certain one.',['vessel','imagery']],
+ ['s-ais2',C2,'evidence','2026-08-06T01:40:00Z','','ais:export','AIS — Kestrel Dawn reappears, now low in the water',
+  'MMSI 636019825 transmits again 2026-08-06 01:40 UTC at 57.884, 5.112, draught 11.8 m (6.1 m before the gap). The ship most likely took on cargo while it was dark.',['vessel','ais']],
+ ['s-social',C2,'evidence','2026-07-15T18:02:00Z','','osint:social','The director thanks the councillor the day after the vote',
+  '@maravelden on social.example: "Proud that Grey Gull will keep Northmouth moving! Thanks to @peterlund for backing local business." https://social.example/@maravelden/112339',['osint','social']],
+ ['s-about1',C2,'evidence','2026-07-01T09:00:00Z','','web archive','Company website, July: Lund Shipping Services listed as a partner',
+  'Archived copy of https://greygull-marine.example/about (2026-07-01): "Our partners: Lund Shipping Services, Northmouth Bunkering."',['web','archived']],
+ ['s-about2',C2,'evidence','2026-09-21T09:30:00Z','','web','Company website, September: the partner is gone',
+  'Live page https://greygull-marine.example/about (2026-09-21): "Our partners: Northmouth Bunkering." Lund Shipping Services no longer appears. Changed some time after 2026-07-01.',['web','changed']],
+ ['s-family',C2,'evidence','2026-09-22T11:00:00Z','','company registry','Registry filing: the councillor\'s brother owns 40%',
+  'Return of allotment, 2026-06-09: 40 of 100 shares in Grey Gull Marine Ltd allotted to Henrik Lund, 22 Harbour Row, Northmouth. Henrik Lund is named as the brother of councillor Peter Lund in the council\'s 2024 register of interests.',['company','conflict-of-interest']],
+ ['s-interests',C2,'evidence','2026-09-22T11:20:00Z','','register of interests','The councillor\'s 2026 declaration does not mention it',
+  'Peter Lund\'s declaration of interests, filed 2026-05-30, lists no interest in Grey Gull Marine Ltd and no shareholding by a family member. Declarations must be updated within 28 days of a change.',['conflict-of-interest']],
+ ['s-statement',C2,'evidence','2026-09-24T15:30:00Z','','right of reply','Grey Gull Marine: "a technical fault"',
+  'Email from Mara Velden, 2026-09-24: "Grey Gull Marine complies with all applicable sanctions. Our vessel\'s transponder suffered a technical fault in early August, which was reported to the flag state. We have never called at Port Varan."',['reply']],
+ ['s-find',C2,'finding','2026-09-24T16:00:00Z','','analyst','What we can stand up so far',
+  'Confirmed: the company\'s age, the single-tender award, the 40% family shareholding, the 52-hour AIS gap. Likely but not proven: that the tanker at Port Varan is Kestrel Dawn. Not established: that the councillor influenced the award. Waiting on the councillor\'s reply.',['finding']],
+ ['sq1',C2,'lead',null,'','checklist','Did councillor Lund declare the family shareholding anywhere else?','',['question']],
+ ['sq2',C2,'lead',null,'','checklist','Can the flag state confirm a reported transponder fault?','',['question']],
+ ['sq3',C2,'lead',null,'','checklist','Why was it a single tender, and who else could have bid?','',['question']],
+ ['sq4',C2,'lead',null,'','checklist','Is the tanker at Port Varan Kestrel Dawn — a second image, or port call records?','',['question']],
 ];
-const answers = {lq1:'Oslo harbour front, Norway — 59.9106 N, 10.7403 E', q1:'Phishing LNK attachment — Invoice_4471.pdf.lnk', q2:'CORP\\svc_backup'};
+const answers = {sq3:'Minutes say "urgency" after the previous supplier\'s contract lapsed; two local suppliers say they were never asked.', q1:'Phishing LNK attachment — Invoice_4471.pdf.lnk', q2:'CORP\\svc_backup'};
 const verdicts = {
   'ipv4:203.0.113.47':'malicious','hostport:203.0.113.47:4444':'malicious','domain:update-lamp.test':'malicious',
   'domain:lantern-invoice.example':'malicious','url:http://update-lamp.test/s.ps1':'malicious',
@@ -103,7 +107,7 @@ const attrs = {
   'domain:lantern-invoice.example':[['Registered','2026-09-01','r-whois',3],['Registrar','Example Registrar Inc.','r-whois',3],['Registrant email','n1ghtlamp@mail.example','r-whois',2]],
   'handle:@n1ghtlamp':[['Platform','forum.example','r-forum',3],['Joined','2025-11','r-forum',2],['Offers','"lamp loader" builder','r-forum',2],['Contact','n1ghtlamp@mail.example','r-forum',3]],
   'btc:bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh':[['Inbound','0.42 BTC across 3 transfers','r-chain',2],['Advertised by','@n1ghtlamp','r-wallet',2]],
-  'ipv4:203.0.113.47':[['Port','4444/tcp','r-c2a',3],['Role','C2 for fake svchost.exe','r-find1',3],['Also seen','Credential stuffing, portal case','p1',3]],
+  'ipv4:203.0.113.47':[['Port','4444/tcp','r-c2a',3],['Role','C2 for fake svchost.exe','r-find1',3]],
   'domain:update-lamp.test':[['Resolves to','198.51.100.23','r-dns',3],['Serves','/s.ps1 second stage','r-ps',3]]
 };
 /* Asserted relationships: an analyst claim with a label, confidence and its evidence */
@@ -142,5 +146,23 @@ const feed = [
   {id:'f12',source:'Sample research notes',date:'2023-08-29T19:00:00Z',title:'International operation disrupts QakBot botnet infrastructure',
    body:'Law enforcement disrupted the QakBot malware botnet, used for years as an initial access loader for ransomware groups, and redirected infected computers to an uninstaller.'}
 ];
-return {cases, R, answers, verdicts, attrs, edges, feed};
+const D = t => Date.parse(t);
+const story = {
+  claims:[
+    {id:'sc1', t:'Grey Gull Marine Ltd was set up less than three weeks before the tender closed', st:'confirmed', for:['r:s-reg', 'r:s-tender'], against:[], about:['st-co'], note:'', at:D('2026-09-18T12:00:00Z')},
+    {id:'sc2', t:'The contract was awarded without competition', st:'confirmed', for:['r:s-tender'], against:[], about:['st-board', 'st-co'], note:'Minutes give "urgency" as the reason.', at:D('2026-09-18T12:10:00Z')},
+    {id:'sc3', t:'The councillor\'s brother owns 40% of the company that won', st:'confirmed', for:['r:s-family', 'r:s-interests'], against:[], about:['st-bro', 'st-cllr', 'st-co'], note:'', at:D('2026-09-22T11:30:00Z')},
+    {id:'sc4', t:'The councillor did not declare the family interest', st:'unverified', for:['r:s-interests'], against:[], about:['st-cllr'], note:'Ask whether a later declaration exists (lead sq1).', at:D('2026-09-22T11:40:00Z')},
+    {id:'sc5', t:'Kestrel Dawn loaded cargo at Port Varan while its transponder was off', st:'disputed', for:['r:s-ais1', 'r:s-sat', 'r:s-ais2'], against:['r:s-statement'], about:['st-co'], note:'The company says a technical fault; the satellite match is likely, not certain.', at:D('2026-09-24T16:10:00Z')}],
+  replies:[
+    {id:'sr1', who:'st-co', name:'', via:'Email to Mara Velden, director', at:D('2026-09-22T09:00:00Z'), due:D('2026-09-25T17:00:00Z'), claims:['sc1', 'sc2', 'sc3', 'sc5'], st:'answered', resp:'Grey Gull Marine complies with all applicable sanctions. Our vessel\'s transponder suffered a technical fault in early August, which was reported to the flag state. We have never called at Port Varan.', respAt:D('2026-09-24T15:30:00Z')},
+    {id:'sr2', who:'st-cllr', name:'', via:'Email and phone', at:D('2026-09-23T10:00:00Z'), due:D('2026-09-27T12:00:00Z'), claims:['sc2', 'sc3', 'sc4'], st:'waiting', resp:'', respAt:null},
+    {id:'sr3', who:'st-board', name:'', via:'Email to the press office', at:D('2026-09-23T10:15:00Z'), due:D('2026-09-27T12:00:00Z'), claims:['sc2'], st:'declined', resp:'The Board does not comment on individual contracts.', respAt:D('2026-09-23T16:40:00Z')},
+    {id:'sr4', who:'st-bro', name:'', via:'Letter and phone', at:D('2026-09-23T11:00:00Z'), due:D('2026-09-27T12:00:00Z'), claims:['sc3'], st:'waiting', resp:'', respAt:null}],
+  archive:{
+    'https://greygull-marine.example':{req:D('2026-09-18T10:35:00Z'), checked:D('2026-09-18T10:40:00Z'), at:D('2026-09-18T10:36:00Z'), snap:'https://web.archive.org/web/20260918103600/https://greygull-marine.example'},
+    'https://greygull-marine.example/about':{req:D('2026-09-21T09:35:00Z'), checked:D('2026-09-21T09:40:00Z'), at:D('2026-07-01T09:00:00Z'), snap:'https://web.archive.org/web/20260701090000/https://greygull-marine.example/about'},
+    'https://social.example/@maravelden/112339':{req:D('2026-09-21T09:50:00Z'), checked:D('2026-09-21T10:05:00Z'), at:D('2026-09-21T09:55:00Z'), snap:'https://web.archive.org/web/20260921095500/https://social.example/@maravelden/112339'}}
+};
+return {cases, R, answers, verdicts, attrs, edges, feed, story};
 })();

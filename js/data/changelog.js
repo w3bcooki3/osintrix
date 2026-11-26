@@ -4,6 +4,86 @@
    Each change has a type: "added" | "changed" | "fixed" | "removed". */
 const CHANGELOG_DATA = [
 {
+  "version": "1.88",
+  "name": "Privacy, undo, keyboard and the tour",
+  "date": "2026-11-26",
+  "summary": "A privacy audit, undo where it was missing, the graph by keyboard, and a tour of both sample cases.",
+  "changes": [
+    {
+      "type": "added",
+      "text": "Security → Discreet titles and alerts: keeps case names out of the browser tab, the taskbar and your browser history, and reminder alerts outside the app say only that a reminder is due."
+    },
+    {
+      "type": "fixed",
+      "text": "The browser no longer keeps what you type into OSINTrix forms for its own autofill — a subject's email, a phone number or a source's name could otherwise be offered back on other sites, outside the workspace and its encryption."
+    },
+    {
+      "type": "added",
+      "text": "Undo right after deleting a Story claim or a request for comment, deleting a case template, and removing a file from a record (the file itself goes only once Undo has had its chance)."
+    },
+    {
+      "type": "added",
+      "text": "The graph by keyboard: Tab reaches it, the arrow keys move to the nearest entry that way with its details alongside, Enter opens it, Shift+F10 its menu, + / − zoom and 0 fits. A screen reader hears where you are."
+    },
+    {
+      "type": "fixed",
+      "text": "Entity table rows and places on the map can be reached with Tab and opened with Enter."
+    },
+    {
+      "type": "changed",
+      "text": "The guided tour covers both sample cases: the timeline, rules, graph, related entries and the crew behind Op Lantern, then Claims, Right of reply and Protected sources on Kestrel Dawn, and new cases from templates."
+    }
+  ]
+},
+{
+  "version": "1.87",
+  "name": "Two sample cases",
+  "date": "2026-11-26",
+  "summary": "The sample data is now two cases that show everything: a cybercrime investigation and a journalism story.",
+  "changes": [
+    {
+      "type": "changed",
+      "text": "Op Lantern is the cybercrime and OSINT case: the invoice LNK intrusion, and with the OSINT sample the crew behind it — a refund scam on the same server that served the intrusion's second stage, with its infrastructure, money, accounts, page changes and working hours. The link is shown as a lead with its evidence, not as proof."
+    },
+    {
+      "type": "added",
+      "text": "Kestrel Dawn, a journalism case: a harbour fuel contract, a councillor's family shareholding and a tanker that switched off its transponder. Claims weighed against evidence (confirmed, unverified, disputed), right of reply (answered, declined, waiting), archived pages that changed, ship tracking and a company network."
+    },
+    {
+      "type": "added",
+      "text": "Example notes: for each case a checklist and a written note, plus two general ones. A Case notes notebook links pages to cases, vault entries and study pages with [[ ]], tags and checklists, so the links panel and page graph have something to show."
+    },
+    {
+      "type": "removed",
+      "text": "The Customer portal and Harbour photo CTF sample cases, and the separate Harbourline case. In a workspace that still has them, they are replaced once, after a restore point — and only if nothing of yours was added to them."
+    }
+  ]
+},
+{
+  "version": "1.86",
+  "name": "Cleaner panels",
+  "date": "2026-11-26",
+  "summary": "Panels fit what is in them, open stories stand out, and Patterns is now Regex.",
+  "changes": [
+    {
+      "type": "changed",
+      "text": "Threat Intel: a story panel is as tall as the story instead of running empty to the bottom of the window, and the page behind it is blurred and dimmed so the story reads on its own. Click outside it or press Esc to close; previous / next and J / K still move through the list."
+    },
+    {
+      "type": "changed",
+      "text": "Query library, Detections and CTF: the side panel floats, is as tall as its content, and blurs the page behind it."
+    },
+    {
+      "type": "changed",
+      "text": "Patterns is now called Regex. The Forensics kit no longer lists a log parser: log parsers are on the Regex page, and old links to the kit's tab still go there."
+    },
+    {
+      "type": "fixed",
+      "text": "A small scrollbar showed at the right of the case tabs on Windows at 125% and 150% display scaling, and on other strips that scroll sideways."
+    }
+  ]
+},
+{
   "version": "1.85",
   "name": "Real-mouse fixes",
   "date": "2026-11-26",

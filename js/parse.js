@@ -1,7 +1,7 @@
 /* ==========================================================================
    Log parser — turns a line of almost any log into named fields.
 
-   Order: your own parsers (Lab → Log parsers) → built-in formats:
+   Order: your own parsers (Regex → Log parsers) → built-in formats:
    JSON · CEF · LEEF · Windows event XML · syslog header (+ whatever follows) ·
    Apache/Nginx access · IIS/W3C and Zeek (with their #Fields header) ·
    Cisco ASA · sshd / sudo / su · key=value (FortiGate, Sysmon text, iptables,
@@ -199,7 +199,7 @@ function fieldMatch(r, name, val){
   if(v == null) return false; const s = String(v).toLowerCase(); return /^[<>]=?\d/.test(val) ? (val[0] === '>' ? +s > +val.replace(/[<>=]/g, '') : +s < +val.replace(/[<>=]/g, '')) : (s === val || s.includes(val));
 }
 
-/* ---------- Lab → Log parser ---------- */
+/* ---------- Regex → Log parsers ---------- */
 const CANON_NAMES = Object.keys(CANON).concat(['time']);
 function genRegex(line){
   const rules = [

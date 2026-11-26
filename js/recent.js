@@ -3,7 +3,7 @@
    sealed the same way as attachments. Every item can be reopened or deleted on its own. */
 const RECENT_MAX = 15, RECENT_TEXT_MAX = 2 * 1048576, RECENT_FILE_MAX = 50 * 1048576;
 const RECENT_TOOLS = {certs:['Certificates', 'shield-check'], cloudScan:['Cloud config scanner', 'cloud'], cloudLogs:['Cloud logs', 'cloud'], labFile:['Lab · file inspector', 'file-search'],
-  pcap:['Lab · packet capture', 'network'], sqlite:['Lab · SQLite', 'database'], image:['Lab · image', 'image'], logParse:['Lab · log parser', 'scroll-text']};
+  pcap:['Lab · packet capture', 'network'], sqlite:['Lab · SQLite', 'database'], image:['Lab · image', 'image'], logParse:['Regex · log parser', 'scroll-text']};
 const recentAll = () => (DB.recent = Array.isArray(DB.recent) ? DB.recent : []);
 const recentOf = tool => recentAll().filter(x => x.tool === tool);
 const recentLastMap = () => (DB.work && DB.work.last) || {};

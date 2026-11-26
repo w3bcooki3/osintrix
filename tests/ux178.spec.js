@@ -43,7 +43,7 @@ test('URLs saved lowercase by 1.77 get their case back from the record, and thei
   noErrors(errors);
 });
 
-test('Patterns: one page with the pattern builder and the log parsers; the old Log parsers tab opens it', async ({ page }) => {
+test('Regex: one page with the pattern builder and the log parsers; not in the Forensics kit; the old Log parsers tab opens it', async ({ page }) => {
   const errors = await open(page, '#/regex');
   await expect(page.locator('.pat-tabs [role=tab]')).toHaveText([/Build a pattern/, /Log parsers/]);
   await expect(page.locator('.pat-tabs [data-v=build]')).toHaveAttribute('aria-selected', 'true');
@@ -53,10 +53,14 @@ test('Patterns: one page with the pattern builder and the log parsers; the old L
   await page.click('.pat-tabs [data-v=build]');
   await expect(page.locator('[data-act=rxDemo]').first()).toBeVisible();
   // from the kit's old tab
-  await page.evaluate(() => { go('#/lab'); });   // an old link or bookmark to the kit's Log parsers tab
+  await page.evaluate(() => { go('#/lab'); });
+  // the Forensics kit no longer lists a log parser; the Regex page is in the sidebar
+  await expect(page.locator('.labtabs')).toBeVisible(); expect(await page.evaluate(() => LAB_TABS.some(t => t[0] === 'logs') || /log parser/i.test(document.querySelector('.labtabs').textContent))).toBe(false);
+  await expect(page.locator('#side a[href="#/regex"]')).toContainText('Regex');
+  // an old link or bookmark to the kit's Log parsers tab
   await page.evaluate(() => { const b = document.createElement('button'); b.dataset.act = 'labTab'; b.dataset.v = 'logs'; document.querySelector('main, #main, body').appendChild(b); b.click(); });
   await expect(page).toHaveURL(/#\/regex/); await expect(page.locator('.pat-tabs [data-v=logs]')).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('h1')).toContainText('Patterns');
+  await expect(page.locator('h1')).toContainText('Regex');
   noErrors(errors);
 });
 

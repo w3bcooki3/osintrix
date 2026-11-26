@@ -246,7 +246,10 @@ async function attAct(a, rid, fid){
     const u = URL.createObjectURL(new Blob([b], {type:kind === 'pdf' ? 'application/pdf' : 'text/plain;charset=utf-8'})); window.open(u, '_blank', 'noopener'); setTimeout(() => URL.revokeObjectURL(u), 60000); return; }
   if(a === 'attDl'){ const b = await fileBlob(fid); if(!b) return toast('That file is missing from this browser'); const u = URL.createObjectURL(b), l = document.createElement('a'); l.href = u; l.download = safeName(m.name, 'file'); document.body.appendChild(l); l.click(); setTimeout(() => { URL.revokeObjectURL(u); l.remove(); }, 200); return; }
   if(a === 'attKit'){ const b = await fileBlob(fid); if(!b) return toast('That file is missing from this browser'); go('#/lab'); UI.labTab = 'file'; return labLoad(new File([b], m.name, {type:m.type, lastModified:m.modified}), false); }
-  if(a === 'attDel') return confirmDlg('Remove ' + m.name + '?', 'The file is removed from this record and deleted from the browser once no restore point needs it. The record stays.', 'Remove file', () => { r.att = r.att.filter(x => x !== m); if(!fileInUse(fid) && !(DB.trash || []).some(x => filesOfItem(x).includes(fid))) blobDel('file:' + fid); mutate('removed file ' + m.name); renderAll(); });
+  if(a === 'attDel') return confirmDlg('Remove ' + m.name + '?', 'The file is removed from this record and deleted from the browser once no restore point needs it. The record stays.', 'Remove file', () => { const at = r.att.indexOf(m); r.att = r.att.filter(x => x !== m); mutate('removed file ' + m.name); renderAll();
+    /* the file itself goes once Undo has had its chance */
+    const gone = setTimeout(() => { if(!(r.att || []).includes(m) && !fileInUse(fid) && !(DB.trash || []).some(x => filesOfItem(x).includes(fid))) blobDel('file:' + fid); }, 8000);
+    toast('Removed ' + m.name, 'Undo', () => { clearTimeout(gone); r.att.splice(Math.max(0, at), 0, m); mutate('put back file ' + m.name); renderAll(); }); });
 }
 /* backups carry files as data URLs */
 async function filesForExport(recs){

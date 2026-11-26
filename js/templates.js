@@ -101,5 +101,6 @@ const CT_ACTS = {
   ctPick:(id, v) => { closeDlg(); caseDlg(false, v); },
   ctChange:() => { closeDlg(); ctPickDlg(); },
   ctSaveAs:id => ctSaveDlg(id),
-  ctDel:(id, v) => { const t = (DB.caseTemplates || []).find(x => x.id === v); if(!t) return; confirmDlg('Delete the template “' + t.name + '”?', 'Cases made from it keep everything; only the template goes.', 'Delete', () => { DB.caseTemplates = DB.caseTemplates.filter(x => x.id !== v); mutate('deleted a case template'); ctPickDlg(); }); },
+  ctDel:(id, v) => { const t = (DB.caseTemplates || []).find(x => x.id === v); if(!t) return; confirmDlg('Delete the template “' + t.name + '”?', 'Cases made from it keep everything; only the template goes.', 'Delete', () => { const i = DB.caseTemplates.indexOf(t); DB.caseTemplates = DB.caseTemplates.filter(x => x.id !== v); mutate('deleted a case template'); ctPickDlg();
+    toast('Template “' + t.name + '” deleted', 'Undo', () => { DB.caseTemplates.splice(i, 0, t); mutate('put back a case template'); if($('dlg') && $('dlg').querySelector('.ct-card')) ctPickDlg(); }); }); },
 };

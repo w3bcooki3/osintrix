@@ -17,7 +17,8 @@ function seedDB(){
   const recs = DEMO.R.map(([id, caseId, type, t, host, source, title, body, tags]) => ({
     id, caseId, type, tsRaw:t || '', tsZone:t ? 'explicit' : '', ts:t ? E.parseTime(t) : null, host, source, title, body, tags:tags || [],
     ents:E.extract(body), answer:DEMO.answers[id] || '', addedBy:'You', addedAt:t ? E.parseTime(t) + 240000 : Date.parse('2026-09-14T09:40:00Z'), hash:''}));
-  const cases = DEMO.cases.map(c => ({...c, created:Date.parse(c.created), updated:Date.parse(c.updated), color:DEMO_CASE_STYLE[c.id][0], icon:DEMO_CASE_STYLE[c.id][1]}));
+  const cases = DEMO.cases.map(c => ({...c, created:Date.parse(c.created), updated:Date.parse(c.updated), color:DEMO_CASE_STYLE[c.id][0], icon:DEMO_CASE_STYLE[c.id][1],
+    ...(c.id === 'c-story' ? JSON.parse(JSON.stringify({claims:DEMO.story.claims, replies:DEMO.story.replies})) : {})}));   /* the journalism case: claims, right of reply */
   const entries = DEMO_ENTRIES.map(([id, caseId, type, fields, x], i) => ({id, caseId, type, fields:{...fields}, priority:x.priority || 'medium', starred:!!x.starred,
     tags:x.tags || [], notes:x.notes || '', src:x.src || '', created:T - i * 3600e3, pos:DEMO_POS[id] ? {x:DEMO_POS[id][0] * .84, y:DEMO_POS[id][1] * .84} : null}));
   const verdicts = {...DEMO.verdicts};
@@ -25,7 +26,7 @@ function seedDB(){
   const tools = TOOLS_SEED.map(t => ({id:'t' + t.id, name:t.name, url:t.url, cat:t.parentCategory, sub:t.childCategory, desc:t.description, tags:t.tags || [],
     pinned:!!t.isPinned, starred:!!t.isStarred, added:Date.parse(t.dateAdded) || Date.now(), uses:0, seed:true}));
   return {v:2, cases, records:recs, entries, links:DEMO_LINKS.map(([a, b, label, conf, src], i) => ({id:'l' + i, caseId:entries.find(e => e.id === a).caseId, a, b, label, conf, src})),
-    verdicts, tools, feed:DEMO.feed.map(f => ({...f, ts:Date.parse(f.date)})), active:'c-lantern',
+    verdicts, tools, feed:DEMO.feed.map(f => ({...f, ts:Date.parse(f.date)})), archive:JSON.parse(JSON.stringify(DEMO.story.archive)), active:'c-lantern',
     prefs:{theme:'light', size:'m', density:'comfortable', tz:'UTC', navRail:true}, log:[], sample:true};
 }
 /* A stored workspace is "usable" only if this version understands it. Anything else is kept, never overwritten. */

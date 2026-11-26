@@ -273,6 +273,8 @@ function viewSecurity(){
         S.sign ? 'Ready' : 'Not created', S.sign ? '' : `<button class="btn sm" data-act="secGo" data-v="custody">Create</button>`, S.sign ? `<p class="sx2-fp">Fingerprint <span class="mono" id="keyFp">…</span></p>` : '')}
       ${item('bkp', fresh ? 'ok' : 'warn', 'download', 'Backup', 'One file with every case, note, tool and setting. Seal it with its own passphrase and keep it off this computer.',
         lastB ? esc(ago(lastB)) + ' ago' : 'Never', `<button class="btn sm${fresh ? '' : ' primary'}" data-act="exportAll">${ico('download','sm')}Export</button><button class="btn sm" data-act="secBackup" title="Export everything, encrypted with its own passphrase">${ico('file-lock','sm')}Encrypted</button>`)}
+      ${item('disc', DB.prefs.discreet ? 'ok' : 'idle', 'eye-off', 'Discreet titles and alerts', 'Keeps case names out of the browser tab, the taskbar and your browser history, and reminder alerts outside the app say only that a reminder is due. For screens that are shared or seen, and sensitive work. Names already in your browser history stay there until you clear it.',
+        DB.prefs.discreet ? 'On' : 'Off', `<button class="btn sm" data-act="secDisc" aria-pressed="${!!DB.prefs.discreet}">${ico(DB.prefs.discreet ? 'eye' : 'eye-off','sm')}${DB.prefs.discreet ? 'Turn off' : 'Turn on'}</button>`)}
       </div>
       <section class="sx2-cus" id="custody">${st('idle', 'stamp')}<div class="sx2-m"><h3>Chain-of-custody report</h3><p>A signed JSON file listing every record in a case with its SHA-256, capture time and attached files, plus the audit chain. Anyone can verify it here; any change after signing is detected.</p>
         <div class="sx2-cr"><label class="sr" for="cusCase">Case</label><select id="cusCase" class="gsel bord">${DB.cases.map(c => `<option value="${c.id}"${c.id === DB.active ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}</select><button class="btn primary" data-act="cusMake">${ico('stamp','sm')}Create signed report</button><button class="btn" data-act="cusVerify">${ico('badge-check','sm')}Verify a report…</button></div></div></section>
@@ -289,6 +291,7 @@ const SEC_ACTS = {
     closeDlg(); setTimeout(() => passDlg('New passphrase', 'Choose the new passphrase.', 'Change', async nw => { await encChange(old, nw); closeDlg(); renderAll(); toast('Passphrase changed'); }, true), 50); }, false),
   secOff:() => passDlg('Turn off encryption', 'Your data will be stored unencrypted in this browser. Enter the passphrase to confirm.', 'Turn off', async p => { try{ await encDisable(p); }catch(e){ throw new Error('bad'); } closeDlg(); renderAll(); toast('Encryption is off'); }, false),
   secLock:() => lockNow(),
+  secDisc:() => { DB.prefs.discreet = !DB.prefs.discreet; save(); onRoute(); toast(DB.prefs.discreet ? 'Case names are kept out of the tab title, history and alerts' : 'Tab titles show case names again'); },
   secBackup:() => backupDlg(true),
   auditCheck:() => { UI.auditV = null; renderMain(); },
   auditCsv:() => { const A = DB.audit || {entries:[]}; download('osintrix-audit-' + new Date().toISOString().slice(0, 10) + '.csv', ['index,time,case,action,entry_hash,chain_hash'].concat(A.entries.map(e => [e.i, new Date(e.at).toISOString(), caseNm(e.c) || '', e.what, e.d, e.h].map(csvCell).join(','))).join('\n'), 'text/csv'); },

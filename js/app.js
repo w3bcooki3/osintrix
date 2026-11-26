@@ -61,10 +61,10 @@ function placeInsp(){ const t = document.querySelector('.gtools') || document.qu
   if(t){ const r = t.getBoundingClientRect(); if(r.height) y = Math.round(r.bottom + 10); }
   document.documentElement.style.setProperty('--insp-top', y ? y + 'px' : ''); }
 window.addEventListener('resize', () => { clearTimeout(placeInsp.t); placeInsp.t = setTimeout(placeInsp, 120); });
-const TITLES = {today:'Today', security:'Security', watch:'Watchlist', trash:'Trash', ctf:'CTF', lab:'Forensics kit', help:'Help', home:'Dashboard', cases:'Cases', toolbox:'Toolbox', entities:'Entities', feeds:'Threat Intel', decoder:'Decoder', reference:'Reference', settings:'Settings', detections:'Detections', queries:'Query library', notes:'Notes', playbooks:'Playbooks', library:'Library', cloud:'Cloud', whatsnew:"What's new", pad:"Scratchpad", notebook:'Notebook', certs:'Certificates', tradecraft:'Tradecraft', regex:'Patterns'};
+const TITLES = {today:'Today', security:'Security', watch:'Watchlist', trash:'Trash', ctf:'CTF', lab:'Forensics kit', help:'Help', home:'Dashboard', cases:'Cases', toolbox:'Toolbox', entities:'Entities', feeds:'Threat Intel', decoder:'Decoder', reference:'Reference', settings:'Settings', detections:'Detections', queries:'Query library', notes:'Notes', playbooks:'Playbooks', library:'Library', cloud:'Cloud', whatsnew:"What's new", pad:"Scratchpad", notebook:'Notebook', certs:'Certificates', tradecraft:'Tradecraft', regex:'Regex'};
 function onRoute(){
   UI.route = parseHash(); $('side').classList.remove('open'); if(typeof hideMenu === 'function') hideMenu(); if(typeof menClose === 'function') menClose(); if(typeof S !== 'undefined' && S.open && S.from !== location.hash && typeof srchClose === 'function') srchClose();   /* menus, the @ list and search belong to the page they were opened on (Back, a link) */
-  document.title = (UI.route.area === 'case' ? theCase().name.split(' — ')[0] + ' · ' + CASE_TABS.find(t => t[0] === UI.route.tab)[1] : TITLES[UI.route.area] || 'OSINTrix') + ' — OSINTrix';
+  document.title = (UI.route.area === 'case' ? (DB.prefs.discreet ? 'Case' : theCase().name.split(' — ')[0]) + ' · ' + CASE_TABS.find(t => t[0] === UI.route.tab)[1] : TITLES[UI.route.area] || 'OSINTrix') + ' — OSINTrix';   /* discreet: no case name in the tab, the taskbar or history */
   const m = $('main'); m.classList.add('enter'); clearTimeout(onRoute.t); onRoute.t = setTimeout(() => m.classList.remove('enter'), 320);
   if(UI.route.area !== 'case' || UI.route.tab !== 'graph'){ UI.graph.mode = null; UI.graph.first = null; }
   if(UI.sel && UI.sel.kind === 'entry'){ const e = entryById(UI.sel.id); if(!e || e.caseId !== DB.active) UI.sel = null; }
@@ -420,7 +420,7 @@ document.addEventListener('click', ev => {
     case 'chDelAsk': { const c = DB.ctf.chals.find(x => x.id === id); return confirmDlg('Delete “' + c.name + '”?', 'Its flag and notes go too. You can undo right after.', 'Delete challenge', () => {
       const i = DB.ctf.chals.indexOf(c); DB.ctf.chals.splice(i, 1); UI.ctfSel = null; mutate('deleted challenge'); renderAll(); toast('Challenge deleted', 'Undo', () => { DB.ctf.chals.splice(i, 0, c); mutate('restored challenge'); renderAll(); }); }); }
     /* forensics kit */
-    case 'labTab': if(v === 'logs'){ UI.ltOpen = null; UI.patTab = 'logs'; return go('#/regex'); }   // log parsers live on the Patterns page
+    case 'labTab': if(v === 'logs'){ UI.ltOpen = null; UI.patTab = 'logs'; return go('#/regex'); }   // an old link to the kit's Log parser tab: log parsers live on the Regex page
       UI.labTab = v; UI.ltOpen = null; return renderMain();
     case 'tsTry': UI.tsIn = v; return renderMain();
     case 'twTry': { const S = twSplit(v); if(!S || !S.name) return; if(UI.tw && UI.tw.sig) UI.tw.sig.stop = true; UI.tw = {d:S.name + '.' + S.tld, list:twGen(v)}; return renderMain(); }
@@ -486,7 +486,7 @@ document.addEventListener('click', ev => {
     case 'resetDemo': { snapshot('Before resetting to the demo'); const prev = DB; DB = seedDB(); DB.prefs = prev.prefs; DB.recent = prev.recent; DB.work = prev.work; mutate('reset demo'); hashRecords(); UI.sel = null; renderAll(); return toast('Demo data reset', 'Undo', () => { DB = prev; mutate('undo reset'); renderAll(); }); }
   }
 });
-document.addEventListener('keydown', ev => { if((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches('span[role=button][data-act], div[role=button][data-act], tr[data-act]')){ ev.preventDefault(); ev.target.click(); } });
+document.addEventListener('keydown', ev => { if((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches('[role=button][data-act]:not(button), tr[data-act]')){ ev.preventDefault(); ev.target.click(); } });
 /* tab strips: ← → Home End move between tabs and open the one reached; focus follows it through the re-render */
 document.addEventListener('keydown', ev => { if(!/^(ArrowLeft|ArrowRight|Home|End)$/.test(ev.key) || ev.altKey || ev.ctrlKey || ev.metaKey) return;
   const t = ev.target.closest && ev.target.closest('[role=tab]'), L = t && t.closest('[role=tablist]'); if(!L) return;
@@ -683,6 +683,7 @@ document.addEventListener('keydown', ev => {
     if(UI.route.area === 'queries' && UI.qopen && qLay() !== 'ide') return clickAct('qClose');
     if(UI.route.area === 'ctf' && UI.ctfSel) return clickAct('ctfClose');
     if(UI.route.area === 'detections' && UI.ropen && rLay() !== 'ide') return clickAct('rClose');
+    if(UI.sel && UI.sel.kind === 'feed' && UI.inspOpen) return clickAct('closeInsp');   /* an open story (the page behind it blurred) closes, panel and all */
     if(UI.graph.mode){ UI.graph.mode = null; UI.graph.first = null; return renderMain(); } if(UI.sel){ UI.sel = null; if(isNarrow()) UI.inspOpen = false; return renderAll(); } return; }
   if((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'k'){ ev.preventDefault(); return S.open ? srchClose() : srchOpen(); }
   if(S.open) return;
@@ -711,6 +712,10 @@ document.addEventListener('keydown', ev => {
   const b = refSelect(n.dataset.v, false); if(b) b.scrollIntoView({block:'nearest'});
 });
 window.addEventListener('hashchange', onRoute);
+/* the browser keeps what is typed into forms for its own autofill — a subject's email, a phone number, a source's name —
+   and offers it later on other sites, outside the workspace and its encryption. Every form the app draws turns that off. */
+const noAutofill = n => { if(n.nodeType !== 1) return; if(n.tagName === 'FORM' && !n.hasAttribute('autocomplete')) n.setAttribute('autocomplete', 'off'); if(n.firstElementChild) n.querySelectorAll('form:not([autocomplete])').forEach(f => f.setAttribute('autocomplete', 'off')); };
+new MutationObserver(ms => { for(const m of ms) for(const n of m.addedNodes) noAutofill(n); }).observe(document.documentElement, {childList:true, subtree:true});
 let rz = null; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if(cy) cy.resize(); if(DB) renderInsp(); }, 120); });
 
 const WL_IMG = {'dashboard-dark':'assets/welcome/dashboard-dark.webp', 'dashboard-light':'assets/welcome/dashboard-light.webp', 'graph-dark':'assets/welcome/graph-dark.webp', 'graph-light':'assets/welcome/graph-light.webp', 'phone-dark':'assets/welcome/phone-dark.webp', 'phone-light':'assets/welcome/phone-light.webp', 'timeline-dark':'assets/welcome/timeline-dark.webp', 'timeline-light':'assets/welcome/timeline-light.webp'};
@@ -770,7 +775,7 @@ async function bootRest(unlocked){
   if(typeof epScanRecords === 'function') epScanRecords();
   if(typeof metaScanFiles === 'function') metaScanFiles();             // files stored before the metadata reader: read once             // obfuscated command lines give up what they name
   if(typeof cxScanRecords === 'function') cxScanRecords();             // certificates already in cases give their thumbprints and names                       // verdict dates: what is here now is the baseline
-  ensureTools(); ensureToolTpl(); ensurePlaybooks(); ensureIntel(); if(typeof ctiLoad === 'function') ctiLoad(); if(typeof watchMonitor === 'function'){ lkLoad(); watchMonitor(); } ensureQueries(); ensureRules(); ensureNotes(); ensureSample(); if(typeof sampleOsintAdd === 'function') sampleOsintAdd(); ensureCTF(); ensureNB(); ensureAchDemo(); applyPrefs(); storageCheck(); await hashRecords(); migrateFieldEnts(); if(migrateHashKeys() + migrateUrlCase()) saveSoon(); ensurePositions(); flush(); onRoute(); nbFlushMedia(); fbInit();
+  ensureTools(); ensureToolTpl(); ensurePlaybooks(); ensureIntel(); if(typeof ctiLoad === 'function') ctiLoad(); if(typeof watchMonitor === 'function'){ lkLoad(); watchMonitor(); } ensureQueries(); ensureRules(); ensureNotes(); ensureSample(); if(typeof sampleOsintAdd === 'function') sampleOsintAdd(); if(DB.sampleFresh){ delete DB.sampleFresh; save(); setTimeout(() => toast('The sample cases were updated: Op Lantern now follows the crew behind the intrusion, and Kestrel Dawn is a new journalism case. A restore point was saved first.'), 900); } ensureCTF(); ensureNB(); ensureAchDemo(); applyPrefs(); storageCheck(); await hashRecords(); migrateFieldEnts(); if(migrateHashKeys() + migrateUrlCase()) saveSoon(); ensurePositions(); flush(); onRoute(); nbFlushMedia(); fbInit();
   let seen = false; try{ seen = !!localStorage.getItem('osintrix:welcomed'); }catch(e){}
   if(!unlocked) setTimeout(() => { $('splash').classList.add('out'); setTimeout(() => $('splash').remove(), 320); if(!seen) showWelcome(); }, 350);
   /* offline helper: caches the app's own files (never your data) so repeat visits open instantly and work without a connection. Not possible when opened as a file. */

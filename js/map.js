@@ -103,7 +103,7 @@ function caseMapView(c, D){
   const card = p => { const la = p.la.toFixed(6), lo = p.lo.toFixed(6), n = near(p), on = mp.sel === p.k, ref = p.entries.length + p.recs.length;
     return `<article class="pcard${on ? ' on' : ''}" id="pl-${esc(p.k.replace(/[^\w]/g, '_'))}">
       <header data-act="mapSel" data-v="${esc(p.k)}">${order.has(p.k) ? `<span class="pord">${order.get(p.k)}</span>` : `<span class="pord none">${ico('map-pin','sm')}</span>`}
-        <div class="ph-t"><h3>${esc(p.label || 'Unnamed place')}</h3><div class="ph-m"><button class="pcoord mono" data-act="flagCopy" data-v="${la}, ${lo}" title="Copy coordinates">${la}, ${lo}${ico('copy','sm')}</button>
+        <div class="ph-t"><h3><button type="button" class="ph-sel" data-act="mapSel" data-v="${esc(p.k)}">${esc(p.label || 'Unnamed place')}</button></h3><div class="ph-m"><button class="pcoord mono" data-act="flagCopy" data-v="${la}, ${lo}" title="Copy coordinates">${la}, ${lo}${ico('copy','sm')}</button>
           ${[...p.src].map(s => `<span class="chip">${esc(s)}</span>`).join('')}${p.ts ? `<span class="chip">${ico('clock','sm')}${esc(E.fmtFull(p.ts, tz()).slice(0, 16))}</span>` : ''}</div></div>
         ${ref ? `<button class="btn sm" data-act="mapOpen" data-v="${esc(p.k)}">${ico('panel-right','sm')}Details</button>` : ''}</header>
       <div class="plinks">${PLACE_LINKS.map(([l, f, i]) => ext(f(la, lo, p.ts), l, i)).join('')}</div>

@@ -217,10 +217,12 @@ test('old Office and OpenDocument metadata: .doc, .xls and .ppt (Compound File) 
   noErrors(errors);
 });
 
-test('sample case: “Harbourline refund scam” is added to a workspace with sample data and fills every Infrastructure view and an identity profile; the account timeline fits its card and shows every label whole', async ({ page }) => {
+test('Op Lantern’s OSINT half (the crew’s refund scam) joins the case in a workspace with sample data and fills every Infrastructure view and an identity profile; the account timeline fits its card and shows every label whole', async ({ page }) => {
   const errors = await open(page, '#/home', { osintSample: true });
-  await expect.poll(() => page.evaluate(() => DB.cases.some(c => c.id === 'c-harbour')), { timeout: 15000 }).toBe(true);
-  const X = await page.evaluate(() => { const I = infraIndex('c-harbour'), W = walletIndex('c-harbour'), F = footIndex('c-harbour'), C = chIndex('c-harbour'), H = hrIndex('c-harbour'), P = idpBuild('sp-jan');
+  await expect.poll(() => page.evaluate(() => DB.osintSample === 2 && DB.entries.some(e => e.id === 'sp-jan' && e.caseId === 'c-lantern')), { timeout: 15000 }).toBe(true);
+  expect(await page.evaluate(() => DB.cases.some(c => c.id === 'c-harbour'))).toBe(false);   // no separate case any more
+  await page.evaluate(() => sampleOsintElsewhere());   // the scam's subject under another name in the (test-only) portal case
+  const X = await page.evaluate(() => { const I = infraIndex('c-lantern'), W = walletIndex('c-lantern'), F = footIndex('c-lantern'), C = chIndex('c-lantern'), H = hrIndex('c-lantern'), P = idpBuild('sp-jan');
     return { infra: I && (I.facts || I.rows || []).length, links: I && (I.links || I.groups || []).length, money: W && (W.flows || W.edges || []).length, acc: F.accounts.length, renamed: F.accounts.filter(a => a.names.some(n => n.old)).length,
       changes: C.groups.map(g => g.label).sort(), hours: H.people.map(p => p.who).sort(), same: H.pairs.map(q => [q.a.who, q.b.who].sort().join(' ~ ')), people: P.people.map(p => p.e.id), ids: P.ids.length, conflicts: P.conflicts.length }; });
   expect(X.infra).toBeGreaterThan(10); expect(X.money).toBeGreaterThan(3); expect(X.acc).toBeGreaterThan(4); expect(X.renamed).toBeGreaterThanOrEqual(2);
@@ -228,7 +230,7 @@ test('sample case: “Harbourline refund scam” is added to a workspace with sa
   expect(X.hours).toEqual(['@harbour_deals', 'Faisal', 'jake_nyc', 'newsbot_24', 'u/north_wind_77']); expect(X.same).toContain('@harbour_deals ~ u/north_wind_77');
   expect(X.people).toEqual(['sp-jan', 'sp-haven']); expect(X.ids).toBeGreaterThanOrEqual(6); expect(X.conflicts).toBe(2);
   // every view draws without an error
-  await page.evaluate(() => { DB.active = 'c-harbour'; go(caseHash('c-harbour', 'infra')); });
+  await page.evaluate(() => { DB.active = 'c-lantern'; go(caseHash('c-lantern', 'infra')); });
   for(const v of ['dom', 'money', 'acc', 'hours']){ await page.evaluate(v => { UI.ivView = v; renderAll(); }, v); await page.waitForTimeout(200); await expect(page.locator('#main .empty')).toHaveCount(0); }
   // the account timeline: as wide as its card, and no label cut off on the left
   await page.evaluate(() => { UI.ivView = 'acc'; renderAll(); });
@@ -244,7 +246,7 @@ test('regex builder: select fields in SSH log lines, the pattern is built and tr
   const errors = await open(page, '#/home');
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   // its own entry in the sidebar, and "regex" in search goes straight to it
-  await page.click('#side a[href="#/regex"]'); await expect(page.locator('.lhd h1')).toHaveText('Patterns');
+  await page.click('#side a[href="#/regex"]'); await expect(page.locator('.lhd h1')).toHaveText('Regex');
   await page.evaluate(() => go('#/home')); await page.evaluate(() => srchOpen()); await page.fill('#srQ', 'regex'); await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/#\/regex$/); await expect(page.locator('[data-act=rxDemo]:not([data-v])')).toBeVisible();
   await page.click('[data-act=rxDemo]:not([data-v])');
@@ -548,8 +550,9 @@ test('polish: no screen is wider than a phone, tab strips that do not fit scroll
 
 test('polish on a desktop: a case summary cut off with … shows in full when pointed at; the decoder groups its operations', async ({ page }) => {
   const errors = await open(page, '#/home', { osintSample: true });
-  const cut = page.locator('#main small').filter({ hasText: 'Fake refund support' }).first();
-  await cut.hover(); await expect(cut).toHaveAttribute('title', /went quiet: who runs it, where the money goes, and when they work/);
+  await expect.poll(() => page.evaluate(() => DB.osintSample === 2), { timeout: 15000 }).toBe(true); await page.evaluate(() => renderAll());
+  const cut = page.locator('#main small').filter({ hasText: 'Phishing LNK on WS-FIN-07' }).first();
+  await cut.hover(); await expect(cut).toHaveAttribute('title', /also runs a refund scam: infrastructure, money, accounts and working hours/);
   await page.evaluate(() => go('#/decoder')); await expect(page.locator('.txbar > button')).toHaveCount(4);   // one row: Auto-decode, then a menu per group
   await expect(page.locator('[data-act=txMenu] small')).toHaveText([/^Decode · \d+$/, /^Encode & transform · \d+$/, /^Analyse · \d+$/]);
   await page.click('[data-act=txMenu][data-v=Decode]'); await page.locator('#ctx .ctx-it', { hasText: 'Base64 decode' }).click();
@@ -560,8 +563,10 @@ test('polish on a desktop: a case summary cut off with … shows in full when po
 });
 
 test('right-click an indicator anywhere: copy, copy defanged, details, every case it is in, watch and the lookups for its kind; plain text keeps the browser menu', async ({ page, context }) => {
-  const errors = await open(page, '#/case/c-harbour/timeline', { osintSample: true });
+  const errors = await open(page, '#/home', { osintSample: true });
+  await expect.poll(() => page.evaluate(() => DB.osintSample === 2), { timeout: 15000 }).toBe(true); await page.evaluate(() => go('#/case/c-lantern/timeline'));
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.fill('#tlq', 'harbour@proton'); await page.waitForTimeout(400);   // a long timeline: filter to the record first
   const v = page.locator('#main .v', { hasText: /^j\.harbour@proton\.me$/ }).first();
   await v.click({ button: 'right' });
   await expect(page.locator('#ctx .ctx-title')).toContainText('j.harbour@proton.me');
@@ -569,10 +574,17 @@ test('right-click an indicator anywhere: copy, copy defanged, details, every cas
   await page.locator('#ctx .ctx-it', { hasText: 'Copy defanged' }).click();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('j[.]harbour[@]proton[.]me');
   // an address from the sample case: watch it, then find it in every case
-  const ip = page.locator('#main .v', { hasText: /^198\.51\.100\.23$/ }).first();
-  await ip.click({ button: 'right' }); await page.getByRole('menuitem', { name: 'Watch', exact: true }).click();
+  await page.keyboard.press('Escape'); await page.fill('#tlq', '198.51.100.23'); await page.waitForTimeout(400);
+  // the timeline draws only the rows in view and redraws as it scrolls: bring the address into view, then right-click the
+  // middle of its own text (an address that wraps has a box whose middle can sit on the next word)
+  const rclickIp = async () => {
+    const hit = () => page.evaluate(() => { for (const v of document.querySelectorAll('#main .v')) { if (v.textContent !== '198.51.100.23' || v.getClientRects().length !== 1) continue; const r = v.getClientRects()[0], x = r.left + r.width / 2, y = r.top + r.height / 2, at = document.elementFromPoint(x, y);
+      if (at && (at === v || v.contains(at))) return [x, y]; } return null; });
+    let xy = await hit(); if (!xy) { await page.evaluate(() => { const v = [...document.querySelectorAll('#main .tlc .v, #main [data-vi] .v')].find(x => x.textContent === '198.51.100.23'); if (v) v.scrollIntoView({ block: 'center' }); }); await page.waitForTimeout(300); xy = await hit(); }
+    await page.mouse.click(xy[0], xy[1], { button: 'right' }); };
+  await rclickIp(); await expect(page.locator('#ctx .ctx-title')).toContainText('198.51.100.23'); await page.getByRole('menuitem', { name: 'Watch', exact: true }).click();
   expect(await page.evaluate(() => !!(DB.watch || {})['ipv4:198.51.100.23'])).toBe(true);
-  await ip.click({ button: 'right' }); await expect(page.locator('#ctx .ctx-it', { hasText: 'Stop watching' })).toBeVisible();
+  await rclickIp(); await expect(page.locator('#ctx .ctx-it', { hasText: 'Stop watching' })).toBeVisible();
   await page.locator('#ctx .ctx-it', { hasText: 'Find in every case' }).click();
   await expect(page).toHaveURL(/#\/entities$/); await expect(page.locator('#entq')).toHaveValue('198.51.100.23');
   // a heading is not an indicator: no menu of ours
@@ -1307,7 +1319,7 @@ test('timeline: scrolling never leaves a blank screen — sticky day headings ar
       if(last < sr.bottom - 120 && sp > 50) bad.push(y); } return bad; }, [step, max]);
   // the OSINT sample case: tall evidence cards between day headings
   await page.evaluate(async () => { delete window.__noOsintSample; await sampleOsintAdd(); });
-  const cid = 'c-harbour'; expect(await page.evaluate(() => DB.cases.some(c => c.id === 'c-harbour'))).toBe(true);
+  const cid = 'c-lantern'; expect(await page.evaluate(() => DB.entries.some(e => e.id === 'sp-jan' && e.caseId === 'c-lantern'))).toBe(true);
   for (const [w, h] of [[1668, 903], [1100, 760]]) { await page.setViewportSize({ width: w, height: h }); await page.evaluate(c => go(caseHash(c, 'timeline')), cid); await expect(page.locator('#tlV > [data-vi]').first()).toBeVisible();
     expect(await scan(70, 12000)).toEqual([]); }
   // a long one: 20,000 events over 200 days stays drawn wherever you land, and quickly
@@ -1325,14 +1337,14 @@ test('timeline: scrolling never leaves a blank screen — sticky day headings ar
 test('inspector: nothing in it is wider than the panel — every vault entry and indicator of the OSINT sample case', async ({ page }) => {
   const errors = await open(page, '#/home');
   await page.setViewportSize({ width: 1500, height: 900 });
-  await page.evaluate(async () => { delete window.__noOsintSample; await sampleOsintAdd(); DB.active = 'c-harbour'; go(caseHash('c-harbour', 'graph')); });
-  const wide = await page.evaluate(async () => { const out = [], ids = DB.entries.filter(e => e.caseId === 'c-harbour').map(e => ['entry', e.id]).concat([...derive('c-harbour').ents.keys()].slice(0, 120).map(k => ['ent', k]));
+  await page.evaluate(async () => { delete window.__noOsintSample; await sampleOsintAdd(); DB.active = 'c-lantern'; go(caseHash('c-lantern', 'graph')); });
+  const wide = await page.evaluate(async () => { const out = [], ids = DB.entries.filter(e => e.caseId === 'c-lantern').map(e => ['entry', e.id]).concat([...derive('c-lantern').ents.keys()].slice(0, 120).map(k => ['ent', k]));
     for(const [k, id] of ids){ select(k, id); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
       for(const el of document.querySelectorAll('#insp, #insp .ibody')) if(el.scrollWidth > el.clientWidth + 1) out.push(id + ' ' + el.scrollWidth + '>' + el.clientWidth); }
     return out; });
   expect(wide).toEqual([]);
   // the legend sits at the bottom when there is no time slider
-  await page.evaluate(() => { UI.sel = null; go(caseHash('c-harbour', 'graph')); });
+  await page.evaluate(() => { UI.sel = null; go(caseHash('c-lantern', 'graph')); });
   const gap = await page.evaluate(() => { const c = document.querySelector('.gcanvas').getBoundingClientRect(), l = document.querySelector('.glegend').getBoundingClientRect(); return [!!document.querySelector('.gtime'), Math.round(c.bottom - l.bottom)]; });
   expect(gap[1]).toBe(gap[0] ? 72 : 16);
   noErrors(errors);
@@ -1409,7 +1421,9 @@ test('threat intel story panel: why it matters first, the source summary, previo
   await page.locator('body').press('j'); await page.locator('body').press('j'); await expect(P.locator('.st-pos')).toHaveText(`${at + 3} of ${nav.length}`);
   await expect(page.locator('.tio-tbl tbody tr.on')).toHaveCount(1);
   // the Lamp loader story: its indicators are already in a case, and that comes first
-  await page.click('.tio-tbl tbody tr:has-text("Lamp loader")');
+  // an open story blurs the page behind it: a click there closes the story, then the list takes clicks again
+  await expect(page.locator('#stScrim')).toBeVisible(); await page.mouse.click(200, 500); await expect(page.locator('#stScrim')).toHaveCount(0);
+  await page.click('.tio-tbl tbody tr:has-text("Lamp loader")'); await expect(page.locator('#stScrim')).toBeVisible();
   await expect(P.locator('.st-w.hot').first()).toContainText('already in Op Lantern'); await expect(P.locator('.st-w.hot .ent, .st-w.hot [data-act]').first()).toBeVisible();
   // triage from the panel keeps the panel on the same story
   await P.locator('[data-act=ctiStar]').click(); await expect(P.locator('[data-act=ctiStar]')).toHaveAttribute('aria-pressed', 'true');

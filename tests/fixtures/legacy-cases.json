@@ -1,0 +1,428 @@
+{
+ "cases": [
+  {
+   "id": "c-portal",
+   "name": "Customer portal — credential stuffing",
+   "code": "TN-2026-011",
+   "status": "review",
+   "owner": "You",
+   "created": "2026-09-09T13:00:00Z",
+   "updated": "2026-09-12T16:05:00Z",
+   "scope": "Burst of failed logins against portal.corp.example; check overlap with other cases.",
+   "color": "#e8590c",
+   "icon": "users"
+  },
+  {
+   "id": "c-lab",
+   "name": "Harbour photo — OSINT & forensics CTF lab",
+   "code": "LAB-2026-01",
+   "status": "active",
+   "owner": "You",
+   "created": "2026-09-20T18:00:00Z",
+   "updated": "2026-09-21T09:30:00Z",
+   "t0": "lab2",
+   "scope": "Practice challenge: work out where harbour.jpg was taken, who posted it, and recover the hidden flag. Flag format FLAG{...}.",
+   "color": "#0ea5a4",
+   "icon": "flag"
+  }
+ ],
+ "records": [
+  [
+   "p1",
+   "c-portal",
+   "evidence",
+   "2026-09-10T02:11:04Z",
+   "WEB02",
+   "access.log",
+   "Burst of failed logins from 203.0.113.47",
+   "203.0.113.47 - - [10/Sep/2026:02:11:04 +0000] \"POST /login HTTP/1.1\" 401 512 \"-\" \"python-requests/2.31\"",
+   [
+    "auth"
+   ]
+  ],
+  [
+   "p2",
+   "c-portal",
+   "evidence",
+   "2026-09-10T02:11:05Z",
+   "WEB02",
+   "access.log",
+   "Failed login from 203.0.113.47",
+   "203.0.113.47 - - [10/Sep/2026:02:11:05 +0000] \"POST /login HTTP/1.1\" 401 512 \"-\" \"python-requests/2.31\"",
+   [
+    "auth"
+   ]
+  ],
+  [
+   "p3",
+   "c-portal",
+   "evidence",
+   "2026-09-10T02:14:40Z",
+   "WEB02",
+   "access.log",
+   "Successful login after 212 failures",
+   "203.0.113.47 - - [10/Sep/2026:02:14:40 +0000] \"POST /login HTTP/1.1\" 302 0 \"-\" \"python-requests/2.31\" user=m.silva@corp.example",
+   [
+    "auth"
+   ]
+  ],
+  [
+   "p4",
+   "c-portal",
+   "evidence",
+   "2026-09-10T03:02:12Z",
+   "WEB02",
+   "access.log",
+   "Second source 192.0.2.66 tries the same list",
+   "192.0.2.66 - - [10/Sep/2026:03:02:12 +0000] \"POST /login HTTP/1.1\" 401 512 \"-\" \"python-requests/2.31\"",
+   [
+    "auth"
+   ]
+  ],
+  [
+   "p5",
+   "c-portal",
+   "finding",
+   "2026-09-12T16:00:00Z",
+   "",
+   "analyst",
+   "One account compromised; password reset done",
+   "m.silva@corp.example reset 2026-09-12. 203.0.113.47 blocked at WAF.",
+   [
+    "auth"
+   ]
+  ],
+  [
+   "lab1",
+   "c-lab",
+   "note",
+   "2026-09-20T18:00:00Z",
+   "",
+   "ctf:brief",
+   "Challenge brief — \"Harbour lights\" (OSINT, 300 pts)",
+   "A user posted harbour.jpg with the caption \"golden hour at the old docks\". Find the city, the uploader, and the flag hidden in the file. Flag format: FLAG{...}",
+   [
+    "ctf",
+    "brief"
+   ]
+  ],
+  [
+   "lab2",
+   "c-lab",
+   "evidence",
+   "2026-09-20T18:12:00Z",
+   "",
+   "exiftool",
+   "EXIF from harbour.jpg — GPS present",
+   "File: harbour.jpg  SHA256=4be1c0d9a8f7e6d5c4b3a2918070605040302010f0e0d0c0b0a09080706050  Make: ExampleCam  Model: X100  DateTimeOriginal: 2026:08:21 18:42:07  Software: GIMP 2.10  GPSLatitude: 59 deg 54' 38.00\" N  GPSLongitude: 10 deg 44' 25.00\" E",
+   [
+    "exif",
+    "geolocation"
+   ]
+  ],
+  [
+   "lab3",
+   "c-lab",
+   "evidence",
+   "2026-09-20T18:20:00Z",
+   "",
+   "strings",
+   "strings -n 8 harbour.jpg — odd base64 after the JPEG end marker",
+   "Trailing data after FFD9 at offset 0x2A41F: RkxBR3toYXJib3VyX2xpZ2h0c181OU59  (appended with cat, not steganography)",
+   [
+    "strings",
+    "flag"
+   ]
+  ],
+  [
+   "lab4",
+   "c-lab",
+   "evidence",
+   "2026-09-20T18:34:00Z",
+   "",
+   "osint:photo-site",
+   "Original upload by @k3lpie_sails on photos.example",
+   "Reverse image search finds the same photo posted 2026-08-21 by @k3lpie_sails on photos.example, caption \"golden hour at the old docks\". Profile links to k3lpie@mail.example.",
+   [
+    "osint"
+   ]
+  ],
+  [
+   "lab5",
+   "c-lab",
+   "finding",
+   "2026-09-21T09:20:00Z",
+   "",
+   "analyst",
+   "GPS resolves to Oslo harbour front (59.9106 N, 10.7403 E)",
+   "Converted DMS 59°54'38\"N 10°44'25\"E → 59.910556, 10.740278. Matches the skyline in the photo. Try Lab → Coordinates to check.",
+   [
+    "geolocation"
+   ]
+  ],
+  [
+   "lq1",
+   "c-lab",
+   "lead",
+   null,
+   "",
+   "checklist",
+   "Where was the photo taken?",
+   "",
+   [
+    "question"
+   ]
+  ],
+  [
+   "lq2",
+   "c-lab",
+   "lead",
+   null,
+   "",
+   "checklist",
+   "What does the trailing base64 decode to?",
+   "Try the Decoder — it is the flag.",
+   [
+    "question"
+   ]
+  ],
+  [
+   "lq3",
+   "c-lab",
+   "lead",
+   null,
+   "",
+   "checklist",
+   "Is @k3lpie_sails active on other platforms?",
+   "",
+   [
+    "question"
+   ]
+  ]
+ ],
+ "answers": {
+  "lq1": "Oslo harbour front, Norway — 59.9106 N, 10.7403 E"
+ },
+ "entries": [
+  [
+   "lab-img",
+   "c-lab",
+   "media",
+   {
+    "title": "harbour.jpg",
+    "type": "Image",
+    "resolution": "4032×3024"
+   },
+   {
+    "priority": "high",
+    "starred": true,
+    "tags": [
+     "ctf"
+    ],
+    "src": "lab2"
+   }
+  ],
+  [
+   "lab-hash",
+   "c-lab",
+   "file",
+   {
+    "hash": "4be1c0d9a8f7e6d5c4b3a2918070605040302010f0e0d0c0b0a09080706050",
+    "filename": "harbour.jpg",
+    "size": "172 KB",
+    "type": "JPEG"
+   },
+   {
+    "priority": "medium",
+    "tags": [
+     "ctf"
+    ],
+    "src": "lab2"
+   }
+  ],
+  [
+   "lab-loc",
+   "c-lab",
+   "location",
+   {
+    "address": "Harbour front",
+    "city": "Oslo",
+    "country": "Norway",
+    "coordinates": "59.910556, 10.740278"
+   },
+   {
+    "priority": "high",
+    "tags": [
+     "geolocation"
+    ],
+    "src": "lab5"
+   }
+  ],
+  [
+   "lab-user",
+   "c-lab",
+   "username",
+   {
+    "username": "@k3lpie_sails",
+    "platform": "photos.example",
+    "availability": "Active"
+   },
+   {
+    "priority": "high",
+    "tags": [
+     "uploader"
+    ],
+    "src": "lab4"
+   }
+  ],
+  [
+   "lab-mail",
+   "c-lab",
+   "email",
+   {
+    "email": "k3lpie@mail.example",
+    "provider": "mail.example",
+    "verified": "Unverified"
+   },
+   {
+    "priority": "medium",
+    "tags": [
+     "uploader"
+    ],
+    "src": "lab4"
+   }
+  ],
+  [
+   "p-ip",
+   "c-portal",
+   "ip",
+   {
+    "ip": "203.0.113.47",
+    "asn": "AS64500 (documentation)"
+   },
+   {
+    "priority": "critical",
+    "tags": [
+     "attacker"
+    ],
+    "src": "p1",
+    "verdict": "malicious"
+   }
+  ],
+  [
+   "p-ip2",
+   "c-portal",
+   "ip",
+   {
+    "ip": "192.0.2.66",
+    "asn": "AS64502 (documentation)"
+   },
+   {
+    "priority": "high",
+    "tags": [
+     "attacker"
+    ],
+    "src": "p4",
+    "verdict": "suspicious"
+   }
+  ],
+  [
+   "p-acct",
+   "c-portal",
+   "email",
+   {
+    "email": "m.silva@corp.example",
+    "provider": "corp.example",
+    "verified": "Verified"
+   },
+   {
+    "priority": "high",
+    "tags": [
+     "victim"
+    ],
+    "src": "p3"
+   }
+  ]
+ ],
+ "links": [
+  [
+   "p-ip",
+   "p-acct",
+   "logged in as",
+   3,
+   "p3"
+  ],
+  [
+   "lab-img",
+   "lab-loc",
+   "taken at",
+   3,
+   "lab5"
+  ],
+  [
+   "lab-user",
+   "lab-img",
+   "uploaded",
+   3,
+   "lab4"
+  ],
+  [
+   "lab-user",
+   "lab-mail",
+   "profile links to",
+   2,
+   "lab4"
+  ],
+  [
+   "lab-hash",
+   "lab-img",
+   "hash of",
+   3,
+   "lab2"
+  ]
+ ],
+ "pos": {
+  "p-ip": [
+   0,
+   0
+  ],
+  "p-acct": [
+   240,
+   0
+  ],
+  "p-ip2": [
+   0,
+   170
+  ],
+  "lab-img": [
+   0,
+   0
+  ],
+  "lab-loc": [
+   230,
+   -90
+  ],
+  "lab-hash": [
+   -230,
+   -90
+  ],
+  "lab-user": [
+   0,
+   190
+  ],
+  "lab-mail": [
+   230,
+   190
+  ]
+ },
+ "notes": [
+  {
+   "id": "n5",
+   "caseId": "c-portal",
+   "color": "purple",
+   "pinned": false,
+   "text": "203.0.113.47 is also the Lantern C2. Same actor, or shared hosting? Compare timing.",
+   "due": ""
+  }
+ ]
+}

@@ -86,14 +86,17 @@ const DEMO_ENTRIES = [
   ['v-fam','c-lantern','threat',{name:'Lamp loader',kind:'Malware family',severity:'High',confidence:'Medium'},{priority:'high',tags:['malware'],src:'r-forum'}],
   ['v-reg','c-lantern','organization',{name:'Example Registrar Inc.',industry:'Domain registrar',country:'—'},{priority:'low',tags:['infrastructure'],src:'r-whois'}],
   ['v-loc','c-lantern','location',{address:'12 Sample Street',city:'Example City',country:'Exampleland'},{priority:'low',tags:['whois'],notes:'WHOIS registrant address. Almost certainly false.',src:'r-whois'}],
-  ['lab-img','c-lab','media',{title:'harbour.jpg',type:'Image',resolution:'4032×3024'},{priority:'high',starred:true,tags:['ctf'],src:'lab2'}],
-  ['lab-hash','c-lab','file',{hash:'4be1c0d9a8f7e6d5c4b3a2918070605040302010f0e0d0c0b0a09080706050',filename:'harbour.jpg',size:'172 KB',type:'JPEG'},{priority:'medium',tags:['ctf'],src:'lab2'}],
-  ['lab-loc','c-lab','location',{address:'Harbour front',city:'Oslo',country:'Norway',coordinates:'59.910556, 10.740278'},{priority:'high',tags:['geolocation'],src:'lab5'}],
-  ['lab-user','c-lab','username',{username:'@k3lpie_sails',platform:'photos.example',availability:'Active'},{priority:'high',tags:['uploader'],src:'lab4'}],
-  ['lab-mail','c-lab','email',{email:'k3lpie@mail.example',provider:'mail.example',verified:'Unverified'},{priority:'medium',tags:['uploader'],src:'lab4'}],
-  ['p-ip','c-portal','ip',{ip:'203.0.113.47',asn:'AS64500 (documentation)'},{priority:'critical',tags:['attacker'],src:'p1',verdict:'malicious'}],
-  ['p-ip2','c-portal','ip',{ip:'192.0.2.66',asn:'AS64502 (documentation)'},{priority:'high',tags:['attacker'],src:'p4',verdict:'suspicious'}],
-  ['p-acct','c-portal','email',{email:'m.silva@corp.example',provider:'corp.example',verified:'Verified'},{priority:'high',tags:['victim'],src:'p3'}],
+  ['st-co','c-story','organization',{name:'Grey Gull Marine Ltd',industry:'Marine fuel supply',country:'Exampleland'},{priority:'critical',starred:true,tags:['subject'],notes:'Company no. 14552019, incorporated 2026-06-02.',src:'s-reg'}],
+  ['st-dir','c-story','person',{name:'Mara Velden',role:'Director, Grey Gull Marine'},{priority:'high',tags:['subject','right-of-reply'],src:'s-reg'}],
+  ['st-cllr','c-story','person',{name:'Peter Lund',role:'Councillor, Northmouth Harbour Board'},{priority:'critical',starred:true,tags:['subject','right-of-reply'],src:'s-tender'}],
+  ['st-bro','c-story','person',{name:'Henrik Lund',role:'Shareholder (40%), Grey Gull Marine'},{priority:'high',tags:['subject'],notes:'Brother of councillor Peter Lund (2024 register of interests).',src:'s-family'}],
+  ['st-board','c-story','organization',{name:'Northmouth Harbour Board',industry:'Public body',country:'Exampleland'},{priority:'medium',tags:['public-body'],src:'s-tender'}],
+  ['st-ship','c-story','vessel',{imo:'9074729',mmsi:'636019825',name:'KESTREL DAWN',flag:'Liberia'},{priority:'critical',starred:true,tags:['vessel'],notes:'Tanker, 183 m. AIS gap 2026-08-03 21:14 to 2026-08-06 01:40 UTC.',src:'s-ais1'}],
+  ['st-port','c-story','location',{address:'Port Varan oil terminal',city:'Port Varan',country:'—',coordinates:'57.903, 5.087'},{priority:'high',tags:['sanctioned'],notes:'Fictional terminal under sanctions in this story.',src:'s-sat'}],
+  ['st-dom','c-story','domain',{domain:'greygull-marine.example',registrar:'Example Registrar Inc.',created:'2026-05-29'},{priority:'medium',tags:['company-site'],src:'s-whois'}],
+  ['st-mail','c-story','email',{email:'m.velden@mail.example',provider:'mail.example',verified:'Unverified'},{priority:'medium',tags:['registrant'],src:'s-whois'}],
+  ['st-handle','c-story','username',{username:'@maravelden',platform:'social.example',availability:'Active'},{priority:'medium',tags:['social'],src:'s-social'}],
+  ['st-contract','c-story','document',{title:'Fuel supply contract — Harbour Board minutes, item 6',type:'Other'},{priority:'high',tags:['contract'],src:'s-tender'}],
 ];
 /* analyst-asserted links between vault entries [from, to, label, confidence 1-3, evidence record] */
 const DEMO_LINKS = [
@@ -103,12 +106,14 @@ const DEMO_LINKS = [
   ['v-dom1','v-mail','registrant',2,'r-whois'],['v-dom1','v-reg','registered via',3,'r-whois'],['v-dom1','v-loc','registrant address',1,'r-whois'],
   ['v-handle','v-mail','uses email',3,'r-forum'],['v-handle','v-btc','advertises wallet',2,'r-wallet'],['v-handle','v-forum','posts on',3,'r-forum'],
   ['v-handle','v-fam','sells',2,'r-forum'],['v-alias','v-handle','alias of',2,'r-forum'],['v-actor','v-handle','operates',1,'r-forum'],
-  ['p-ip','p-acct','logged in as',3,'p3'],
-  ['lab-img','lab-loc','taken at',3,'lab5'],['lab-user','lab-img','uploaded',3,'lab4'],['lab-user','lab-mail','profile links to',2,'lab4'],['lab-hash','lab-img','hash of',3,'lab2'],
+  ['st-dir','st-co','director of',3,'s-reg'],['st-bro','st-co','owns 40% of',3,'s-family'],['st-bro','st-cllr','brother of',3,'s-family'],
+  ['st-cllr','st-board','sits on',3,'s-tender'],['st-board','st-contract','awarded',3,'s-tender'],['st-contract','st-co','won by',3,'s-tender'],
+  ['st-co','st-ship','operates',2,'s-statement'],['st-ship','st-port','seen at (likely)',1,'s-sat'],['st-co','st-dom','website',3,'s-reg'],
+  ['st-dom','st-mail','registrant',2,'s-whois'],['st-dir','st-mail','uses email',2,'s-whois'],['st-dir','st-handle','posts as',2,'s-social'],['st-handle','st-cllr','thanks',2,'s-social'],
 ];
-const DEMO_CASE_STYLE = {'c-lantern':['#5470f5','crosshair'],'c-portal':['#e8590c','users'],'c-lab':['#0ea5a4','flag']};
+const DEMO_CASE_STYLE = {'c-lantern':['#5470f5','crosshair'],'c-story':['#d9480f','newspaper']};
 /* Curated demo layout: delivery chain left, infrastructure centre, actor cluster right */
 const DEMO_POS = {'v-sender':[0,0],'v-lnk':[0,170],'v-victim':[-190,170],'v-url':[0,340],'v-dom2':[-190,470],'v-ip2':[-380,470],'v-hash':[190,470],'v-ip1':[190,640],
   'v-fam':[380,340],'v-dom1':[220,0],'v-reg':[220,-170],'v-loc':[420,-130],'v-mail':[440,90],'v-handle':[620,220],'v-alias':[800,100],'v-btc':[800,340],'v-forum':[620,420],'v-actor':[820,220],
-  'p-ip':[0,0],'p-acct':[240,0],'p-ip2':[0,170],
-  'lab-img':[0,0],'lab-loc':[230,-90],'lab-hash':[-230,-90],'lab-user':[0,190],'lab-mail':[230,190]};
+  'st-cllr':[0,0],'st-board':[-220,-150],'st-contract':[0,-260],'st-bro':[220,0],'st-co':[220,-260],'st-dir':[460,-260],'st-mail':[680,-150],'st-dom':[460,-420],
+  'st-handle':[460,-60],'st-ship':[220,-480],'st-port':[0,-560]};

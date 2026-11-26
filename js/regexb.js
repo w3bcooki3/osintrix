@@ -481,11 +481,11 @@ function labRegex(){
 /* redraw without losing your place in the lines */
 function rxRender(){ const a = $('rxLines'), y = a ? a.scrollTop : 0; renderMain(); const b = $('rxLines'); if(b) b.scrollTop = y; }
 /* its own page in the sidebar (Kit → Regex builder) */
-/* Patterns: build a pattern from your own lines, and the parsers that read evidence into fields — one place for both */
+/* Regex: build a pattern from your own lines, and the parsers that read evidence into fields — one place for both */
 function viewRegex(){ const t = UI.patTab === 'logs' ? 'logs' : 'build', np = (DB.parsers || []).length;
   return `<div class="scroll"><div class="page wide">
-    <header class="lhd rx-lhd"><div><h1>Patterns</h1><p>${t === 'logs' ? 'How evidence is read into fields: try a log line, keep your own parsers, and tell the parser what a vendor’s field names mean.' : 'Tested, explained, fast patterns for Splunk, KQL, Grok, Python, JavaScript and PCRE — your lines never leave this browser.'}</p></div></header>
-    <div class="seg pat-tabs" role="tablist" aria-label="Patterns"><button role="tab" data-act="patTab" data-v="build" aria-selected="${t === 'build'}">${ico('regex','sm')}Build a pattern</button><button role="tab" data-act="patTab" data-v="logs" aria-selected="${t === 'logs'}">${ico('scan-text','sm')}Log parsers${np ? ` <span class="t3">${np}</span>` : ''}</button></div>
+    <header class="lhd rx-lhd"><div><h1>Regex</h1><p>${t === 'logs' ? 'How evidence is read into fields: try a log line, keep your own parsers, and tell the parser what a vendor’s field names mean.' : 'Tested, explained, fast patterns for Splunk, KQL, Grok, Python, JavaScript and PCRE — your lines never leave this browser.'}</p></div></header>
+    <div class="seg pat-tabs" role="tablist" aria-label="Regex"><button role="tab" data-act="patTab" data-v="build" aria-selected="${t === 'build'}">${ico('regex','sm')}Build a pattern</button><button role="tab" data-act="patTab" data-v="logs" aria-selected="${t === 'logs'}">${ico('scan-text','sm')}Log parsers${np ? ` <span class="t3">${np}</span>` : ''}</button></div>
     ${t === 'logs' ? labParse() : labRegex()}</div></div>`; }
 function rxLibHtml(){ return `<div class="rx-libl">${RX_LIB.map(([n, p], i) => `<div class="rx-libi"><span>${esc(n)}</span><code class="mono">${esc(p)}</code><button class="iconbtn xs" data-act="rxLib" data-v="${i}" aria-label="Copy the pattern for ${esc(n)}">${ico('copy','sm')}</button></div>`).join('')}</div>`; }
 /* selecting text in a line → a field to name */

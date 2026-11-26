@@ -318,7 +318,9 @@ const STORY_ACTS = {
   stClaimGo:id => { UI.stView = 'claims'; renderMain(); const el = document.getElementById('stc-' + id); if(el){ el.scrollIntoView({block:'center'}); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1200); } },
   stStatus:(id, v) => { const cl = stOf(theCase()).claims.find(x => x.id === id); if(!cl || !ST_STATUS.some(s => s[0] === v)) return; cl.st = v; mutate('claim marked ' + v); renderMain(); },
   stClaimEdit:id => stClaimDlg(id),
-  stClaimDel:id => { const c = stOf(theCase()), cl = c.claims.find(x => x.id === id); if(!cl) return; confirmDlg('Delete this claim?', cap(cl.t, 200), 'Delete', () => { c.claims = c.claims.filter(x => x.id !== id); for(const r of c.replies) r.claims = (r.claims || []).filter(x => x !== id); mutate('deleted a claim'); renderMain(); }); },
+  stClaimDel:id => { const c = stOf(theCase()), cl = c.claims.find(x => x.id === id); if(!cl) return; confirmDlg('Delete this claim?', cap(cl.t, 200), 'Delete', () => { const i = c.claims.indexOf(cl), was = c.replies.map(r => [r, (r.claims || []).slice()]);
+    c.claims = c.claims.filter(x => x.id !== id); for(const r of c.replies) r.claims = (r.claims || []).filter(x => x !== id); mutate('deleted a claim'); renderMain();
+    toast('Claim deleted', 'Undo', () => { c.claims.splice(i, 0, cl); for(const [r, k] of was) r.claims = k; mutate('put back a claim'); renderMain(); }); }); },
   stEvAdd:(id, v) => stEvDlg(id, v),
   stEvGo:() => { const P = UI.stPick, cl = P && stOf(theCase()).claims.find(x => x.id === P.cl); if(!cl) return closeDlg(); const add = [...document.querySelectorAll('#dlg input[data-pk]:checked')].map(i => i.dataset.pk);
     cl[P.side] = [...new Set([...(cl[P.side] || []), ...add])]; closeDlg(); if(add.length) mutate('added evidence to a claim'); renderMain(); },
@@ -338,7 +340,8 @@ const STORY_ACTS = {
       <footer><button class="btn" type="button" data-act="dclose">Cancel</button><button class="btn danger" type="submit">${ico('flame','sm')}Burn</button></footer></form>`); },
   stReplyNew:() => stReplyDlg(null),
   stReplyEdit:id => stReplyDlg(id),
-  stReplyDel:id => { const c = stOf(theCase()); c.replies = c.replies.filter(x => x.id !== id); closeDlg(); mutate('deleted a request for comment'); renderMain(); },
+  stReplyDel:id => { const c = stOf(theCase()), i = c.replies.findIndex(x => x.id === id), x = c.replies[i]; if(!x) return; c.replies.splice(i, 1); closeDlg(); mutate('deleted a request for comment'); renderMain();
+    toast('Request for comment deleted', 'Undo', () => { c.replies.splice(i, 0, x); mutate('put back a request for comment'); renderMain(); }); },   /* the record that someone had the chance to reply: easy to get back */
   stArchSave:(id, url) => { const go = () => { const A = stArch(); (A[url] || (A[url] = {})).req = Date.now(); window.open('https://web.archive.org/save/' + url, '_blank', 'noopener,noreferrer'); mutate('asked the Wayback Machine to save a page'); renderMain(); toast('Saving in a new tab. Come back here when it is done; the copy is found and kept.'); };
     if(DB.prefs.archOk) return go();
     confirmDlg('Make a public copy of this page?', 'The address ' + cap(url, 120) + ' is sent to the Internet Archive, which saves the page where anyone can see it. Whoever runs the page may notice it was archived. You will not be asked again.', 'Archive it', () => { DB.prefs.archOk = 1; go(); }, true); },
