@@ -43,7 +43,8 @@ test('remember on this device keeps a key that opens it after a reload; Lock for
 
 test('a way back for whoever forgot it: a door at the foot of Tradecraft and a line in the shortcuts list', async ({ page }) => {
   const errors = await lockedApp(page, '#/tradecraft');
-  await page.locator('a.tc-door').scrollIntoViewIfNeeded(); await expect(page.locator('a.tc-door')).toHaveText(/Blackbook\s*Locked/);
+  // the page can still be drawing (the Tradecraft data loads on demand): wait for the door, then click it (a click re-finds it if it was redrawn)
+  await expect(page.locator('a.tc-door')).toHaveText(/Blackbook\s*Locked/);
   await page.click('a.tc-door'); await expect(page.locator('#bbPass')).toBeVisible();
   await page.evaluate(() => go('#/home')); await page.keyboard.press('?');
   await expect(page.locator('#dlg')).toContainText('then type blackbook');

@@ -62,4 +62,10 @@ async function budget(page, ms) {
   return ms * Math.min(6, Math.max(1, runs[1] / CAL_MS));
 }
 const noErrors = errors => expect(errors, errors.join('\n')).toEqual([]);
-module.exports = { APP, fixture, open, capture, noErrors, budget };
+/* Every change written to storage? Wait for that before a reload: a write still on its way when the page goes away
+   can land too late for the next page (on a busy machine, a large workspace is written to IndexedDB in the background). */
+async function settled(page) {
+  await expect.poll(() => page.evaluate(() => typeof isDirty === 'function' && !isDirty()), { timeout: 15000 }).toBe(true);
+}
+
+module.exports = { APP, fixture, open, capture, noErrors, budget, settled };

@@ -9,7 +9,7 @@
    The list below is rewritten by tools/stamp.py on every build; a new list means a new cache and the old one
    is deleted. */
 /* build:start */
-const BUILD = '1.90-af845bc88095';
+const BUILD = '1.90-388ff667ff91';
 const FILES = [
   'css/app.css?v=1.90-477e515b',
   'css/design.css?v=1.90-2495d8ec',
@@ -42,7 +42,7 @@ const FILES = [
   'js/ctf.js?v=1.90-b0cbbf46',
   'js/cti.js?v=1.90-0d64f394',
   'js/data/attack.js?v=1.90-c1562fb4',
-  'js/data/blackbook-sealed.js?v=1.90-2588cb10',
+  'js/data/blackbook-sealed.js?v=1.90-011b670e',
   'js/data/cert-guide.js?v=1.90-4398ad03',
   'js/data/cert-samples.js?v=1.90-0299cc85',
   'js/data/changelog.js?v=1.90-e6a53624',
@@ -134,7 +134,7 @@ const FILES = [
   'js/safety.js?v=1.90-a8cab4b5',
   'js/savedv.js?v=1.90-95c50a46',
   'js/search.js?v=1.90-f5959f1f',
-  'js/security.js?v=1.90-eb3d8ab9',
+  'js/security.js?v=1.90-6f206a52',
   'js/setup.js?v=1.90-215cd8c0',
   'js/share.js?v=1.90-4baa7d43',
   'js/sightings.js?v=1.90-07677802',

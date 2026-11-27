@@ -2,13 +2,14 @@
 // history and system alerts; no form hands what is typed to the browser's autofill; a shared case file carries no
 // protected sources or keys; a stealer log saved to a case never carries a password.
 const { test, expect } = require('@playwright/test');
-const { open, noErrors, fixture } = require('./helpers');
+const { open, noErrors, fixture, settled } = require('./helpers');
 
 test('discreet titles and alerts: no case name in the tab or history, a reminder alert says only that one is due', async ({ page }) => {
   const errors = await open(page, '#/case/c-story/story', { legacy: false });
   await expect(page).toHaveTitle(/^Kestrel Dawn · Story/);
   await page.evaluate(() => go('#/security')); await page.click('[data-act=secDisc]');
   await page.evaluate(() => go('#/case/c-story/timeline')); await expect(page).toHaveTitle('Case · Timeline — OSINTrix');
+  await settled(page);
   await page.reload(); await expect.poll(() => page.evaluate(() => typeof DB !== 'undefined' && !!DB && !!document.querySelector('#sidenav .nv'))).toBe(true);
   await expect(page).toHaveTitle('Case · Timeline — OSINTrix');   // remembered
   // a reminder falls due: the system alert carries nothing from the note

@@ -23,7 +23,12 @@ const PROGRAMMING = /Cannot read|Cannot set|undefined|is not a function|is not i
 test('every way a file comes in survives damaged and random files: nothing hangs, nothing crashes, a damaged part is named', async ({ page }) => {
   const errors = await open(page, '#/home');
   const report = {};
-  for (const [entry, files] of Object.entries(ENTRIES)) for (const file of files) {
+  // docs/ holds realistic lure samples (a .cmd in a RAR, an HTA in OneNote, an ISO with a shortcut) that stay on the
+  // owner's machine and out of the public repository; they're fed in when present. Every other fixture must exist.
+  const local = f => f.startsWith('docs/') && !fs.existsSync(path.join(__dirname, 'fixtures', f));
+  const skipped = Object.values(ENTRIES).flat().filter(local);
+  if (skipped.length) test.info().annotations.push({ type: 'local samples not present', description: [...new Set(skipped)].join(', ') });
+  for (const [entry, files] of Object.entries(ENTRIES)) for (const file of files.filter(f => !local(f))) {
     expect(fs.existsSync(path.join(__dirname, 'fixtures', file)), file).toBe(true);
     report[file] = await page.evaluate(async ([entry, name, b64]) => {
       let s = 1234567; const rnd = () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648, at = n => Math.floor(rnd() * n);

@@ -610,7 +610,8 @@ test('storage: real usage, early warnings, refusing files that do not fit, and c
   await page.evaluate(() => { storageEstimate = async () => { STORE.quota = 500e6; STORE.usage = 450e6; return STORE; }; });
   await expect.poll(async () => { await page.evaluate(() => storageCheck()); return page.locator('#saved').textContent(); }).toContain('Storage 90% full');
   expect(await page.evaluate(() => nbRoomFor(80e6))).toBe(false);
-  await page.evaluate(() => { storageOK = false; paintSaved(); }); await expect(page.locator('#saved')).toContainText('Not saved');
+  // a save already under way can repaint the bar after the stand-in, so set it again until 'Not saved' is what shows
+  await expect.poll(async () => { await page.evaluate(() => { storageOK = false; paintSaved(); }); return page.locator('#saved').textContent(); }).toContain('Not saved');
   noErrors(errors);
 });
 

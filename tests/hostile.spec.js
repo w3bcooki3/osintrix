@@ -3,7 +3,7 @@
 // app keeps — then every page, case tab, details panel and edit dialog is opened, before and
 // after a refresh. Nothing may run, no markup may appear, no link may carry a script URL.
 const { test, expect } = require('@playwright/test');
-const { open, noErrors } = require('./helpers');
+const { open, noErrors, settled } = require('./helpers');
 const fs = require('fs'), path = require('path');
 test.setTimeout(240000);
 const FX = p => fs.readFileSync(path.join(__dirname, 'fixtures', p), 'utf8');
@@ -119,6 +119,7 @@ test('everything kept comes back from a backup and after a refresh: places, grad
     const pick = () => { const r = id => DB.records.find(x => x.id === id); return {geo:r(rs[0].id).geo, cred:r(rs[1].id).cred, shift:r(rs[2].id).tsShift, att:r(rs[3].id).att, srcRel:DB.srcRel, cc:DB.phoneCC, hunts:DB.hunts.map(h => h.name + h.q), trash:DB.trash.map(x => x.label).sort()}; };
     window.__pick = pick; return pick(); });
   // after a refresh
+  await settled(page);
   await page.reload(); await expect.poll(() => page.evaluate(() => typeof DB !== 'undefined' && !!document.querySelector('#sidenav .nv'))).toBe(true);
   const ids = await page.evaluate(() => DB.records.filter(r => r.caseId === DB.active).slice(0, 4).map(r => r.id));
   const read = () => page.evaluate(ids => { const r = id => DB.records.find(x => x.id === id); return {geo:r(ids[0]).geo, cred:r(ids[1]).cred, shift:r(ids[2]).tsShift, att:r(ids[3]).att, srcRel:DB.srcRel, cc:DB.phoneCC, hunts:DB.hunts.map(h => h.name + h.q), trash:DB.trash.map(x => x.label).sort()}; }, ids);
@@ -131,6 +132,7 @@ test('everything kept comes back from a backup and after a refresh: places, grad
   await page.click('[data-act=confirmOk]');
   await expect.poll(() => page.evaluate(() => DB.phoneCC)).toBe('GB');
   expect(await read()).toEqual(want);
+  await settled(page);
   await page.reload(); await expect.poll(() => page.evaluate(() => typeof DB !== 'undefined' && !!document.querySelector('#sidenav .nv'))).toBe(true);
   expect(await read()).toEqual(want);
   noErrors(errs);
