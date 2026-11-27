@@ -9,10 +9,10 @@
    The list below is rewritten by tools/stamp.py on every build; a new list means a new cache and the old one
    is deleted. */
 /* build:start */
-const BUILD = '1.90-f4903e5d04d5';
+const BUILD = '1.90-af845bc88095';
 const FILES = [
   'css/app.css?v=1.90-477e515b',
-  'css/design.css?v=1.90-623944b6',
+  'css/design.css?v=1.90-2495d8ec',
   'css/fonts.css?v=1.90-6b722f46',
   'css/theme.css?v=1.90-c7d9472f',
   'js/ach.js?v=1.90-ee81d8ef',
@@ -21,7 +21,7 @@ const FILES = [
   'js/app.js?v=1.90-b042bd05',
   'js/areas.js?v=1.90-c0271440',
   'js/auto.js?v=1.90-45557b5b',
-  'js/blackbook.js?v=1.90-b3081c2d',
+  'js/blackbook.js?v=1.90-10a6362a',
   'js/brand.js?v=1.90-dfff2db0',
   'js/browserp.js?v=1.90-6f0338f8',
   'js/caseents.js?v=1.90-bc922570',
@@ -42,10 +42,10 @@ const FILES = [
   'js/ctf.js?v=1.90-b0cbbf46',
   'js/cti.js?v=1.90-0d64f394',
   'js/data/attack.js?v=1.90-c1562fb4',
-  'js/data/blackbook-sealed.js?v=1.90-478ecf43',
+  'js/data/blackbook-sealed.js?v=1.90-2588cb10',
   'js/data/cert-guide.js?v=1.90-4398ad03',
   'js/data/cert-samples.js?v=1.90-0299cc85',
-  'js/data/changelog.js?v=1.90-e4118388',
+  'js/data/changelog.js?v=1.90-e6a53624',
   'js/data/cloudguide-pack.js?v=1.90-2a04047d',
   'js/data/cloudguide.js?v=1.90-f4e2ee0a',
   'js/data/ctf-cheats.js?v=1.90-a94afc1e',

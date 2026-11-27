@@ -5,13 +5,25 @@
 const CHANGELOG_DATA = [
 {
   "version": "1.90",
-  "name": "The Blackbook, locked",
+  "name": "The Blackbook, locked and deepened",
   "date": "2026-11-26",
-  "summary": "The Blackbook's contents are now encrypted with the owner's passphrase, so the public code reveals nothing of them.",
+  "summary": "The Blackbook's contents are encrypted with the owner's passphrase, and every play became a full dossier.",
   "changes": [
     {
       "type": "changed",
       "text": "The Blackbook asks for a passphrase and decrypts in the browser (AES-256-GCM, key from PBKDF2-SHA256 with 600,000 iterations). Only the encrypted file is published; the readable source stays on the owner's machine."
+    },
+    {
+      "type": "changed",
+      "text": "Every Blackbook play is now a dossier: where it was seen in the wild, the exact events and fields to read, what to do when the hunt fires, how to respond, and how to prove the detection works — with severity, signal quality and platforms at a glance."
+    },
+    {
+      "type": "added",
+      "text": "Thirty-three new plays for today's attack surface: AD CS certificates, delegation and shadow credentials, forged tickets, the DPAPI backup key, LAPS and AdminSDHolder, DCShadow, GPO deployment and “ESX Admins”; DLL side-loading, COM hijacking, browser extensions, Office add-ins, accessibility backdoors and RDP hijacking; macOS stealers; token replay, Conditional Access tampering, cloud run-command, metadata credentials, storage, serverless and LLMjacking; Okta, Google Workspace, GitHub and CI, Snowflake; ESXi ransomware. Every new Sigma rule is proven like the rest."
+    },
+    {
+      "type": "added",
+      "text": "The Blackbook's Hunt view is a coverage matrix you can filter by platform, severity and proven Sigma rule; a Doctrine tab sets out a hunt from start to finish and the telemetry to switch on first."
     },
     {
       "type": "added",
@@ -23,6 +35,7 @@ const CHANGELOG_DATA = [
     }
   ]
 },
+
 {
   "version": "1.89",
   "name": "A curated toolbox, many nodes at once, and the Blackbook",
