@@ -2382,6 +2382,21 @@ html.ds[data-theme=light] select,html.ds[data-theme=light] input{color-scheme:li
 .ds .ti-ssvc{display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:8px;background:var(--surface-2);font-size:calc(13px * var(--ts,1))}.ds .ti-ssvc.r{background:var(--red-soft);color:var(--red)}
 .ds .wl-ch{margin-bottom:18px}.ds .wl-ch header{display:flex;align-items:center;padding:12px 16px}.ds .wl-ch h3{margin:0;font-size:calc(14px * var(--ts,1));display:flex;gap:6px;align-items:center}
 .ds .lk-v .lk-band{align-self:flex-start}
+/* watchlist 1.93: file a change, the per-indicator card, your own history */
+.ds .wl-row{display:flex;align-items:center;gap:8px;padding-right:12px;border-bottom:1px solid var(--line)}.ds .wl-row:last-child{border-bottom:0}
+.ds .wl-row > .li{flex:1;min-width:0;border-bottom:0}.ds .wl-row > .btn,.ds .wl-f{flex:none;white-space:nowrap}.ds .wl-f{display:inline-flex;gap:4px;align-items:center;font-size:calc(12.5px * var(--ts,1))}
+.ds .wl-note{margin-top:3px;font-size:calc(12.5px * var(--ts,1));color:var(--text-2);overflow-wrap:anywhere}
+.ds .wl-btns{white-space:nowrap;text-align:right}
+.ds .wl-d{margin-top:18px}.ds .wl-d header{display:flex;align-items:center;gap:8px;padding:12px 16px}.ds .wl-d h3{margin:0;display:flex;gap:8px;align-items:center;font-size:calc(14px * var(--ts,1));min-width:0;overflow-wrap:anywhere}
+.ds .wl-set{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:10px 16px;align-items:end;margin-bottom:6px}
+.ds .wl-set label:not(.chk){display:flex;flex-direction:column;gap:5px;font-size:calc(12.5px * var(--ts,1));color:var(--text-2)}
+.ds .wl-set .chk{grid-column:1/-1}
+.ds .wl-sub{margin:18px 0 8px;font-size:calc(13.5px * var(--ts,1))}
+.ds .wl-hs{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px 18px}
+.ds .wl-h h4{margin:0 0 4px;font-size:calc(12.5px * var(--ts,1));color:var(--text-2);font-weight:560}
+.ds .wl-h .tbl td{padding:5px 8px 5px 0;font-size:calc(12.5px * var(--ts,1));vertical-align:top}.ds .wl-h .tbl td.mono{overflow-wrap:anywhere}.ds .wl-h .nw{white-space:nowrap}
+.ds .wl-fine{margin:10px 0 0;font-size:calc(12.5px * var(--ts,1))}
+@media (max-width:640px){.ds .wl-set{grid-template-columns:minmax(0,1fr)}.ds .wl-row{flex-wrap:wrap;padding:0 12px 10px 0}.ds .wl-row > .li{flex-basis:100%}.ds .wl-row > .btn,.ds .wl-row > .wl-f{margin-left:auto}}
 
 /* ---------- v1.27 Case copilot ---------- */
 .ds .cp{margin-bottom:18px;padding:0}
@@ -4208,6 +4223,7 @@ button.st-w:active{transform:scale(.995)}
 @media (max-width:760px){.st-b2{grid-template-columns:100px minmax(0,1fr)}.st-b2 small{display:none}}
 /* ---------- chats & forwards ---------- */
 .cn{display:flex;flex-direction:column;gap:16px;margin-top:14px}
+.cn-intro{margin:0 0 14px;max-width:80ch;line-height:1.6}.cn-intro .btn{margin-left:6px;vertical-align:middle}
 .cn-sum{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
 .cn-sum>div{background:var(--surface);border:1px solid var(--border-soft);border-radius:12px;padding:12px 14px}
 .cn-sum b{display:block;font:650 calc(22px * var(--ts,1)) var(--mono)}

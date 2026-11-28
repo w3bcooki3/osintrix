@@ -187,8 +187,9 @@ function walletSubmit(){
 document.addEventListener('input', ev => { if(ev.target && ev.target.id === 'wlText'){ const h = $('wlHint'); if(!h) return; clearTimeout(UI.wlT); UI.wlT = setTimeout(() => { let P = null; try{ P = walletParse(ev.target.value); }catch(e){} h.textContent = P ? 'Recognised: ' + P.label : ev.target.value.trim() ? 'Not recognised yet' : ''; }, 250); } });
 const WL_ACTS = {
   ivView:(id, v) => { UI.ivView = v; renderMain(); },
+  cnMsgs:() => { const R = DB.records.filter(r => r.caseId === DB.active && r.chatAuthor).map(r => r.id); if(!R.length) return; UI.facet.ids = R; UI.facet.idsLabel = 'chat records, one per author'; UI.tlMode = 'events'; UI.q = ''; go(caseHash(DB.active, 'timeline')); },
   wlPaste:() => walletPasteDlg(),
   wlOwner:(id, v) => { UI.wlOwner = v || null; renderMain(); },
-  wlRecs:(id, v) => { UI.facet.ids = String(v).split(',').filter(Boolean); UI.tlMode = 'events'; go(caseHash(DB.active, 'timeline')); },
+  wlRecs:(id, v) => { UI.facet.ids = String(v).split(',').filter(Boolean); UI.facet.idsLabel = 'records behind this payment'; UI.tlMode = 'events'; go(caseHash(DB.active, 'timeline')); },
   wlCopy:(id, v) => copyText(v),
 };

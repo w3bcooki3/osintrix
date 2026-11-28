@@ -36,6 +36,6 @@ const EVN_ACTS = {
   nCite:(id, v) => { const n = (DB.notes || []).find(x => x.id === id), rid = noteRefs(n)[+v - 1], r = rid && recById(rid); if(!r) return toast('That event is no longer in the case');
     DB.active = r.caseId; closeDlg(); UI.sel = {kind:'rec', id:r.id}; UI.tlMode = 'events'; UI.q = ''; UI.ast = null; delete UI.facet.ids; go(caseHash(r.caseId, 'timeline')); },
   nCiteAll:id => { const n = (DB.notes || []).find(x => x.id === id), R = noteRefs(n).filter(recById); if(!R.length) return; const r0 = recById(R[0]);
-    DB.active = r0.caseId; closeDlg(); UI.tlMode = 'events'; UI.q = ''; UI.ast = null; UI.facet.ids = R; go(caseHash(r0.caseId, 'timeline')); },
-  idsOff:() => { delete UI.facet.ids; renderMain(); },
+    DB.active = r0.caseId; closeDlg(); UI.tlMode = 'events'; UI.q = ''; UI.ast = null; UI.facet.ids = R; delete UI.facet.idsLabel; go(caseHash(r0.caseId, 'timeline')); },
+  idsOff:() => { delete UI.facet.ids; delete UI.facet.idsLabel; renderMain(); },
 };

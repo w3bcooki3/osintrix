@@ -338,7 +338,7 @@ function caseTimeline(c, D){
     ${UI.pivot ? `<span class="chip accent">Pivot: ${esc(entSplit(UI.pivot).v)} <button data-act="pivotOff" aria-label="Exit pivot">${ico('x','sm')}</button></span>` : ''}
     ${UI.facet.slot ? `<span class="chip accent">${esc(UI.facet.slot.day != null ? UI.facet.slot.day.replace(/^\w+,?\s*/, '') : WD[UI.facet.slot.wd])} ${String(UI.facet.slot.h).padStart(2, '0')}:00 <button data-act="slotOff" aria-label="Clear time filter">${ico('x','sm')}</button></span>` : ''}
     ${UI.facet.win ? `<span class="chip accent">${UI.facet.win.label ? esc(UI.facet.win.label) : '±5 min of ' + esc(E.fmtClock(UI.facet.win.at, tz()))} <button data-act="winOff" aria-label="Clear time window">${ico('x','sm')}</button></span>` : ''}
-    ${UI.facet.ids ? `<span class="chip accent">${UI.facet.ids.length} events a note cites <button data-act="idsOff" aria-label="Show all events">${ico('x','sm')}</button></span>` : ''}
+    ${UI.facet.ids ? `<span class="chip accent">${UI.facet.ids.length} ${esc(UI.facet.idsLabel || 'events a note cites')} <button data-act="idsOff" aria-label="Show all events">${ico('x','sm')}</button></span>` : ''}
     ${UI.facet.host || UI.pivot || UI.q || UI.facet.slot || UI.facet.win || UI.facet.ids ? `<button class="btn xs ghost" data-act="clearFilters">Clear</button>` : ''}
     <span class="sp"></span><button class="btn xs${UI.tlSel ? ' on' : ''}" data-act="tlSel" aria-pressed="${!!UI.tlSel}">${ico('square-check','sm')}Select</button><button class="btn xs${UI.tlHeat ? ' on' : ''}" data-act="tlHeat" aria-pressed="${!!UI.tlHeat}">${ico('grid-3x3','sm')}Heatmap</button>` : ''}</div>`;
   if(UI.tlMode === 'story') return `<div class="scroll">${bar}${storyHTML(D)}</div>`;
@@ -397,7 +397,7 @@ function storyHTML(D){
 /* Infrastructure: what the case pivots on — domains and addresses, money, accounts */
 function caseInfra(c, D){
   const v = ['dom', 'money', 'acc', 'hours', 'chats'].includes(UI.ivView) ? UI.ivView : 'dom';
-  const seg = `<div class="seg qseg" role="group" aria-label="View"><button data-act="ivView" data-v="dom" aria-pressed="${v === 'dom'}">${ico('network','sm')}Domains &amp; addresses</button><button data-act="ivView" data-v="money" aria-pressed="${v === 'money'}">${ico('bitcoin','sm')}Money</button><button data-act="ivView" data-v="acc" aria-pressed="${v === 'acc'}">${ico('history','sm')}Accounts</button><button data-act="ivView" data-v="hours" aria-pressed="${v === 'hours'}">${ico('clock-3','sm')}Active hours</button><button data-act="ivView" data-v="chats" aria-pressed="${v === 'chats'}">${ico('message-square','sm')}Chats</button></div>`;
+  const seg = `<div class="seg qseg" role="group" aria-label="View"><button data-act="ivView" data-v="dom" aria-pressed="${v === 'dom'}">${ico('network','sm')}Domains &amp; addresses</button><button data-act="ivView" data-v="money" aria-pressed="${v === 'money'}">${ico('bitcoin','sm')}Money</button><button data-act="ivView" data-v="acc" aria-pressed="${v === 'acc'}">${ico('history','sm')}Accounts</button><button data-act="ivView" data-v="hours" aria-pressed="${v === 'hours'}">${ico('clock-3','sm')}Active hours</button><button data-act="ivView" data-v="chats" aria-pressed="${v === 'chats'}">${ico('message-square','sm')}Chat network</button></div>`;
   const body = v === 'money' ? walletView(c) : v === 'acc' ? footView(c) : v === 'hours' ? hrView(c) : v === 'chats' && typeof cnView === 'function' ? cnView(c) : infraView(c);
   return `<div class="scroll"><div class="page wide">${seg}${body}</div></div>`;
 }

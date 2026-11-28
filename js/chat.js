@@ -67,5 +67,5 @@ async function importChats(files){
   if(!made.length) return;
   DB.records.push(...made); mutate('imported a chat export'); if(typeof hashRecords === 'function') await hashRecords(); closeDlg(); afterCapture(cid, made.map(r => r.id));
   const na = made.filter(r => r.chatAuthor).length, nc = made.filter(r => r.chatnet).length;
-  toast(`${total.toLocaleString()} messages read from ${nc} chat${nc === 1 ? '' : 's'} — ${na} author${na === 1 ? '' : 's'}, each a record; post times in Active hours, forwards in Infrastructure → Chats`);
+  toast(`${total.toLocaleString()} messages read from ${nc} chat${nc === 1 ? '' : 's'} — ${na} author${na === 1 ? '' : 's'}, each a record; post times in Active hours, forwards in Infrastructure → Chat network`);
 }

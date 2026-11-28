@@ -1,6 +1,6 @@
 /* ==========================================================================
    Chats & forwards — the network behind Telegram and Discord chats you imported
-   (case → Infrastructure → Chats)
+   (case → Infrastructure → Chat network)
      · sources: every channel your chats forward from — how often, into how many
        chats, first and last time, and whether it turns up in your other cases
      · coordinated pushes: the same post appearing in several chats within
@@ -82,7 +82,9 @@ function cnView(c){
   const X = cnIndex(c.id), ago = ms => ms < 60000 ? Math.round(ms / 1000) + ' s' : ms < 3600000 ? Math.round(ms / 60000) + ' min' : ms < 864e5 ? (ms / 3600000).toFixed(1) + ' h' : Math.round(ms / 864e5) + ' days', d = t => esc(E.fmtFull(t, tz()).slice(0, 16));
   if(!X.chats.length) return empty('message-square', 'No chat exports in this case', 'Drop a Telegram Desktop export (result.json) or a DiscordChatExporter JSON into Capture. Each author becomes a record, and the chat’s forwards, shared posts and copy-paste are mapped here.');
   const fast = X.pushes.filter(p => p.fast), ren = cnRenamed(c.id), nm = i => esc(X.chats[i].name);
+  const nAuth = DB.records.filter(r => r.caseId === c.id && r.chatAuthor).length;
   return `<div class="cn">
+    <p class="cn-intro t3">How posts travel between the chats you imported: where they are forwarded from, the same post pushed into several chats, the same text from different accounts. The messages themselves are evidence, one record per author.${nAuth ? ` <button class="btn sm" data-act="cnMsgs">${ico('message-square','sm')}Read the messages (${nAuth} author${nAuth === 1 ? '' : 's'})</button>` : ''}</p>
     <div class="cn-sum">${[[X.chats.length, 'chats'], [X.chats.reduce((s, x) => s + x.n, 0).toLocaleString(), 'messages'], [X.sources.length, 'sources forwarded from'], [fast.length, 'pushed into several chats within ' + CN_PUSH_MIN + ' min'], [X.copy.length, 'texts sent by several accounts'], [ren.length, 'accounts that changed name']].map(([n, l]) => `<div><b>${n}</b><span>${l}</span></div>`).join('')}</div>
     ${X.sources.length ? `<section class="card"><header><h3>Forward map</h3><span class="t3 small">sources → your chats · width = forwards${X.sources.some(s => s.other.length) ? ' · <span class="cn-x">orange</span>: also in another case' : ''}</span></header><div class="body cn-mapw">${cnMap(X)}</div></section>` : ''}
     <div class="cn-two">

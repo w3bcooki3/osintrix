@@ -188,9 +188,25 @@ const LK_ACTS = {
   watchNow:async (id, v, t) => { const keys = Object.keys(DB.watch || {}).filter(k => WATCH_KINDS.has(entSplit(k).k)); if(!keys.length) return toast('Nothing on the watchlist can be checked online'); if(!LK_PROVIDERS.some(lkOn)) return toast('Turn on lookup sources in Threat Intel → Sources first');
     if(t) t.disabled = true; toast('Checking ' + keys.length + ' watched indicator' + (keys.length > 1 ? 's' : '') + '…'); const n = await watchCheck(keys, {quiet:true}); toast(n ? n + ' changed — see Changes' : 'No changes'); renderMain(); },
   watchSeen:() => { Object.values(DB.watch || {}).forEach(w => w.unseen = false); mutate('watch changes seen'); renderMain(); },
+  watchOpen:id => { UI.wOpen = UI.wOpen === id ? null : id; renderMain(); if(UI.wOpen) requestAnimationFrame(() => { const el = $('wlDetail'); if(el) el.scrollIntoView({block:'nearest'}); }); },
+  watchFile:(id, v) => { const n = watchFile(id, +v || 0, false); renderMain(); toast(n ? 'Added to ' + plural(n, 'case') + ' as evidence' : 'Already in its cases — or open a case first', n ? 'Open' : '', n ? () => go(caseHash(DB.records[DB.records.length - 1].caseId, 'timeline')) : null); },
+  watchCheckOne:async (id, v, t) => { if(!LK_PROVIDERS.some(lkOn)) return toast('Turn on lookup sources in Threat Intel → Sources first'); if(t) t.disabled = true;
+    const n = await watchCheck([id], {quiet:true}); toast(n ? 'Changed — see below' : 'No change since the last check'); renderMain(); },
+  watchNotifyToggle:async () => { DB.prefs.watchNotify = !DB.prefs.watchNotify;
+    if(DB.prefs.watchNotify && typeof Notification !== 'undefined' && Notification.permission === 'default'){ try{ await Notification.requestPermission(); }catch(e){} }
+    if(DB.prefs.watchNotify && (typeof Notification === 'undefined' || Notification.permission !== 'granted')){ DB.prefs.watchNotify = false; toast('Notifications are blocked for this page in your browser settings'); }
+    mutate(DB.prefs.watchNotify ? 'watchlist notifications on' : 'watchlist notifications off'); watchMonitor(); renderMain(); },
 };
 document.addEventListener('change', ev => { const t = ev.target; if(!t || !t.dataset) return;
   if(t.id === 'watchEvery'){ DB.prefs.watchEvery = +t.value || 0; mutate('online watch checks: ' + t.options[t.selectedIndex].text); watchMonitor(); return; }
+  if(t.dataset.wset && DB.watch && DB.watch[t.dataset.wkey]){ const w = DB.watch[t.dataset.wkey], f = t.dataset.wset;
+    if(f === 'every') w.every = +t.value || 0; else if(f === 'note') w.note = cap(t.value, 500).trim(); else w[f] = !!t.checked;
+    if(!w.every) delete w.every; if(!w.note) delete w.note; if(!w.mute) delete w.mute; if(!w.file) delete w.file;
+    mutate('watch settings for ' + entSplit(t.dataset.wkey).v); if(f === 'every') watchMonitor();
+    // redraw so the row shows the note and the muted chip; keep keyboard focus where it was
+    const a = document.activeElement, sel = a && a.dataset && a.dataset.wset ? `[data-wset="${a.dataset.wset}"][data-wkey="${CSS.escape(a.dataset.wkey)}"]` : '';
+    if(UI.route && UI.route.area === 'watch'){ renderMain(); if(sel){ const n = document.querySelector(sel); if(n) n.focus({ preventScroll: true }); } }
+    return; }
   if(t.dataset.lkkey){ const S = lkSettings(), v = cap(t.value, 300).replace(/\s+/g, ''); if(v) S.keys[t.dataset.lkkey] = v; else delete S.keys[t.dataset.lkkey]; mutate('saved a lookup key'); }
   if(t.dataset.lkrelay){ const S = lkSettings(), v = cap(t.value, 300).trim(); if(t.dataset.lkrelay === 'url'){ if(v && !/^https:\/\/[a-z0-9.-]+(:\d+)?(\/[\w./-]*)?$/i.test(v)){ t.setCustomValidity('Use an https:// address'); t.reportValidity(); return; } t.setCustomValidity(''); S.relay.url = v.replace(/\/+$/, ''); } else S.relay.token = v; mutate('saved relay settings'); }
 });

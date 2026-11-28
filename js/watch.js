@@ -68,24 +68,46 @@ function watchCard(){
 }
 function viewWatch(){
   const W = DB.watch || {}, g = globalEnts(), H = watchHits(), keys = Object.keys(W).sort((a, b) => W[b].at - W[a].at);
-  return `<div class="scroll"><div class="page">${pageHead('eye','var(--amber)','Watchlist','Entities you are tracking. Any new evidence, log import or news item that mentions one is flagged — across every case. IPs, domains, URLs, hashes and CVEs can also be re-checked online, and you are told what changed.',
+  return `<div class="scroll"><div class="page">${pageHead('eye','var(--amber)','Watchlist','Entities you are tracking. Any new evidence, log import or news item that mentions one is flagged — across every case. IPs, domains, URLs, hashes, CVEs and crypto wallets can also be re-checked online, and you are told what changed.',
       typeof watchEvery === 'function' ? `<label class="sr" for="watchEvery">Check online</label><select id="watchEvery" class="inp ti-sel" title="Re-check watched indicators with your lookup sources while the app is open">${[[0, 'Online checks off'], [1, 'Check every hour'], [6, 'Check every 6 hours'], [24, 'Check daily']].map(([h, l]) => `<option value="${h}"${(+DB.prefs.watchEvery || 0) === h ? ' selected' : ''}>${l}</option>`).join('')}</select>
-        <button class="btn" data-act="watchNow">${ico('radar','sm')}Check now</button>` : '')}
-    ${(() => { const A = keys.flatMap(k => (W[k].alerts || []).map(a => ({k, ...a}))).sort((a, b) => b.at - a.at); const un = keys.some(k => W[k].unseen);
+        <button class="btn" data-act="watchNow">${ico('radar','sm')}Check now</button>
+        <button class="btn${DB.prefs.watchNotify ? ' on' : ''}" data-act="watchNotifyToggle" aria-pressed="${!!DB.prefs.watchNotify}" title="A desktop notice for important changes while OSINTrix is in the background">${ico('bell','sm')}${DB.prefs.watchNotify ? 'Notifying' : 'Notify me'}</button>` : '')}
+    ${(() => { const A = keys.flatMap(k => (W[k].alerts || []).map((a, i) => ({k, i, ...a}))).sort((a, b) => b.at - a.at); const un = keys.some(k => W[k].unseen);
       return A.length ? `<section class="card wl-ch"><header><h3>${ico('activity','sm')} Changes${un ? ' <span class="chip amber sq">new</span>' : ''}</h3>${un ? `<button class="btn sm ghost" data-act="watchSeen" style="margin-left:auto">${ico('check','sm')}Mark seen</button>` : ''}</header><div class="body flush">
-        ${A.slice(0, 30).map(a => `<button class="li" data-act="lookEnt" data-id="${esc(a.k)}"><span class="mono t3" style="width:120px;font-size:calc(12.5px * var(--ts,1))">${esc(E.fmtFull(a.at, tz()).slice(0, 16))}</span><div class="main2"><b style="font-weight:540">${esc(entSplit(a.k).v)}</b><small>${a.d.map(d => (d.hot ? '▲ ' : '') + esc(d.t)).join(' · ')}</small></div></button>`).join('')}</div></section>` : ''; })()}
+        ${A.slice(0, 30).map(a => `<div class="wl-row"><button class="li" data-act="lookEnt" data-id="${esc(a.k)}"><span class="mono t3" style="width:120px;font-size:calc(12.5px * var(--ts,1))">${esc(E.fmtFull(a.at, tz()).slice(0, 16))}</span><div class="main2"><b style="font-weight:540">${esc(entSplit(a.k).v)}</b><small>${a.d.map(d => (d.hot ? '▲ ' : '') + esc(d.t)).join(' · ')}</small></div></button>${a.filed ? `<span class="t3 wl-f">${ico('check','sm')}In the case</span>` : `<button class="btn sm ghost" data-act="watchFile" data-id="${esc(a.k)}" data-v="${a.i}" title="Keep this change as dated evidence in the cases that hold it">${ico('plus','sm')}Add to case</button>`}</div>`).join('')}</div></section>` : ''; })()}
     ${keys.length ? `<section class="card" style="overflow-x:auto"><table class="tbl cardify"><thead><tr><th>Entity</th><th>Verdict</th><th class="n">New sightings</th><th class="hide-m">Last online check</th><th class="hide-m">Cases</th><th class="hide-m">Watching since</th><th></th></tr></thead><tbody>
       ${keys.map(k => { const {k:kind, v} = entSplit(k), ge = g.get(k), n = H.filter(h => h.k === k).length;
-        return `<tr data-act="selEnt" data-id="${esc(k)}"><td><div class="ce-e">${kindBadge(kind,'sm')}<div style="min-width:0"><div class="v mono">${esc(v)}</div><div class="t3" style="font-size:calc(12.5px * var(--ts,1))">${esc(E.LABEL[kind] || kind)} ${ctxChips(kind, v)}</div></div></div></td>
+        return `<tr data-act="selEnt" data-id="${esc(k)}"><td><div class="ce-e">${kindBadge(kind,'sm')}<div style="min-width:0"><div class="v mono">${esc(v)}${W[k].mute ? ` <span class="chip sq" title="Changes are kept, without notices">muted</span>` : ''}</div><div class="t3" style="font-size:calc(12.5px * var(--ts,1))">${esc(E.LABEL[kind] || kind)} ${ctxChips(kind, v)}</div>${W[k].note ? `<div class="wl-note">${esc(W[k].note)}</div>` : ''}</div></div></td>
           <td>${vdLabel(verdictOf(k)) || '<span class="t3">—</span>'}</td><td class="n">${n ? `<span class="chip amber sq">${n}</span>` : '0'}</td>
           <td class="hide-m">${W[k].snap && typeof VD_NAME !== 'undefined' ? `<span class="lk-band" style="--c:${VD_COL[W[k].snap.band]}">${esc(VD_NAME[W[k].snap.band])} ${+W[k].snap.score | 0}</span> <span class="t3">${esc(iAgo(W[k].checked))}</span>` : '<span class="t3">—</span>'}</td>
           <td class="hide-m">${ge ? [...ge.cases].filter(theCase).map(cid => { const o = theCase(cid); return `<a class="ce-case" href="${caseHash(cid, 'entities')}" style="--cc:${esc(o.color)}">${esc(caseNm(o))}</a>`; }).join(' ') : '<span class="t3">—</span>'}</td>
-          <td class="hide-m t3">${esc(E.fmtDate(W[k].at, tz()))}</td><td><button class="iconbtn" data-act="watch" data-id="${esc(k)}" aria-label="Stop watching" title="Stop watching">${ico('x','sm')}</button></td></tr>`; }).join('')}</tbody></table></section>
+          <td class="hide-m t3">${esc(E.fmtDate(W[k].at, tz()))}</td><td class="wl-btns"><button class="iconbtn${UI.wOpen === k ? ' on' : ''}" data-act="watchOpen" data-id="${esc(k)}" aria-expanded="${UI.wOpen === k}" aria-label="History and settings for ${esc(v)}" title="History and settings">${ico('sliders-horizontal','sm')}</button><button class="iconbtn" data-act="watch" data-id="${esc(k)}" aria-label="Stop watching" title="Stop watching">${ico('x','sm')}</button></td></tr>`; }).join('')}</tbody></table></section>
+      ${UI.wOpen && W[UI.wOpen] ? watchDetail(UI.wOpen) : ''}
       <h2 class="hh" style="margin-top:26px">New sightings</h2>
       <section class="card"><div class="body flush">${H.length ? H.slice(0, 50).map(h => h.r ? `<button class="li" data-act="selRec" data-id="${h.r.id}"><span class="mono t3" style="width:120px;font-size:calc(12.5px * var(--ts,1))">${esc(E.fmtFull(h.r.addedAt, tz()).slice(0, 16))}</span><div class="main2"><b style="font-weight:540">${esc(entSplit(h.k).v)}</b><small>${esc(caseNm(h.r.caseId) || '')} · ${esc(h.r.title.slice(0, 90))}</small></div></button>`
         : `<button class="li" data-act="selFeed" data-id="${h.f.id}"><span class="mono t3" style="width:120px;font-size:calc(12.5px * var(--ts,1))">news</span><div class="main2"><b style="font-weight:540">${esc(entSplit(h.k).v)}</b><small>${esc(h.f.title)}</small></div></button>`).join('') : '<p class="t3" style="padding:14px 18px;margin:0">Nothing new yet.</p>'}</div></section>`
     : empty('eye', 'Nothing on your watchlist', 'Open any IP, domain, email, handle or wallet and choose <b>Watch</b>. From then on, every capture, log import and news item is checked for it.')}
   </div></div>`;
+}
+
+/* one watched indicator: why it is watched, how often, and everything your checks have seen it point to */
+const WS_NAME = {ips:'Addresses', ns:'Name servers', mx:'Mail servers', cname:'CNAME', ptr:'Reverse names', asn:'Networks', registrar:'Registrars', hold:'Suspensions'};
+function watchDetail(key){
+  const w = DB.watch[key], {k, v} = entSplit(key), S = w.seen || {}, f = t => esc(E.fmtDate(t, tz())), online = WATCH_KINDS.has(k);
+  const hist = Object.keys(WS_NAME).filter(n => S[n] && Object.keys(S[n]).length).map(n => `<div class="wl-h"><h4>${WS_NAME[n]}</h4><table class="tbl"><tbody>${Object.entries(S[n]).sort((a, b) => b[1][1] - a[1][1]).map(([val, [a, b]]) => {
+    const now = w.snap && String(w.snap[n] || '').split(',').includes(val);
+    return `<tr><td class="mono">${esc(val)}</td><td class="t3"><span class="nw">${f(a)}</span>${f(a) !== f(b) ? ' → <span class="nw">' + f(b) + '</span>' : ''}</td><td>${now ? '<span class="chip green sq">now</span>' : '<span class="chip sq">before</span>'}</td></tr>`; }).join('')}</tbody></table></div>`).join('');
+  return `<section class="card wl-d" id="wlDetail" aria-label="History and settings for ${esc(v)}"><header><h3>${kindBadge(k,'sm')} <span class="mono">${esc(v)}</span></h3>${online ? `<button class="btn sm" data-act="watchCheckOne" data-id="${esc(key)}" style="margin-left:auto">${ico('radar','sm')}Check now</button>` : ''}</header><div class="body">
+    <div class="wl-set">
+      <label><span>Why you watch it</span><input class="inp" data-wset="note" data-wkey="${esc(key)}" maxlength="500" value="${esc(w.note || '')}" placeholder="e.g. the portal's server; tell me if it moves"></label>
+      ${online ? `<label><span>Check online</span><select class="inp" data-wset="every" data-wkey="${esc(key)}">${[[0, 'As the whole list'], [1, 'Every hour'], [6, 'Every 6 hours'], [24, 'Daily'], [168, 'Weekly']].map(([h, l]) => `<option value="${h}"${(+w.every || 0) === h ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
+      <label class="chk"><input type="checkbox" data-wset="file" data-wkey="${esc(key)}"${w.file ? ' checked' : ''}> Add every change to the cases that hold it</label>
+      <label class="chk"><input type="checkbox" data-wset="mute" data-wkey="${esc(key)}"${w.mute ? ' checked' : ''}> Mute — keep changes, without notices</label>` : '<p class="t3" style="margin:0">This kind cannot be checked online; new sightings in your evidence and the news are still flagged.</p>'}
+    </div>
+    ${online ? `<h4 class="wl-sub">What your checks have seen${w.checked ? ` <span class="t3">· last ${esc(iAgo(w.checked))}</span>` : ''}</h4>
+      ${hist ? `<div class="wl-hs">${hist}</div><p class="t3 wl-fine">Kept from your own checks, so the record stays after the infrastructure moves. Only what your switched-on sources answered.</p>`
+        : `<p class="t3" style="margin:0">Nothing yet. Each online check adds what the indicator points to — addresses, name servers, mail servers, network, registrar — with when it was first and last seen.</p>`}` : ''}
+  </div></section>`;
 }
 
 /* ---------- around this event ---------- */

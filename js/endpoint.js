@@ -203,5 +203,5 @@ function moveView(c, D){
 }
 const EP_ACTS = {
   epOnly:(id, v) => { UI.epOnly = v === '1'; renderMain(); },
-  mvShow:(id, v) => { UI.facet.ids = String(v).split(',').filter(Boolean); UI.tlMode = 'events'; renderMain(); },
+  mvShow:(id, v) => { UI.facet.ids = String(v).split(',').filter(Boolean); UI.facet.idsLabel = 'events behind this movement'; UI.tlMode = 'events'; renderMain(); },
 };

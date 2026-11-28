@@ -423,8 +423,18 @@ function importSafeIntel(prev){
   DB.prefs = DB.prefs || {}; DB.prefs.watchEvery = (prev.prefs || {}).watchEvery || 0;
   for(const c of DB.cases || []){ const p = (prev.cases || []).find(x => x.id === c.id); c.autoLook = !!(p && p.autoLook); }
   const W = {}; for(const [k, w] of Object.entries(DB.watch && typeof DB.watch === 'object' ? DB.watch : {})){ if(typeof k !== 'string' || k.length > 600 || !w || typeof w !== 'object') continue;
-    const s = w.snap && typeof w.snap === 'object' ? {band:IMP_BANDS.has(w.snap.band) ? w.snap.band : 'unknown', score:Math.round(impNum(w.snap.score, 0, 100)), ports:impStr(w.snap.ports, 2000), ips:impStr(w.snap.ips, 4000), ns:impStr(w.snap.ns, 2000), vt:impNum(w.snap.vt, 0, 999), abuse:impNum(w.snap.abuse, 0, 100), pulses:impNum(w.snap.pulses, 0, 1e6), malware:impStr(w.snap.malware, 1000)} : null;
-    W[k] = {at:impNum(w.at, 0, 9e15), checked:impNum(w.checked, 0, 9e15), snap:s, unseen:!!w.unseen, alerts:(Array.isArray(w.alerts) ? w.alerts : []).slice(0, 20).map(a => ({at:impNum(a && a.at, 0, 9e15), d:(Array.isArray(a && a.d) ? a.d : []).slice(0, 20).map(x => ({hot:!!(x && x.hot), t:impStr(x && x.t, 300)}))}))};
+    const p = w.snap && typeof w.snap === 'object' ? w.snap : null, s = p ? {band:IMP_BANDS.has(p.band) ? p.band : 'unknown', score:Math.round(impNum(p.score, 0, 100))} : null;
+    /* text fields of a check, each only if the file has it (a missing field is not compared later), numbers clamped */
+    if(s){ for(const [f, n] of [['ports', 2000], ['ips', 4000], ['ns', 2000], ['mx', 2000], ['cname', 2000], ['ptr', 2000], ['cves', 4000], ['malware', 1000], ['breaches', 2000], ['subs', 12000], ['certs', 5000], ['asn', 20], ['org', 120], ['registrar', 120], ['hold', 300], ['tor', 10], ['ethBal', 60], ['expl', 30]]) if(f in p) s[f] = impStr(p[f], n);
+      for(const [f, hi] of [['vt', 999], ['abuse', 100], ['pulses', 1e6], ['txs', 1e9], ['bal', 2.1e15], ['expires', 9e15], ['epss', 1], ['sv', 9]]) if(f in p) s[f] = impNum(p[f], 0, hi);
+      if('nx' in p) s.nx = !!p.nx; }
+    /* your own history: value -> [first, last seen], bounded */
+    const seen = {}; if(w.seen && typeof w.seen === 'object') for(const f of ['ips', 'ns', 'mx', 'cname', 'ptr', 'asn', 'registrar', 'hold']){ const m = w.seen[f]; if(!m || typeof m !== 'object') continue; const o = {};
+      for(const [val, t] of Object.entries(m).slice(0, 60)) if(Array.isArray(t) && val.length <= 300) o[val] = [impNum(t[0], 0, 9e15), impNum(t[1], 0, 9e15)]; if(Object.keys(o).length) seen[f] = o; }
+    W[k] = {at:impNum(w.at, 0, 9e15), checked:impNum(w.checked, 0, 9e15), snap:s, unseen:!!w.unseen, alerts:(Array.isArray(w.alerts) ? w.alerts : []).slice(0, 20).map(a => ({at:impNum(a && a.at, 0, 9e15), d:(Array.isArray(a && a.d) ? a.d : []).slice(0, 20).map(x => ({hot:!!(x && x.hot), t:impStr(x && x.t, 300)})), ...(a && a.filed ? {filed:true} : {})}))};
+    if(Object.keys(seen).length) W[k].seen = seen; if(w.note) W[k].note = impStr(w.note, 500); if(w.mute) W[k].mute = true; if(w.file) W[k].file = true;
+    /* an imported file does not choose how often this browser goes online, like the list-wide setting above */
+    const pe = prev.watch && prev.watch[k] && +prev.watch[k].every; if(pe > 0) W[k].every = impNum(pe, 0, 168);
     if(!W[k].snap) delete W[k].snap; }
   DB.watch = W;
 }

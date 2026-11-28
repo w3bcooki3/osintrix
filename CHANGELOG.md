@@ -2,6 +2,22 @@
 
 All notable changes to OSINTrix, newest first. The format is based on [Keep a Changelog](https://keepachangelog.com); this file is generated from `js/data/changelog.js` by `tools/changelog.py`.
 
+## [1.93] — A watchlist that keeps a record (2026-11-28)
+
+_Watched indicators are compared on far more than their reputation: where they point, their mail, certificates, subdomains, registrar and registry status, and money moving through watched wallets. Your own checks build a first-seen/last-seen history, changes can go straight into the case as dated evidence, and each item gets a note, its own interval and a mute. Desktop notices are opt-in._
+
+### Added
+- The watchlist now notices a domain moving to a new address or network, getting mail set up, a new certificate or subdomain, a registrar transfer or renewal, being suspended (client or server hold) or lifted, and going dark or coming back; an address changing its open ports, reverse name or network; a CVE becoming exploited or its EPSS jumping. Only the sources you have switched on are asked, and a field is compared only when both checks have it, so an older snapshot is not reported as all new.
+- Bitcoin and Ethereum addresses can be watched: new transactions and balance changes are reported, from mempool.space and Blockscout when they are switched on.
+- Your own passive-DNS history: each watched item keeps what your checks have seen (addresses, name and mail servers, aliases, reverse names, networks, registrars, holds) with first and last seen, so the record stays after the infrastructure moves. Open it with the sliders button on the item's row.
+- “Add to case” on a change keeps it as dated evidence in every case that holds the indicator, with its time, source “watchlist” and the new values as entities; never twice. An item can be set to add every change by itself.
+- Per item: a note on why you watch it, its own check interval (hourly to weekly, even with the list's checks off) and a mute that keeps changes without notices.
+- “Notify me” shows a desktop notice when an important change is found while OSINTrix is in the background. Off by default; in discreet mode the notice does not name the indicator. Checks still run only while OSINTrix is open, and catch up when it is opened again.
+
+### Changed
+- Importing a workspace keeps watch history, notes and filing settings, but never an item's check interval: a file cannot make this browser go online more often.
+- Infrastructure → “Chats” is now “Chat network”, with a line saying what it shows (how posts travel between chats) and a “Read the messages” button that opens the chat records themselves, one per author.
+
 ## [1.92] — Forensic files in the sample case, and a steadier timeline (2026-11-28)
 
 _Op Lantern's sample gains a victim's browser profile, the shop's Windows event log and its CloudTrail, read by the same readers as yours; long timeline records stop jumping under the pointer; Blackbook coverage goes to the ATT&CK Navigator._

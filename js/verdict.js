@@ -130,39 +130,101 @@ function ctiRank(st){
 }
 
 /* ---------- watch monitor ---------- */
-/* what of a verdict is worth comparing between checks */
-function lkSnap(V){ const A = V.attrs || {}; return {band:V.band, score:V.score, ports:(A.ports || []).slice().sort((a, b) => a - b).join(','), ips:(A.ips || []).slice().sort().join(','), ns:(A.ns || []).slice().sort().join(','), vt:A.vtMal || 0, abuse:A.abuseScore || 0, pulses:A.pulses || 0, malware:(A.malware || []).slice().sort().join(',')}; }
-function lkDiff(a, b){
-  if(!a) return []; const out = [], list = s => s ? s.split(',') : [], delta = (x, y) => { const X = new Set(list(x)), Y = new Set(list(y)); return [[...Y].filter(i => !X.has(i)), [...X].filter(i => !Y.has(i))]; };
+/* what of a verdict is worth comparing between checks. A field is only compared when both checks have it, so a
+   snapshot from an older version never reports everything as new. */
+const WS_LIST = ['ports', 'ips', 'ns', 'mx', 'cname', 'ptr', 'cves', 'malware', 'breaches', 'subs', 'certs'];
+function lkSnap(V){ const A = V.attrs || {}, j = (x, n = 400) => (Array.isArray(x) ? x : []).map(String).slice(0, n).sort().join(','), o = {sv:2, band:V.band, score:V.score};
+  for(const f of WS_LIST) o[f] = j(A[f], f === 'subs' ? 200 : f === 'certs' ? 60 : 100);
+  o.ports = (A.ports || []).slice().sort((a, b) => a - b).join(',');
+  Object.assign(o, {asn:String(A.asn || ''), org:String(A.asname || A.org || A.netname || '').slice(0, 120), registrar:String(A.registrar || '').slice(0, 120), expires:+A.expires || 0,
+    hold:(A.status || []).filter(x => /hold/i.test(x)).join(','), nx:!!A.nx, tor:String(A.tor || ''), vt:A.vtMal || 0, abuse:A.abuseScore || 0, pulses:A.pulses || 0,
+    txs:+A.txs || 0, bal:+A.bal || 0, ethBal:String(A.ethBal || ''), expl:String(A.exploitation || ''), epss:+A.epss || 0});
+  return o; }
+const wsDay = t => t ? new Date(t).toISOString().slice(0, 10) : '?';
+function lkDiff(a, b, kind){
+  if(!a) return []; const out = [], list = s => s ? String(s).split(',') : [], has = f => f in a && f in b, delta = (x, y) => { const X = new Set(list(x)), Y = new Set(list(y)); return [[...Y].filter(i => !X.has(i)), [...X].filter(i => !Y.has(i))]; };
+  const some = (L, n = 5) => L.slice(0, n).join(', ') + (L.length > n ? ' and ' + (L.length - n) + ' more' : '');
   if(a.band !== b.band) out.push({hot:/malicious|suspicious/.test(b.band) && !/malicious/.test(a.band), t:'Verdict ' + VD_NAME[a.band] + ' → ' + VD_NAME[b.band] + ' (' + b.score + ')'});
-  for(const [f, name] of [['ports', 'port'], ['ips', 'address'], ['ns', 'name server']]){ const [add, gone] = delta(a[f], b[f]); if(add.length) out.push({hot:f !== 'ns', t:'New ' + name + (add.length > 1 ? 's' : '') + ': ' + add.slice(0, 5).join(', ')}); if(gone.length) out.push({hot:false, t:'Gone: ' + gone.slice(0, 5).join(', ')}); }
+  /* it went dark, or came back: a takedown working, or infrastructure coming up */
+  if(has('nx') && a.nx !== b.nx) out.push({hot:true, t:b.nx ? 'Stopped resolving — the domain no longer exists in DNS (taken down or let go?)' : 'Resolves again — the domain is back online'});
+  if(has('hold') && b.hold && b.hold !== a.hold) out.push({hot:true, t:'Suspended by the registry or registrar: ' + b.hold});
+  if(has('hold') && a.hold && !b.hold) out.push({hot:true, t:'No longer suspended (' + a.hold + ' lifted)'});
+  for(const [f, name, hot] of [['ips', 'address', true], ['ports', 'port', true], ['ns', 'name server', true], ['mx', 'mail server', true], ['cname', 'CNAME', false], ['ptr', 'reverse name', false], ['cves', 'CVE on an exposed service', true], ['malware', 'malware link', true], ['breaches', 'breach', true]]){
+    if(!(f in a)) continue; const [add, gone] = delta(a[f], b[f]);
+    if(f === 'mx' && add.length && !list(a.mx).length && kind === 'domain'){ out.push({hot:true, t:'Mail set up: ' + some(add) + ' — the domain can now send and receive mail'}); continue; }
+    if(add.length) out.push({hot, t:'New ' + name + (add.length > 1 ? 's' : '') + ': ' + some(add)}); if(gone.length) out.push({hot:false, t:'Gone' + (f === 'ips' ? ' (address)' : f === 'ports' ? ' (port)' : '') + ': ' + some(gone)}); }
+  if(has('asn') && a.asn && b.asn && a.asn !== b.asn) out.push({hot:true, t:'Moved network: ' + a.asn + (a.org ? ' (' + a.org + ')' : '') + ' → ' + b.asn + (b.org ? ' (' + b.org + ')' : '')});
+  if(has('registrar') && a.registrar && b.registrar && a.registrar !== b.registrar) out.push({hot:true, t:'Transferred to another registrar: ' + a.registrar + ' → ' + b.registrar});
+  if(has('expires') && a.expires && b.expires && b.expires > a.expires + 864e5) out.push({hot:false, t:'Renewed until ' + wsDay(b.expires)});
+  if(has('certs')){ const [add] = delta(a.certs, b.certs); if(add.length && a.certs) out.push({hot:true, t:add.length + ' new certificate' + (add.length > 1 ? 's' : '') + ' issued'}); }
+  if(has('subs')){ const [add] = delta(a.subs, b.subs); if(add.length && a.subs) out.push({hot:true, t:'New subdomain' + (add.length > 1 ? 's' : '') + ': ' + some(add)}); }
+  if(has('tor') && a.tor !== b.tor) out.push({hot:b.tor === 'exit', t:b.tor ? 'Now a Tor ' + b.tor : 'No longer a Tor relay'});
   if(b.vt > a.vt) out.push({hot:true, t:'VirusTotal detections ' + a.vt + ' → ' + b.vt}); if(b.abuse - a.abuse >= 15) out.push({hot:true, t:'AbuseIPDB score ' + a.abuse + '% → ' + b.abuse + '%'});
-  if(b.pulses > a.pulses) out.push({hot:b.pulses - a.pulses >= 1, t:(b.pulses - a.pulses) + ' new OTX pulse' + (b.pulses - a.pulses > 1 ? 's' : '')});
-  const [mw] = delta(a.malware, b.malware); if(mw.length) out.push({hot:true, t:'Now linked to ' + mw.slice(0, 3).join(', ')});
+  if(b.pulses > a.pulses) out.push({hot:true, t:(b.pulses - a.pulses) + ' new OTX pulse' + (b.pulses - a.pulses > 1 ? 's' : '')});
+  /* wallets: money moving is the news */
+  if(has('txs') && b.txs > a.txs) out.push({hot:true, t:(b.txs - a.txs) + ' new transaction' + (b.txs - a.txs > 1 ? 's' : '')});
+  if(has('bal') && b.bal !== a.bal && (a.txs || b.txs)) out.push({hot:true, t:'Balance ' + (a.bal / 1e8).toFixed(8).replace(/\.?0+$/, '') + ' → ' + (b.bal / 1e8).toFixed(8).replace(/\.?0+$/, '') + ' BTC'});
+  if(has('ethBal') && a.ethBal && b.ethBal && a.ethBal !== b.ethBal) out.push({hot:true, t:'Balance ' + a.ethBal + ' → ' + b.ethBal});
+  /* CVEs: exploitation is what changes the priority */
+  if(has('expl') && b.expl && a.expl !== b.expl) out.push({hot:/active|poc/i.test(b.expl), t:'Exploitation: ' + (a.expl || 'none') + ' → ' + b.expl});
+  if(has('epss') && b.epss - a.epss >= 0.1) out.push({hot:true, t:'EPSS ' + (a.epss * 100).toFixed(0) + '% → ' + (b.epss * 100).toFixed(0) + '% chance of exploitation in 30 days'});
   return out;
 }
-const WATCH_KINDS = new Set(['ipv4', 'ipv6', 'domain', 'url', 'md5', 'sha1', 'sha256', 'cve']);
+/* your own passive DNS: every value a watched indicator pointed to, with when it was first and last seen by your checks */
+const WS_SEEN = ['ips', 'ns', 'mx', 'cname', 'ptr', 'asn', 'registrar', 'hold'];
+function watchSeen(w, snap, at){
+  const S = w.seen && typeof w.seen === 'object' ? w.seen : (w.seen = {});
+  for(const f of WS_SEEN){ const vals = String(snap[f] || '').split(',').filter(Boolean); if(!vals.length) continue; const m = S[f] = S[f] || {};
+    for(const v of vals.slice(0, 40)){ const x = m[v]; if(x) x[1] = at; else m[v] = [at, at]; }
+    const keys = Object.keys(m); if(keys.length > 60) keys.sort((p, q) => m[p][1] - m[q][1]).slice(0, keys.length - 60).forEach(k => delete m[k]); }
+}
+const WATCH_KINDS = new Set(['ipv4', 'ipv6', 'domain', 'url', 'md5', 'sha1', 'sha256', 'cve', 'btc', 'eth']);
 const MON = {t:null, busy:false};
-function watchEvery(){ const h = +(DB.prefs && DB.prefs.watchEvery) || 0; return h > 0 ? h * 3600e3 : 0; }
+function watchEvery(w){ const own = w && +w.every; const h = own > 0 ? own : +(DB.prefs && DB.prefs.watchEvery) || 0; return h > 0 ? h * 3600e3 : 0; }
+const watchAny = () => (+(DB.prefs && DB.prefs.watchEvery) || 0) > 0 || Object.values(DB.watch || {}).some(w => +w.every > 0);
 async function watchCheck(keys, opts = {}){
-  if(MON.busy) return 0; MON.busy = true; let changed = 0;
+  if(MON.busy) return 0; MON.busy = true; let changed = 0; const hot = [];
   try{
     for(const key of keys){ const w = DB.watch && DB.watch[key]; if(!w) continue; const {k, v} = entSplit(key); if(!WATCH_KINDS.has(k)) continue;
       const res = await lkInvestigate(k, v, {force:true}); if(!Object.keys(res).length) continue;
-      const V = lkVerdict(k, v, res), snap = lkSnap(V), diff = lkDiff(w.snap, snap);
-      w.checked = Date.now(); w.snap = snap;
-      if(diff.length){ w.alerts = [{at:Date.now(), d:diff}, ...(w.alerts || [])].slice(0, 20); w.unseen = true; changed++;
-        if(diff.some(d => d.hot) && !opts.quiet) toast('Watchlist: ' + v + ' — ' + diff.find(d => d.hot).t, 'Open', () => go('#/watch')); }
+      const V = lkVerdict(k, v, res), snap = lkSnap(V), now = Date.now(), diff = lkDiff(w.snap, snap, k);
+      w.checked = now; w.snap = snap; watchSeen(w, snap, now);
+      if(diff.length){ w.alerts = [{at:now, d:diff}, ...(w.alerts || [])].slice(0, 20); w.unseen = true; changed++;
+        if(w.file) watchFile(key, 0, true);
+        if(diff.some(d => d.hot) && !w.mute){ hot.push([v, diff.find(d => d.hot).t]); if(!opts.quiet) toast('Watchlist: ' + v + ' — ' + diff.find(d => d.hot).t, 'Open', () => go('#/watch')); } }
       lkHist(k, v, V);
     }
   }finally{ MON.busy = false; }
+  if(hot.length) watchPing(hot);
   if(keys.length){ save(); if(UI.route && UI.route.area === 'watch') bgRender(); }
   return changed;
 }
-/* runs while the app is open: anything not checked within the chosen interval is re-checked, a few at a time */
+/* a desktop notice for important changes, only when asked for and only while the tab is in the background; discreet mode keeps the indicator off the lock screen */
+function watchPing(hot){
+  try{ if(!DB.prefs || !DB.prefs.watchNotify || typeof Notification === 'undefined' || Notification.permission !== 'granted' || !document.hidden) return;
+    const body = DB.prefs.discreet ? hot.length + ' watched item' + (hot.length > 1 ? 's' : '') + ' changed' : hot.slice(0, 3).map(([v, t]) => v + ': ' + t).join('\n');
+    new Notification('OSINTrix watchlist', {body, tag:'osintrix-watch'}); }catch(e){}
+}
+/* a change, kept as evidence in each case that holds the indicator (or the open case): dated when the check saw it, with what changed and from where */
+function watchFile(key, i, auto){
+  const w = DB.watch && DB.watch[key], a = w && (w.alerts || [])[i]; if(!a) return 0; const {k, v} = entSplit(key);
+  const g = typeof globalEnts === 'function' ? globalEnts().get(key) : null, cases = [...(g ? g.cases : [])].filter(cid => typeof theCase === 'function' && theCase(cid));
+  const to = cases.length ? cases : !auto && DB.active && theCase(DB.active) ? [DB.active] : []; if(!to.length) return 0;
+  const lead = (a.d.find(d => d.hot) || a.d[0]).t, body = v + '\n\n' + a.d.map(d => '• ' + d.t).join('\n') + '\n\nNoticed by an online check from the watchlist on ' + new Date(a.at).toISOString().replace('T', ' ').slice(0, 16) + ' UTC.';
+  let n = 0;
+  for(const cid of to){ if(DB.records.some(r => r.caseId === cid && r.watchAt === a.at && r.watchKey === key)) continue;
+    DB.records.push({id:uid('r'), caseId:cid, type:'evidence', title:'Watchlist: ' + v + ' — ' + lead.slice(0, 140), body, tsRaw:new Date(a.at).toISOString(), tsZone:'explicit', ts:a.at, source:'watchlist', host:'', tags:['watch'].concat(a.d.some(d => d.hot) ? ['change'] : []),
+      ents:[{k, v}, ...E.extract(a.d.map(d => d.t).join('\n')).filter(e => !(e.k === k && e.v === v))], answer:'', addedBy:auto ? 'Watchlist' : 'You', addedAt:Date.now(), hash:'', watchAt:a.at, watchKey:key}); n++; }
+  if(n){ a.filed = true; mutate((auto ? 'watchlist filed ' : 'filed ') + 'a change to ' + v); if(typeof hashRecords === 'function') hashRecords(); }
+  return n;
+}
+/* runs while the app is open: anything not checked within its interval is re-checked, a few at a time; on opening, overdue ones are caught up first */
 function watchMonitor(){
-  clearInterval(MON.t); if(!watchEvery()) return;
-  const tick = () => { if(document.hidden || MON.busy || !DB.watch) return; const due = Object.keys(DB.watch).filter(key => WATCH_KINDS.has(entSplit(key).k) && Date.now() - (DB.watch[key].checked || 0) > watchEvery()).slice(0, 5); if(due.length) watchCheck(due); };
+  clearInterval(MON.t); if(!watchAny()) return;
+  const tick = () => { if(document.hidden && !DB.prefs.watchNotify || MON.busy || !DB.watch) return;
+    const due = Object.keys(DB.watch).filter(key => { const w = DB.watch[key], e = watchEvery(w); return e && WATCH_KINDS.has(entSplit(key).k) && Date.now() - (w.checked || 0) > e; })
+      .sort((p, q) => (DB.watch[p].checked || 0) - (DB.watch[q].checked || 0)).slice(0, 5);
+    if(due.length) watchCheck(due); };
   MON.t = setInterval(tick, 5 * 60000); setTimeout(tick, 20000);
 }
 /* recent investigations, for the Investigate history */

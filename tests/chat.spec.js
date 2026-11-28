@@ -90,3 +90,16 @@ test('chats & forwards: sources across chats and cases, a push within minutes an
   await expect(nh).toHaveCount(2); await expect(nh.nth(0)).toContainText('Lamp Support'); await expect(nh.nth(1)).toContainText('LampHelp');
   noErrors(errors);
 });
+
+test('the chat network says what it is, and leads to the messages themselves', async ({ page }) => {
+  const errors = await open(page, '#/home', { legacy: false, osintSample: true });
+  await page.evaluate(() => { DB.active = 'c-lantern'; UI.ivView = 'chats'; go(caseHash('c-lantern', 'infra')); });
+  await expect(page.getByRole('button', { name: 'Chat network' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.cn-intro')).toContainText('The messages themselves are evidence');
+  const n = await page.evaluate(() => DB.records.filter(r => r.caseId === 'c-lantern' && r.chatAuthor).length);
+  expect(n).toBeGreaterThan(0);
+  await page.locator('.cn-intro').getByRole('button', { name: /Read the messages/ }).click();
+  await expect(page.locator('.chip.accent', { hasText: 'chat records, one per author' })).toContainText(String(n));
+  expect(await page.evaluate(() => derive().recs.filter(passes).every(r => r.chatAuthor))).toBe(true);
+  noErrors(errors);
+});
