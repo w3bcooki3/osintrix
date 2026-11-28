@@ -53,8 +53,37 @@ ENTRIES = [['sp-jan', 'person', {'name': 'Jan Harbour', 'dob': '1991-04-02', 'na
 LINKS = [['sp-jan', 'sp-mail', 3, 'uses'], ['sp-jan', 'sp-x', 2, 'runs'], ['sp-jan', 'sp-rd', 2, 'runs'], ['sp-jan', 'sp-tel', 3, 'uses'], ['sp-mail', 'sp-w1', 2, 'paid from'], ['sp-jan', 'sp-w2', 2, 'controls'], ['sp-jan', 'sp-w3', 1, 'controls'], ['sp-jan', 'sp-org', 2, 'director of'], ['sp-org', 'sp-site', 3, 'owns']]
 # the same person in another sample case, under another name — joined by the email
 ELSEWHERE = {'case': 'c-portal', 'entries': [['sp-haven', 'person', {'name': 'J. Haven', 'dob': '1990-04-02', 'nationality': 'Belgian'}], ['sp-mail2', 'email', {'email': 'J.Harbour@proton.me'}]], 'links': [['sp-haven', 'sp-mail2', 3, 'uses']]}
+# 1.91: chats, pictures and a document from tests/fixtures/sample (made by tools/make_sample_media.py). The app imports them the way
+# it imports your own files — chats through the chat reader, files through the same storage, EXIF and preview steps.
+import base64
+S = 'tests/fixtures/sample'
+rb = lambda n: base64.b64encode(open(os.path.join(S, n), 'rb').read()).decode('ascii')
+EXTRA = {
+  'chats': [{'name': n, 'text': open(os.path.join(S, n), encoding='utf-8').read()} for n in ('refund-desk.json', 'staff.json', 'dealshub.json')],
+  'files': [{'name': 'pier.jpg', 'type': 'image/jpeg', 'b64': rb('pier.jpg'), 'mod': U('2026-03-08T16:44:10Z')},
+            {'name': 'warehouse.jpg', 'type': 'image/jpeg', 'b64': rb('warehouse.jpg'), 'mod': U('2026-03-09T08:02:00Z')},
+            {'name': 'portal.png', 'type': 'image/png', 'b64': rb('portal.png'), 'mod': U('2026-03-04T10:15:00Z')},
+            {'name': 'handbook.docx', 'type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'b64': rb('handbook.docx'), 'mod': U('2026-03-10T07:25:00Z')}],
+  # the geolocation of the re-shared picture, as an analyst would have written it in "Where was this taken?"
+  'geo': {'file': 'warehouse.jpg', 'data': {
+    'note': 'Shared in the staff group the day after "the new desk by the pier" photo, with every piece of metadata stripped by the messenger. Located from the sign and the building, then matched to the pier photo’s GPS, about 300 m away.',
+    'clues': [{'id': 'c1', 'kind': 'sign', 'text': 'Sign: "SADAMA — LADU 7 · PEALEVÕTT" (harbour, warehouse 7, pick-up)'},
+              {'id': 'c2', 'kind': 'lang', 'text': 'Estonian: õ in PEALEVÕTT; "sadama" and "ladu" are Estonian words'},
+              {'id': 'c3', 'kind': 'build', 'text': 'Red-brick port warehouse with tall loading doors'},
+              {'id': 'c4', 'kind': 'sky', 'text': 'Shadow falls to the north-east: sun in the south-west, afternoon'},
+              {'id': 'c5', 'kind': 'road', 'text': 'Dashed white centre line, no kerb: a port service road'}],
+    'cands': [{'id': 'k1', 'name': 'Sadama street by the old port, Tallinn', 'lat': 59.44410, 'lon': 24.76120, 'verdict': 'confirmed', 'fit': {'c1': 'y', 'c2': 'y', 'c3': 'y', 'c4': 'y', 'c5': 'y'},
+               'note': 'Brick warehouses on the port side of Sadama street; about 300 m from the GPS in pier.jpg, taken the evening before.'},
+              {'id': 'k2', 'name': 'Sadama, Pärnu', 'lat': 58.38300, 'lon': 24.49700, 'verdict': 'out', 'fit': {'c1': 'y', 'c2': 'y', 'c3': 'n'}, 'note': 'Also a Sadama street, but no brick warehouses on it.'},
+              {'id': 'k3', 'name': 'Rotterdam — the address the company gives', 'lat': 51.92250, 'lon': 4.47920, 'verdict': 'out', 'fit': {'c1': 'n', 'c2': 'n'}, 'note': 'Dutch signage would not be in Estonian.'}]}},
+  'entries': [['sp-desk', 'location', {'address': 'Sadama street, Tallinn old port', 'city': 'Tallinn', 'country': 'Estonia', 'coordinates': '59.44410, 24.76120'}],
+              ['sp-mira', 'person', {'name': 'Mira S', 'role': 'Refund desk staff (Telegram)'}],
+              ['sp-tgdk', 'username', {'username': 'Dmitri K', 'platform': 'Telegram'}],
+              ['sp-chan', 'url', {'url': 'https://t.me/harbour_payouts'}]],
+  'links': [['sp-org', 'sp-desk', 2, 'works from (photo GPS, geolocation)'], ['sp-jan', 'sp-tgdk', 1, 'possibly the same as'], ['sp-mira', 'sp-tgdk', 2, 'works for'], ['sp-tgdk', 'sp-chan', 2, 'pays staff through']],
+}
 out = {'case': {'id': 'c-harbour', 'code': 'HL-2026-031', 'name': 'Harbourline refund scam', 'scope': 'Fake refund support on X, Reddit and Telegram after a marine-electronics shop went quiet: who runs it, where the money goes, and when they work.', 'color': '#0ea5e9', 'icon': 'briefcase', 'created': U('2026-03-01T09:00:00Z')},
-       'records': R, 'pages': PAGES, 'hours': HOURS, 'entries': ENTRIES, 'links': LINKS, 'elsewhere': ELSEWHERE}
+       'records': R, 'pages': PAGES, 'hours': HOURS, 'entries': ENTRIES, 'links': LINKS, 'elsewhere': ELSEWHERE, 'extra': EXTRA}
 s = json.dumps(out, ensure_ascii=False, separators=(',', ':')).replace('</', '<\\/')   # so the file can sit inside a <script> in the offline build
 open('js/data/sample-osint.js', 'w').write('/* Sample case “Harbourline refund scam” — built by tools/make_sample_osint.py from the test fixtures; loaded only when the sample case is added. */\nconst SAMPLE_OSINT = ' + s + ';\n')
 print(len(s), 'bytes;', len(R), 'records;', sum(len(h['t']) for h in HOURS), 'post times')

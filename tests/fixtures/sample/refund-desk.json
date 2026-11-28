@@ -1,0 +1,88 @@
+{
+ "name": "Harbourline Refund Desk",
+ "type": "public_channel",
+ "id": 1777000001,
+ "messages": [
+  {
+   "id": 1,
+   "type": "message",
+   "date": "2026-03-02T09:05:00",
+   "date_unixtime": "1772435100",
+   "from": "Harbourline Refund Desk",
+   "from_id": "channel1777000001",
+   "text": "Harbourline customers: orders cancelled after the warehouse move are being refunded. Open harbour-line-portal.test/refund with your order number to claim."
+  },
+  {
+   "id": 2,
+   "type": "message",
+   "date": "2026-03-02T17:40:00",
+   "date_unixtime": "1772466000",
+   "from": "Harbourline Refund Desk",
+   "from_id": "channel1777000001",
+   "text": "Refunds are paid within 24 hours once your card is verified. Support never asks for your password, only the confirmation code."
+  },
+  {
+   "id": 3,
+   "type": "message",
+   "date": "2026-03-03T09:10:00",
+   "date_unixtime": "1772521800",
+   "from": "Harbourline Refund Desk",
+   "from_id": "channel1777000001",
+   "text": "Queue is long today. If the portal is slow, write to @harbourline_support on Reddit or to j.harbour@proton.me and we process it by hand."
+  },
+  {
+   "id": 4,
+   "type": "message",
+   "date": "2026-03-04T08:55:00",
+   "date_unixtime": "1772607300",
+   "from": "Harbourline Refund Desk",
+   "from_id": "channel1777000001",
+   "text": "New refund link for orders 4400 to 4800: harbour-line-portal.test/r/4400. The old link stops working tonight."
+  },
+  {
+   "id": 5,
+   "type": "message",
+   "date": "2026-03-05T10:20:00",
+   "date_unixtime": "1772698800",
+   "from": "Harbourline Refund Desk",
+   "from_id": "channel1777000001",
+   "text": "A small processing fee is taken in crypto for international refunds. Pay only to the address shown in the portal."
+  },
+  {
+   "id": 6,
+   "type": "message",
+   "date": "2026-03-06T09:00:00",
+   "date_unixtime": "1772780400",
+   "from": "Harbourline Refund Desk",
+   "from_id": "channel1777000001",
+   "text": "Thank you for your patience. 312 refunds paid this week. Claim yours before Friday: harbour-line-portal.test/refund"
+  },
+  {
+   "id": 7,
+   "type": "message",
+   "date": "2026-03-08T11:30:00",
+   "date_unixtime": "1772962200",
+   "from": "Harbourline Refund Desk",
+   "from_id": "channel1777000001",
+   "text": "Weekend team is on. Write to us with your order number and the last four digits of your card."
+  },
+  {
+   "id": 8,
+   "type": "message",
+   "date": "2026-03-10T09:15:00",
+   "date_unixtime": "1773126900",
+   "from": "Harbourline Refund Desk",
+   "from_id": "channel1777000001",
+   "text": "Portal moved to a faster server today. If the page does not open, clear your browser and try again."
+  },
+  {
+   "id": 9,
+   "type": "message",
+   "date": "2026-03-12T09:05:00",
+   "date_unixtime": "1773299100",
+   "from": "Harbourline Refund Desk",
+   "from_id": "channel1777000001",
+   "text": "Last week to claim refunds for cancelled orders. After 20 March unclaimed refunds go back to the bank."
+  }
+ ]
+}

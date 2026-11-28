@@ -219,7 +219,7 @@ test('old Office and OpenDocument metadata: .doc, .xls and .ppt (Compound File) 
 
 test('Op Lantern’s OSINT half (the crew’s refund scam) joins the case in a workspace with sample data and fills every Infrastructure view and an identity profile; the account timeline fits its card and shows every label whole', async ({ page }) => {
   const errors = await open(page, '#/home', { osintSample: true });
-  await expect.poll(() => page.evaluate(() => DB.osintSample === 2 && DB.entries.some(e => e.id === 'sp-jan' && e.caseId === 'c-lantern')), { timeout: 15000 }).toBe(true);
+  await expect.poll(() => page.evaluate(() => DB.osintSample === 3 && DB.entries.some(e => e.id === 'sp-jan' && e.caseId === 'c-lantern')), { timeout: 15000 }).toBe(true);
   expect(await page.evaluate(() => DB.cases.some(c => c.id === 'c-harbour'))).toBe(false);   // no separate case any more
   await page.evaluate(() => sampleOsintElsewhere());   // the scam's subject under another name in the (test-only) portal case
   const X = await page.evaluate(() => { const I = infraIndex('c-lantern'), W = walletIndex('c-lantern'), F = footIndex('c-lantern'), C = chIndex('c-lantern'), H = hrIndex('c-lantern'), P = idpBuild('sp-jan');
@@ -227,7 +227,7 @@ test('Op Lantern’s OSINT half (the crew’s refund scam) joins the case in a w
       changes: C.groups.map(g => g.label).sort(), hours: H.people.map(p => p.who).sort(), same: H.pairs.map(q => [q.a.who, q.b.who].sort().join(' ~ ')), people: P.people.map(p => p.e.id), ids: P.ids.length, conflicts: P.conflicts.length }; });
   expect(X.infra).toBeGreaterThan(10); expect(X.money).toBeGreaterThan(3); expect(X.acc).toBeGreaterThan(4); expect(X.renamed).toBeGreaterThanOrEqual(2);
   expect(X.changes.some(l => /harbourline-deals\.shop\/about/.test(l))).toBe(true); expect(X.changes.some(l => /^Mastodon/.test(l))).toBe(true);
-  expect(X.hours).toEqual(['@harbour_deals', 'Faisal', 'jake_nyc', 'newsbot_24', 'u/north_wind_77']); expect(X.same).toContain('@harbour_deals ~ u/north_wind_77');
+  expect(X.hours).toEqual(['@harbour_deals', 'Dmitri K', 'Faisal', 'Harbourline Refund Desk', 'Mira S', 'jake_nyc', 'newsbot_24', 'u/north_wind_77']);   // 1.91: the imported chats add their authors expect(X.same).toContain('@harbour_deals ~ u/north_wind_77');
   expect(X.people).toEqual(['sp-jan', 'sp-haven']); expect(X.ids).toBeGreaterThanOrEqual(6); expect(X.conflicts).toBe(2);
   // every view draws without an error
   await page.evaluate(() => { DB.active = 'c-lantern'; go(caseHash('c-lantern', 'infra')); });
@@ -550,7 +550,7 @@ test('polish: no screen is wider than a phone, tab strips that do not fit scroll
 
 test('polish on a desktop: a case summary cut off with … shows in full when pointed at; the decoder groups its operations', async ({ page }) => {
   const errors = await open(page, '#/home', { osintSample: true });
-  await expect.poll(() => page.evaluate(() => DB.osintSample === 2), { timeout: 15000 }).toBe(true); await page.evaluate(() => renderAll());
+  await expect.poll(() => page.evaluate(() => DB.osintSample === 3), { timeout: 15000 }).toBe(true); await page.evaluate(() => renderAll());
   const cut = page.locator('#main small').filter({ hasText: 'Phishing LNK on WS-FIN-07' }).first();
   await cut.hover(); await expect(cut).toHaveAttribute('title', /also runs a refund scam: infrastructure, money, accounts and working hours/);
   await page.evaluate(() => go('#/decoder')); await expect(page.locator('.txbar > button')).toHaveCount(4);   // one row: Auto-decode, then a menu per group
@@ -564,10 +564,11 @@ test('polish on a desktop: a case summary cut off with … shows in full when po
 
 test('right-click an indicator anywhere: copy, copy defanged, details, every case it is in, watch and the lookups for its kind; plain text keeps the browser menu', async ({ page, context }) => {
   const errors = await open(page, '#/home', { osintSample: true });
-  await expect.poll(() => page.evaluate(() => DB.osintSample === 2), { timeout: 15000 }).toBe(true); await page.evaluate(() => go('#/case/c-lantern/timeline'));
+  await expect.poll(() => page.evaluate(() => DB.osintSample === 3), { timeout: 20000 }).toBe(true); await page.evaluate(() => go('#/case/c-lantern/timeline'));   // 3: the chats and files are in too (1.91), so nothing redraws mid-test
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.fill('#tlq', 'harbour@proton'); await page.waitForTimeout(400);   // a long timeline: filter to the record first
   const v = page.locator('#main .v', { hasText: /^j\.harbour@proton\.me$/ }).first();
+  await v.hover(); await page.waitForTimeout(150);   // a long record opens up under the pointer (1.91: a chat record comes first); aim after it has
   await v.click({ button: 'right' });
   await expect(page.locator('#ctx .ctx-title')).toContainText('j.harbour@proton.me');
   await expect(page.locator('#ctx')).toContainText('Open in Have I Been Pwned');
@@ -581,6 +582,7 @@ test('right-click an indicator anywhere: copy, copy defanged, details, every cas
     const hit = () => page.evaluate(() => { for (const v of document.querySelectorAll('#main .v')) { if (v.textContent !== '198.51.100.23' || v.getClientRects().length !== 1) continue; const r = v.getClientRects()[0], x = r.left + r.width / 2, y = r.top + r.height / 2, at = document.elementFromPoint(x, y);
       if (at && (at === v || v.contains(at))) return [x, y]; } return null; });
     let xy = await hit(); if (!xy) { await page.evaluate(() => { const v = [...document.querySelectorAll('#main .tlc .v, #main [data-vi] .v')].find(x => x.textContent === '198.51.100.23'); if (v) v.scrollIntoView({ block: 'center' }); }); await page.waitForTimeout(300); xy = await hit(); }
+    await page.mouse.move(xy[0], xy[1]); await page.waitForTimeout(150); xy = (await hit()) || xy;   // a long record opens up under the pointer: aim again
     await page.mouse.click(xy[0], xy[1], { button: 'right' }); };
   await rclickIp(); await expect(page.locator('#ctx .ctx-title')).toContainText('198.51.100.23'); await page.getByRole('menuitem', { name: 'Watch', exact: true }).click();
   expect(await page.evaluate(() => !!(DB.watch || {})['ipv4:198.51.100.23'])).toBe(true);

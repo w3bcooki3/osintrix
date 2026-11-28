@@ -72,6 +72,32 @@ async function sampleOsintAdd(){
   const c = DB.cases.find(x => x.id === cid); if(c && !/refund scam/.test(c.scope || '')) c.scope = (c.scope || '').replace(/\s*$/, '') + ' The crew behind it also runs a refund scam: infrastructure, money, accounts and working hours are in this case too.';
   DB.osintSample = 2; mutate('added the OSINT half of Op Lantern'); if(typeof hashRecords === 'function') hashRecords(); if(typeof ensurePositions === 'function') ensurePositions(); renderAll();
 }
+/* 1.91: the chats, pictures and the staff handbook (SAMPLE_OSINT.extra, from tests/fixtures/sample). They go through the
+   same readers as your own files — the chat reader, file storage with its EXIF, preview and hash steps — so every view
+   that works on imported material (Chats, Active hours, Media, Places, Where was this taken?, the File inspector) has
+   something to show. Added once, to a workspace that already has the rest of Op Lantern's sample. */
+async function sampleExtrasAdd(){
+  if(!DB || !DB.sample || DB.osintSample !== 2 || window.__noOsintSample || UI.sxBusy || !DB.cases.some(c => c.id === LANTERN)) return;
+  if(typeof chatParse !== 'function' || typeof storeFile !== 'function' || typeof lazyNeed !== 'function' || !(await lazyNeed('sample')) || typeof SAMPLE_OSINT === 'undefined' || !SAMPLE_OSINT.extra) return;
+  if(DB.osintSample !== 2 || DB.entries.some(e => e.id === 'sp-desk')) return;
+  UI.sxBusy = true;
+  try{
+    const X = SAMPLE_OSINT.extra, cid = LANTERN, made = [];
+    for(const c of X.chats){ const P = chatParse(c.text); if(P && P.msgs.length) made.push(...chatRecords(P, cid, c.name).recs); }
+    if(STORE.idb) for(const f of X.files){
+      try{ const bin = Uint8Array.from(atob(f.b64), ch => ch.charCodeAt(0)), m = await storeFile(new File([bin], f.name, {type:f.type, lastModified:f.mod})), r = fileRecord(m, cid);
+        if(X.geo && f.name === X.geo.file) r.geo = JSON.parse(JSON.stringify(X.geo.data));
+        made.push(r); }catch(e){}   // no room in this browser: the rest still comes in
+    }
+    if(DB.osintSample !== 2 || DB.entries.some(e => e.id === 'sp-desk')) return;   // another tab got there first
+    const created = SAMPLE_OSINT.case.created;
+    DB.entries.push(...X.entries.filter(([id]) => !DB.entries.some(e => e.id === id)).map(([id, type, fields]) => ({id, caseId:cid, type, fields, tags:['scam'], notes:'', priority:type === 'person' ? 'high' : 'medium', starred:false, created, src:''})));
+    DB.links.push(...X.links.filter(([a, b]) => DB.entries.some(e => e.id === a) && DB.entries.some(e => e.id === b)).map(([a, b, conf, label]) => ({id:uid('l'), caseId:cid, a, b, conf, label, src:''})));
+    DB.records.push(...made); mutate('added chats and files to Op Lantern');
+    if(typeof hashRecords === 'function') await hashRecords(); if(typeof ensurePositions === 'function') ensurePositions(); renderAll();
+    DB.osintSample = 3; save();   // marked done only now, so nothing that waits for it is redrawn under its feet
+  } finally { UI.sxBusy = false; }
+}
 /* the scam's subject under another name in another case, when that case is there (it is not among the sample cases
    since 1.87; the test suite keeps one) — for the identity profile's cross-case matches and conflicts */
 function sampleOsintElsewhere(){

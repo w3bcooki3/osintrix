@@ -2,7 +2,9 @@
    The Blackbook — a hidden part of the Kit (contents: js/data/blackbook-sealed.js, encrypted).
    Opened by typing "blackbook" in search (Ctrl K) or at #/blackbook; once
    opened it stays in the side menu. Four parts:
-   · Hunt — doctrine, the attacker's first checks mirrored for defenders, and
+   · Hunt — plays across the attack chain, with your coverage (to do / hunted / detecting, kept in this browser).
+   · Sweeps — ordered sets of plays for one situation (new environment, ransomware warning, vendor breach).
+   · Doctrine — the hunt workflow, telemetry, habits, the attacker's first checks mirrored for defenders, and
      plays across the attack chain: how an operator sees it, what it leaves,
      the logs you need, hunts in KQL / SPL / Sigma / EQL / osquery, tuning
      and what closes it. A Sigma hunt joins your Detections in one click and
@@ -12,7 +14,7 @@
      authorised investigator, and how cybercriminals were actually caught.
    · OSINT — infrastructure pivots, archives, verification, exact syntax.
    ========================================================================== */
-const BB_TABS = [['hunt', 'Hunt', 'crosshair'], ['doctrine', 'Doctrine', 'lightbulb'], ['apt', 'APT casebook', 'shield-alert'], ['under', 'Underground', 'skull'], ['osint', 'OSINT', 'scan-search']];
+const BB_TABS = [['hunt', 'Hunt', 'crosshair'], ['sweeps', 'Sweeps', 'route'], ['doctrine', 'Doctrine', 'lightbulb'], ['apt', 'APT casebook', 'shield-alert'], ['under', 'Underground', 'skull'], ['osint', 'OSINT', 'scan-search']];
 const BB_SEV = {low:'Low', medium:'Medium', high:'High', critical:'Critical'};
 const BB_GO = {lab:['Forensics kit', 'file-search'], tradecraft:['Tradecraft', 'eye-off'], entities:['Entities', 'fingerprint'], 'case:timeline':['Timeline', 'clock'], 'case:infra':['Infrastructure', 'network'], 'case:questions':['Analysis', 'scale']};
 const bbOpen = () => UI.bbOpen || (UI.bbOpen = new Set());
@@ -52,6 +54,14 @@ function bbLockView(){
 }
 document.addEventListener('submit', ev => { if(ev.target && ev.target.dataset && ev.target.dataset.form === 'bbUnlock'){ ev.preventDefault(); ev.stopImmediatePropagation(); bbTry(); } }, true);
 
+/* ---- Drawing (1.91): a compact header, one bar for the tabs and search, then each part.
+   Hunt is a list grouped by stage of the attack with your coverage beside it; a play opens as a dossier in the order the work
+   happens (understand, detect, hunt, triage, respond, harden, prove); Sweeps are ordered sets of plays for one situation. */
+const BB_ST = {todo:'To do', hunted:'Hunted', live:'Detecting'};
+const bbSt = id => { const S = DB.prefs.bbSt; return S && BB_ST[S[id]] ? S[id] : 'todo'; };
+const bbShort = (B, k) => (B.langs[k] || k).split(' — ')[0];
+const bbSevTag = s => `<span class="bbx-sev s-${s}">${BB_SEV[s]}</span>`;
+
 function viewBlackbook(){
   if(typeof BLACKBOOK === 'undefined'){
     if(typeof BLACKBOOK_SEALED === 'undefined'){
@@ -63,102 +73,171 @@ function viewBlackbook(){
   const B = BLACKBOOK, tab = BB_TABS.some(t => t[0] === UI.bbTab) ? UI.bbTab : 'hunt', q = (UI.bbQ || '').trim().toLowerCase(), words = q.split(/\s+/).filter(Boolean);
   const hit = (...s) => !words.length || words.every(w => s.join(' ').toLowerCase().includes(w));
   const mark = s => { let h = esc(s); for(const w of words) h = h.replace(new RegExp('(' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi'), '<mark>$1</mark>'); return h; };
-  let body = '', toc = '', shown = 0, wide = false;
+  let body = '', shown = 0;
   if(tab === 'hunt'){
     const play = UI.bbPlay && B.plays.find(p => p.id === UI.bbPlay);
-    if(play){ body = bbDossier(play, mark); wide = true; }
-    else { const r = bbMatrix(B, hit, mark); body = r.html; shown = r.n; wide = true; }
-  } else if(tab === 'doctrine'){
-    const wf = (B.workflow || []).filter(x => hit(...x)), tel = (B.telemetry || []).filter(x => hit(...x)), doc = B.doctrine.filter(d => hit(...d)), mir = B.mirror.filter(m => hit(...m.slice(0, 3)));
-    shown = wf.length + tel.length + doc.length + mir.length;
-    body = (wf.length ? `<section class="tc-ch" id="bb-wf"><header><span class="tc-n">01</span><div><h2>${ico('list-checks', 'sm')}A hunt, start to finish</h2><p>Six steps, each with what it should produce. Every play in the Hunt tab plugs into steps 2–4.</p></div></header>
-        <ol class="bb-wf">${wf.map(([t, d, out]) => `<li><div><b>${mark(t)}</b><p>${mark(d)}</p></div><span class="bb-out"><small>Produces</small>${mark(out)}</span></li>`).join('')}</ol></section>` : '')
-      + (tel.length ? `<section class="tc-ch" id="bb-tel"><header><span class="tc-n">02</span><div><h2>${ico('database', 'sm')}Telemetry you need first</h2><p>What each source reveals, how to switch it on, and how long to keep it. A hunt can only find what was recorded.</p></div></header>
-        <div class="tc-mx bb-tbl" tabindex="0" role="region" aria-label="Telemetry sources"><table><thead><tr><th>Source</th><th>What it reveals</th><th>How to switch it on</th><th>Keep</th></tr></thead><tbody>${tel.map(([a, b, c, d]) => `<tr><td><b>${mark(a)}</b></td><td>${mark(b)}</td><td>${mark(c)}</td><td class="nw">${mark(d)}</td></tr>`).join('')}</tbody></table></div></section>` : '')
-      + (doc.length ? `<section class="tc-ch" id="bb-doctrine"><header><span class="tc-n">03</span><div><h2>${ico('lightbulb', 'sm')}How a hunter thinks</h2><p>The habits that separate a hunt from a search.</p></div></header><div class="tc-part bb-doc"><ol>${doc.map(([t, b]) => `<li><b>${mark(t)}</b><p>${mark(b)}</p></li>`).join('')}</ol></div></section>` : '')
-      + (mir.length ? `<section class="tc-ch" id="bb-mirror"><header><span class="tc-n">04</span><div><h2>${ico('git-compare', 'sm')}Their first checks, your first checks</h2><p>What a penetration tester or bug-bounty hunter looks at first on an organisation — and the defender’s mirror of each.</p></div></header>
-        <div class="tc-mx bb-tbl" tabindex="0" role="region" aria-label="Their checks and yours"><table><thead><tr><th>They look for</th><th>Why it pays</th><th>Your check</th></tr></thead><tbody>${mir.map(([a, b, c, id]) => `<tr><td><b>${mark(a)}</b></td><td>${mark(b)}</td><td>${mark(c)}<br><button class="lnk" data-act="bbJump" data-v="${esc(id)}">The play ${ico('arrow-right', 'sm')}</button></td></tr>`).join('')}</tbody></table></div></section>` : '');
-    toc = [['bb-wf', 'list-checks', 'A hunt, start to finish'], ['bb-tel', 'database', 'Telemetry you need first'], ['bb-doctrine', 'lightbulb', 'How a hunter thinks'], ['bb-mirror', 'git-compare', 'Their checks, yours']].map(([id, i, l]) => `<button data-act="bbToc" data-v="${id}">${ico(i, 'sm')}<span>${l}</span></button>`).join('');
-  } else if(tab === 'apt'){
-    const L = B.apt.filter(a => hit(a.name, a.who, a.when, a.what, a.tells.join(' '), a.lesson)); shown += L.length;
-    body = L.map(a => `<article class="bb-case" id="bb-apt-${a.id}"><header><h2>${mark(a.name)}</h2><p class="t3">${mark(a.who)} · ${mark(a.when)}</p></header>
-      <p>${mark(a.what)}</p><div class="bb-cols"><div><h3>The tells</h3><ul>${a.tells.map(t => `<li>${mark(t)}</li>`).join('')}</ul></div>
-      <div><h3>Plays that catch it</h3><ul class="bb-plist">${a.plays.map(id => { const p = B.plays.find(x => x.id === id); return p ? `<li><button class="lnk" data-act="bbJump" data-v="${esc(id)}">${esc(p.t)}</button> <span class="bb-sev s-${p.sev}">${BB_SEV[p.sev]}</span></li>` : ''; }).join('')}</ul></div></div>
-      <p class="bb-lesson"><b>The lesson.</b> ${mark(a.lesson)}</p></article>`).join('');
-    toc = B.apt.map(a => `<button data-act="bbToc" data-v="bb-apt-${a.id}">${ico('shield-alert', 'sm')}<span>${esc(a.name)}</span></button>`).join('');
-  } else if(tab === 'under'){
-    const groups = B.underground.map((g, gi) => { const pts = g.pts.filter(x => hit(x[0], x[1], g.h)); shown += pts.length; return pts.length ? `<section class="tc-part" id="bb-u-${gi}"><h3>${esc(g.h)}</h3><ul>${pts.map(x => `<li><b>${mark(x[0])}</b><p>${mark(x[1])}</p>${x[2] ? bbGoBtn(x[2]) : ''}</li>`).join('')}</ul></section>` : ''; }).join('');
-    const cases = B.caught.filter(c => hit(c.name, c.year, c.how, c.lesson, c.src)); shown += cases.length;
-    body = `<div class="bb-note">${ico('scale', 'sm')}<p>For authorised investigators: CTI teams, journalists and law enforcement. Observe and record; do not buy, take part or provoke. Anything that names a victim or a crime in progress goes to the victim and the police.</p></div>${groups}
-      ${cases.length ? `<section class="tc-ch" id="bb-caught"><header><span class="tc-n">${ico('lock', 'sm')}</span><div><h2>How they were caught</h2><p>From court filings and official statements: the mistake that identified each one, and what an investigator can learn from it.</p></div></header>
-        <div class="bb-pat">${B.caughtPatterns.map(([t, d]) => `<div><b>${esc(t)}</b><span>${esc(d)}</span></div>`).join('')}</div>
-        ${cases.map(c => `<article class="bb-case"><header><h2>${mark(c.name)}</h2><p class="t3">${esc(c.year)} · ${mark(c.src)}</p></header><p>${mark(c.how)}</p><p class="bb-lesson"><b>For the investigator.</b> ${mark(c.lesson)}</p></article>`).join('')}</section>` : ''}`;
-    toc = B.underground.map((g, gi) => `<button data-act="bbToc" data-v="bb-u-${gi}">${ico('skull', 'sm')}<span>${esc(g.h)}</span></button>`).join('') + `<button data-act="bbToc" data-v="bb-caught">${ico('lock', 'sm')}<span>How they were caught</span></button>`;
-  } else {
-    const groups = B.osint.map((g, gi) => { const pts = g.pts.filter(x => hit(x[0], x[1], g.h)); shown += pts.length; return pts.length ? `<section class="tc-part" id="bb-o-${gi}"><h3>${esc(g.h)}</h3><ul>${pts.map(x => `<li><b>${mark(x[0])}</b><p>${mark(x[1])}</p>${x[2] ? bbGoBtn(x[2]) : ''}</li>`).join('')}</ul></section>` : ''; }).join('');
-    body = groups + `<p class="t3 small">The basics — research environment, personas, pivoting, attribution — are in <button class="lnk" data-act="bbGo" data-v="tradecraft">Tradecraft</button>.</p>`;
-    toc = B.osint.map((g, gi) => `<button data-act="bbToc" data-v="bb-o-${gi}">${ico('scan-search', 'sm')}<span>${esc(g.h)}</span></button>`).join('');
-  }
-  const counts = {plays:B.plays.length, hunts:B.plays.reduce((n, p) => n + Object.keys(p.q).length, 0), sigma:B.plays.filter(p => p.q.sigma).length};
-  return `<div class="scroll"><div class="page tc bb">
-    <header class="tc-hd bb-hd"><div><span class="tc-ix">${ico('gem', 'sm')}Private · works offline</span><h1>Blackbook</h1><p>Think like the intruder, hunt like the defender: ${counts.plays} plays across today’s attack surface with ${counts.hunts} hunts (${counts.sigma} Sigma rules, each proven), the APT casebook, the cybercrime underground, and the OSINT that moves an investigation. Detection and investigation only — no exploit code.</p></div>
-      ${typeof BLACKBOOK_SEALED !== 'undefined' ? `<button class="btn sm ghost bb-lockbtn" data-act="bbLock" title="Lock it again on this device">${ico('lock', 'sm')}Lock</button>` : ''}<div class="search-in tc-q">${ico('search')}<label class="sr" for="bbQ">Search the Blackbook</label><input id="bbQ" class="inp" placeholder="Kerberoast, AD CS, rclone, Okta, favicon…" value="${esc(UI.bbQ || '')}"></div></header>
-    <nav class="tabs bb-tabs" role="tablist" aria-label="Parts of the Blackbook">${BB_TABS.map(([k, l, i]) => `<button role="tab" aria-selected="${k === tab}" class="${k === tab ? 'on' : ''}" data-act="bbTab" data-v="${k}">${ico(i, 'sm')}${l}</button>`).join('')}</nav>
-    ${wide ? `<div class="bb-wide">${body}</div>` : `<div class="tc-grid"><nav class="tc-toc" aria-label="Contents">${toc}</nav>
-      <div class="tc-main">${body || empty('search', 'Nothing in the Blackbook matches', 'Try another word.')}${words.length && shown ? `<p class="t3 small">${shown} match${shown === 1 ? '' : 'es'} for “${esc(UI.bbQ)}”.</p>` : ''}</div></div>`}</div></div>`;
+    if(play) body = bbDossier(play, mark);
+    else { const r = bbMatrix(B, hit, mark); body = r.html; shown = r.n; }
+  } else if(tab === 'sweeps'){ const r = bbSweeps(B, hit, mark); body = r.html; shown = r.n; }
+  else if(tab === 'doctrine'){ const r = bbDoctrine(B, hit, mark); body = r.html; shown = r.n; }
+  else if(tab === 'apt'){ const r = bbCases(B, hit, mark); body = r.html; shown = r.n; }
+  else if(tab === 'under'){ const r = bbUnder(B, hit, mark); body = r.html; shown = r.n; }
+  else { const r = bbRef(B.osint, 'bb-o-', hit, mark); shown = r.n;
+    body = r.html ? r.html + `<p class="t3 small bbx-foot">The basics — research environment, personas, pivoting, attribution — are in <button class="lnk" data-act="bbGo" data-v="tradecraft">Tradecraft</button>.</p>` : ''; }
+  const dossier = tab === 'hunt' && UI.bbPlay;
+  const counts = {plays:B.plays.length, hunts:B.plays.reduce((n, p) => n + Object.keys(p.q).length, 0), sigma:B.plays.filter(p => p.q.sigma).length, apt:B.apt.length};
+  const nothing = !dossier && !body ? empty('search', 'Nothing in the Blackbook matches', 'Try another word, or clear the search.') : '';
+  return `<div class="scroll"><div class="page tc bb bbx">
+    <header class="bbx-hd"><div class="bbx-id"><span class="tc-ix">${ico('gem', 'sm')}Private · works offline</span><h1>Blackbook</h1>
+        <p>Detection plays, hunts and investigation tradecraft — defensive only, no exploit code.</p></div>
+      <dl class="bbx-stats"><div><dt>Plays</dt><dd>${counts.plays}</dd></div><div><dt>Hunts</dt><dd>${counts.hunts}</dd></div><div><dt>Proven Sigma</dt><dd>${counts.sigma}</dd></div><div><dt>Campaigns</dt><dd>${counts.apt}</dd></div></dl>
+      ${typeof BLACKBOOK_SEALED !== 'undefined' ? `<button class="btn sm ghost bb-lockbtn" data-act="bbLock" title="Lock it again on this device">${ico('lock', 'sm')}Lock</button>` : ''}</header>
+    <div class="bbx-bar"><nav class="tabs bb-tabs" role="tablist" aria-label="Parts of the Blackbook">${BB_TABS.map(([k, l, i]) => `<button role="tab" aria-selected="${k === tab}" class="${k === tab ? 'on' : ''}" data-act="bbTab" data-v="${k}">${ico(i, 'sm')}${l}</button>`).join('')}</nav>
+      <div class="search-in bbx-q">${ico('search')}<label class="sr" for="bbQ">Search the Blackbook</label><input id="bbQ" class="inp" type="search" placeholder="Kerberoast, AD CS, rclone, Okta…" value="${esc(UI.bbQ || '')}"></div></div>
+    ${body}${nothing}${words.length && shown && !dossier ? `<p class="t3 small bbx-foot">${shown} match${shown === 1 ? '' : 'es'} for “${esc(UI.bbQ)}”.</p>` : ''}</div></div>`;
 }
 
 const BB_FID = {high:'High signal', medium:'Needs triage', low:'Hunt in bulk'};
 /* older or partial packs still draw: anything missing gets a safe default */
-function bbNorm(B){ if(B.__norm) return; for(const k of ['sections', 'plays', 'doctrine', 'mirror', 'apt', 'underground', 'caught', 'caughtPatterns', 'osint', 'workflow', 'telemetry']) if(!Array.isArray(B[k])) B[k] = []; B.langs = B.langs || {}; B.plats = B.plats || {};
+function bbNorm(B){ if(B.__norm) return; for(const k of ['sections', 'plays', 'doctrine', 'mirror', 'apt', 'underground', 'caught', 'caughtPatterns', 'osint', 'workflow', 'telemetry', 'sweeps']) if(!Array.isArray(B[k])) B[k] = []; B.langs = B.langs || {}; B.plats = B.plats || {};
   for(const p of B.plays){ p.plat = Array.isArray(p.plat) ? p.plat : []; p.fid = BB_FID[p.fid] ? p.fid : 'medium'; p.sev = BB_SEV[p.sev] ? p.sev : 'medium'; for(const k of ['sig', 'fix', 'att', 'events', 'triage', 'respond', 'seen']) if(!Array.isArray(p[k])) p[k] = []; p.q = p.q || {}; p.lens = p.lens || ''; p.logs = p.logs || ''; p.fp = p.fp || ''; }
+  for(const a of B.apt){ a.plays = Array.isArray(a.plays) ? a.plays.filter(id => B.plays.some(p => p.id === id)) : []; a.tells = Array.isArray(a.tells) ? a.tells : []; }
+  for(const s of B.sweeps){ s.steps = Array.isArray(s.steps) ? s.steps.filter(x => Array.isArray(x) && B.plays.some(p => p.id === x[0])) : []; }
   try{ Object.defineProperty(B, '__norm', {value:true}); }catch(e){} }
-const bbFilters = () => UI.bbF || (UI.bbF = {plat:new Set(), sev:new Set(), sigma:false});
+const bbFilters = () => UI.bbF || (UI.bbF = {plat:new Set(), sev:new Set(), sigma:false, st:'', ids:null, idsLabel:''});
 function bbVisible(B, hit){
   const F = bbFilters();
-  return B.plays.filter(p => (!F.plat.size || p.plat.some(x => F.plat.has(x))) && (!F.sev.size || F.sev.has(p.sev)) && (!F.sigma || p.q.sigma)
+  return B.plays.filter(p => (!F.plat.size || p.plat.some(x => F.plat.has(x))) && (!F.sev.size || F.sev.has(p.sev)) && (!F.sigma || p.q.sigma) && (!F.st || bbSt(p.id) === F.st) && (!F.ids || F.ids.includes(p.id))
     && hit(p.t, p.lens, p.sig.join(' '), p.att.join(' '), p.logs, p.fp, p.fix.join(' '), Object.values(p.q).join(' '), (p.seen || []).flat().join(' '), (p.events || []).flat().join(' '), (p.triage || []).join(' '), p.plat.map(x => B.plats[x]).join(' ')));
 }
+/* your progress: a bar split into detecting / hunted / to do */
+function bbProgress(ids, label){
+  const n = ids.length, live = ids.filter(id => bbSt(id) === 'live').length, hunted = ids.filter(id => bbSt(id) === 'hunted').length, pc = x => n ? (x / n * 100).toFixed(2) + '%' : '0';
+  return `<div class="bbx-prog" role="img" aria-label="${esc(label)}: ${live} detecting, ${hunted} hunted, ${n - live - hunted} to do"><i class="p-live" style="width:${pc(live)}"></i><i class="p-hunted" style="width:${pc(hunted)}"></i></div>`;
+}
 function bbMatrix(B, hit, mark){
-  const F = bbFilters(), vis = bbVisible(B, hit), ids = new Set(vis.map(p => p.id)), used = new Set(B.plays.flatMap(p => p.plat));
-  const chip = (act, v, label, on, n) => `<button class="chip${on ? ' on' : ''}" aria-pressed="${on}" data-act="${act}" data-v="${v}">${esc(label)}${n != null ? `<small>${n}</small>` : ''}</button>`;
-  const bar = `<div class="bb-filters" role="group" aria-label="Filter plays">
-      <div><span class="t3">Platform</span>${Object.entries(B.plats).filter(([k]) => used.has(k)).map(([k, l]) => chip('bbFPlat', k, l, F.plat.has(k), B.plays.filter(p => p.plat.includes(k)).length)).join('')}</div>
-      <div><span class="t3">Severity</span>${['critical', 'high', 'medium', 'low'].map(k => chip('bbFSev', k, BB_SEV[k], F.sev.has(k))).join('')}${chip('bbFSigma', '1', 'Has a proven Sigma rule', F.sigma)}
-        ${F.plat.size || F.sev.size || F.sigma ? `<button class="lnk" data-act="bbFClear">Clear filters</button>` : ''}<span class="sp"></span><span class="t3">${vis.length} of ${B.plays.length} plays</span></div>
-      <div><span class="t3">Your stack</span>${Object.entries(B.langs).map(([k, l]) => chip('bbStack', k, l.split(' — ')[0], bbStack().includes(k))).join('')}</div></div>`;
-  const rows = B.sections.map(s => { const ps = B.plays.filter(p => p.sec === s.id && ids.has(p.id)); if(!ps.length) return '';
-    return `<section class="bb-row" id="bb-s-${s.id}" aria-labelledby="bb-sh-${s.id}"><header><h2 id="bb-sh-${s.id}">${ico(s.icon, 'sm')}${esc(s.title)}<small>${ps.length}</small></h2><p>${esc(s.lead)}</p></header>
-      <div class="bb-tiles">${ps.map(p => `<button class="bb-tile" data-act="bbOpenPlay" data-v="${p.id}"><span class="bb-tt">${mark(p.t)}</span>
-        <span class="bb-tm"><span class="bb-sev s-${p.sev}">${BB_SEV[p.sev]}</span><span class="bb-fid f-${p.fid}">${BB_FID[p.fid]}</span>${p.q.sigma ? `<span class="bb-sg" title="Proven Sigma rule">${ico('check', 'sm')}Sigma</span>` : ''}</span>
-        <span class="bb-tp">${p.plat.map(x => esc(B.plats[x])).join(' · ')}</span><span class="bb-ids">${p.att.map(esc).join(' ')}</span></button>`).join('')}</div></section>`; }).join('');
-  return {n:vis.length, html:bar + (rows || empty('search', 'No play matches', 'Clear a filter or try another word.'))};
+  const F = bbFilters(), vis = bbVisible(B, hit), ids = new Set(vis.map(p => p.id)), used = new Set(B.plays.flatMap(p => p.plat)), all = B.plays.map(p => p.id);
+  const live = all.filter(id => bbSt(id) === 'live').length, hunted = all.filter(id => bbSt(id) === 'hunted').length;
+  const chip = (act, v, label, on) => `<button class="chip${on ? ' on' : ''}" aria-pressed="${on}" data-act="${act}" data-v="${v}">${label}</button>`;
+  const plat = F.plat.size === 1 ? [...F.plat][0] : '';
+  const stack = bbStack();
+  const anyF = F.plat.size || F.sev.size || F.sigma || F.st || F.ids;
+  const bar = `<div class="bbx-tools" role="group" aria-label="Filter plays">
+      <label class="bbx-sel"><span class="sr">Platform</span><select id="bbPlat" class="inp sm" aria-label="Platform"><option value="">All platforms</option>${Object.entries(B.plats).filter(([k]) => used.has(k)).map(([k, l]) => `<option value="${esc(k)}"${k === plat ? ' selected' : ''}>${esc(l)} (${B.plays.filter(p => p.plat.includes(k)).length})</option>`).join('')}</select></label>
+      <span class="bbx-seg" role="group" aria-label="Severity">${['critical', 'high', 'medium', 'low'].map(k => chip('bbFSev', k, BB_SEV[k], F.sev.has(k))).join('')}</span>
+      ${chip('bbFSigma', '1', `${ico('check', 'sm')}Proven Sigma`, F.sigma)}
+      <label class="bbx-sel"><span class="sr">Your status</span><select id="bbSt" class="inp sm" aria-label="Your status"><option value="">Any status</option>${Object.entries(BB_ST).map(([k, l]) => `<option value="${k}"${F.st === k ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
+      ${F.ids ? `<span class="chip on bbx-set">${esc(F.idsLabel || 'A set of plays')}<button class="bbx-x" data-act="bbFIds" aria-label="Show every play">${ico('x', 'sm')}</button></span>` : ''}
+      ${anyF ? `<button class="lnk" data-act="bbFClear">Clear filters</button>` : ''}<span class="sp"></span>
+      <details class="bbx-stack"><summary>${ico('file-code', 'sm')}Languages: ${stack.map(k => esc(bbShort(B, k))).join(', ')}</summary>
+        <div><p class="t3">Hunts in these languages are shown on each play.</p>${Object.entries(B.langs).map(([k, l]) => chip('bbStack', k, esc(l), stack.includes(k))).join('')}</div></details></div>`;
+  const cover = `<section class="bbx-cover" aria-label="Your coverage"><div><h2>Your coverage</h2><p class="t3">Mark each play as you hunt it and as a detection goes live. Kept in this browser.</p></div>
+      <div class="bbx-cn"><span><b>${live}</b>detecting</span><span><b>${hunted}</b>hunted</span><span><b>${all.length - live - hunted}</b>to do</span></div>${bbProgress(all, 'All plays')}</section>`;
+  const secs = B.sections.map(s => ({s, ps:B.plays.filter(p => p.sec === s.id)}));
+  const nav = `<nav class="bbx-secs" aria-label="Stages of an attack">${secs.map(({s, ps}) => { const n = ps.filter(p => ids.has(p.id)).length;
+      return `<button data-act="bbToc" data-v="bb-s-${s.id}"${n ? '' : ' disabled'}>${ico(s.icon, 'sm')}<span>${esc(s.title)}</span><small>${n}</small>${bbProgress(ps.map(p => p.id), s.title)}</button>`; }).join('')}</nav>`;
+  const rows = secs.map(({s, ps}) => { ps = ps.filter(p => ids.has(p.id)); if(!ps.length) return '';
+    return `<section class="bb-row" id="bb-s-${s.id}" aria-labelledby="bb-sh-${s.id}"><header><h2 id="bb-sh-${s.id}">${ico(s.icon, 'sm')}${esc(s.title)}</h2><p>${esc(s.lead)}</p></header>
+      <ul class="bbx-plays">${ps.map(p => { const st = bbSt(p.id);
+        return `<li><button class="bb-tile" data-act="bbOpenPlay" data-v="${p.id}">${bbSevTag(p.sev)}<span class="bbx-t"><span class="bb-tt">${mark(p.t)}</span><small>${p.plat.map(x => esc(B.plats[x])).join(' · ')}</small></span>
+          <span class="bbx-h">${Object.keys(p.q).filter(k => stack.includes(k)).map(k => `<span${k === 'sigma' ? ' class="sg" title="Proven Sigma rule"' : ''}>${esc(bbShort(B, k))}</span>`).join('')}</span>
+          <span class="bbx-st st-${st}">${BB_ST[st]}</span></button></li>`; }).join('')}</ul></section>`; }).join('');
+  return {n:vis.length, html:`<div class="bbx-idx">${nav}<div class="bbx-main">${cover}${bar}<p class="t3 small bbx-count" aria-live="polite">${vis.length} of ${B.plays.length} plays</p>${rows || empty('search', 'No play matches', 'Clear a filter or try another word.')}</div></div>`};
 }
 
 function bbDossier(p, mark){
   const B = BLACKBOOK, sec = B.sections.find(s => s.id === p.sec) || {}, list = bbVisible(B, () => true), i = list.findIndex(x => x.id === p.id), prev = list[i - 1], next = list[i + 1];
   const stack = bbStack(), langs = Object.keys(p.q).filter(k => stack.includes(k)), cur = langs.includes((UI.bbLang || {})[p.id]) ? UI.bbLang[p.id] : langs[0], rule = bbRuleOf(p), code = cur ? p.q[cur] : '';
-  const tbl = (head, rows) => `<div class="tc-mx bb-tbl" tabindex="0" role="region" aria-label="${esc(head.join(', '))}"><table><thead><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${r.map((c, j) => `<td${j === 0 ? ' class="nw"' : ''}>${mark(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
-  return `<article class="bb-dos" id="bb-dossier" data-play="${p.id}" aria-labelledby="bb-dt">
-    <nav class="bb-dnav" aria-label="Plays"><button class="btn sm ghost" data-act="bbBack">${ico('arrow-left', 'sm')}All plays</button><span class="t3">${ico(sec.icon || 'crosshair', 'sm')}${esc(sec.title || '')}</span><span class="sp"></span>
-      ${prev ? `<button class="btn sm ghost" data-act="bbOpenPlay" data-v="${prev.id}" title="${esc(prev.t)}">${ico('arrow-left', 'sm')}Previous</button>` : ''}${next ? `<button class="btn sm ghost" data-act="bbOpenPlay" data-v="${next.id}" title="${esc(next.t)}">Next${ico('arrow-right', 'sm')}</button>` : ''}</nav>
-    <header class="bb-dh"><h2 id="bb-dt" tabindex="-1">${mark(p.t)}</h2><p class="bb-tech">${p.att.map(bbTech).join(' ')}</p>
-      <dl class="bb-meta"><div><dt>Severity</dt><dd><span class="bb-sev s-${p.sev}">${BB_SEV[p.sev]}</span></dd></div><div><dt>Signal</dt><dd><span class="bb-fid f-${p.fid}">${BB_FID[p.fid]}</span></dd></div>
-        <div><dt>Platforms</dt><dd>${p.plat.map(x => esc(B.plats[x])).join(', ')}</dd></div><div><dt>Hunts</dt><dd>${Object.keys(p.q).map(k => esc(B.langs[k].split(' — ')[0])).join(', ')}</dd></div></dl></header>
-    <div class="bb-cols"><section><h3>How an operator sees it</h3><p>${mark(p.lens)}</p>
-        ${(p.seen || []).length ? `<h3>Seen in the wild</h3>${tbl(['Who', 'When', 'What'], p.seen)}` : ''}</section>
-      <section><h3>What it leaves</h3><ul>${p.sig.map(s => `<li>${mark(s)}</li>`).join('')}</ul><h3>Logs you need</h3><p class="t2">${mark(p.logs)}</p></section></div>
-    <section><h3>Telemetry to read</h3>${tbl(['Source', 'Event', 'Fields', 'Look for'], p.events || [])}</section>
-    ${langs.length ? `<section class="bb-q"><div class="bb-qt"><div class="bb-qtabs" role="tablist" aria-label="Hunts for ${esc(p.t)}">${langs.map(k => `<button role="tab" aria-selected="${k === cur}" class="${k === cur ? 'on' : ''}" data-act="bbLang" data-id="${p.id}" data-v="${k}">${esc(B.langs[k].split(' — ')[0])}</button>`).join('')}</div>
+  const st = bbSt(p.id), cases = B.apt.filter(a => a.plays.includes(p.id)), sweeps = B.sweeps.filter(s => s.steps.some(x => x[0] === p.id));
+  const tbl = (head, rows) => `<div class="tc-mx bb-tbl" tabindex="0" role="region" aria-label="${esc(head.join(', '))}"><table><thead><tr>${head.map(h => `<th scope="col">${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${r.map((c, j) => `<td${j === 0 ? ' class="nw"' : ''}>${mark(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  const stage = (id, n, title, inner) => `<section class="bbx-s" id="bbd-${id}" aria-labelledby="bbd-${id}-h"><h3 id="bbd-${id}-h"><span class="bbx-n">${n}</span>${title}</h3>${inner}</section>`;
+  const parts = [['understand', 'Understand'], ['detect', 'Detect'], ['hunt', 'Hunt'], ['triage', 'Triage'], ['respond', 'Respond'], ['harden', 'Harden'], ['prove', 'Prove']];
+  const hunt = langs.length ? `<div class="bb-q"><div class="bb-qt"><div class="bb-qtabs" role="tablist" aria-label="Hunts for ${esc(p.t)}">${langs.map(k => `<button role="tab" aria-selected="${k === cur}" class="${k === cur ? 'on' : ''}" data-act="bbLang" data-id="${p.id}" data-v="${k}">${esc(bbShort(B, k))}</button>`).join('')}</div>
         <span class="sp"></span><button class="btn sm ghost" data-act="bbCopy" data-id="${p.id}" data-v="${cur}">${ico('copy', 'sm')}Copy</button>
         ${cur === 'sigma' ? (rule ? `<button class="btn sm ghost" data-act="bbOpenRule" data-v="${p.id}">${ico('file-code', 'sm')}In your Detections</button>` : `<button class="btn sm ghost" data-act="bbRule" data-v="${p.id}">${ico('plus', 'sm')}Add to Detections</button>`) + `<button class="btn sm ghost" data-act="bbHunt" data-v="${p.id}">${ico('crosshair', 'sm')}Hunt my evidence</button>` : ''}</div>
-      <pre class="bb-code" tabindex="0" aria-label="${esc(B.langs[cur])}"><code>${esc(code)}</code></pre>
-      ${cur === 'sigma' && p.ev ? `<p class="bb-proof t3">${ico('check', 'sm')}Proven on: <code>${esc(p.ev[0])}</code></p>` : ''}</section>` : `<p class="t3">None of your stack’s languages has a hunt for this play — change “Your stack” on the play list.</p>`}
-    <div class="bb-cols3"><section><h3>When it fires</h3><ol>${(p.triage || []).map(s => `<li>${mark(s)}</li>`).join('')}</ol></section>
-      <section><h3>Respond</h3><ol>${(p.respond || []).map(s => `<li>${mark(s)}</li>`).join('')}</ol></section>
-      <section><h3>What closes it</h3><ul>${p.fix.map(s => `<li>${mark(s)}</li>`).join('')}</ul></section></div>
-    <div class="bb-cols"><section><h3>What else looks like this</h3><p class="t2">${mark(p.fp)}</p></section>${p.validate ? `<section><h3>Prove it works</h3><p class="t2">${mark(p.validate)}</p></section>` : ''}</div>
-  </article>`;
+      <pre class="bb-code" tabindex="0" aria-label="${esc(B.langs[cur] || cur)}"><code>${esc(code)}</code></pre>
+      ${cur === 'sigma' && p.ev ? `<p class="bb-proof">${ico('check', 'sm')}<span>Proven: matches <code>${esc(p.ev[0])}</code>, and leaves <code>${esc(p.ev[1])}</code> alone.</span></p>` : ''}</div>`
+    : `<p class="t3">None of your languages has a hunt for this play. Change “Languages” on the play list.</p>`;
+  return `<div class="bbx-dwrap"><article class="bb-dos" id="bb-dossier" data-play="${p.id}" aria-labelledby="bb-dt">
+    <nav class="bb-dnav" aria-label="Plays"><button class="btn sm ghost" data-act="bbBack">${ico('arrow-left', 'sm')}All plays</button><span class="t3 bbx-crumb">${ico(sec.icon || 'crosshair', 'sm')}${esc(sec.title || '')}</span><span class="sp"></span>
+      ${prev ? `<button class="btn sm ghost" data-act="bbOpenPlay" data-v="${prev.id}" title="${esc(prev.t)}" aria-label="Previous: ${esc(prev.t)}">${ico('arrow-left', 'sm')}<span class="bbx-lbl">Previous</span></button>` : ''}${next ? `<button class="btn sm ghost" data-act="bbOpenPlay" data-v="${next.id}" title="${esc(next.t)}" aria-label="Next: ${esc(next.t)}"><span class="bbx-lbl">Next</span>${ico('arrow-right', 'sm')}</button>` : ''}</nav>
+    <header class="bb-dh"><h2 id="bb-dt" tabindex="-1">${mark(p.t)}</h2>
+      <ul class="bbx-facts"><li>${bbSevTag(p.sev)}</li><li><span class="bb-fid f-${p.fid}">${BB_FID[p.fid]}</span></li><li>${p.plat.map(x => esc(B.plats[x])).join(', ')}</li><li class="bb-tech">${p.att.map(bbTech).join(' ')}</li></ul>
+      <div class="bbx-mine" role="radiogroup" aria-label="Your status for this play">${Object.entries(BB_ST).map(([k, l]) => `<button role="radio" aria-checked="${k === st}" class="${k === st ? 'on' : ''}" data-act="bbSetSt" data-id="${p.id}" data-v="${k}">${k === 'live' ? ico('circle-check', 'sm') : k === 'hunted' ? ico('crosshair', 'sm') : ico('circle-dot', 'sm')}${l}</button>`).join('')}</div></header>
+    <div class="bbx-dgrid"><div class="bbx-dmain">
+    ${stage('understand', 1, 'Understand', `<h4>How an operator sees it</h4><p>${mark(p.lens)}</p>${(p.seen || []).length ? `<h4>Seen in the wild</h4>${tbl(['Who', 'When', 'What'], p.seen)}` : ''}
+      ${cases.length ? `<p class="bbx-also">${ico('shield-alert', 'sm')}<span>In the APT casebook: ${cases.map(a => `<button class="lnk" data-act="bbCase" data-v="${esc(a.id)}">${esc(a.name)}</button>`).join(', ')}</span></p>` : ''}`)}
+    ${stage('detect', 2, 'Detect', `<div class="bb-cols"><div><h4>What it leaves</h4><ul>${p.sig.map(s => `<li>${mark(s)}</li>`).join('')}</ul></div><div><h4>Logs you need</h4><p class="t2">${mark(p.logs)}</p></div></div>
+      ${(p.events || []).length ? `<h4>Telemetry to read</h4>${tbl(['Source', 'Event', 'Fields', 'Look for'], p.events)}` : '<h4>Telemetry to read</h4><p class="t3">The logs above; no single event marks it.</p>'}`)}
+    ${stage('hunt', 3, 'Hunt', hunt + (p.fp ? `<h4>What else looks like this</h4><p class="t2">${mark(p.fp)}</p>` : ''))}
+    ${stage('triage', 4, 'Triage', `<h4>When it fires</h4><ol>${(p.triage || []).map(s => `<li>${mark(s)}</li>`).join('')}</ol>`)}
+    ${stage('respond', 5, 'Respond', `<ol>${(p.respond || []).map(s => `<li>${mark(s)}</li>`).join('')}</ol>`)}
+    ${stage('harden', 6, 'Harden', `<h4>What closes it</h4><ul>${p.fix.map(s => `<li>${mark(s)}</li>`).join('')}</ul>`)}
+    ${stage('prove', 7, 'Prove', `<h4>Prove it works</h4><p class="t2">${mark(p.validate || 'Replay the behaviour in a test environment and check the hunt finds it.')}</p>
+      ${sweeps.length ? `<p class="bbx-also">${ico('route', 'sm')}<span>Part of the sweeps: ${sweeps.map(s => `<button class="lnk" data-act="bbSweepGo" data-v="${esc(s.id)}">${esc(s.t)}</button>`).join(', ')}</span></p>` : ''}`)}
+    </div><nav class="bbx-otp" aria-label="On this play"><b>On this play</b>${parts.map(([id, l], n) => `<button data-act="bbToc" data-v="bbd-${id}"><span>${n + 1}</span>${l}</button>`).join('')}</nav></div>
+  </article></div>`;
+}
+
+/* Sweeps: plays in the order to run them for one situation, with why each one is next */
+function bbSweeps(B, hit, mark){
+  const L = B.sweeps.filter(s => hit(s.t, s.when, s.why, s.steps.map(x => x[1]).join(' '), s.steps.map(x => (B.plays.find(p => p.id === x[0]) || {}).t).join(' ')));
+  if(!B.sweeps.length) return {n:0, html:`<p class="t3">This copy of the Blackbook has no sweeps yet.</p>`};
+  return {n:L.length, html:`<p class="bbx-intro">A sweep is a set of plays run in order for one situation — a new environment, a ransomware warning, a vendor breach. Each step says why it comes next. Your status on each play counts here too.</p>
+    <div class="bbx-sweeps">${L.map(s => { const ids = s.steps.map(x => x[0]), done = ids.filter(id => bbSt(id) !== 'todo').length;
+      return `<article class="bbx-sweep" id="bb-sw-${esc(s.id)}" aria-labelledby="bb-sw-${esc(s.id)}-h"><header><div><h2 id="bb-sw-${esc(s.id)}-h">${mark(s.t)}</h2><p class="t2">${mark(s.when)}</p></div>
+          <div class="bbx-swp"><span class="t3">${done} of ${ids.length} worked</span>${bbProgress(ids, s.t)}</div></header>
+        ${s.why ? `<p class="bbx-why">${mark(s.why)}</p>` : ''}
+        <ol class="bbx-steps">${s.steps.map(([id, why]) => { const p = B.plays.find(x => x.id === id), st = bbSt(id);
+          return `<li class="st-${st}"><span class="bbx-dot" aria-hidden="true"></span><div><button class="lnk bbx-stp" data-act="bbJump" data-v="${esc(id)}">${esc(p.t)}</button> ${bbSevTag(p.sev)}<span class="bbx-st st-${st}">${BB_ST[st]}</span><p>${mark(why)}</p></div></li>`; }).join('')}</ol>
+        <div class="bbx-acts"><button class="btn sm" data-act="bbJump" data-v="${esc((s.steps.find(x => bbSt(x[0]) === 'todo') || s.steps[0])[0])}">${ico('crosshair', 'sm')}${done && done < ids.length ? 'Next step' : 'Start'}</button>
+          <button class="btn sm ghost" data-act="bbShowSet" data-v="sweep:${esc(s.id)}">${ico('list', 'sm')}These plays in the list</button></div></article>`; }).join('')}</div>`};
+}
+
+function bbDoctrine(B, hit, mark){
+  const wf = (B.workflow || []).filter(x => hit(...x)), tel = (B.telemetry || []).filter(x => hit(...x)), doc = B.doctrine.filter(d => hit(...d)), mir = B.mirror.filter(m => hit(...m.slice(0, 3)));
+  const n = wf.length + tel.length + doc.length + mir.length;
+  const ch = (id, i, k, title, lead, inner) => `<section class="tc-ch" id="${id}"><header><span class="tc-n">${k}</span><div><h2>${ico(i, 'sm')}${title}</h2><p>${lead}</p></div></header>${inner}</section>`;
+  const html = (wf.length ? ch('bb-wf', 'list-checks', '01', 'A hunt, start to finish', 'Six steps, each with what it should produce. Every play plugs into steps 2–4.',
+        `<ol class="bb-wf">${wf.map(([t, d, out]) => `<li><div><b>${mark(t)}</b><p>${mark(d)}</p></div><span class="bb-out"><small>Produces</small>${mark(out)}</span></li>`).join('')}</ol>`) : '')
+    + (tel.length ? ch('bb-tel', 'database', '02', 'Telemetry you need first', 'What each source reveals, how to switch it on, and how long to keep it. A hunt can only find what was recorded.',
+        `<div class="tc-mx bb-tbl" tabindex="0" role="region" aria-label="Telemetry sources"><table><thead><tr><th scope="col">Source</th><th scope="col">What it reveals</th><th scope="col">How to switch it on</th><th scope="col">Keep</th></tr></thead><tbody>${tel.map(([a, b, c, d]) => `<tr><td><b>${mark(a)}</b></td><td>${mark(b)}</td><td>${mark(c)}</td><td class="nw">${mark(d)}</td></tr>`).join('')}</tbody></table></div>`) : '')
+    + (doc.length ? ch('bb-doctrine', 'lightbulb', '03', 'How a hunter thinks', 'The habits that separate a hunt from a search.', `<div class="bbx-ref"><dl>${doc.map(([t, b]) => `<div><dt>${mark(t)}</dt><dd>${mark(b)}</dd></div>`).join('')}</dl></div>`) : '')
+    + (mir.length ? ch('bb-mirror', 'git-compare', '04', 'Their first checks, your first checks', 'What a penetration tester or bug-bounty hunter looks at first — and the defender’s mirror of each.',
+        `<div class="tc-mx bb-tbl" tabindex="0" role="region" aria-label="Their checks and yours"><table><thead><tr><th scope="col">They look for</th><th scope="col">Why it pays</th><th scope="col">Your check</th></tr></thead><tbody>${mir.map(([a, b, c, id]) => `<tr><td><b>${mark(a)}</b></td><td>${mark(b)}</td><td>${mark(c)}<br><button class="lnk" data-act="bbJump" data-v="${esc(id)}">The play ${ico('arrow-right', 'sm')}</button></td></tr>`).join('')}</tbody></table></div>`) : '');
+  const toc = [['bb-wf', 'list-checks', 'A hunt, start to finish'], ['bb-tel', 'database', 'Telemetry you need first'], ['bb-doctrine', 'lightbulb', 'How a hunter thinks'], ['bb-mirror', 'git-compare', 'Their checks, yours']];
+  return {n, html:html ? bbWithToc(toc, html) : ''};
+}
+
+function bbCases(B, hit, mark){
+  const L = B.apt.filter(a => hit(a.name, a.who, a.when, a.what, a.tells.join(' '), a.lesson));
+  const html = L.map(a => `<article class="bb-case bbx-case" id="bb-apt-${a.id}" aria-labelledby="bb-apt-${a.id}-h"><header><h2 id="bb-apt-${a.id}-h">${mark(a.name)}</h2><p class="t3">${mark(a.who)} · ${mark(a.when)}</p></header>
+      <p class="bbx-what">${mark(a.what)}</p>
+      <div class="bb-cols"><div><h3>The tells</h3><ul>${a.tells.map(t => `<li>${mark(t)}</li>`).join('')}</ul></div>
+        <div><h3>Plays that catch it</h3><ul class="bbx-cplays">${a.plays.map(id => { const p = B.plays.find(x => x.id === id), st = bbSt(id); return `<li>${bbSevTag(p.sev)}<button class="lnk" data-act="bbJump" data-v="${esc(id)}">${esc(p.t)}</button><span class="bbx-st st-${st}">${BB_ST[st]}</span></li>`; }).join('')}</ul>
+          <button class="btn sm ghost" data-act="bbShowSet" data-v="apt:${esc(a.id)}">${ico('list', 'sm')}These plays in the list</button></div></div>
+      <p class="bb-lesson"><b>The lesson.</b> ${mark(a.lesson)}</p></article>`).join('');
+  return {n:L.length, html:html ? bbWithToc(B.apt.map(a => [`bb-apt-${a.id}`, 'shield-alert', a.name]), html) : ''};
+}
+
+function bbUnder(B, hit, mark){
+  const r = bbRef(B.underground, 'bb-u-', hit, mark, true), cases = B.caught.filter(c => hit(c.name, c.year, c.how, c.lesson, c.src));
+  const caught = cases.length ? `<section class="tc-ch" id="bb-caught"><header><span class="tc-n">${ico('lock', 'sm')}</span><div><h2>How they were caught</h2><p>From court filings and official statements: the mistake that identified each one, and what an investigator can learn from it.</p></div></header>
+      <div class="bb-pat">${B.caughtPatterns.map(([t, d]) => `<div><b>${esc(t)}</b><span>${esc(d)}</span></div>`).join('')}</div>
+      ${cases.map(c => `<article class="bb-case bbx-case"><header><h2>${mark(c.name)}</h2><p class="t3">${esc(c.year)} · ${mark(c.src)}</p></header><p>${mark(c.how)}</p><p class="bb-lesson"><b>For the investigator.</b> ${mark(c.lesson)}</p></article>`).join('')}</section>` : '';
+  const html = r.html || caught ? `<div class="bb-note">${ico('scale', 'sm')}<p>For authorised investigators: CTI teams, journalists and law enforcement. Observe and record; do not buy, take part or provoke. Anything that names a victim or a crime in progress goes to the victim and the police.</p></div>${r.html}${caught}` : '';
+  return {n:r.n + cases.length, html:html ? bbWithToc(B.underground.map((g, gi) => [`bb-u-${gi}`, 'skull', g.h]).concat([['bb-caught', 'lock', 'How they were caught']]), html) : ''};
+}
+
+/* a reference part (Underground, OSINT): one heading per group, each point a term and its explanation side by side */
+function bbRef(groups, pre, hit, mark, inner){
+  let n = 0;
+  const html = groups.map((g, gi) => { const pts = g.pts.filter(x => hit(x[0], x[1], g.h)); n += pts.length; return pts.length ? `<section class="bbx-grp" id="${pre}${gi}" aria-labelledby="${pre}${gi}-h"><h2 id="${pre}${gi}-h">${esc(g.h)}<small>${pts.length}</small></h2>
+      <div class="bbx-ref"><dl>${pts.map(x => `<div><dt>${mark(x[0])}</dt><dd>${mark(x[1])}${x[2] ? bbGoBtn(x[2]) : ''}</dd></div>`).join('')}</dl></div></section>` : ''; }).join('');
+  return {n, html:inner || !html ? html : bbWithToc(groups.map((g, gi) => [`${pre}${gi}`, 'scan-search', g.h]), html)};
+}
+function bbWithToc(items, html){
+  return `<div class="tc-grid"><nav class="tc-toc" aria-label="Contents">${items.map(([id, i, l]) => `<button data-act="bbToc" data-v="${esc(id)}">${ico(i, 'sm')}<span>${esc(l)}</span></button>`).join('')}</nav><div class="tc-main">${html}</div></div>`;
 }
 
 function bbAddRule(id, quiet){
@@ -171,6 +250,9 @@ function bbAddRule(id, quiet){
   if(!quiet) toast(`“${r.title}” is in your Detections`, 'Open', () => { UI.rule = r.id; UI.ropen = true; go('#/detections'); });
   return r;
 }
+document.addEventListener('change', ev => { const t = ev.target; if(!t || (t.id !== 'bbPlat' && t.id !== 'bbSt')) return; const F = bbFilters();
+  if(t.id === 'bbPlat') F.plat = t.value ? new Set([t.value]) : new Set(); else F.st = BB_ST[t.value] ? t.value : '';
+  renderMain(); const el = $(t.id); if(el) el.focus(); });
 document.addEventListener('input', ev => { if(ev.target && ev.target.id === 'bbQ'){ clearTimeout(UI.bbT); UI.bbT = setTimeout(() => { UI.bbQ = ev.target.value; UI.bbPlay = null; const p = ev.target.selectionStart; renderMain(); const i = $('bbQ'); if(i){ i.focus(); i.setSelectionRange(p, p); } }, 180); } });
 const BB_ACTS = {
   bbTab:(id, v) => { if(v === 'hunt' && UI.bbTab === 'hunt') UI.bbPlay = null; UI.bbTab = v; renderMain(); const m = $('main'); const s = m && m.querySelector('.scroll'); if(s) s.scrollTop = 0; },
@@ -181,6 +263,14 @@ const BB_ACTS = {
   bbFSev:(id, v) => { const F = bbFilters(); F.sev.has(v) ? F.sev.delete(v) : F.sev.add(v); renderMain(); },
   bbFSigma:() => { const F = bbFilters(); F.sigma = !F.sigma; renderMain(); },
   bbFClear:() => { UI.bbF = null; renderMain(); },
+  bbFIds:() => { const F = bbFilters(); F.ids = null; F.idsLabel = ''; renderMain(); },
+  bbSetSt:(id, v, el) => { const pid = el && el.dataset.id; if(!pid || !BB_ST[v]) return; const S = Object.assign({}, DB.prefs.bbSt || {}); if(v === 'todo') delete S[pid]; else S[pid] = v; DB.prefs.bbSt = S; save(); renderMain();
+    const b = document.querySelector(`[data-act=bbSetSt][data-id="${pid}"][data-v="${v}"]`); if(b) b.focus(); },
+  bbCase:(id, v) => { UI.bbTab = 'apt'; UI.bbQ = ''; UI.bbPlay = null; renderMain(); const el = $('bb-apt-' + v); if(el){ el.scrollIntoView({block:'start'}); const h = el.querySelector('h2'); if(h){ h.tabIndex = -1; h.focus({preventScroll:true}); } } },
+  bbSweepGo:(id, v) => { UI.bbTab = 'sweeps'; UI.bbQ = ''; UI.bbPlay = null; renderMain(); const el = $('bb-sw-' + v); if(el){ el.scrollIntoView({block:'start'}); const h = el.querySelector('h2'); if(h){ h.tabIndex = -1; h.focus({preventScroll:true}); } } },
+  bbShowSet:(id, v) => { const B = BLACKBOOK, [kind, key] = v.split(':'), src = kind === 'apt' ? B.apt.find(a => a.id === key) : B.sweeps.find(s => s.id === key); if(!src) return;
+    UI.bbF = null; const F = bbFilters(); F.ids = kind === 'apt' ? src.plays.slice() : src.steps.map(x => x[0]); F.idsLabel = kind === 'apt' ? src.name : src.t;
+    UI.bbTab = 'hunt'; UI.bbQ = ''; UI.bbPlay = null; renderMain(); const sc = document.querySelector('#main .scroll'); if(sc) sc.scrollTop = 0; },
   bbPlay:(id, v) => { const o = bbOpen(); if(o.has(v)) o.delete(v); else o.add(v); renderMain(); const b = document.querySelector(`[data-act=bbPlay][data-v="${v}"]`); if(b) b.focus(); },
   bbJump:(id, v) => { UI.bbTab = 'hunt'; UI.bbQ = ''; UI.bbF = null; BB_ACTS.bbOpenPlay(null, v); },
   bbLang:(id, v, el) => { const pid = el && el.dataset.id; if(!pid) return; UI.bbLang = UI.bbLang || {}; UI.bbLang[pid] = v; renderMain(); const b = document.querySelector(`[data-act=bbLang][data-id="${pid}"][data-v="${v}"]`); if(b) b.focus(); },

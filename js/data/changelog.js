@@ -4,6 +4,34 @@
    Each change has a type: "added" | "changed" | "fixed" | "removed". */
 const CHANGELOG_DATA = [
 {
+  "version": "1.91",
+  "name": "A sample case with everything in it, and a Blackbook you can work through",
+  "date": "2026-11-27",
+  "summary": "Op Lantern's sample now holds chats, pictures, a place found by geolocation and a Word file with a past; the Blackbook was redrawn and gained sweeps, coverage and new plays.",
+  "changes": [
+    {
+      "type": "added",
+      "text": "The sample case Op Lantern now has Telegram and Discord chats (a channel, the staff group with a renamed member, and a post pushed into several chats within minutes), a photo with camera and GPS, a picture with its metadata stripped that is geolocated in “Where was this taken?”, a screenshot, and a Word handbook whose tracked changes, comment and hidden text point back at the subject. They are read by the same importers as your own files, so Chats, Active hours, Media, Places and the File inspector all have something to show. A workspace that already has the sample gets them once."
+    },
+    {
+      "type": "added",
+      "text": "Blackbook: sweeps — ordered sets of plays for one situation (a new environment, a ransomware warning, an identity takeover, a leaked cloud key, a breached supplier), each step saying why it comes next."
+    },
+    {
+      "type": "added",
+      "text": "Blackbook: your coverage. Mark each play to do, hunted or detecting; the list, each stage of the attack and every sweep show how far you are. Kept in this browser."
+    },
+    {
+      "type": "added",
+      "text": "Blackbook: four new plays where it was thinnest — network scanners and share hunting, cloud discovery from a stolen identity, cloud data held to ransom, ESXi backdoors through unsigned VIBs — three more campaigns (Akira, Cl0p and MOVEit, Change Healthcare), and Microsoft Defender hunts for eight plays that only had Sigma. Every new Sigma rule is proven like the rest."
+    },
+    {
+      "type": "changed",
+      "text": "Blackbook redrawn: a compact header with the counts, one bar for the parts and search, the plays as a calm list grouped by stage with your coverage beside it, and each play in the order the work happens — understand, detect, hunt, triage, respond, harden, prove — with a contents list, hunts that wrap instead of running off the page, and links to the campaigns and sweeps it belongs to. Underground and OSINT read as a reference: each point beside its explanation."
+    }
+  ]
+},
+{
   "version": "1.90",
   "name": "The Blackbook, locked and deepened",
   "date": "2026-11-26",

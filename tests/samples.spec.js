@@ -38,11 +38,35 @@ test('example notes: a checklist and a written note for each case, two general o
 
 test('the OSINT sample joins Op Lantern, tied to the intrusion by the server they shared', async ({ page }) => {
   const errors = await open(page, '#/home', { legacy: false, osintSample: true });
-  await expect.poll(() => page.evaluate(() => DB.osintSample), { timeout: 15000 }).toBe(2);
+  await expect.poll(() => page.evaluate(() => DB.osintSample), { timeout: 15000 }).toBeGreaterThanOrEqual(2);   // 3 once the chats and files are in (1.91)
   const r = await page.evaluate(() => ({ cases: DB.cases.map(c => c.id), sp: DB.entries.filter(e => e.id.startsWith('sp-')).map(e => e.caseId), bridge: DB.links.filter(l => l.caseId === 'c-lantern' && /resolved to|possibly the same person/.test(l.label)).map(l => l.a + '>' + l.b + ':' + l.conf),
     finding: DB.records.some(x => x.caseId === 'c-lantern' && x.type === 'finding' && /198\.51\.100\.23/.test(x.body) && /not proof/.test(x.body)), scope: /refund scam/.test(theCase('c-lantern').scope) }));
   expect(r.cases).toEqual(['c-lantern', 'c-story']); expect(new Set(r.sp)).toEqual(new Set(['c-lantern']));
   expect(r.bridge).toEqual(expect.arrayContaining(['sp-portal>v-ip2:3', 'v-actor>sp-jan:1'])); expect(r.finding).toBe(true); expect(r.scope).toBe(true);
+  noErrors(errors);
+});
+
+test('Op Lantern also has chats, pictures and a document, read by the same importers as your own files (1.91)', async ({ page }) => {
+  const errors = await open(page, '#/home', { legacy: false, osintSample: true });
+  await expect.poll(() => page.evaluate(() => DB.osintSample), { timeout: 20000 }).toBe(3);
+  const r = await page.evaluate(() => { const R = DB.records.filter(x => x.caseId === 'c-lantern');
+    return { chats: R.filter(x => x.chatnet).map(x => x.chatnet.chat).sort(), authors: R.filter(x => x.chatAuthor).length,
+      renamed: R.some(x => x.chatAuthor && x.chatAuthor.names.map(n => n.name).join() === 'n1ghtlamp,lamp'),
+      files: R.filter(x => x.att && x.att.length).map(x => x.att[0].name).sort(), gps: R.flatMap(x => x.att || []).filter(a => a.gps).map(a => a.name + ' ' + a.cam),
+      geo: R.filter(x => x.geo).map(x => geoOf(x).cands.find(c => c.verdict === 'confirmed').name), places: mapData('c-lantern').pts.length,
+      desk: DB.links.some(l => l.a === 'sp-org' && l.b === 'sp-desk') }; });
+  expect(r.chats).toEqual(['Deals Hub #refunds', 'HL desk staff', 'Harbourline Refund Desk']);
+  expect(r.authors).toBe(8); expect(r.renamed).toBe(true);
+  expect(r.files).toEqual(['handbook.docx', 'pier.jpg', 'portal.png', 'warehouse.jpg']);
+  expect(r.gps).toEqual(['pier.jpg Google Pixel 7']);
+  expect(r.geo).toEqual(['Sadama street by the old port, Tallinn']); expect(r.places).toBeGreaterThanOrEqual(2); expect(r.desk).toBe(true);
+  // the chat network finds the post pushed into several chats, and the file inspector reads the document's history
+  await page.evaluate(() => { UI.ivView = 'chats'; go('#/case/c-lantern/infra'); });
+  await expect(page.locator('#main')).toContainText('Coordinated pushes');
+  await page.evaluate(() => { const x = DB.records.find(y => y.title === 'File: handbook.docx'); attAct('attKit', x.id, x.att[0].id); });
+  await expect(page.locator('#main')).toContainText('Deleted text still in the file'); await expect(page.locator('#main')).toContainText('Sadama, Tallinn');
+  // added once: running it again changes nothing
+  const n = await page.evaluate(async () => { const before = DB.records.length; await sampleExtrasAdd(); return DB.records.length - before; }); expect(n).toBe(0);
   noErrors(errors);
 });
 

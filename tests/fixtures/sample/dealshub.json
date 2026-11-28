@@ -1,0 +1,112 @@
+{
+ "guild": {
+  "id": "683463514521600009",
+  "name": "Deals Hub"
+ },
+ "channel": {
+  "id": "683463766179840010",
+  "type": "GuildTextChat",
+  "name": "refunds"
+ },
+ "messages": [
+  {
+   "id": "1477928445542400000",
+   "type": "Default",
+   "timestamp": "2026-03-02T07:20:00+00:00",
+   "content": "anyone else had their Harbourline order cancelled? no reply from the shop for 3 weeks",
+   "author": {
+    "id": "849255963033600003",
+    "name": "sailnut",
+    "nickname": "sailnut"
+   }
+  },
+  {
+   "id": "1477931213783040001",
+   "type": "Default",
+   "timestamp": "2026-03-02T07:31:00+00:00",
+   "content": "Harbourline customers: orders cancelled after the warehouse move are being refunded. Open harbour-line-portal.test/refund with your order number to claim.",
+   "author": {
+    "id": "1475794383667200001",
+    "name": "harbourline_support",
+    "nickname": "Harbourline Support"
+   }
+  },
+  {
+   "id": "1477931968757760002",
+   "type": "Default",
+   "timestamp": "2026-03-02T07:34:00+00:00",
+   "content": "Harbourline customers: orders cancelled after the warehouse move are being refunded. Open harbour-line-portal.test/refund with your order number to claim.",
+   "author": {
+    "id": "1476341740339200002",
+    "name": "quickfix_88",
+    "nickname": "quickfix"
+   }
+  },
+  {
+   "id": "1477939015188480003",
+   "type": "Default",
+   "timestamp": "2026-03-02T08:02:00+00:00",
+   "content": "is that link real? the shop site never mentioned a refund portal",
+   "author": {
+    "id": "643374356889600004",
+    "name": "marta.k",
+    "nickname": "Marta"
+   }
+  },
+  {
+   "id": "1477939770163200004",
+   "type": "Default",
+   "timestamp": "2026-03-02T08:05:00+00:00",
+   "content": "it is real, I got mine yesterday, took 10 minutes",
+   "author": {
+    "id": "1476341740339200002",
+    "name": "quickfix_88",
+    "nickname": "quickfix"
+   }
+  },
+  {
+   "id": "1478648439767040005",
+   "type": "Default",
+   "timestamp": "2026-03-04T07:01:00+00:00",
+   "content": "New refund link for orders 4400 to 4800: harbour-line-portal.test/r/4400. The old link stops working tonight.",
+   "author": {
+    "id": "1475794383667200001",
+    "name": "harbourline_support",
+    "nickname": "Harbourline Support"
+   }
+  },
+  {
+   "id": "1478648943083520006",
+   "type": "Default",
+   "timestamp": "2026-03-04T07:03:00+00:00",
+   "content": "New refund link for orders 4400 to 4800: harbour-line-portal.test/r/4400. The old link stops working tonight.",
+   "author": {
+    "id": "1476341740339200002",
+    "name": "quickfix_88",
+    "nickname": "quickfix"
+   }
+  },
+  {
+   "id": "1479097146408960007",
+   "type": "Default",
+   "timestamp": "2026-03-05T12:44:00+00:00",
+   "content": "they asked me for a fee in bitcoin before paying the refund. reporting this to the bank",
+   "author": {
+    "id": "643374356889600004",
+    "name": "marta.k",
+    "nickname": "Marta"
+   }
+  },
+  {
+   "id": "1479098656358400008",
+   "type": "Default",
+   "timestamp": "2026-03-05T12:50:00+00:00",
+   "content": "Please send us a direct message, we will look at your case personally.",
+   "author": {
+    "id": "1475794383667200001",
+    "name": "harbourline_support",
+    "nickname": "Harbourline Support"
+   }
+  }
+ ]
+}

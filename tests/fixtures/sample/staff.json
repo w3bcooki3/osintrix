@@ -1,0 +1,221 @@
+{
+ "name": "HL desk staff",
+ "type": "private_supergroup",
+ "id": 1777000002,
+ "messages": [
+  {
+   "id": 1,
+   "type": "message",
+   "date": "2026-03-01T20:02:00",
+   "date_unixtime": "1772388120",
+   "from": "Dmitri K",
+   "from_id": "user101",
+   "text": "Group for the desk. Channel goes live tomorrow morning, portal is ready on the usual box."
+  },
+  {
+   "id": 2,
+   "type": "message",
+   "date": "2026-03-01T20:10:00",
+   "date_unixtime": "1772388600",
+   "from": "n1ghtlamp",
+   "from_id": "user303",
+   "text": "portal is on 198.51.100.23 same as before, update-lamp.test still points there too, dont worry about it"
+  },
+  {
+   "id": 3,
+   "type": "message",
+   "date": "2026-03-01T20:12:00",
+   "date_unixtime": "1772388720",
+   "from": "Dmitri K",
+   "from_id": "user101",
+   "text": "Move it before the week is out. I do not want the two things on one address."
+  },
+  {
+   "id": 4,
+   "type": "message",
+   "date": "2026-03-02T09:06:00",
+   "date_unixtime": "1772435160",
+   "from": "Dmitri K",
+   "from_id": "user101",
+   "text": "Harbourline customers: orders cancelled after the warehouse move are being refunded. Open harbour-line-portal.test/refund with your order number to claim.",
+   "forwarded_from": "Harbourline Refund Desk",
+   "forwarded_from_id": "channel1777000001"
+  },
+  {
+   "id": 5,
+   "type": "message",
+   "date": "2026-03-02T11:30:00",
+   "date_unixtime": "1772443800",
+   "from": "Mira S",
+   "from_id": "user404",
+   "text": "First three claims in. All three paid the fee. Which wallet do I give for BTC?"
+  },
+  {
+   "id": 6,
+   "type": "message",
+   "date": "2026-03-02T11:34:00",
+   "date_unixtime": "1772444040",
+   "from": "Dmitri K",
+   "from_id": "user101",
+   "text": "BTC to bc1qqk6ykfsk8wy3rkddzq2m3pm00wnhyha9wegr4q only. USDT on TRON to TbVnG8JkHyEKx3SkTqvSrJEE7M4YhtPSD2. Nothing else."
+  },
+  {
+   "id": 7,
+   "type": "message",
+   "date": "2026-03-02T17:41:00",
+   "date_unixtime": "1772466060",
+   "from": "Dmitri K",
+   "from_id": "user101",
+   "text": "Refunds are paid within 24 hours once your card is verified. Support never asks for your password, only the confirmation code.",
+   "forwarded_from": "Harbourline Refund Desk",
+   "forwarded_from_id": "channel1777000001"
+  },
+  {
+   "id": 8,
+   "type": "message",
+   "date": "2026-03-03T10:15:00",
+   "date_unixtime": "1772525700",
+   "from": "Mira S",
+   "from_id": "user404",
+   "text": "Someone asked who owns the company. I said Harbourline Deals B.V., Rotterdam, like the site says."
+  },
+  {
+   "id": 9,
+   "type": "message",
+   "date": "2026-03-03T10:20:00",
+   "date_unixtime": "1772526000",
+   "from": "Dmitri K",
+   "from_id": "user101",
+   "text": "Good. Never say Tallinn. The office stays out of everything."
+  },
+  {
+   "id": 10,
+   "type": "message",
+   "date": "2026-03-04T08:56:00",
+   "date_unixtime": "1772607360",
+   "from": "Dmitri K",
+   "from_id": "user101",
+   "text": "New refund link for orders 4400 to 4800: harbour-line-portal.test/r/4400. The old link stops working tonight.",
+   "forwarded_from": "Harbourline Refund Desk",
+   "forwarded_from_id": "channel1777000001"
+  },
+  {
+   "id": 11,
+   "type": "message",
+   "date": "2026-03-04T14:40:00",
+   "date_unixtime": "1772628000",
+   "from": "n1ghtlamp",
+   "from_id": "user303",
+   "text": "new batch of numbers from the shop database is in the drive, 1900 rows"
+  },
+  {
+   "id": 12,
+   "type": "message",
+   "date": "2026-03-05T10:21:00",
+   "date_unixtime": "1772698860",
+   "from": "Dmitri K",
+   "from_id": "user101",
+   "text": "A small processing fee is taken in crypto for international refunds. Pay only to the address shown in the portal.",
+   "forwarded_from": "Harbourline Refund Desk",
+   "forwarded_from_id": "channel1777000001"
+  },
+  {
+   "id": 13,
+   "type": "message",
+   "date": "2026-03-05T12:05:00",
+   "date_unixtime": "1772705100",
+   "from": "Mira S",
+   "from_id": "user404",
+   "text": "Fee payments today: 14 BTC, 9 USDT. Sending the list tonight."
+  },
+  {
+   "id": 14,
+   "type": "message",
+   "date": "2026-03-06T09:01:00",
+   "date_unixtime": "1772780460",
+   "from": "Dmitri K",
+   "from_id": "user101",
+   "text": "Thank you for your patience. 312 refunds paid this week. Claim yours before Friday: harbour-line-portal.test/refund",
+   "forwarded_from": "Harbourline Refund Desk",
+   "forwarded_from_id": "channel1777000001"
+  },
+  {
+   "id": 15,
+   "type": "message",
+   "date": "2026-03-07T21:30:00",
+   "date_unixtime": "1772911800",
+   "from": "lamp",
+   "from_id": "user303",
+   "text": "changed my name here, the old one is on too many forums now"
+  },
+  {
+   "id": 16,
+   "type": "message",
+   "date": "2026-03-08T11:31:00",
+   "date_unixtime": "1772962260",
+   "from": "Dmitri K",
+   "from_id": "user101",
+   "text": "Weekend team is on. Write to us with your order number and the last four digits of your card.",
+   "forwarded_from": "Harbourline Refund Desk",
+   "forwarded_from_id": "channel1777000001"
+  },
+  {
+   "id": 17,
+   "type": "message",
+   "date": "2026-03-08T18:45:00",
+   "date_unixtime": "1772988300",
+   "from": "Mira S",
+   "from_id": "user404",
+   "text": "Photo of the new desk by the pier, the view is nice at least"
+  },
+  {
+   "id": 18,
+   "type": "message",
+   "date": "2026-03-10T09:16:00",
+   "date_unixtime": "1773126960",
+   "from": "Dmitri K",
+   "from_id": "user101",
+   "text": "Portal moved to a faster server today. If the page does not open, clear your browser and try again.",
+   "forwarded_from": "Harbourline Refund Desk",
+   "forwarded_from_id": "channel1777000001"
+  },
+  {
+   "id": 19,
+   "type": "message",
+   "date": "2026-03-10T09:30:00",
+   "date_unixtime": "1773127800",
+   "from": "lamp",
+   "from_id": "user303",
+   "text": "moved the portal off the old box as you asked. dns will catch up in a day"
+  },
+  {
+   "id": 20,
+   "type": "message",
+   "date": "2026-03-10T13:02:00",
+   "date_unixtime": "1773140520",
+   "from": "Mira S",
+   "from_id": "user404",
+   "text": "Payouts channel for the team: t.me/harbour_payouts"
+  },
+  {
+   "id": 21,
+   "type": "message",
+   "date": "2026-03-12T09:06:00",
+   "date_unixtime": "1773299160",
+   "from": "Dmitri K",
+   "from_id": "user101",
+   "text": "Last week to claim refunds for cancelled orders. After 20 March unclaimed refunds go back to the bank.",
+   "forwarded_from": "Harbourline Refund Desk",
+   "forwarded_from_id": "channel1777000001"
+  },
+  {
+   "id": 22,
+   "type": "message",
+   "date": "2026-03-12T23:10:00",
+   "date_unixtime": "1773349800",
+   "from": "Dmitri K",
+   "from_id": "user101",
+   "text": "After the 20th we close the desk, wipe the group and start the next shop."
+  }
+ ]
+}
