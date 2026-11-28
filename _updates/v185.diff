@@ -1,0 +1,194 @@
+diff --git a/css/app.css b/css/app.css
+index 602491c..0fd9c93 100644
+--- a/css/app.css
++++ b/css/app.css
+@@ -1887,6 +1887,8 @@ html.modal, html.modal body{overflow:hidden}
+ .gmiss{top:12px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;padding:8px 8px 8px 14px;border-radius:12px;background:var(--surface);border:1px solid var(--accent-line);box-shadow:var(--shadow);font-size:calc(13.5px * var(--ts,1));max-width:calc(100% - 24px);flex-wrap:wrap}
+ .gmiss>span{flex:1 1 220px}
+ .gcanvas.haspanel .gmiss{left:calc(50% - 180px)}
++/* the side panel runs the full height on the right: the zoom buttons and the time slider sit beside it, not under it */
++@media (min-width:761px){ .gcanvas.haspanel .gzoom{right:364px} .gcanvas.haspanel .gtime{left:calc(50% - 176px)} .ds .gcanvas.haspanel .gtime{left:16px;right:364px} }
+ .pklist{max-height:52vh;overflow:auto;border:1px solid var(--border-soft);border-radius:12px;overscroll-behavior:contain}
+ .pk{display:flex;align-items:center;gap:10px;padding:9px 12px;border-top:1px solid var(--border-soft);cursor:pointer}
+ .pk:first-child{border-top:0}
+diff --git a/js/app.js b/js/app.js
+index a447a48..87bc212 100644
+--- a/js/app.js
++++ b/js/app.js
+@@ -63,7 +63,7 @@ function placeInsp(){ const t = document.querySelector('.gtools') || document.qu
+ window.addEventListener('resize', () => { clearTimeout(placeInsp.t); placeInsp.t = setTimeout(placeInsp, 120); });
+ const TITLES = {today:'Today', security:'Security', watch:'Watchlist', trash:'Trash', ctf:'CTF', lab:'Forensics kit', help:'Help', home:'Dashboard', cases:'Cases', toolbox:'Toolbox', entities:'Entities', feeds:'Threat Intel', decoder:'Decoder', reference:'Reference', settings:'Settings', detections:'Detections', queries:'Query library', notes:'Notes', playbooks:'Playbooks', library:'Library', cloud:'Cloud', whatsnew:"What's new", pad:"Scratchpad", notebook:'Notebook', certs:'Certificates', tradecraft:'Tradecraft', regex:'Patterns'};
+ function onRoute(){
+-  UI.route = parseHash(); $('side').classList.remove('open');
++  UI.route = parseHash(); $('side').classList.remove('open'); if(typeof hideMenu === 'function') hideMenu(); if(typeof menClose === 'function') menClose(); if(typeof S !== 'undefined' && S.open && S.from !== location.hash && typeof srchClose === 'function') srchClose();   /* menus, the @ list and search belong to the page they were opened on (Back, a link) */
+   document.title = (UI.route.area === 'case' ? theCase().name.split(' — ')[0] + ' · ' + CASE_TABS.find(t => t[0] === UI.route.tab)[1] : TITLES[UI.route.area] || 'OSINTrix') + ' — OSINTrix';
+   const m = $('main'); m.classList.add('enter'); clearTimeout(onRoute.t); onRoute.t = setTimeout(() => m.classList.remove('enter'), 320);
+   if(UI.route.area !== 'case' || UI.route.tab !== 'graph'){ UI.graph.mode = null; UI.graph.first = null; }
+diff --git a/js/brand.js b/js/brand.js
+index 51896db..29a14d4 100644
+--- a/js/brand.js
++++ b/js/brand.js
+@@ -3,7 +3,7 @@
+    The mark: a lens (the O of OSINT) with a dotted thread running through it
+    from a known point to a new lead (cyan). Gradient squircle, white line.
+    ========================================================================== */
+-const BRAND = {name:'OSINTrix', tagline:'Follow every thread.', version:'v1.84'};
++const BRAND = {name:'OSINTrix', tagline:'Follow every thread.', version:'v1.85'};
+ function logoMark(size = 32, id = 'lg' + Math.random().toString(36).slice(2, 6)){
+   return `<svg class="mark" width="${size}" height="${size}" viewBox="0 0 32 32" aria-hidden="true">
+     <defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5468ff"/><stop offset=".6" stop-color="#7c5cff"/><stop offset="1" stop-color="#a855f7"/></linearGradient>
+diff --git a/js/graph.js b/js/graph.js
+index 5a46620..e83a4fb 100644
+--- a/js/graph.js
++++ b/js/graph.js
+@@ -99,7 +99,7 @@ function mountGraph(){
+   const els = graphElements(D), sig = [DB.active, focused, big, text, accent, bg, JSON.stringify(els)].join('|');
+   if(cy && CY_SIG === sig && cy.container() === el && !cyDead()){ graphAfter(el, focused); return; }   /* two re-renders in one frame: the first already put it back */
+   if(cy && CY_SIG === sig && cy.container() && !cy.container().isConnected && !cyDead()){ const old = cy.container(); cyKeep(); el.replaceWith(old); cy.resize(); graphAfter(old, focused); return; }
+-  if(cy){ cy.destroy(); cy = null; }
++  if(cy){ if(CTX && CTX.graph) hideMenu(); cy.destroy(); cy = null; }   /* a menu on the old graph points at what may no longer be there */
+   CY_SIG = sig;
+   cy = cytoscape({container:el, elements:els, minZoom:big ? .05 : .2, maxZoom:3, boxSelectionEnabled:false, hideEdgesOnViewport:big, textureOnViewport:big, pixelRatio:big ? 1 : 'auto',
+     layout:focused ? gvLayout(D) : hasPos ? {name:'preset'} : {name:'cose', animate:false, nodeRepulsion:() => 14000, idealEdgeLength:() => 95, nodeOverlap:20, padding:40, randomize:false, numIter:1500},
+@@ -135,6 +135,7 @@ function mountGraph(){
+   if(view){ cy.zoom(view.z); cy.pan(view.p); } else { fitNice(); setTimeout(() => { if(cy === me){ fitNice(); ready = true; } }, 90); }
+   cy.on('viewport', () => { radialHide(); if(!ready || cy !== me) return; (UI.graph.views || (UI.graph.views = {}))[DB.active] = {z:cy.zoom(), p:{...cy.pan()}}; });
+   cy.on('grab', 'node', radialHide);
++  cy.on('grab viewport', () => { if(CTX && CTX.graph) hideMenu(); });   /* a menu opened on the graph does not outlive a drag, pan or zoom */
+   cy.on('dragfree', 'node', ev => { if(focused) return;   /* a focused view's places are its own; the whole graph keeps its layout */ const e = entryById(ev.target.id()); if(e){ e.pos = {...ev.target.position()}; save(); } });
+   cy.on('tap', 'node', ev => {
+     const id = ev.target.id();
+@@ -149,8 +150,10 @@ function mountGraph(){
+   cy.on('tap', 'edge', ev => { const id = ev.target.id(); if(id.startsWith('co-')) return; UI.sel = {kind:'link', id}; UI.inspOpen = true; renderInsp(); refreshGraphTools(); });
+   cy.on('tap', ev => { if(ev.target === cy){ radialHide(); if(UI.sel){ UI.sel = null; renderInsp(); refreshGraphTools(); } cy.elements().removeClass('faded'); } });
+   cy.on('dbltap', ev => { if(ev.target === cy){ UI.graph.newPos = {...ev.position}; entryDlg(); } });
+-  const menuAt = (ev, fn) => { const oe = ev.originalEvent || {}, r = el.getBoundingClientRect(), rp = ev.renderedPosition || (ev.target.renderedPosition && ev.target.renderedPosition()) || {x:0, y:0};
+-    fn((oe.clientX != null ? oe.clientX : r.left + rp.x), (oe.clientY != null ? oe.clientY : r.top + rp.y)); };
++  /* holding a node is how a touch screen opens its menu; with a mouse it is how a drag starts (the right button opens
++     the menu), so a mouse hold no longer opens it and then leaves it behind when the node is dragged */
++  const menuAt = (ev, fn) => { const oe = ev.originalEvent || {}; if(ev.type === 'taphold' && !/^touch/.test(oe.type || '')) return; const r = el.getBoundingClientRect(), rp = ev.renderedPosition || (ev.target.renderedPosition && ev.target.renderedPosition()) || {x:0, y:0};
++    fn((oe.clientX != null ? oe.clientX : r.left + rp.x), (oe.clientY != null ? oe.clientY : r.top + rp.y)); if(CTX) CTX.graph = true; };
+   cy.on('cxttap taphold', 'node', ev => menuAt(ev, (x, y) => nodeMenu(ev.target.id(), x, y)));
+   cy.on('cxttap taphold', 'edge', ev => { if(!ev.target.id().startsWith('co-')) menuAt(ev, (x, y) => edgeMenu(ev.target.id(), x, y)); });
+   cy.on('cxttap taphold', ev => { if(ev.target === cy) menuAt(ev, (x, y) => canvasMenu({...ev.position}, x, y)); });
+@@ -174,7 +177,10 @@ function graphAfter(el, focused){
+      moves the graph without resizing it (a note or bar appearing above it after entities are added), the spot it
+      remembers is stale and the graph stops taking the mouse. Have it measure again at the start of every press. */
+   if(!el.__bbFresh){ el.__bbFresh = true; const fresh = () => { const r = cy && cy.container() === el && cy.renderer(); if(r && r.invalidateContainerClientCoordsCache) r.invalidateContainerClientCoordsCache(); };
+-    for(const t of ['mousedown', 'touchstart', 'wheel', 'mouseover']) el.addEventListener(t, fresh, {capture:true, passive:true}); }
++    for(const t of ['mousedown', 'touchstart', 'wheel', 'mouseover']) el.addEventListener(t, fresh, {capture:true, passive:true});
++    /* hovering a node fades the rest; the graph only undoes that when the mouse moves over its own canvas, so going
++       straight from a node onto the zoom or fit buttons (which sit beside it) left everything faded */
++    el.addEventListener('mouseleave', () => { if(cy && cy.container() === el && !$('radial') && cy.elements('.faded').length){ cy.elements().removeClass('faded'); if(typeof applyFind === 'function') applyFind(); } }); }
+   cy.elements().unselect().removeClass('src gvfocus faded');
+   if(UI.sel && UI.sel.kind === 'entry'){ const n = cy.getElementById(UI.sel.id); if(n.length){ n.select(); if(UI.gFocus === UI.sel.id){ UI.gFocus = null; cy.animate({center:{eles:n}, zoom:Math.max(cy.zoom(), 1.1)}, {duration:280}); } } }
+   if(UI.graph.first){ const n = cy.getElementById(UI.graph.first); if(n.length) n.addClass('src'); }
+diff --git a/js/integrity.js b/js/integrity.js
+index 68426cd..a2215b2 100644
+--- a/js/integrity.js
++++ b/js/integrity.js
+@@ -207,7 +207,7 @@ function paintReadOnly(){
+ function tabSaved(){ try{ TABS.ch && TABS.ch.postMessage({t:'saved', at:Date.now()}); }catch(e){} }
+ if(TABS.ch) TABS.ch.onmessage = async ev => {
+   if(TABS.writer || !ev.data || ev.data.t !== 'saved' || !DB || SEC.key || SEC.locked) return;
+-  clearTimeout(TABS.rt); TABS.rt = setTimeout(async () => { const d = await loadAll(); if(d && !d.__locked && !d.__bad && usable(d)){ const prefs = DB.prefs; DB = normStored(d); DB.prefs = prefs; cache = {}; renderAll(); } }, 300);
++  clearTimeout(TABS.rt); TABS.rt = setTimeout(async () => { const d = await loadAll(); if(d && !d.__locked && !d.__bad && usable(d)){ const prefs = DB.prefs; DB = normStored(d); DB.prefs = prefs; cache = {}; bgRender(true); } }, 300);
+ };
+ 
+ /* automations from a backup arrive switched off and checked field by field: a file must never start acting on its own */
+diff --git a/js/lazy.js b/js/lazy.js
+index 8072ea0..b9754d5 100644
+--- a/js/lazy.js
++++ b/js/lazy.js
+@@ -56,11 +56,30 @@ async function lzUnpack(box){
+ const lazyPending = () => Object.keys(LZ).filter(k => !lzHas(k) && !LZ[k].failed && !LZ[k].only).length;
+ let LZ_REDRAW = false;
+ const lzBusy = () => { const a = document.activeElement; return !!(a && a.closest && a.closest('#main') && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) && !(a.type === 'checkbox' || a.type === 'radio')); };
+-function lzRedraw(){
+-  if(LZ_REDRAW) return; LZ_REDRAW = true;
+-  const go = () => { LZ_REDRAW = false; if(lzBusy()){ document.addEventListener('focusout', () => setTimeout(lzRedraw, 0), {once:true}); return; } if(typeof renderMain === 'function') renderMain(); if(typeof renderNav === 'function') renderNav(); };
+-  requestAnimationFrame(go);
++/* A redraw that nobody asked for (data arriving, a reminder, another tab's save, a background check) waits until the
++   person is free: not typing in a box on the page, and not halfway through a click. Redrawing in either moment throws
++   away what they typed, or replaces the button between its press and its release so the click never lands. One
++   pending redraw per kind; a full redraw covers a page redraw. */
++let LZ_PRESS = false;
++document.addEventListener('pointerdown', () => { LZ_PRESS = true; }, true);
++for(const t of ['pointerup', 'pointercancel']) document.addEventListener(t, () => setTimeout(() => { LZ_PRESS = false; }, 0), true);
++const BG_DUE = new Map();
++/* busy means there is something to lose: a box on the page holding text that is not saved yet (an empty box, or one
++   still showing what it was drawn with, loses nothing) */
++const bgBusy = () => { if(!lzBusy()) return false; const a = document.activeElement; if(a.isContentEditable) return true;
++  if(a.tagName === 'SELECT') return false; return a.value !== '' && a.value !== a.defaultValue; };
++function whenFree(key, fn){
++  if(BG_DUE.has(key)){ BG_DUE.set(key, fn); return; } BG_DUE.set(key, fn);
++  const run = () => { if(bgBusy()){ document.addEventListener('focusout', () => setTimeout(run, 0), {once:true}); return; }
++    if(LZ_PRESS){ document.addEventListener('pointerup', () => setTimeout(run, 30), {once:true, capture:true}); return; }
++    const f = BG_DUE.get(key); BG_DUE.delete(key); if(key === 'main' && BG_DUE.has('all')) return;
++    const a = document.activeElement, id = a && a.id && a !== document.body ? a.id : '';
++    try{ f(); }catch(e){ console.error(e); }
++    if(id && document.activeElement !== a){ const b = document.getElementById(id); if(b && b.focus) b.focus({preventScroll:true}); }   /* the cursor stays where it was */ };
++  requestAnimationFrame(run);
+ }
++const bgRender = all => whenFree(all ? 'all' : 'main', () => { if(all){ if(typeof renderAll === 'function') renderAll(); } else { if(typeof renderMain === 'function') renderMain(); if(typeof renderNav === 'function') renderNav(); } });
++function lzRedraw(){ bgRender(false); }
+ /* called once the app has started: after the first screen is drawn, add every file in the background, with its follow-up.
+    Files marked "only" (the MAC vendor list, the world map, enrichment data, the QR reader) are fetched only by the tool that needs them. */
+ function lazyWatch(){
+diff --git a/js/nblinks.js b/js/nblinks.js
+index fe021cd..52fc618 100644
+--- a/js/nblinks.js
++++ b/js/nblinks.js
+@@ -249,9 +249,12 @@ function nbwGraphBind(){
+   svg.addEventListener('focusin', ev => { const g = ev.target.closest('.nbg-n'); hi(g ? g.dataset.id : null); });
+   let drag = null;
+   svg.addEventListener('pointerdown', ev => { if(ev.button) return; drag = {x:ev.clientX, y:ev.clientY, vb:vb.slice(), moved:false, node:ev.target.closest('.nbg-n')}; });
+-  svg.addEventListener('pointermove', ev => { if(!drag) return; const dx = ev.clientX - drag.x, dy = ev.clientY - drag.y; if(!drag.moved && Math.hypot(dx, dy) < 4) return;
++  /* a press whose release never arrives (the browser took it for a native drag, the pointer was lost) must not leave
++     the view panning on plain hover: with no button down the press is over */
++  svg.addEventListener('pointermove', ev => { if(!drag) return; if(!(ev.buttons & 1)){ drag = null; return; } const dx = ev.clientX - drag.x, dy = ev.clientY - drag.y; if(!drag.moved && Math.hypot(dx, dy) < 4) return;
+     if(!drag.moved){ drag.moved = true; try{ svg.setPointerCapture(ev.pointerId); }catch(e){} } const r = svg.getBoundingClientRect(), k = Math.max(vb[2] / r.width, vb[3] / r.height);
+     UI.nbgVB.set([drag.vb[0] - dx * k, drag.vb[1] - dy * k, vb[2], vb[3]]); });
++  svg.addEventListener('pointercancel', () => { drag = null; });
+   svg.addEventListener('pointerup', () => { const d = drag; drag = null; if(!d || d.moved || !d.node) return; nbwGraphOpen(d.node.dataset.id); });
+   svg.addEventListener('keydown', ev => { const g = ev.target.closest('.nbg-n'); if(g && (ev.key === 'Enter' || ev.key === ' ')){ ev.preventDefault(); nbwGraphOpen(g.dataset.id); } });
+   svg.addEventListener('wheel', ev => { ev.preventDefault(); const r = svg.getBoundingClientRect(), f = ev.deltaY > 0 ? 1.12 : 1 / 1.12; nbwZoomAt(f, (ev.clientX - r.left) / r.width, (ev.clientY - r.top) / r.height); }, {passive:false});
+diff --git a/js/search.js b/js/search.js
+index 109da6a..dc12842 100644
+--- a/js/search.js
++++ b/js/search.js
+@@ -247,7 +247,7 @@ function srchPreview(){
+     <div class="sp-f"><span><kbd>Enter</kbd> ${it.kind === 'tool' ? 'open site' : 'open'}</span>${it.kind === 'tool' ? '<span><kbd>Shift</kbd> <kbd>Enter</kbd> show in Toolbox</span>' : ''}</div>`;
+ }
+ function srchOpen(prefill){ setTimeout(() => scrollHints(), 80);
+-  S.index = srchIndex(); S.open = true; S.at = 0; S.scope = 'all'; S.q = prefill || '';
++  S.index = srchIndex(); S.open = true; S.from = location.hash; S.at = 0; S.scope = 'all'; S.q = prefill || '';
+   let w = $('srch'); if(!w){ w = document.createElement('div'); w.id = 'srch'; document.body.appendChild(w); }
+   w.hidden = false;
+   w.innerHTML = `<div class="sr-scrim" data-act="srClose"></div><div class="sr-box" role="dialog" aria-modal="true" aria-label="Search everything">
+diff --git a/js/story.js b/js/story.js
+index 4952874..a3d301b 100644
+--- a/js/story.js
++++ b/js/story.js
+@@ -232,7 +232,7 @@ async function stArchFind(url){
+     return false; }
+   catch(e){ x.checked = Date.now(); throw e; }
+ }
+-async function stArchFindMany(urls){ let found = 0, err = null; for(const u of urls){ try{ if(await stArchFind(u)) found++; }catch(e){ err = e; } } mutate('checked archived copies'); renderMain(); return {found, err}; }
++async function stArchFindMany(urls){ let found = 0, err = null; for(const u of urls){ try{ if(await stArchFind(u)) found++; }catch(e){ err = e; } } mutate('checked archived copies'); bgRender(); return {found, err}; }
+ /* back from the archive's tab: look for copies just requested */
+ window.addEventListener('focus', () => { const A = DB && DB.archive; if(!A || !(UI.route && UI.route.tab === 'story')) return;
+   const L = Object.entries(A).filter(([, x]) => x.req && !x.snap && Date.now() - x.req < 15 * 60000).map(([u]) => u); if(L.length) setTimeout(() => stArchFindMany(L).catch(() => {}), 1500); });
+diff --git a/js/verdict.js b/js/verdict.js
+index 27d654d..4ecfc6b 100644
+--- a/js/verdict.js
++++ b/js/verdict.js
+@@ -156,7 +156,7 @@ async function watchCheck(keys, opts = {}){
+       lkHist(k, v, V);
+     }
+   }finally{ MON.busy = false; }
+-  if(keys.length){ save(); if(UI.route && UI.route.area === 'watch') renderMain(); }
++  if(keys.length){ save(); if(UI.route && UI.route.area === 'watch') bgRender(); }
+   return changed;
+ }
+ /* runs while the app is open: anything not checked within the chosen interval is re-checked, a few at a time */

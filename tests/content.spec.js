@@ -109,7 +109,7 @@ test('cloud OSINT guide, reference sections, tradecraft chapters and the new pla
   await expect(page.locator('#tc-tricks h2')).toContainText('Tricks that save hours'); await expect(page.locator('#tc-detect h2')).toContainText('From findings to detections');
   await page.locator('#tc-tricks [data-act=tcGo][data-v=cloud]').click(); await expect(page).toHaveURL(/#\/cloud/);
   await page.evaluate(() => go('#/tradecraft')); await page.locator('#tc-tricks [data-act=tcGo][data-v=queries]').first().click(); await expect(page).toHaveURL(/#\/queries/);
-  await page.evaluate(() => go('#/tradecraft')); await page.fill('#tcQ', 'Gravatar'); await expect(page.locator('.tc-part li')).toHaveCount(1);
+  await page.evaluate(() => { go('#/tradecraft'); UI.tcQ = 'Gravatar'; renderMain(); }); await expect(page.locator('.tc-part li')).toHaveCount(1);
   // the playbooks
   const pb = await page.evaluate(async () => { await lazyNeed('pb'); ensurePlaybooks(); return ['pb-cloud-footprint', 'pb-stealer-log', 'pb-aitm', 'pb-drainer'].map(id => (DB.playbooks.find(p => p.id === id) || {}).steps?.length || 0); });
   expect(pb.every(n => n >= 6)).toBe(true);
