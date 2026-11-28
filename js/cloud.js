@@ -159,9 +159,11 @@ function cloudFindingsToCase(){
   DB.records.push(r); mutate('added cloud scan to ' + caseNm(theCase(cid))); hashRecords().then(renderAll);
   toast('Added to ' + caseNm(theCase(cid)), 'Open', () => { UI.sel = {kind:'rec', id:r.id}; UI.inspOpen = true; go(caseHash(cid, 'timeline')); });
 }
+/* one timeline row per event: the title says what, who and from where, so the timeline reads without opening each one */
+const clTimelineRows = R => R.rows.map(e => ({time:e.time, event:[e.name + (e.error ? ' (' + e.error + ')' : ''), (String(e.request || '').match(/"key":"([^"]{1,60})/) || [])[1], e.actor, e.src_ip].filter(Boolean).join(' · ') + (e.why ? ' — ' + e.why : ''), actor:e.actor, src:e.src_ip, service:e.service, severity:e.sev || '', error:e.error || '', resource:e.resource || '', request:e.request || ''}));
 function cloudLogsToTimeline(){
   const R = UI.cloudLogs; if(!R || !R.rows.length) return; if(!DB.cases.length) return toast('Create a case first');
-  const rows = R.rows.map(e => ({time:e.time, event:e.name + (e.why ? ' — ' + e.why : ''), actor:e.actor, src:e.src_ip, service:e.service, severity:e.sev || '', error:e.error || '', resource:e.resource || ''}));
+  const rows = clTimelineRows(R);
   const cols = [...new Set(rows.flatMap(r => Object.keys(r)))];
   LOGIMP = {title:'Send cloud log events to the timeline', caseId:DB.active, name:R.name || 'cloud log', fmt:R.fmtLabel, rows, cols, map:{time:'time', title:'event', host:'src', source:'service'}};
   logImportDlg();

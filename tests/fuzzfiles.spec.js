@@ -4,7 +4,7 @@
 // must not hang, crash with a programming error, or eat the tab's memory. The mutations are seeded, so a failure
 // can be reproduced exactly.
 const { test, expect } = require('@playwright/test');
-const { open, noErrors } = require('./helpers');
+const { open, noErrors, slowness } = require('./helpers');
 const fs = require('fs'), path = require('path'), zlib = require('zlib');
 test.setTimeout(600000);
 const FX = p => fs.readFileSync(path.join(__dirname, 'fixtures', p)).toString('base64');
@@ -50,12 +50,13 @@ test('every way a file comes in survives damaged and random files: nothing hangs
         const ms = performance.now() - t; if(ms > out.slowMs){ out.slowMs = Math.round(ms); out.slowest = label; } }
       return {...out, broken:[...out.broken]}; }, [entry, path.basename(file), fs.readFileSync(path.join(__dirname, 'fixtures', file)).toString('base64')]);
   }
-  const bad = Object.entries(report).filter(([, r]) => r.bugs.length || r.broken.length || r.slowMs > 4000);
+  const lim = 4000 * await slowness(page);   // a busy machine is given more time; a reader that hangs still fails
+  const bad = Object.entries(report).filter(([, r]) => r.bugs.length || r.broken.length || r.slowMs > lim);
   console.log(JSON.stringify(Object.fromEntries(bad), null, 1));
   for (const [f, r] of Object.entries(report)) {
     expect(r.bugs, f + ': escaped or programming errors').toEqual([]);
     expect(r.broken, f + ': parts that failed to read (each is a reader to make tolerant)').toEqual([]);
-    expect(r.slowMs, f + ': slowest (' + r.slowest + ')').toBeLessThan(4000);
+    expect(r.slowMs, f + ': slowest (' + r.slowest + ')').toBeLessThan(lim);
   }
   noErrors(errors);
 });

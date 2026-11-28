@@ -168,7 +168,7 @@ function labBrowser(){
   if(!R) return `<label class="drop" id="brDrop" tabindex="0"><input type="file" id="brIn" class="sr" multiple>${ico('app-window')}<b>Drop a browser profile — its folder, a ZIP of it, or some of its files</b>
     <span>Chrome, Edge, Brave, Opera, Firefox and Safari. One timeline of visits, searches, what was typed in the address bar, downloads and where they came from, saved logins (user names only — passwords are never read), form entries, bookmarks and extensions, with the account that was signed in. A <span class="mono">-wal</span> file next to a database is read too.</span>
     <span class="drop-feat"><i>Signed-in accounts</i><i>Visits</i><i>Searches</i><i>Typed in the address bar</i><i>Downloads &amp; their source</i><i>Saved logins</i><i>Form entries</i><i>Extensions</i><i>Hours of use</i></span></label>
-    <div class="wrap" style="margin-top:10px"><button class="btn" data-act="brFolder">${ico('folder-open','sm')}Choose a profile folder</button><input type="file" id="brDir" class="sr" webkitdirectory multiple></div>
+    <div class="wrap" style="margin-top:10px"><button class="btn" data-act="brFolder">${ico('folder-open','sm')}Choose a profile folder</button><button class="btn ghost" data-act="brExample">${ico('sparkles','sm')}Try an example profile</button><input type="file" id="brDir" class="sr" webkitdirectory multiple></div>
     <details class="caphelp" style="margin-top:12px"><summary>${ico('circle-help','sm')}Where is the profile?</summary><div class="caphelp-b"><ul>
       <li><b>Chrome</b> — Windows <span class="mono">%LOCALAPPDATA%\\Google\\Chrome\\User Data\\Default</span> (other profiles are <span class="mono">Profile 1</span>, <span class="mono">Profile 2</span>…; <span class="mono">Local State</span> sits one folder up). macOS <span class="mono">~/Library/Application Support/Google/Chrome/Default</span>.</li>
       <li><b>Edge</b> — <span class="mono">%LOCALAPPDATA%\\Microsoft\\Edge\\User Data\\Default</span>. <b>Brave</b> — <span class="mono">%LOCALAPPDATA%\\BraveSoftware\\Brave-Browser\\User Data\\Default</span>.</li>
@@ -228,22 +228,31 @@ function bindBrowser(){
     brLoad(e.dataTransfer.files); };
   d.onkeydown = e => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); inp.click(); } };
 }
-const BR_ACTS = {
-  brFolder:() => { const x = $('brDir'); if(x) x.click(); },
-  brClear:() => { UI.brP = null; renderMain(); },
-  brSave:() => { const R = UI.brP; if(!R || !R.files) return; const P = R.profile, d = t => isFinite(t) ? new Date(t).toISOString().replace('T', ' ').slice(0, 19) + ' UTC' : '';
+/* the profile as one evidence record — what the Save button and the sample case add */
+function brRecord(R, cid){ const P = R.profile, d = t => isFinite(t) ? new Date(t).toISOString().replace('T', ' ').slice(0, 19) + ' UTC' : '';
     const body = [`Browser profile: ${R.browser || 'unknown browser'}${P.name ? ' — profile “' + P.name + '”' : ''}`, P.accounts.length ? 'Signed in: ' + P.accounts.map(a => a.email + (a.name ? ' (' + a.name + ')' : '')).join(', ') : '', P.sync ? 'Sync account: ' + P.sync : '', P.dlDir ? 'Downloads folder: ' + P.dlDir : '',
       isFinite(R.from) ? `Activity: ${d(R.from)} → ${d(R.to)} — ${R.visits} visits, ${R.searches.length} searches, ${R.downloads.length} downloads, ${R.logins.length} saved logins (passwords not read), ${R.extensions.length} extensions` : '',
       R.flags.length ? 'Stands out:\n' + R.flags.map(f => '  - ' + f[1]).join('\n') : '', R.searches.length ? 'Searches:\n' + R.searches.slice(0, 40).map(x => `  ${d(x.t)}  ${x.term}`).join('\n') : '',
       R.downloads.length ? 'Downloads:\n' + R.downloads.slice(0, 40).map(x => `  ${d(x.t)}  ${x.name} ← ${x.url}${x.opened ? ' (opened)' : ''}`).join('\n') : '', R.logins.length ? 'Saved logins:\n' + R.logins.map(l => `  ${brHost(l.site)} — ${l.user}`).join('\n') : '',
       'Files read: ' + R.files.map(f => f.path).join(', ')].filter(Boolean).join('\n');
-    const r = {id:uid('r'), caseId:DB.active, type:'evidence', title:'Browser profile: ' + (P.accounts[0] ? P.accounts[0].email : P.name || R.browser || 'profile'), body, tsRaw:isFinite(R.to) ? new Date(R.to).toISOString() : new Date().toISOString(), tsZone:'explicit', ts:isFinite(R.to) ? R.to : Date.now(), source:'browser-profile', host:'', tags:['browser'].concat(R.flags.some(f => f[0]) ? ['flag'] : []), ents:R.iocs, answer:'', addedBy:'You', addedAt:Date.now(), hash:''};
+    const r = {id:uid('r'), caseId:cid, type:'evidence', title:'Browser profile: ' + (P.accounts[0] ? P.accounts[0].email : P.name || R.browser || 'profile'), body, tsRaw:isFinite(R.to) ? new Date(R.to).toISOString() : new Date().toISOString(), tsZone:'explicit', ts:isFinite(R.to) ? R.to : Date.now(), source:'browser-profile', host:'', tags:['browser'].concat(R.flags.some(f => f[0]) ? ['flag'] : []), ents:R.iocs, answer:'', addedBy:'You', addedAt:Date.now(), hash:''};
+  return r; }
+/* every event of the profile as timeline rows, the shape the log importer takes */
+const brRows = R => R.ev.slice(-5000).map(e => ({time:new Date(e.t).toISOString(), summary:(BR_KIND[e.k] ? BR_KIND[e.k][0].replace(/s$/, '') + ': ' : '') + e.title, url:e.url, detail:e.sub, artifact:(R.browser || 'Browser') + ' — ' + e.k}));
+const BR_MAP = {time:'time', title:'summary', host:'', source:'artifact'};
+const BR_ACTS = {
+  brFolder:() => { const x = $('brDir'); if(x) x.click(); },
+  // the sample case's victim profile: made up, with reserved domains (tools/make_sample_forensics.py)
+  brExample:async () => { const ok = typeof lazyNeed === 'function' && await lazyNeed('sample'), B = ok && typeof SAMPLE_OSINT !== 'undefined' && SAMPLE_OSINT.extra && SAMPLE_OSINT.extra.forensics && SAMPLE_OSINT.extra.forensics.browser;
+    if(!B) return toast('The example profile could not be loaded');
+    brLoad([new File([Uint8Array.from(atob(B.b64), c => c.charCodeAt(0))], B.name, {type:'application/zip', lastModified:B.mod})]); },
+  brClear:() => { UI.brP = null; renderMain(); },
+  brSave:() => { const R = UI.brP; if(!R || !R.files) return; const r = brRecord(R, DB.active);
     DB.records.push(r); mutate('saved browser profile'); hashRecords(); renderNav(); toast('Saved to ' + caseNm(theCase()) + ' with ' + R.iocs.length + ' indicators — “Send to timeline” adds every event', 'Open', () => { UI.sel = {kind:'rec', id:r.id}; UI.inspOpen = true; go(caseHash(DB.active, 'timeline')); }); },
   brTab:(id, v) => { UI.brTab = v; UI.brPg = 0; renderMain(); },
   brKind:(id, v) => { const F = UI.brF || (UI.brF = {}); F.off = F.off || []; F.off = F.off.includes(v) ? F.off.filter(x => x !== v) : F.off.concat(v); UI.brPg = 0; renderMain(); },
   brPg:(id, v) => { UI.brPg = +v; renderMain(); },
   brCsv:() => { const R = UI.brP; if(!R || !R.ev) return; download('browser-timeline.csv', ['time_utc,kind,title,url,detail'].concat(R.ev.map(e => [new Date(e.t).toISOString(), e.k, e.title, e.url, e.sub].map(csvCell).join(','))).join('\n'), 'text/csv'); },
   brSend:() => { const R = UI.brP; if(!R || !R.ev || !R.ev.length) return;
-    const rows = R.ev.slice(-5000).map(e => ({time:new Date(e.t).toISOString(), summary:(BR_KIND[e.k] ? BR_KIND[e.k][0].replace(/s$/, '') + ': ' : '') + e.title, url:e.url, detail:e.sub, artifact:(R.browser || 'Browser') + ' — ' + e.k}));
-    LOGIMP = {title:'Send the browser timeline', caseId:DB.active, name:(R.browser || 'Browser') + ' profile', fmt:'Browser profile', rows, cols:['time', 'summary', 'url', 'detail', 'artifact'], map:{time:'time', title:'summary', host:'', source:'artifact'}}; logImportDlg(); }
+    LOGIMP = {title:'Send the browser timeline', caseId:DB.active, name:(R.browser || 'Browser') + ' profile', fmt:'Browser profile', rows:brRows(R), cols:['time', 'summary', 'url', 'detail', 'artifact'], map:Object.assign({}, BR_MAP)}; logImportDlg(); }
 };

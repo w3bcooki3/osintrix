@@ -3,7 +3,7 @@
 // that must and must not merge, odd timelines, broken files, and random input fed to
 // every engine. Each check states the right answer, not just "no crash".
 const { test, expect } = require('@playwright/test');
-const { open, noErrors, budget } = require('./helpers');
+const { open, noErrors, budget, slowness } = require('./helpers');
 
 test('indicators: defanged, unicode, IPv6, hashes and the things that are NOT indicators', async ({ page }) => {
   const errors = await open(page, '#/home');
@@ -158,7 +158,7 @@ test('every built-in Sigma rule converts to every SIEM and survives the evasion 
 
 test('random input never breaks the engines', async ({ page }) => {
   const errors = await open(page, '#/home');
-  const R = await page.evaluate(() => {
+  const R = await page.evaluate(k => {
     let seed = 7; const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
     const pool = 'aZ09 .:/\\-_@[](){}<>|"\'=,;!?#$%^&*~`\n\t\u00e9\u0436\u4e2d\u{1F600}\u200b\u0000hxxp://[.]10.0.0.1 CEF:0| LEEF:2.0| <Event><EventID> {"a": EventID=4688 New Process Name: -enc ';
     const gen = n => { let s = ''; for (let i = 0; i < n; i++) s += pool[Math.floor(rnd() * pool.length)]; return s; };
@@ -167,9 +167,9 @@ test('random input never breaks the engines', async ({ page }) => {
       for (const [name, fn] of [['extract', () => E.extract(s)], ['parseLog', () => parseLog(s)], ['recFields', () => recFields({ title: s.slice(0, 20), body: s, host: '', source: '' })], ['observations', () => E.observations({ title: '', body: s, tags: [], ents: E.extract(s), host: '' })],
         ['sigma', () => { const p = sigmaParse('detection:\n    s:\n        CommandLine|contains: \'' + s.slice(0, 30).replace(/'/g, '') + '\'\n    condition: s'); return p.cond ? sigmaEval(p, recFields({ title: '', body: s, host: '', source: '' })) : 0; }],
         ['noteInline', () => noteInline(s)], ['dupNorm', () => dupNorm({ type: 'person', fields: { name: s } })], ['lineTime', () => E.lineTime(s)]]) { try { fn(); } catch (e) { fails.push(name + ': ' + e.message + ' :: ' + JSON.stringify(s.slice(0, 60))); } }
-      if (performance.now() - t0 > 400) slow++; }
+      if (performance.now() - t0 > 400 * k) slow++; }
     const inl = noteInline('<img src=x onerror=alert(1)> **b** `c`');
-    return { fails: fails.slice(0, 10), slow, safe: !/<img/.test(inl) && /<b>b<\/b>/.test(inl) }; });
+    return { fails: fails.slice(0, 10), slow, safe: !/<img/.test(inl) && /<b>b<\/b>/.test(inl) }; }, await slowness(page));
   expect(R.fails).toEqual([]); expect(R.slow).toBe(0); expect(R.safe).toBe(true);
   noErrors(errors);
 });

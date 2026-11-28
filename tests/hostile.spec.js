@@ -3,7 +3,7 @@
 // app keeps — then every page, case tab, details panel and edit dialog is opened, before and
 // after a refresh. Nothing may run, no markup may appear, no link may carry a script URL.
 const { test, expect } = require('@playwright/test');
-const { open, noErrors, settled } = require('./helpers');
+const { open, noErrors, settled, slowness } = require('./helpers');
 const fs = require('fs'), path = require('path');
 test.setTimeout(240000);
 const FX = p => fs.readFileSync(path.join(__dirname, 'fixtures', p), 'utf8');
@@ -140,7 +140,7 @@ test('everything kept comes back from a backup and after a refresh: places, grad
 
 test('every parser takes junk, huge, deeply nested, oddly encoded and pathological input without throwing or hanging; text files in UTF-16, with a byte-order mark or in the old Windows code page read correctly', async ({ page }) => {
   const errs = await open(page, '#/home');
-  const r = await page.evaluate(async () => {
+  const r = await page.evaluate(async SLOW => {
     const out = [], rnd = (s => () => (s = (s * 1103515245 + 12345) >>> 0) / 4294967296)(7);
     const T = { empty: '', nul: '\0\0', html: '<img src=x onerror=window.__x=1>"\'>', rtl: '‮ مرحبا 你好 🧑‍💻 \uD800 ￿', bom: '﻿id,name\r\n1,"a""b"\r\n2,"unclosed\r\n',
       longline: 'A'.repeat(1e6), lines: Array.from({ length: 50000 }, (_, i) => 'line ' + i + ' 10.0.0.' + (i % 255)).join('\n'), deepjson: '['.repeat(100000) + ']'.repeat(100000), deepobj: '{"a":'.repeat(20000) + '1' + '}'.repeat(20000), trunc: '{"a":[1,2,{"b":"c',
@@ -153,7 +153,7 @@ test('every parser takes junk, huge, deeply nested, oddly encoded and pathologic
     for(const [k, h] of Object.entries({ png: [137, 80, 78, 71, 13, 10, 26, 10], jpg: [255, 216, 255, 225, 0, 255], pdf: [37, 80, 68, 70], zip: [80, 75, 3, 4], pe: [77, 90], elf: [127, 69, 76, 70], pcap: [212, 195, 178, 161], sqlite: [83, 81, 76, 105, 116, 101], ftyp: [0, 0, 0, 24, 102, 116, 121, 112], tiff: [73, 73, 42, 0, 255, 255, 255, 255], der: [48, 130, 255, 255] }))
       for(const fill of ['r', 0, 255]) B[k + fill] = Uint8Array.from([...h, ...Array.from({ length: 3000 }, () => fill === 'r' ? Math.floor(rnd() * 256) : fill)]);
     const PB = { pcap: b => pcapRead(b), pe: b => peInfo(b), elf: b => elfInfo(b), png: b => pngInfo(b), pdf: b => pdfInfo(b), zip: b => zipInfo(b), meta: b => metaRead(b, 'x', ''), tiff: b => parseTiff(b, 0), x5: b => X5.read(b), pic: b => picSigBlob(new Blob([b])) };
-    for(const [n, f] of Object.entries(PB)) for(const [k, v] of Object.entries(B)){ const t0 = performance.now(); try{ await f(v); }catch(e){ if(!/^Not |cannot|could not|truncated/i.test(e.message)) out.push(n + ' <- ' + k + ': ' + e.message); } if(performance.now() - t0 > 2500) out.push(n + ' <- ' + k + ' slow'); }
+    for(const [n, f] of Object.entries(PB)) for(const [k, v] of Object.entries(B)){ const t0 = performance.now(); try{ await f(v); }catch(e){ if(!/^Not |cannot|could not|truncated/i.test(e.message)) out.push(n + ' <- ' + k + ': ' + e.message); } if(performance.now() - t0 > 2500 * SLOW) out.push(n + ' <- ' + k + ' slow'); }
     // text files written by Windows tools
     const s = 'Zeit,Benutzer,Nachricht\r\n2026-11-02 08:15,jürgen,Anmeldung fehlgeschlagen — 203.0.113.7\r\n';
     const le = new Uint8Array(s.length * 2), be = new Uint8Array(s.length * 2); for(let i = 0; i < s.length; i++){ le[i * 2] = s.charCodeAt(i) & 255; le[i * 2 + 1] = s.charCodeAt(i) >> 8; be[i * 2] = s.charCodeAt(i) >> 8; be[i * 2 + 1] = s.charCodeAt(i) & 255; }
@@ -162,7 +162,7 @@ test('every parser takes junk, huge, deeply nested, oddly encoded and pathologic
     const cpRead = await fileText(new File([cp], 'x.csv'));
     const rows = logParse(reads[0], 'x.csv').rows;
     return { out, x: window.__x, same: reads.every(t => t === s), cp: cpRead === s.replace('—', '-'), user: rows[0] && Object.values(rows[0]).includes('jürgen') };
-  });
+  }, await slowness(page));
   expect(r).toEqual({ out: [], x: undefined, same: true, cp: true, user: true });
   noErrors(errs);
 });

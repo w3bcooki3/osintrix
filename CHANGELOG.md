@@ -2,6 +2,22 @@
 
 All notable changes to OSINTrix, newest first. The format is based on [Keep a Changelog](https://keepachangelog.com); this file is generated from `js/data/changelog.js` by `tools/changelog.py`.
 
+## [1.92] — Forensic files in the sample case, and a steadier timeline (2026-11-28)
+
+_Op Lantern's sample gains a victim's browser profile, the shop's Windows event log and its CloudTrail, read by the same readers as yours; long timeline records stop jumping under the pointer; Blackbook coverage goes to the ATT&CK Navigator._
+
+### Added
+- The sample case Op Lantern now has a victim's Chrome profile (her searches, the fake refund portal, the confirmation code she typed, shown masked, and the receipt she downloaded), the Security log of the real shop's office PC (a password spray from the portal's server, then a remote desktop session that copies the customer list) and the shop's CloudTrail (the stolen backup key used from the same address, a new key made, logging nearly stopped, and the key used again from the server the portal moved to). Each is read by the browser-profile, event-log and cloud-log readers, kept as a file with its hash, and joined to the scam by its addresses.
+- Browser profile: “Try an example profile” opens the sample victim's profile in one click.
+- Blackbook: your coverage downloads as an ATT&CK Navigator layer, each technique coloured by the best status you gave a play for it, with the plays in its comment.
+
+### Changed
+- Cloud logs sent to the timeline are titled with what happened, the object, who and from where (“GetObject · exports/orders.csv · office-backup · 198.51.100.23”), not the event name alone.
+
+### Fixed
+- A long record on the timeline no longer opens up under a passing pointer and pushes everything below it away; it opens when you choose it or reach it with the keyboard.
+- On a phone, a long line in a two-column screen (Settings' recent changes, for one) no longer makes the page wider than the screen.
+
 ## [1.91] — A sample case with everything in it, and a Blackbook you can work through (2026-11-27)
 
 _Op Lantern's sample now holds chats, pictures, a place found by geolocation and a Word file with a past; the Blackbook was redrawn and gained sweeps, coverage and new plays._

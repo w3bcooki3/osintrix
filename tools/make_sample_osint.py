@@ -82,6 +82,20 @@ EXTRA = {
               ['sp-chan', 'url', {'url': 'https://t.me/harbour_payouts'}]],
   'links': [['sp-org', 'sp-desk', 2, 'works from (photo GPS, geolocation)'], ['sp-jan', 'sp-tgdk', 1, 'possibly the same as'], ['sp-mira', 'sp-tgdk', 2, 'works for'], ['sp-tgdk', 'sp-chan', 2, 'pays staff through']],
 }
+# 1.92: the three forensic files of the case, from tests/fixtures/sample (made by tools/make_sample_forensics.py): a victim's
+# browser profile, the real shop's office-PC Security log and its CloudTrail. The app reads them with the same readers as your own.
+import gzip
+EXTRA['forensics'] = {
+  'browser': {'name': 'lind-chrome-profile.zip', 'b64': rb('lind-chrome-profile.zip'), 'mod': U('2026-03-08T10:15:00Z')},
+  # the event log is mostly empty chunk space: gzipped here (mtime 0, so the build stays the same), unpacked in the page
+  'evtx': {'name': 'office-pc2-security.evtx', 'gz': base64.b64encode(gzip.compress(open(os.path.join(S, 'office-pc2-security.evtx'), 'rb').read(), 9, mtime=0)).decode('ascii'), 'mod': U('2026-03-11T08:30:00Z')},
+  'trail': {'name': 'shop-cloudtrail.json', 'text': open(os.path.join(S, 'shop-cloudtrail.json'), encoding='utf-8').read(), 'mod': U('2026-03-11T08:40:00Z')},
+  'entries': [['sp-ip1', 'ip', {'ip': '198.51.100.23'}], ['sp-ip2', 'ip', {'ip': '203.0.113.80'}], ['sp-portal', 'domain', {'domain': 'harbour-line-portal.test'}],
+              ['sp-shop', 'organization', {'name': 'Harbourline Marine', 'industry': 'Marine electronics retail', 'website': 'https://harbourline-marine.example', 'country': 'Netherlands'}],
+              ['sp-petra', 'person', {'name': 'Petra Lind', 'role': 'Victim'}]],
+  'links': [['sp-portal', 'sp-ip1', 3, 'hosted on (staff chat, 1 Mar)'], ['sp-ip1', 'sp-ip2', 2, 'portal moved to (staff chat; CloudTrail, 10 Mar)'],
+            ['sp-ip1', 'sp-shop', 3, 'took the customer list from (event log, CloudTrail)'], ['sp-org', 'sp-shop', 3, 'poses as'], ['sp-petra', 'sp-portal', 3, 'paid a fee through (browser profile)']],
+}
 out = {'case': {'id': 'c-harbour', 'code': 'HL-2026-031', 'name': 'Harbourline refund scam', 'scope': 'Fake refund support on X, Reddit and Telegram after a marine-electronics shop went quiet: who runs it, where the money goes, and when they work.', 'color': '#0ea5e9', 'icon': 'briefcase', 'created': U('2026-03-01T09:00:00Z')},
        'records': R, 'pages': PAGES, 'hours': HOURS, 'entries': ENTRIES, 'links': LINKS, 'elsewhere': ELSEWHERE, 'extra': EXTRA}
 s = json.dumps(out, ensure_ascii=False, separators=(',', ':')).replace('</', '<\\/')   # so the file can sit inside a <script> in the offline build

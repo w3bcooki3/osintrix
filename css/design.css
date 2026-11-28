@@ -315,7 +315,9 @@ html.ds[data-theme=dark]{
 .ds .ev .meta svg{display:inline-block!important;width:12px;height:12px;color:var(--text-3)}
 .ds .ev .raw{display:block;margin-top:8px;padding:9px 12px;border-radius:9px;background:var(--code);border:1px solid var(--border-soft);font:calc(12.5px * var(--ts,1))/1.7 var(--mono);color:var(--text-2);
   white-space:pre-wrap;overflow-wrap:anywhere;overflow:hidden;max-height:calc(1.7em * 4 + 18px);-webkit-mask-image:linear-gradient(#000 72%,transparent);mask-image:linear-gradient(#000 72%,transparent)}
-.ds .ev:is([aria-selected=true],[aria-current=true]) .raw,.ds .ev:hover .raw{max-height:none;-webkit-mask-image:none;mask-image:none}
+/* a long record opens when it is chosen or reached with the keyboard, not under a passing pointer: growing on hover moved
+   everything below it while the pointer was on its way to something else */
+.ds .ev:is([aria-selected=true],[aria-current=true],:focus-visible) .raw{max-height:none;-webkit-mask-image:none;mask-image:none}
 .ds .ev .ents{display:flex!important;flex-wrap:wrap;gap:6px;margin-top:8px}
 .ds .ev .ents .ent{height:24px}
 .ds .ev .bdg .chip{height:22px;padding:0 8px;border-radius:999px!important;font-size:calc(11.5px * var(--ts,1));font-weight:600;gap:5px;white-space:nowrap}
@@ -4033,6 +4035,7 @@ button.st-w:active{transform:scale(.995)}
 .bbx-cn{display:flex;gap:18px;font-size:calc(12.5px * var(--ts,1));color:var(--text-2)}
 .bbx-cn b{display:block;font:600 calc(17px * var(--ts,1)) var(--mono);color:var(--text)}
 .bbx-cover .bbx-prog{grid-column:1/-1}
+.bbx-cover .bbx-cx{grid-column:1/-1;display:flex;justify-content:flex-end;margin-top:-2px}
 .bbx-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .bbx-tools .sp{flex:1}
 .bbx-sel select{height:30px;padding:0 28px 0 10px;width:auto}

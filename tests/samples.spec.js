@@ -38,7 +38,7 @@ test('example notes: a checklist and a written note for each case, two general o
 
 test('the OSINT sample joins Op Lantern, tied to the intrusion by the server they shared', async ({ page }) => {
   const errors = await open(page, '#/home', { legacy: false, osintSample: true });
-  await expect.poll(() => page.evaluate(() => DB.osintSample), { timeout: 15000 }).toBeGreaterThanOrEqual(2);   // 3 once the chats and files are in (1.91)
+  await expect.poll(() => page.evaluate(() => DB.osintSample), { timeout: 15000 }).toBeGreaterThanOrEqual(2);   // 3 once the chats and files are in (1.91), 4 once the logs are (1.92)
   const r = await page.evaluate(() => ({ cases: DB.cases.map(c => c.id), sp: DB.entries.filter(e => e.id.startsWith('sp-')).map(e => e.caseId), bridge: DB.links.filter(l => l.caseId === 'c-lantern' && /resolved to|possibly the same person/.test(l.label)).map(l => l.a + '>' + l.b + ':' + l.conf),
     finding: DB.records.some(x => x.caseId === 'c-lantern' && x.type === 'finding' && /198\.51\.100\.23/.test(x.body) && /not proof/.test(x.body)), scope: /refund scam/.test(theCase('c-lantern').scope) }));
   expect(r.cases).toEqual(['c-lantern', 'c-story']); expect(new Set(r.sp)).toEqual(new Set(['c-lantern']));
@@ -48,7 +48,7 @@ test('the OSINT sample joins Op Lantern, tied to the intrusion by the server the
 
 test('Op Lantern also has chats, pictures and a document, read by the same importers as your own files (1.91)', async ({ page }) => {
   const errors = await open(page, '#/home', { legacy: false, osintSample: true });
-  await expect.poll(() => page.evaluate(() => DB.osintSample), { timeout: 20000 }).toBe(3);
+  await expect.poll(() => page.evaluate(() => DB.osintSample), { timeout: 20000 }).toBe(4);
   const r = await page.evaluate(() => { const R = DB.records.filter(x => x.caseId === 'c-lantern');
     return { chats: R.filter(x => x.chatnet).map(x => x.chatnet.chat).sort(), authors: R.filter(x => x.chatAuthor).length,
       renamed: R.some(x => x.chatAuthor && x.chatAuthor.names.map(n => n.name).join() === 'n1ghtlamp,lamp'),
@@ -57,7 +57,7 @@ test('Op Lantern also has chats, pictures and a document, read by the same impor
       desk: DB.links.some(l => l.a === 'sp-org' && l.b === 'sp-desk') }; });
   expect(r.chats).toEqual(['Deals Hub #refunds', 'HL desk staff', 'Harbourline Refund Desk']);
   expect(r.authors).toBe(8); expect(r.renamed).toBe(true);
-  expect(r.files).toEqual(['handbook.docx', 'pier.jpg', 'portal.png', 'warehouse.jpg']);
+  expect(r.files).toEqual(['handbook.docx', 'lind-chrome-profile.zip', 'office-pc2-security.evtx', 'pier.jpg', 'portal.png', 'shop-cloudtrail.json', 'warehouse.jpg']);
   expect(r.gps).toEqual(['pier.jpg Google Pixel 7']);
   expect(r.geo).toEqual(['Sadama street by the old port, Tallinn']); expect(r.places).toBeGreaterThanOrEqual(2); expect(r.desk).toBe(true);
   // the chat network finds the post pushed into several chats, and the file inspector reads the document's history
@@ -67,6 +67,42 @@ test('Op Lantern also has chats, pictures and a document, read by the same impor
   await expect(page.locator('#main')).toContainText('Deleted text still in the file'); await expect(page.locator('#main')).toContainText('Sadama, Tallinn');
   // added once: running it again changes nothing
   const n = await page.evaluate(async () => { const before = DB.records.length; await sampleExtrasAdd(); return DB.records.length - before; }); expect(n).toBe(0);
+  noErrors(errors);
+});
+
+test('Op Lantern also has a victim’s browser profile, the shop’s event log and its CloudTrail, read by the readers you use (1.92)', async ({ page }) => {
+  const errors = await open(page, '#/home', { legacy: false, osintSample: true });
+  await expect.poll(() => page.evaluate(() => DB.osintSample), { timeout: 20000 }).toBe(4);
+  const r = await page.evaluate(() => { const R = DB.records.filter(x => x.caseId === 'c-lantern'), tag = t => R.filter(x => (x.tags || []).includes(t));
+    return { profile: R.filter(x => x.source === 'browser-profile').map(x => x.title), browser: tag('browser').length, evtx: tag('evtx').length,
+      rules: [...new Set(tag('sigma-match').flatMap(x => x.det.map(d => d.title)))].sort(), trail: tag('cloudtrail').map(x => x.title),
+      masked: R.some(x => x.source === 'browser-profile' && !/804613/.test(x.body)) && !R.some(x => /804613/.test(x.body)),
+      links: DB.links.filter(l => l.caseId === 'c-lantern' && /^sp-(ip1|ip2|portal|shop|petra)$/.test(l.a + '') || /^sp-(ip1|ip2|shop)$/.test(l.b + '')).length,
+      ip: R.filter(x => (x.ents || []).some(e => e.v === '198.51.100.23')).length }; });
+  expect(r.profile).toEqual(['Browser profile: p.lind@example.net']);
+  expect(r.browser).toBeGreaterThan(20); expect(r.evtx).toBeGreaterThan(40);
+  expect(r.rules).toEqual(expect.arrayContaining(['Password Spray From Single Source', 'RDP Logon From Public IP Address']));
+  expect(r.trail).toContain('GetObject · exports/orders-4400-4800.csv · office-backup · 198.51.100.23');
+  expect(r.trail.some(t => /^StopLogging \(AccessDenied\)/.test(t))).toBe(true);
+  expect(r.masked).toBe(true);                      // the code her bank texted her is typed into a form, and shown masked
+  expect(r.links).toBeGreaterThanOrEqual(5); expect(r.ip).toBeGreaterThan(10);   // the portal's address joins the chat, the event log and the cloud log
+  // a workspace that already had 1.91's material gets only the logs, once
+  const up = await page.evaluate(async () => { const ids = new Set(DB.entries.filter(e => /^sp-(ip1|ip2|portal|shop|petra)$/.test(e.id)).map(e => e.id));
+    DB.records = DB.records.filter(x => !(x.tags || []).some(t => /browser|evtx|cloudtrail/.test(t)) && x.source !== 'browser-profile' && !(x.att && x.att.some(a => /lind-chrome|office-pc2|shop-cloudtrail/.test(a.name))));
+    DB.entries = DB.entries.filter(e => !ids.has(e.id)); DB.links = DB.links.filter(l => !ids.has(l.a) && !ids.has(l.b)); DB.osintSample = 3;
+    const chats = DB.records.filter(x => x.chatnet).length; await sampleExtrasAdd(); const once = DB.records.length; await sampleExtrasAdd();
+    return { flag: DB.osintSample, chats: DB.records.filter(x => x.chatnet).length - chats, logs: DB.records.filter(x => (x.tags || []).includes('cloudtrail')).length, again: DB.records.length - once }; });
+  expect(up).toEqual({ flag: 4, chats: 0, logs: 15, again: 0 });
+  noErrors(errors);
+});
+
+test('the browser-profile reader opens an example profile in one click', async ({ page }) => {
+  const errors = await open(page, '#/lab');
+  await page.evaluate(() => { UI.labTab = 'brow'; UI.brP = null; renderMain(); });
+  await page.getByRole('button', { name: 'Try an example profile' }).click();
+  await expect(page.locator('#main')).toContainText('Google Chrome'); await expect(page.locator('#main')).toContainText('p.lind@example.net (Petra Lind)');
+  await page.getByRole('button', { name: /Logins & forms/ }).click();
+  await expect(page.locator('#main')).toContainText('harbour-line-portal.test'); await expect(page.locator('#brBody code.masked')).toHaveCount(1);
   noErrors(errors);
 });
 

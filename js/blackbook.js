@@ -115,6 +115,19 @@ function bbProgress(ids, label){
   const n = ids.length, live = ids.filter(id => bbSt(id) === 'live').length, hunted = ids.filter(id => bbSt(id) === 'hunted').length, pc = x => n ? (x / n * 100).toFixed(2) + '%' : '0';
   return `<div class="bbx-prog" role="img" aria-label="${esc(label)}: ${live} detecting, ${hunted} hunted, ${n - live - hunted} to do"><i class="p-live" style="width:${pc(live)}"></i><i class="p-hunted" style="width:${pc(hunted)}"></i></div>`;
 }
+/* your coverage as an ATT&CK Navigator layer (format 4.5): every technique a play covers, scored by the best status you gave
+   any play for it — 2 detecting, 1 hunted, 0 to do — with the plays and their status in the comment. Open it in the Navigator
+   (Open Existing Layer → Upload from local); nothing is sent anywhere from here. */
+function bbNavLayer(B){
+  const rank = {live:2, hunted:1, todo:0}, T = new Map();
+  for(const p of B.plays) for(const id of p.att || []){ const st = bbSt(p.id), t = T.get(id) || {score:0, plays:[]}; t.score = Math.max(t.score, rank[st] || 0); t.plays.push(p.t + ' — ' + BB_ST[st]); T.set(id, t); }
+  const col = ['#e8e8e8', '#f6c35b', '#4caf7d'];
+  return {name:'Blackbook coverage', versions:{layer:'4.5', navigator:'5.1.0'}, domain:'enterprise-attack',
+    description:`Blackbook plays marked in OSINTrix on ${new Date().toISOString().slice(0, 10)}: ${B.plays.filter(p => bbSt(p.id) === 'live').length} detecting, ${B.plays.filter(p => bbSt(p.id) === 'hunted').length} hunted, ${B.plays.filter(p => bbSt(p.id) === 'todo').length} to do.`.replace(/\s+/g, ' '),
+    techniques:[...T].sort((a, b) => a[0].localeCompare(b[0])).map(([id, t]) => ({techniqueID:id, score:t.score, color:col[t.score], comment:t.plays.join('\n'), enabled:true, showSubtechniques:id.includes('.')})),
+    gradient:{colors:col, minValue:0, maxValue:2}, legendItems:[{label:'Detecting', color:col[2]}, {label:'Hunted', color:col[1]}, {label:'To do', color:col[0]}],
+    sorting:3, layout:{layout:'side', showName:true, showID:false}, hideDisabled:false, selectTechniquesAcrossTactics:true, selectSubtechniquesWithParent:false};
+}
 function bbMatrix(B, hit, mark){
   const F = bbFilters(), vis = bbVisible(B, hit), ids = new Set(vis.map(p => p.id)), used = new Set(B.plays.flatMap(p => p.plat)), all = B.plays.map(p => p.id);
   const live = all.filter(id => bbSt(id) === 'live').length, hunted = all.filter(id => bbSt(id) === 'hunted').length;
@@ -132,7 +145,8 @@ function bbMatrix(B, hit, mark){
       <details class="bbx-stack"><summary>${ico('file-code', 'sm')}Languages: ${stack.map(k => esc(bbShort(B, k))).join(', ')}</summary>
         <div><p class="t3">Hunts in these languages are shown on each play.</p>${Object.entries(B.langs).map(([k, l]) => chip('bbStack', k, esc(l), stack.includes(k))).join('')}</div></details></div>`;
   const cover = `<section class="bbx-cover" aria-label="Your coverage"><div><h2>Your coverage</h2><p class="t3">Mark each play as you hunt it and as a detection goes live. Kept in this browser.</p></div>
-      <div class="bbx-cn"><span><b>${live}</b>detecting</span><span><b>${hunted}</b>hunted</span><span><b>${all.length - live - hunted}</b>to do</span></div>${bbProgress(all, 'All plays')}</section>`;
+      <div class="bbx-cn"><span><b>${live}</b>detecting</span><span><b>${hunted}</b>hunted</span><span><b>${all.length - live - hunted}</b>to do</span></div>${bbProgress(all, 'All plays')}
+      <div class="bbx-cx"><button class="btn sm" data-act="bbNav" title="A layer file for the MITRE ATT&amp;CK Navigator: each technique coloured by your best status for it">${ico('download', 'sm')}ATT&amp;CK Navigator layer</button></div></section>`;
   const secs = B.sections.map(s => ({s, ps:B.plays.filter(p => p.sec === s.id)}));
   const nav = `<nav class="bbx-secs" aria-label="Stages of an attack">${secs.map(({s, ps}) => { const n = ps.filter(p => ids.has(p.id)).length;
       return `<button data-act="bbToc" data-v="bb-s-${s.id}"${n ? '' : ' disabled'}>${ico(s.icon, 'sm')}<span>${esc(s.title)}</span><small>${n}</small>${bbProgress(ps.map(p => p.id), s.title)}</button>`; }).join('')}</nav>`;
@@ -255,6 +269,7 @@ document.addEventListener('change', ev => { const t = ev.target; if(!t || (t.id 
   renderMain(); const el = $(t.id); if(el) el.focus(); });
 document.addEventListener('input', ev => { if(ev.target && ev.target.id === 'bbQ'){ clearTimeout(UI.bbT); UI.bbT = setTimeout(() => { UI.bbQ = ev.target.value; UI.bbPlay = null; const p = ev.target.selectionStart; renderMain(); const i = $('bbQ'); if(i){ i.focus(); i.setSelectionRange(p, p); } }, 180); } });
 const BB_ACTS = {
+  bbNav:() => { if(typeof BLACKBOOK === 'undefined') return; const B = BLACKBOOK; download('blackbook-coverage-layer.json', JSON.stringify(bbNavLayer(B), null, 1), 'application/json'); toast('Layer saved — open it in the ATT&CK Navigator with “Open Existing Layer”'); },
   bbTab:(id, v) => { if(v === 'hunt' && UI.bbTab === 'hunt') UI.bbPlay = null; UI.bbTab = v; renderMain(); const m = $('main'); const s = m && m.querySelector('.scroll'); if(s) s.scrollTop = 0; },
   bbToc:(id, v) => { const el = $(v); if(el) el.scrollIntoView({behavior:'smooth', block:'start'}); },
   bbOpenPlay:(id, v) => { UI.bbPlay = v; renderMain(); const sc = document.querySelector('#main .scroll'); if(sc) sc.scrollTop = 0; const h = $('bb-dt'); if(h) h.focus({preventScroll:true}); },

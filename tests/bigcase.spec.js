@@ -1,7 +1,7 @@
 // A 10,000-record case: built, then every case tab and the main pages open within a time limit, a re-render of the
 // graph keeps the drawing instead of rebuilding it, and saving and moving the case to a file stay quick.
 const { test, expect } = require('@playwright/test');
-const { open, noErrors, budget } = require('./helpers');
+const { open, noErrors, budget, slowness } = require('./helpers');
 
 test('a 10,000-record case stays quick: every tab, the graph kept on re-render, save and move-to-file', async ({ page }) => {
   test.setTimeout(180000);
@@ -17,9 +17,12 @@ test('a 10,000-record case stays quick: every tab, the graph kept on re-render, 
   const openTime = h => page.evaluate(h => new Promise(res => { const t = performance.now(); go(h); requestAnimationFrame(() => requestAnimationFrame(() => res(performance.now() - t))); }), h);
   /* each screen opened twice, the better time kept: one garbage-collection pause on a busy machine is not a slow screen */
   const twice = async h => { const a = await openTime(h); await openTime('#/settings'); return Math.min(a, await openTime(h)); };
-  for (const tab of ['overview', 'vault', 'entities', 'timeline', 'map', 'media', 'infra', 'questions', 'report']) { const t = await twice('#/case/c-big/' + tab); if (t > lim) slow.push(tab + ' ' + Math.round(t)); }
-  for (const a of ['home', 'today', 'cases', 'entities', 'feeds', 'tradecraft']) { const t = await twice('#/' + a); if (t > lim) slow.push(a + ' ' + Math.round(t)); }
-  expect(slow).toEqual([]);
+  const hashes = [...['overview', 'vault', 'entities', 'timeline', 'map', 'media', 'infra', 'questions', 'report'].map(t => '#/case/c-big/' + t), ...['home', 'today', 'cases', 'entities', 'feeds', 'tradecraft'].map(a => '#/' + a)];
+  for (const h of hashes) { const t = await twice(h); if (t > lim) slow.push([h, t]); }
+  // a screen over its limit is timed twice more, with the limit taken again: a moment of load passes, a slow screen stays slow
+  for (let k = 0; k < 2 && slow.length; k++) { const l2 = 900 * await slowness(page), still = [];
+    for (const [h, t] of slow) { const t2 = Math.min(t, await twice(h)); if (t2 > l2) still.push([h, t2]); } slow.splice(0, slow.length, ...still); }
+  expect(slow.map(([h, t]) => h.replace(/^#\/(case\/c-big\/)?/, '') + ' ' + Math.round(t))).toEqual([]);
   // the graph: built once, then a re-render keeps the same drawing
   await page.evaluate(() => go('#/case/c-big/graph')); await expect(page.locator('#cy canvas').first()).toBeVisible({ timeout: 30000 });
   await expect.poll(() => page.evaluate(() => !!cy && cy.nodes().length)).toBe(2000);

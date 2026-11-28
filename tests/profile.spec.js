@@ -1,6 +1,6 @@
 // Indicator profile: what a value is and what should worry you about it, read from the value alone.
 const { test, expect } = require('@playwright/test');
-const { open, capture, noErrors, budget } = require('./helpers');
+const { open, capture, noErrors, fast } = require('./helpers');
 
 const prof = (page, k, v) => page.evaluate(([k, v]) => { const P = ipfProfile(k, v); return { flags: P.flags.map(f => f.lvl + ' ' + f.t), facts: Object.fromEntries(P.facts) }; }, [k, v]);
 const has = (P, re) => P.flags.some(f => re.test(f));
@@ -64,8 +64,7 @@ test('profile: hosting, URL tricks, addresses, hashes and wallets are read corre
   const e = await prof(page, 'email', 'billing@paypa1.com'); expect(has(e, /^bad Looks like paypal\.com/)).toBe(true); expect(has(e, /^info Role mailbox/)).toBe(true);
   expect((await prof(page, 'email', 'j.doe+shop@gmail.com')).facts['Same inbox as']).toBe('jdoe@gmail.com');
   // a thousand domains profile quickly
-  const ms = await page.evaluate(() => { IPF.cache.clear(); const t = performance.now(); for (let i = 0; i < 1000; i++) ipfProfile('domain', 'host' + i + '-portal' + (i % 7) + '.example' + (i % 3 ? '.com' : '.top')); return performance.now() - t; });
-  expect(ms).toBeLessThan(await budget(page, 400));
+  await fast(page, 400, () => page.evaluate(() => { IPF.cache.clear(); const t = performance.now(); for (let i = 0; i < 1000; i++) ipfProfile('domain', 'host' + i + '-portal' + (i % 7) + '.example' + (i % 3 ? '.com' : '.top')); return performance.now() - t; }));
   noErrors(errors);
 });
 

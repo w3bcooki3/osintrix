@@ -76,27 +76,62 @@ async function sampleOsintAdd(){
    same readers as your own files — the chat reader, file storage with its EXIF, preview and hash steps — so every view
    that works on imported material (Chats, Active hours, Media, Places, Where was this taken?, the File inspector) has
    something to show. Added once, to a workspace that already has the rest of Op Lantern's sample. */
+/* 1.91 added the case's chats, pictures and document; 1.92 its three forensic files. Workspaces made before either get
+   what they lack, once: 2 → 4 adds everything, 3 → 4 only the forensic files. The flag moves only when all of it is in. */
 async function sampleExtrasAdd(){
-  if(!DB || !DB.sample || DB.osintSample !== 2 || window.__noOsintSample || UI.sxBusy || !DB.cases.some(c => c.id === LANTERN)) return;
+  if(!DB || !DB.sample || !(DB.osintSample === 2 || DB.osintSample === 3) || window.__noOsintSample || UI.sxBusy || !DB.cases.some(c => c.id === LANTERN)) return;
   if(typeof chatParse !== 'function' || typeof storeFile !== 'function' || typeof lazyNeed !== 'function' || !(await lazyNeed('sample')) || typeof SAMPLE_OSINT === 'undefined' || !SAMPLE_OSINT.extra) return;
-  if(DB.osintSample !== 2 || DB.entries.some(e => e.id === 'sp-desk')) return;
+  const from = DB.osintSample, todo = () => DB.osintSample === from && !DB.entries.some(e => e.id === (from === 2 ? 'sp-desk' : 'sp-ip1'));
+  if(!todo()) return;
   UI.sxBusy = true;
   try{
-    const X = SAMPLE_OSINT.extra, cid = LANTERN, made = [];
-    for(const c of X.chats){ const P = chatParse(c.text); if(P && P.msgs.length) made.push(...chatRecords(P, cid, c.name).recs); }
-    if(STORE.idb) for(const f of X.files){
-      try{ const bin = Uint8Array.from(atob(f.b64), ch => ch.charCodeAt(0)), m = await storeFile(new File([bin], f.name, {type:f.type, lastModified:f.mod})), r = fileRecord(m, cid);
-        if(X.geo && f.name === X.geo.file) r.geo = JSON.parse(JSON.stringify(X.geo.data));
-        made.push(r); }catch(e){}   // no room in this browser: the rest still comes in
+    const X = SAMPLE_OSINT.extra, cid = LANTERN, made = [], ents = [], links = [];
+    if(from === 2){
+      for(const c of X.chats){ const P = chatParse(c.text); if(P && P.msgs.length) made.push(...chatRecords(P, cid, c.name).recs); }
+      if(STORE.idb) for(const f of X.files){
+        try{ const m = await storeFile(new File([sxBytes(f.b64)], f.name, {type:f.type, lastModified:f.mod})), r = fileRecord(m, cid);
+          if(X.geo && f.name === X.geo.file) r.geo = JSON.parse(JSON.stringify(X.geo.data));
+          made.push(r); }catch(e){}   // no room in this browser: the rest still comes in
+      }
+      ents.push(...X.entries); links.push(...X.links);
     }
-    if(DB.osintSample !== 2 || DB.entries.some(e => e.id === 'sp-desk')) return;   // another tab got there first
+    const F = X.forensics; if(F){ made.push(...await sampleForensics(F, cid)); ents.push(...F.entries); links.push(...F.links); }
+    if(!todo()) return;   // another tab got there first
     const created = SAMPLE_OSINT.case.created;
-    DB.entries.push(...X.entries.filter(([id]) => !DB.entries.some(e => e.id === id)).map(([id, type, fields]) => ({id, caseId:cid, type, fields, tags:['scam'], notes:'', priority:type === 'person' ? 'high' : 'medium', starred:false, created, src:''})));
-    DB.links.push(...X.links.filter(([a, b]) => DB.entries.some(e => e.id === a) && DB.entries.some(e => e.id === b)).map(([a, b, conf, label]) => ({id:uid('l'), caseId:cid, a, b, conf, label, src:''})));
-    DB.records.push(...made); mutate('added chats and files to Op Lantern');
+    DB.entries.push(...ents.filter(([id]) => !DB.entries.some(e => e.id === id)).map(([id, type, fields]) => ({id, caseId:cid, type, fields, tags:['scam'], notes:'', priority:type === 'person' ? 'high' : 'medium', starred:false, created, src:''})));
+    DB.links.push(...links.filter(([a, b]) => DB.entries.some(e => e.id === a) && DB.entries.some(e => e.id === b)).map(([a, b, conf, label]) => ({id:uid('l'), caseId:cid, a, b, conf, label, src:''})));
+    DB.records.push(...made); mutate(from === 2 ? 'added chats, files and logs to Op Lantern' : 'added logs to Op Lantern');
     if(typeof hashRecords === 'function') await hashRecords(); if(typeof ensurePositions === 'function') ensurePositions(); renderAll();
-    DB.osintSample = 3; save();   // marked done only now, so nothing that waits for it is redrawn under its feet
+    DB.osintSample = 4; save();   // marked done only now, so nothing that waits for it is redrawn under its feet
   } finally { UI.sxBusy = false; }
+}
+const sxBytes = b64 => Uint8Array.from(atob(b64), ch => ch.charCodeAt(0));
+/* the victim's browser profile, the shop office PC's Security log and the shop's CloudTrail, read by the same code that
+   reads yours: the browser-profile reader, the event-log reader with the Sigma rules, the cloud-log reader. Each is kept as a
+   file (with its hash) and its events go on the timeline. One that cannot be read here is left out; the rest still come in. */
+async function sampleForensics(F, cid){
+  const out = [], keep = async (bytes, name, type, mod) => { if(!STORE.idb) return; try{ out.push(fileRecord(await storeFile(new File([bytes], name, {type, lastModified:mod})), cid)); }catch(e){} };
+  const rows = (list, M, name, tags) => { const was = LOGIMP; LOGIMP = {caseId:cid}; try{ return list.map(row => { const r = logRec(row, M, name); r.tags = ['imported', ...tags]; return r; }); } finally { LOGIMP = was; } };
+  if(typeof brRead === 'function') try{
+    const z = sxBytes(F.browser.b64), R = await brRead([new File([z], F.browser.name, {type:'application/zip', lastModified:F.browser.mod})]);
+    if(R.files.length){ await keep(z, F.browser.name, 'application/zip', F.browser.mod); out.push(brRecord(R, cid), ...rows(brRows(R), BR_MAP, F.browser.name, ['browser'])); }
+  }catch(e){}
+  if(typeof EVTX !== 'undefined') try{
+    const gz = sxBytes(F.evtx.gz), b = new Uint8Array(await new Response(new Blob([gz]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+    const P = EVTX.parse(b.buffer), list = P.events.map(evtxRow).sort((a, c) => String(a.TimeCreated).localeCompare(String(c.TimeCreated)));
+    if(LZ && LZ.rules) await lazyNeed('rules'); if(typeof ensureRules === 'function') ensureRules();   // the built-in Sigma rules, so the matches are there
+    const S = await evtxSigma(list, () => {}), M = {time:'TimeCreated', title:'Summary', host:'Computer', source:'Channel'};
+    await keep(b, F.evtx.name, 'application/octet-stream', F.evtx.mod);
+    const recs = rows(list, M, F.evtx.name, ['evtx']);
+    recs.forEach((r, i) => { r.body = evtxKv(list[i]); r.ents = extractRich(r.body); const h = S.hits.get(i); if(h){ r.tags.push('sigma-match'); r.det = h.map(x => ({id:x.id, title:x.title, sev:x.severity})); } });
+    out.push(...recs);
+  }catch(e){}
+  if(typeof CL !== 'undefined' && typeof clTimelineRows === 'function') try{
+    const R = CL.parse(F.trail.text);
+    await keep(new TextEncoder().encode(F.trail.text), F.trail.name, 'application/json', F.trail.mod);
+    out.push(...rows(clTimelineRows(R), {time:'time', title:'event', host:'src', source:'service'}, F.trail.name, ['cloudtrail']));
+  }catch(e){}
+  return out;
 }
 /* the scam's subject under another name in another case, when that case is there (it is not among the sample cases
    since 1.87; the test suite keeps one) — for the identity profile's cross-case matches and conflicts */

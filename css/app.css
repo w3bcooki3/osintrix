@@ -510,7 +510,7 @@ html[data-density=compact] .ev{padding:7px 12px} html[data-density=compact] .ev 
   .ph h1{font-size:calc(24px * var(--ts,1))}
   .stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
   .stat{padding:14px;gap:10px;flex-direction:column} .stat b{font-size:calc(24px * var(--ts,1))}
-  .cols-2{grid-template-columns:1fr}
+  .cols-2{grid-template-columns:minmax(0,1fr)}   /* not 1fr: a long line of text in one card would widen the page */
   .vmain,.tmain{padding:16px 16px 96px}
   .egrid,.tgrid,.casegrid{grid-template-columns:1fr}
   .tl{padding:6px 12px 96px} .tlbar{padding:12px 16px}

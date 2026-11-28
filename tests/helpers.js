@@ -23,6 +23,9 @@ async function open(page, hash = '#/home', opt = {}) {
   await expect.poll(() => page.evaluate(() => typeof DB !== 'undefined' && !!DB && !!document.querySelector('#sidenav .nv')), { timeout: 15000 }).toBe(true);
   // the big data files load in the background; tests about their features start once they are in
   await expect.poll(() => page.evaluate(() => typeof lazyPending !== 'function' || lazyPending() === 0), { timeout: 15000 }).toBe(true);
+  // the sample case's chats, files and logs come in once, in the background (sampleExtrasAdd): tests that ask for the sample start after
+  // that, so nothing is added or redrawn under them
+  if (opt.osintSample) await expect.poll(() => page.evaluate(() => !DB.sample || !DB.cases.some(c => c.id === 'c-lantern') || DB.osintSample === 4), { timeout: 30000 }).toBe(true);
   if (legacy) {
     await page.evaluate(L => {
       if (DB.cases.some(c => c.id === 'c-portal')) return;
@@ -50,16 +53,29 @@ async function capture(page, text, caseId) {
   await page.click('[data-act=capSave]');
   await expect(page.locator('#capBody')).toHaveCount(0);   // saved: the capture window has closed
 }
-/* A time limit that holds on a busy machine: a fixed workload is timed first (about 25 ms when idle), and the
-   limit grows with how much slower it ran — at most 6×, so a real slowdown in the app still fails. */
+/* Time limits that hold on a busy machine (the suite runs many browsers at once).
+   slowness(): a fixed workload is timed five times (about 25 ms when idle) and the middle run is compared with that: 1 on an idle
+   machine, more when the processor is shared — at most 6, so a real slowdown in the app still fails.
+   budget(page, ms): a limit scaled by it, taken right after the work it judges.
+   fast(page, ms, measure, first): the work is timed again, up to three times in all, while it is over its limit — a moment of
+   load passes, a slow app is slow every time. measure() returns the milliseconds (or an object of them with limits in ms). */
 const CAL_MS = 25;
-async function budget(page, ms) {
+async function slowness(page) {
   const runs = [];
-  for (let i = 0; i < 3; i++) runs.push(await page.evaluate(() => { const t = performance.now(); let x = 0; const a = [];
+  for (let i = 0; i < 5; i++) runs.push(await page.evaluate(() => { const t = performance.now(); let x = 0; const a = [];
     for (let i = 0; i < 200000; i++) { x += Math.sqrt(i) * Math.sin(i); if (i % 50 === 0) a.push({ i, s: 'v' + i }); }
     JSON.parse(JSON.stringify(a)); const m = new Map(); for (let i = 0; i < 60000; i++) m.set('k' + (i % 5000), i); return performance.now() - t + (x > Infinity ? 1 : 0); }));
   runs.sort((a, b) => a - b);
-  return ms * Math.min(6, Math.max(1, runs[1] / CAL_MS));
+  return Math.min(6, Math.max(1, runs[2] / CAL_MS));
+}
+async function budget(page, ms) { return ms * await slowness(page); }
+async function fast(page, ms, measure, first) {
+  const lims = typeof ms === 'number' ? { time: ms } : ms, one = v => typeof v === 'number' ? { time: v } : v;
+  let got = first === undefined ? one(await measure()) : one(first), k = await slowness(page);
+  for (let n = 1; n < 3 && Object.keys(lims).some(x => !(got[x] < lims[x] * k)); n++) { const again = one(await measure()); k = await slowness(page);
+    for (const x of Object.keys(lims)) got[x] = Math.min(got[x], again[x]); }
+  for (const x of Object.keys(lims)) expect(got[x], x + ' (ms, limit ' + Math.round(lims[x] * k) + ')').toBeLessThan(lims[x] * k);
+  return got;
 }
 const noErrors = errors => expect(errors, errors.join('\n')).toEqual([]);
 /* Every change written to storage? Wait for that before a reload: a write still on its way when the page goes away
@@ -68,4 +84,4 @@ async function settled(page) {
   await expect.poll(() => page.evaluate(() => typeof isDirty === 'function' && !isDirty()), { timeout: 15000 }).toBe(true);
 }
 
-module.exports = { APP, fixture, open, capture, noErrors, budget, settled };
+module.exports = { APP, fixture, open, capture, noErrors, budget, fast, slowness, settled };
